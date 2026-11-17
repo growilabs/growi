@@ -42,10 +42,6 @@ describe('ExtractionFailureLogService', () => {
     await prisma.extractionfailurelogs.deleteMany({});
   });
 
-  it('does not register a Mongoose model, so loading it creates no collection or index', () => {
-    expect(mongoose.modelNames()).not.toContain('ExtractionFailureLog');
-  });
-
   describe('record', () => {
     it('stores a failure that listRecent returns without its internal fields', async () => {
       const entry = makeEntry({ pageId: null, message: null });

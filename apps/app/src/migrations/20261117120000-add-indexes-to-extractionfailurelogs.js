@@ -14,7 +14,6 @@ const INDEXES = [
     // Entries expire 90 days after they occurred
     options: { name: 'occurredAt_1', expireAfterSeconds: 60 * 60 * 24 * 90 },
   },
-  { key: { attachmentId: 1 }, options: { name: 'attachmentId_1' } },
   {
     key: { retentionGroupHash: 1 },
     options: { name: 'retentionGroupHash_1' },
@@ -32,6 +31,14 @@ export async function up(db) {
 
 export async function down(db) {
   logger.info('Rollback migration');
+
+  // indexExists() throws when the collection does not exist
+  const items = await db
+    .listCollections({ name: COLLECTION }, { nameOnly: true })
+    .toArray();
+  if (items.length === 0) {
+    return;
+  }
 
   const collection = db.collection(COLLECTION);
   for (const { options } of INDEXES) {

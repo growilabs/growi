@@ -26,13 +26,12 @@ describe('add-indexes-to-extractionfailurelogs', () => {
 
     const byName = await indexesByName();
     expect([...byName.keys()].filter((name) => name !== '_id_').sort()).toEqual(
-      ['attachmentId_1', 'occurredAt_1', 'retentionGroupHash_1'],
+      ['occurredAt_1', 'retentionGroupHash_1'],
     );
     expect(byName.get('occurredAt_1')).toMatchObject({
       key: { occurredAt: 1 },
       expireAfterSeconds: 60 * 60 * 24 * 90,
     });
-    expect(byName.get('attachmentId_1')?.key).toEqual({ attachmentId: 1 });
     expect(byName.get('retentionGroupHash_1')?.key).toEqual({
       retentionGroupHash: 1,
     });
@@ -45,5 +44,20 @@ describe('add-indexes-to-extractionfailurelogs', () => {
     await migrate.up(mongoose.connection.db);
 
     expect(await indexesByName()).toEqual(before);
+  });
+
+  describe('down', () => {
+    it('removes the indexes it created', async () => {
+      await migrate.up(mongoose.connection.db);
+
+      await migrate.down(mongoose.connection.db);
+
+      const names = [...(await indexesByName()).keys()];
+      expect(names).toEqual(['_id_']);
+    });
+
+    it('does not fail when the collection does not exist', async () => {
+      await expect(migrate.down(mongoose.connection.db)).resolves.toBeUndefined();
+    });
   });
 });

@@ -385,7 +385,6 @@ model extractionfailurelogs {
 
   // The migration 20261117120000-add-indexes-to-extractionfailurelogs creates
   // these; occurredAt_1 also carries the 90-day TTL, which Prisma cannot express.
-  @@index([attachmentId], map: "attachmentId_1")
   @@index([retentionGroupHash], map: "retentionGroupHash_1")
   @@index([occurredAt], map: "occurredAt_1")
 }

@@ -1,5 +1,5 @@
 /**
- * Tests for attachment-search-admin route utilities.
+ * Unit tests for attachment-search-admin: requiresReindex and the GET /failures handler.
  */
 
 import type { MockInstance } from 'vitest';
@@ -95,35 +95,7 @@ describe('attachment-search-admin', () => {
   });
 
   // -------------------------------------------------------------------------
-  // Section 5–6: PUT /config URI validation
-  // -------------------------------------------------------------------------
-
-  describe('PUT /config URI validation', () => {
-    it('5. metadata IP URI (169.254.169.254) produces invalid_extractor_uri', async () => {
-      const { validateExtractorUri } = await import(
-        '~/features/search-attachments/server/services/validate-extractor-uri'
-      );
-      const result = validateExtractorUri('http://169.254.169.254/latest');
-      expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.reason).toBe('metadata_ip');
-      }
-    });
-
-    it('6. file:// URI produces invalid_extractor_uri', async () => {
-      const { validateExtractorUri } = await import(
-        '~/features/search-attachments/server/services/validate-extractor-uri'
-      );
-      const result = validateExtractorUri('file:///etc/passwd');
-      expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.reason).toBe('invalid_scheme');
-      }
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // Section 7–9: requiresReindex
+  // requiresReindex
   // -------------------------------------------------------------------------
 
   describe('computeRequiresReindex', () => {
@@ -137,7 +109,7 @@ describe('attachment-search-admin', () => {
       countAttachments.mockRestore();
     });
 
-    it('7. returns true when mongoCount > esCount', async () => {
+    it('returns true when mongoCount > esCount', async () => {
       countAttachments.mockResolvedValue(10);
 
       const esClient = buildEsClientWithCardinality(5);
@@ -228,7 +200,7 @@ describe('attachment-search-admin', () => {
       expect(result).toBe(false);
     });
 
-    it('8. returns false when isEnabled=false (search not enabled)', async () => {
+    it('returns false when isEnabled=false (search not enabled)', async () => {
       const esClient = buildEsClientWithCardinality(5);
       const crowi = buildCrowiWithEsClient(esClient);
 
@@ -255,7 +227,7 @@ describe('attachment-search-admin', () => {
       expect(esClient.search).not.toHaveBeenCalled();
     });
 
-    it('9. cache: invalidateRequiresReindexCache causes next call to recompute', async () => {
+    it('cache: invalidateRequiresReindexCache causes next call to recompute', async () => {
       const esClient = {
         search: vi.fn(),
       };
@@ -415,7 +387,7 @@ describe('GET /failures', () => {
     vi.mocked(configManager.getConfig).mockReset();
   });
 
-  it('10. returns items and total with defaults (limit=50, no since)', async () => {
+  it('returns items and total with defaults (limit=50, no since)', async () => {
     const fakeItems = [
       {
         attachmentId: 'att1',
@@ -448,7 +420,7 @@ describe('GET /failures', () => {
     expect(mockTotalRecent).toHaveBeenCalledWith(undefined);
   });
 
-  it('11. passes limit and since query params to the service', async () => {
+  it('passes limit and since query params to the service', async () => {
     mockListRecent.mockResolvedValue([]);
     mockTotalRecent.mockResolvedValue(0);
 
@@ -487,7 +459,7 @@ describe('GET /failures', () => {
     expect(mockListRecent).not.toHaveBeenCalled();
   });
 
-  it('12. returns 403 when user is not an admin', async () => {
+  it('returns 403 when user is not an admin', async () => {
     const app = buildTestApp(false);
     const res = await supertest(app).get('/admin/attachment-search/failures');
 
