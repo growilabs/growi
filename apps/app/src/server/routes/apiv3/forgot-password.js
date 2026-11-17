@@ -10,6 +10,7 @@ import injectResetOrderByTokenMiddleware from '~/server/middlewares/inject-reset
 import PasswordResetOrder from '~/server/models/password-reset-order';
 import { configManager } from '~/server/service/config-manager';
 import { growiInfoService } from '~/server/service/growi-info';
+import { acceptPasswordResetRequest } from '~/server/service/password-reset';
 import loggerFactory from '~/utils/logger';
 
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
@@ -139,7 +140,10 @@ module.exports = (crowi) => {
    *                  description: Email address of the user requesting password reset
    *      responses:
    *        '200':
-   *          description: Password reset request processed
+   *          description: >-
+   *            Password reset request accepted. Returned immediately and
+   *            identically whether or not the email belongs to an active
+   *            account; the reset mail is delivered in the background.
    *          content:
    *            application/json:
    *              schema:
@@ -155,24 +159,15 @@ module.exports = (crowi) => {
       const { email } = req.body;
       const locale = configManager.getConfig('app:globalLang');
       const appUrl = growiInfoService.getSiteUrl();
+      const activityId = res.locals.activity._id;
 
-      try {
-        const user = await User.findOne({ email: { $eq: email } });
-
-        // when the user is not found or active
-        if (user == null || user.status !== 2) {
-          // Do not send emails to non GROWI user
-          // For security reason, do not use error messages like "Email does not exist"
-          return res.apiv3();
-        }
-
+      const sendPasswordResetMail = async (targetEmail) => {
         const passwordResetOrderData =
-          await PasswordResetOrder.createPasswordResetOrder(email);
+          await PasswordResetOrder.createPasswordResetOrder(targetEmail);
         const url = new URL(
           `/forgot-password/${passwordResetOrderData.token}`,
           appUrl,
         );
-        const oneTimeUrl = url.href;
         const grwTzoffsetSec = crowi.appService.getTzoffset() * 60;
         const expiredAt = subSeconds(
           passwordResetOrderData.expiredAt,
@@ -182,28 +177,44 @@ module.exports = (crowi) => {
         await sendPasswordResetEmail(
           'passwordReset',
           locale,
-          email,
-          oneTimeUrl,
+          targetEmail,
+          url.href,
           formattedExpiredAt,
         );
+      };
 
-        activityEvent.emit('update', res.locals.activity._id, {
-          action: SupportedAction.ACTION_USER_FOGOT_PASSWORD,
+      try {
+        // Respond without waiting for the mail delivery so that the response
+        // time is the same whether or not the email is registered (prevents
+        // account enumeration by timing).
+        await acceptPasswordResetRequest(email, {
+          isResettableAccount: async (targetEmail) => {
+            const user = await User.findOne({ email: { $eq: targetEmail } });
+            // Do not send emails to non GROWI user or inactive user
+            return user != null && user.status === 2;
+          },
+          sendPasswordResetMail,
+          onMailSent: () => {
+            activityEvent.emit('update', activityId, {
+              action: SupportedAction.ACTION_USER_FOGOT_PASSWORD,
+            });
+          },
+          onMailFailed: (err) => {
+            logger.error(
+              { err },
+              'Error occurred while sending the password reset email.',
+            );
+          },
         });
-
-        return res.apiv3();
       } catch (err) {
-        // The token creation / mail send path is only reached for a registered
-        // active user. Surfacing this error to the client would reveal that the
-        // submitted email is registered (account enumeration). Log it for
-        // operators, but return the same neutral response as the unknown-email
-        // case so both are indistinguishable to the client.
+        // Never reveal failures to the client: the response must stay neutral.
         logger.error(
           { err },
           'Error occurred during password reset request procedure.',
         );
-        return res.apiv3();
       }
+
+      return res.apiv3();
     },
   );
 
