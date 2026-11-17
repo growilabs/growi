@@ -28,6 +28,7 @@ import type {
   ChatAgentRequestDocument,
   ChatAgentRequestModel,
 } from './models/chat-agent-request';
+import { recordAgentAnswer } from './record-agent-answer';
 import type { createSummaryPage, SummaryPageResult } from './summary-page';
 
 const logger = loggerFactory(
@@ -75,12 +76,6 @@ const idsOf = (row: ChatAgentRequestDocument) => ({
 // or a fragment of its API key.
 const errorNameOf = (error: unknown): string =>
   error instanceof Error ? error.name : typeof error;
-
-const isDuplicateKeyError = (error: unknown): boolean =>
-  typeof error === 'object' &&
-  error !== null &&
-  'code' in error &&
-  (error as { readonly code?: unknown }).code === 11000;
 
 // GROWI's AI takes the user as `IUserHasId` because that is how the browser
 // route declares `req.user`, which at runtime is this same hydrated document.
@@ -255,37 +250,19 @@ const answerFor = async (
   }
 };
 
-/**
- * Store the answer, then finish the row. A duplicate means another writer
- * (the stale-row sweep, or an earlier run) already answered, so only the row
- * is finished. Any other failure leaves the row running for the sweep: a row
- * finished without an answer would leave the person unanswered.
- */
 const recordAnswer = async (
   deps: AgentRunnerDeps,
   row: ChatAgentRequestDocument,
   answer: AgentAnswer,
 ): Promise<void> => {
-  try {
-    await deps.outbox.enqueue({
-      kind: 'command-answer',
-      relationId: row.relationId,
-      requestId: row.requestId,
-      answer,
-    });
-  } catch (error) {
-    if (!isDuplicateKeyError(error)) {
-      logger.error(
-        { ...idsOf(row), errorName: errorNameOf(error) },
-        'The answer to an agent request could not be stored; the row is left for the stale-row sweep',
-      );
-      return;
-    }
+  const recorded = await recordAgentAnswer(deps, idsOf(row), answer);
+  if (recorded.outcome === 'not-stored') {
+    logger.error(
+      { ...idsOf(row), errorName: errorNameOf(recorded.error) },
+      'The answer to an agent request could not be stored; the row is left for the stale-row sweep',
+    );
+    return;
   }
-  await deps.requests.updateOne(
-    { relationId: row.relationId, requestId: row.requestId, state: 'running' },
-    { state: 'done' },
-  );
   logger.info({ ...idsOf(row), answer: answer.kind }, 'Agent request answered');
 };
 
