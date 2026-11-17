@@ -484,7 +484,7 @@ Independent of B4/B5.
   - _Boundary: PageLinkBackfillJob_
   - _Depends: B1.2_
 
-- [ ] B3.2 Implement the throttled, resumable backfill job
+- [x] B3.2 Implement the throttled, resumable backfill job
   - Implement a self-paced loop that walks the pages in `_id` order one at a time: build/reuse an
     in-memory path→id map (one projection query) for resolution instead of per-link lookups, extract
     links via the B1 extractor (passing the configured site URL), resolve permalink targets via an
@@ -597,13 +597,17 @@ Independent of B4/B5.
     `lastError`, and, computed on read, the number of pages not yet included and the total page count
     (the `updatedAt`-index count with the walk's page filter)); POST start with a
     scope (`all`, `maxPages` N, or `since` date), which writes `requestedScope`, `requestedAt` and
-    status `requested`; POST stop, which cancels an unclaimed request, sets `stopRequested` on a running
+    status `requested` and clears the previous run's `runCutoff`, `runTotal`, `progressMarker`,
+    `processed` and `skippedPages` in the same write (the loop treats a claimed job with
+    `runTotal == null` as a new run, design.md; without the reset a new start resumes the old
+    range); POST stop, which cancels an unclaimed request, sets `stopRequested` on a running
     run, and sets `stopped` directly when the run's lease has expired; and POST resume, valid only in
     `stopped`, which sets `requested` and keeps the scope, `runCutoff` and the marker. Validate the
     scope (N a positive integer, the date not in the future). Reject a start while a run is active
     and when coverage is `all`
-  - Done when a non-admin is refused on every route; a valid start writes the request and returns the
-    state; a start while a run is active, with coverage `all`, or with an invalid scope is rejected
+  - Done when a non-admin is refused on every route; a valid start writes the request, clears the
+    previous run's fields, and returns the state; a new start after a completed or stopped run walks
+    its own range rather than resuming the old one; a start while a run is active, with coverage `all`, or with an invalid scope is rejected
     without changing the document; two concurrent starts leave exactly one request; after a partial run the not-included count equals
     the number of seeded pages older than `coveredSince` and excludes pages the walk skips; stop cancels an
     unclaimed request, flags a running one, and ends an expired-lease run directly; resume is
