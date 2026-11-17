@@ -205,7 +205,7 @@ describe.skipIf(
     await prisma.revisions.deleteMany({
       where: { pageId: { in: pageIds.map(String) } },
     });
-  }, 120_000);
+  });
 
   it('keeps facet=all within +30% of the page search, and the secondary search within 500ms (p95)', async () => {
     const viewer = await resolveAttachmentSearchViewer(null);

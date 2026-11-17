@@ -116,7 +116,7 @@ describe.skipIf(process.env.ELASTICSEARCH_URI == null)(
 
     const waitForRebuildToEnd = () =>
       vi.waitFor(() => expect(batch().isRebuilding()).toBe(false), {
-        timeout: 30_000,
+        timeout: 3_000,
         interval: 50,
       });
 
@@ -158,7 +158,7 @@ describe.skipIf(process.env.ELASTICSEARCH_URI == null)(
         lastUpdateUser: user._id,
       });
       pageId = page._id.toString();
-    }, 60_000);
+    });
 
     afterAll(async () => {
       await extractor?.close();
@@ -174,7 +174,7 @@ describe.skipIf(process.env.ELASTICSEARCH_URI == null)(
       crowi.attachmentSearchIndexer = undefined;
       crowi.attachmentReindexBatch = undefined;
       crowi.attachmentIndexOperations = undefined;
-    }, 30_000);
+    });
 
     beforeEach(() => {
       config['app:attachmentFullTextSearch:extractorUri'] = extractor.url;
@@ -214,7 +214,7 @@ describe.skipIf(process.env.ELASTICSEARCH_URI == null)(
         await vi.waitFor(
           async () =>
             expect(await docsOfAttachment(NAMES.alias, id)).toEqual([]),
-          { timeout: 10_000, interval: 100 },
+          { timeout: 3_000, interval: 100 },
         );
       });
 
@@ -230,7 +230,7 @@ describe.skipIf(process.env.ELASTICSEARCH_URI == null)(
         await vi.waitFor(
           async () =>
             expect(await docsOfAttachment(NAMES.alias, id)).toEqual([]),
-          { timeout: 10_000, interval: 100 },
+          { timeout: 3_000, interval: 100 },
         );
       });
 
@@ -305,7 +305,7 @@ describe.skipIf(process.env.ELASTICSEARCH_URI == null)(
             expect(await docsOfAttachment(oldIndex, deleted)).toEqual([]);
             expect(await docsOfAttachment(tmp, deleted)).toEqual([]);
           },
-          { timeout: 10_000, interval: 100 },
+          { timeout: 3_000, interval: 100 },
         );
 
         scanHold.release();
@@ -335,7 +335,7 @@ describe.skipIf(process.env.ELASTICSEARCH_URI == null)(
         );
         expect(await docsOfAttachment(NAMES.alias, kept)).toHaveLength(1);
         expect(await docsOfAttachment(NAMES.alias, deleted)).toEqual([]);
-      }, 60_000);
+      });
 
       it('leaves out of the new index an attachment deleted while the rebuild extracts it', async () => {
         const holdKey = `hold-b-${RUN}`;
@@ -355,7 +355,7 @@ describe.skipIf(process.env.ELASTICSEARCH_URI == null)(
         // the delete has run on both indices and found nothing to remove
         await vi.waitFor(
           async () => expect(await docsOfAttachment(tmp, victim)).toEqual([]),
-          { timeout: 10_000, interval: 100 },
+          { timeout: 3_000, interval: 100 },
         );
 
         scanHold.release();
@@ -363,7 +363,7 @@ describe.skipIf(process.env.ELASTICSEARCH_URI == null)(
 
         expect(await aliasTargets(NAMES.alias)).toEqual([tmp]);
         expect(await docsOfAttachment(NAMES.alias, victim)).toEqual([]);
-      }, 60_000);
+      });
 
       it('keeps the live write when the write to the new index fails', async () => {
         const holdKey = `hold-c-${RUN}`;
@@ -397,7 +397,7 @@ describe.skipIf(process.env.ELASTICSEARCH_URI == null)(
         scanHold.release();
         await waitForRebuildToEnd();
         expect(await docsOfAttachment(NAMES.alias, holder)).toHaveLength(1);
-      }, 60_000);
+      });
 
       it('keeps the alias on the old index and clears the running flag when the page rebuild fails', async () => {
         const before = await aliasTargets(NAMES.alias);
@@ -421,7 +421,7 @@ describe.skipIf(process.env.ELASTICSEARCH_URI == null)(
         // and the next rebuild can start
         expect(batch().startRebuild(async () => {})).toBe(true);
         await waitForRebuildToEnd();
-      }, 60_000);
+      });
     });
   },
 );

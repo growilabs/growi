@@ -128,7 +128,7 @@ describe.skipIf(process.env.ELASTICSEARCH_URI == null)(
         next();
       });
       app.use(ADMIN_MOUNT, attachmentSearchAdminFactory(crowi));
-    }, 60_000);
+    });
 
     afterAll(async () => {
       await extractor?.close();
@@ -144,7 +144,7 @@ describe.skipIf(process.env.ELASTICSEARCH_URI == null)(
       crowi.attachmentSearchIndexer = undefined;
       crowi.attachmentReindexBatch = undefined;
       crowi.attachmentIndexOperations = undefined;
-    }, 30_000);
+    });
 
     beforeEach(() => {
       config[EXTRACTOR_URI_KEY] = extractor.url;

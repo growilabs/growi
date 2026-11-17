@@ -58,6 +58,10 @@ const tenantPair = (prefix: string) => ({
 });
 const PAIR_1 = tenantPair('x');
 const PAIR_2 = tenantPair('y');
+const CASES = [
+  { acting: PAIR_1.shorter, other: PAIR_1.longer },
+  { acting: PAIR_2.longer, other: PAIR_2.shorter },
+];
 const NO_ALIAS_WRITE = `fix_attnames_${RUN}c`;
 const NO_ALIAS_DELETE = `fix_attnames_${RUN}d`;
 
@@ -108,6 +112,21 @@ describe.skipIf(process.env.ELASTICSEARCH_URI == null)(
       const delegator = new ElasticsearchDelegator(crowi.socketIoService);
       await delegator.initClient();
       client = getClient(delegator);
+
+      // Each case's untouched tenant holds an alias, an index and one doc
+      await Promise.all(
+        CASES.map(async ({ other }) => {
+          const names = attachmentIndexNames(other);
+          const ext = extensionFor(names);
+          await ext.ensureAttachmentIndex();
+          await ext.syncAttachmentIndexed(
+            `${other}-att`,
+            'page',
+            [docFor(`${other}-att`, 'page')],
+            names.alias,
+          );
+        }),
+      );
     });
 
     afterAll(async () => {
@@ -119,38 +138,28 @@ describe.skipIf(process.env.ELASTICSEARCH_URI == null)(
       await deleteIndices(allNames.map((names) => names.alias));
     });
 
-    it.each([
-      { acting: PAIR_1.shorter, other: PAIR_1.longer },
-      { acting: PAIR_2.longer, other: PAIR_2.shorter },
-    ])('creating and rebuilding the attachment index of $acting leaves $other untouched', async ({
+    it.each(
+      CASES,
+    )('creating and rebuilding the attachment index of $acting leaves $other untouched', async ({
       acting,
       other,
     }) => {
       const actingNames = attachmentIndexNames(acting);
       const otherNames = attachmentIndexNames(other);
       const actingExt = extensionFor(actingNames);
-      const otherExt = extensionFor(otherNames);
-      await otherExt.ensureAttachmentIndex();
-      await otherExt.syncAttachmentIndexed(
-        `${other}-att`,
-        'page',
-        [docFor(`${other}-att`, 'page')],
-        otherNames.alias,
-      );
       const before = await snapshot(otherNames);
       expect(before.docs).toBe(1);
 
       await actingExt.ensureAttachmentIndex();
-      const first = await actingExt.createRebuildIndex();
-      await actingExt.swapAttachmentAlias(first);
-      const second = await actingExt.createRebuildIndex();
-      await actingExt.dropRebuildIndex(second);
-      const third = await actingExt.createRebuildIndex();
-      await actingExt.swapAttachmentAlias(third);
+      const rebuilt = await actingExt.createRebuildIndex();
+      await actingExt.swapAttachmentAlias(rebuilt);
+      const abandoned = await actingExt.createRebuildIndex();
+      await actingExt.dropRebuildIndex(abandoned);
 
-      expect(await aliasTargets(actingNames.alias)).toEqual([third]);
+      expect(await aliasTargets(actingNames.alias)).toEqual([rebuilt]);
+      expect(await indexExists(abandoned)).toBe(false);
       expect(await snapshot(otherNames)).toEqual(before);
-    }, 30_000);
+    });
 
     describe('while the alias does not exist', () => {
       const indexerWith = (extension: AttachmentSearchDelegatorExtension) =>
@@ -222,7 +231,7 @@ describe.skipIf(process.env.ELASTICSEARCH_URI == null)(
         await extensionFor(names).ensureAttachmentIndex();
         expect(await aliasTargets(names.alias)).toEqual([names.indices[0]]);
         await deleteIndices(names.indices);
-      }, 30_000);
+      });
 
       it('lets a delete pass without creating anything', async () => {
         const names = attachmentIndexNames(NO_ALIAS_DELETE);

@@ -35,7 +35,10 @@ import addCustomFunctionToResponse from '~/server/routes/apiv3/response';
 import { prisma } from '~/utils/prisma';
 
 import { attachmentIndexNames } from '../../services/attachment-search-delegator-extension';
-import { attachmentSearchAdminFactory } from './attachment-search-admin';
+import {
+  attachmentSearchAdminFactory,
+  invalidateRequiresReindexCache,
+} from './attachment-search-admin';
 
 vi.mock('~/utils/logger', () => ({
   default: () => ({
@@ -97,7 +100,7 @@ describe.skipIf(process.env.ELASTICSEARCH_URI == null)(
       if (batch == null) throw new Error('not wired');
       expect(batch.startRebuild(async () => {})).toBe(true);
       await vi.waitFor(() => expect(batch.isRebuilding()).toBe(false), {
-        timeout: 30_000,
+        timeout: 3_000,
         interval: 50,
       });
     };
@@ -147,7 +150,7 @@ describe.skipIf(process.env.ELASTICSEARCH_URI == null)(
         next();
       });
       app.use(MOUNT, attachmentSearchAdminFactory(crowi));
-    }, 60_000);
+    });
 
     afterAll(async () => {
       await extractor?.close();
@@ -170,7 +173,7 @@ describe.skipIf(process.env.ELASTICSEARCH_URI == null)(
       crowi.attachmentSearchIndexer = undefined;
       crowi.attachmentReindexBatch = undefined;
       crowi.attachmentIndexOperations = undefined;
-    }, 30_000);
+    });
 
     // One admin's sequence of states; each step builds on the one before.
     it('follows the feature being enabled, the index being rebuilt and the attachments going away', async () => {
@@ -204,11 +207,11 @@ describe.skipIf(process.env.ELASTICSEARCH_URI == null)(
       await deleteIndices(NAMES.indices);
       expect(await requiresReindex()).toBe(false);
 
-      // An attachment again, still no index: the missing alias asks for a rebuild
+      // An attachment again, still no index: the missing alias asks for a rebuild.
+      // A PUT here would re-create the index, so the cache is dropped directly.
       await createAttachments(1);
-      await putConfig({ timeoutMs: 40_000 });
-      await deleteIndices(NAMES.indices);
+      invalidateRequiresReindexCache();
       expect(await requiresReindex()).toBe(true);
-    }, 60_000);
+    });
   },
 );
