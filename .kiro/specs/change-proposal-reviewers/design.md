@@ -420,7 +420,7 @@ interface ReviewQueuePage { readonly items: readonly ChangeProposalSummaryView[]
 function listReviewQueue(viewer: ViewerIdentity, cursor: string | null, limit: number): Promise<ReviewQueuePage>;
 ```
 
-- 1 回に調べる件数の上限（`REVIEW_QUEUE_SCAN_LIMIT`、`listAppliedVisible` と同じ値）に達したら、見つかった分と続きの位置を返す。カーソルは、最後に調べた文書の `_id` を、そのまま文字にしたもの（暗号化しない。core の反映済みの一覧と同じ作り）。最後に調べた文書が、その人に返す操作が 0 件の提案のこともあり、その場合は、カーソルから、その ID の提案が存在し、自分が承認者に指定されていることが分かる（ページのパスや内容は分からない）。この点を許容する（オーナー決定）。不正な値は、既存の前例（`list-applied.ts` と `proposal-list-query.ts`）に合わせ、ルートが 400 で断り、サービスは空の結果を返す。
+- 1 回に調べる件数の上限（`REVIEW_QUEUE_SCAN_LIMIT`、`listAppliedVisible` と同じ値）に達したら、見つかった分と続きの位置を返す。カーソルは、一覧に出した最後の提案の `_id` を、そのまま文字にしたもの（暗号化しない。core の反映済みの一覧と同じ作り）。調べた最後の提案の ID は返さない。調べた最後の提案が、その人に返す操作が 0 件の提案のとき、その ID をカーソルにすると、その提案が実際に開いていることが分かり、取得で見える段階が「閉じている」と表示される提案については、見えない「待ち」の操作の存在を推測できてしまうため（オーナー決定）。上限に達したとき、1 件以上出していればカーソルは出した最後の提案の ID（次の呼び出しは、その次から調べ直す。読む量は増えるが、1 回に調べる上限は変わらない）。1 件も出していなければカーソルは `null` で、その回の一覧はそこで終わる（データの終わりと区別できない）。この制限が起きるのは、承認者として指定された開いている提案が、判断の対象を持たないまま上限の件数以上連続する場合だけである。不正な値は、既存の前例（`list-applied.ts` と `proposal-list-query.ts`）に合わせ、ルートが 400 で断り、サービスは空の結果を返す。
 
 #### review-notifier
 

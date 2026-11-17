@@ -333,26 +333,96 @@ describe('listReviewQueue', () => {
     expect(pages.slice(0, 3)).toEqual([[first._id], [second._id], [third._id]]);
   });
 
-  it('stops at the scan budget with the last scanned proposal as the cursor, and goes on from there (Reviewers Req 5.5)', async () => {
+  it('gives the last listed proposal as the cursor once the limit is reached, even when more proposals follow (Reviewers Req 5.5)', async () => {
     const reviewer = await newReviewer();
-    const scanned: string[] = [];
-    for (let i = 0; i < 4; i += 1) {
-      // biome-ignore lint/performance/noAwaitInLoops: proposals created in order
-      scanned.push((await storeWithoutTarget(reviewer))._id);
-    }
-    const listed = await storeWithTarget(reviewer);
+    const first = await storeWithTarget(reviewer);
+    await storeWithTarget(reviewer);
+    await storeWithoutTarget(reviewer);
+
+    const page = await createReviewQueueQuery().listReviewQueue(
+      reviewer.identity,
+      null,
+      1,
+    );
+
+    expect(page).toMatchObject({ nextCursor: first._id });
+    expect(idsOf(page.items)).toEqual([first._id]);
+  });
+
+  it('stops at the scan budget with the last listed proposal as the cursor, not the last scanned one, and goes on from there without repeats (Reviewers Req 5.5)', async () => {
+    const reviewer = await newReviewer();
+    const first = await storeWithTarget(reviewer);
+    await storeWithoutTarget(reviewer);
+    await storeWithoutTarget(reviewer);
+    const second = await storeWithTarget(reviewer);
     const query = createReviewQueueQuery({ batchSize: 2, limit: 3 });
 
     const firstPage = await query.listReviewQueue(reviewer.identity, null, 10);
-    expect(firstPage).toEqual({ items: [], nextCursor: scanned[2] });
+    expect(idsOf(firstPage.items)).toEqual([first._id]);
+    expect(firstPage.nextCursor).toBe(first._id);
 
     const secondPage = await query.listReviewQueue(
       reviewer.identity,
       firstPage.nextCursor,
       10,
     );
-    expect(idsOf(secondPage.items)).toEqual([listed._id]);
-    expect(secondPage.nextCursor).toBeNull();
+    expect(idsOf(secondPage.items)).toEqual([second._id]);
+    expect(secondPage.nextCursor).toBe(second._id);
+
+    const lastPage = await query.listReviewQueue(
+      reviewer.identity,
+      secondPage.nextCursor,
+      10,
+    );
+    expect(lastPage).toEqual({ items: [], nextCursor: null });
+  });
+
+  it('ends the listing with a null cursor when the scan budget runs out before anything is listed, leaving later proposals out of that pass (Reviewers Req 5.5)', async () => {
+    const reviewer = await newReviewer();
+    const first = await storeWithTarget(reviewer);
+    for (let i = 0; i < 4; i += 1) {
+      // biome-ignore lint/performance/noAwaitInLoops: proposals created in order
+      await storeWithoutTarget(reviewer);
+    }
+    await storeWithTarget(reviewer);
+    const query = createReviewQueueQuery({ batchSize: 2, limit: 3 });
+    const firstPage = await query.listReviewQueue(reviewer.identity, null, 1);
+    expect(firstPage).toMatchObject({ nextCursor: first._id });
+
+    expect(
+      await query.listReviewQueue(reviewer.identity, firstPage.nextCursor, 10),
+    ).toEqual({ items: [], nextCursor: null });
+  });
+
+  it('does not reveal, through the cursor, an open proposal whose visible operations are all settled while a hidden one is pending (Reviewers Req 5.6)', async () => {
+    const reviewer = await newReviewer();
+    const listed = await storeWithTarget(reviewer);
+    await storeWithoutTarget(reviewer);
+    const settledLooking = await store(
+      [
+        edit(await createPage('public', 'failed')),
+        edit(await createPage('hidden', 'pending-hidden')),
+      ],
+      [naming(reviewer)],
+    );
+    await proposals().updateOne(
+      { _id: objectIdOf(settledLooking._id) },
+      {
+        $set: {
+          'operations.0.status': 'failed',
+          'operations.0.reason': 'target-unavailable',
+        },
+      },
+    );
+
+    // The budget of 3 runs out exactly on the settled-looking proposal.
+    const page = await createReviewQueueQuery({
+      batchSize: 2,
+      limit: 3,
+    }).listReviewQueue(reviewer.identity, null, 10);
+
+    expect(idsOf(page.items)).toEqual([listed._id]);
+    expect(JSON.stringify(page)).not.toContain(settledLooking._id);
   });
 
   it.each([

@@ -88,8 +88,8 @@ const toQueueEntries = async (
 
 /**
  * Scans the viewer's open proposals oldest first until `limit` entries are
- * found or the scan budget is spent. The cursor is the id of the last document
- * consumed, so documents scanned but not returned are not read again.
+ * found or the scan budget is spent. The cursor is the id of the last listed
+ * proposal, so the next call scans again what was scanned past it.
  */
 const scanReviewQueue = async (
   viewer: ViewerIdentity,
@@ -102,6 +102,7 @@ const scanReviewQueue = async (
 }> => {
   const matched: QueueEntry[] = [];
   let position = start;
+  let lastListed: string | null = null;
   let scanned = 0;
   while (matched.length < limit && scanned < scan.limit) {
     const take = Math.min(scan.batchSize, scan.limit - scanned);
@@ -118,8 +119,9 @@ const scanReviewQueue = async (
       const entry = entries[i];
       if (entry != null) {
         matched.push(entry);
+        lastListed = row.id;
         if (matched.length === limit) {
-          return { matched, next: position };
+          return { matched, next: lastListed };
         }
       }
     }
@@ -127,7 +129,9 @@ const scanReviewQueue = async (
       return { matched, next: null };
     }
   }
-  return { matched, next: position };
+  // Never the last scanned id (it reveals the proposal is open) nor the input
+  // cursor (the client would loop); see design.md review-queue-query's owner decision.
+  return { matched, next: lastListed };
 };
 
 // Names are read once for the whole page.
