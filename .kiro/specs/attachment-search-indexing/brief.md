@@ -4,7 +4,7 @@
 
 ## Problem
 
-`attachment-search-text-extractor` spec で抽出サービスが動作しても、GROWI の既存検索基盤 (Elasticsearch) に抽出結果が流し込まれなければ検索できない。また、添付アップロード・削除・親ページ権限変更などのイベントに検索インデックスを追従させる仕組み、管理者向けの一括再インデックス・個別再抽出・失敗可視化の API が必要。
+`attachment-search-text-extractor` spec で抽出サービスが動作しても、GROWI の既存検索基盤 (Elasticsearch) に抽出結果が流し込まれなければ検索できない。また、添付アップロード・削除に検索インデックスを追従させる仕組み、親ページの権限変更や削除を検索結果に反映する仕組み、管理者向けの一括再インデックス・個別再抽出・失敗可視化の API が必要。
 
 ## Current State
 
@@ -12,18 +12,18 @@
 - `AttachmentService` は `addAttachHandler` / `detachHandler` の拡張ポイントを持つが **fire-and-forget で例外を握りつぶす**。OpenAI Vector Store 連携が同パターンで同居済み
 - ページ権限変更は `pageEvent.emit('updateMany'|'syncDescendantsUpdate', ...)` で発火、SearchService が `registerUpdateEvent()` で購読している
 - 既存 `rebuildIndex()` は tmp index → alias swap パターン、Socket.io で進捗通知 (`AddPageProgress`, `FinishAddPage`)
-- 添付モデル ([attachment.ts](apps/app/src/server/models/attachment.ts)) はメタデータのみ保持、テキスト本文は持たない
+- 添付 (Prisma の `prisma.attachments`) はメタデータのみ保持、テキスト本文は持たない
 - 添付 API: POST は apiv3 `/attachment`、DELETE は legacy `/_api/attachments.remove`
 
 ## Desired Outcome
 
-- 添付専用 Elasticsearch インデックス `attachments` (ES 8/9 対応 mapping) が存在し、1 添付 = N 文書 (ページ/スライド/シート単位) で運用される
+- 添付専用 Elasticsearch インデックス (ES 8/9 対応 mapping。名前は page index 名から導く) が存在し、1 添付 = N 文書 (ページ/スライド/シート単位) で運用される。権限情報は持たない
 - 添付アップロード時に自動で抽出サービスを呼び出し、結果を ES にインデックスする (機能無効時は一切呼び出さない)
-- 添付削除・親ページ削除・親ページ権限変更が ES に反映される
+- 添付削除は ES に反映される。親ページの削除と権限変更は、添付の文書を書き換えず、検索時に親ページの権限を確かめることで結果に反映される
 - 既存添付を一括でインデックス化する admin 操作が提供される (rebuildIndex 拡張)
 - 個別添付を再抽出する apiv3 エンドポイントが提供される
 - 抽出失敗が MongoDB に記録され admin が参照できる
-- 検索クエリが Page index と Attachment index を multi-index で評価し、結果を親ページ単位に集約した応答型を返す
+- 検索が Page index と添付 index の両方を使い、閲覧者に見せてよい添付ヒットだけを、親ページ単位に集約した応答型で返す
 - Admin 画面用に設定 API / 失敗ログ API が提供される
 - `packages/attachment-text-extractor-client` が orval で自動生成され apps/app から型安全に呼べる
 
@@ -32,13 +32,13 @@
 既存の `ElasticsearchDelegator` / `SearchService` / `AttachmentService` / `ConfigManager` を**拡張**し、apps/app 内に新規 feature module `features/search-attachments/server/` を配置する。
 
 - **Feature module**: `apps/app/src/features/search-attachments/` 配下に server side 全コードを集約。既存モジュールは最小限の差分のみ
-- **ES delegator 拡張**: 独立 delegator を作らず、既存 `ElasticsearchDelegator` に `syncAttachment*` メソッドと `addAllAttachments()` を composition で追加
-- **Indexer 単一窓口**: `AttachmentSearchIndexer.indexAttachment(attachmentId)` が attach/detach/reextract/bulk すべてのエントリポイント (Synthesis で汎化済み)
-- **権限スナップショット**: 添付 ES 文書に `grant` / `granted_users` / `granted_groups` をコピーして保持。親ページ変更時に `update_by_query` で partial update
+- **ES delegator 拡張**: 独立 delegator を作らず、既存 `ElasticsearchDelegator` の ES client を使う拡張 (`AttachmentSearchDelegatorExtension`) が、添付 index の作成・付け替え・書き込み・削除を受け持つ
+- **Indexer 窓口**: `AttachmentSearchIndexer` が attach / detach / reextract の入口。一括再インデックスは `AttachmentReindexBatch` が受け持つ
+- **検索時の権限判定 (Option D)**: 添付 ES 文書に権限情報を持たせない。検索時に、親ページを page_index (viewer filter と検索演算子) と MongoDB で確かめ、ページ検索が本文の抜粋を見せるページの添付ヒットだけを返す。権限変更のたびに添付の文書を書き換える必要が無い
 - **Client package**: `packages/attachment-text-extractor-client/` を新規追加。orval が `apps/attachment-text-extractor` の OpenAPI spec (commit 済みの `openapi.json`) を入力に TS クライアントを自動生成 (pdf-converter-client と同パターン)
-- **Config keys**: `app:attachmentFullTextSearch:enabled` / `extractorUrl` / `maxFileSizeBytes` / `timeoutMs` / `maxConcurrency` を [config-definition.ts](apps/app/src/server/service/config-manager/config-definition.ts) に追加
-- **検索クエリ**: ES `_msearch` で page_index と attachments_index を並列クエリ、app 側で `pageId` 集約。viewer フィルタは既存 `filterPagesByViewer` と同じ権限モデル
-- **性能 fallback**: 添付 msearch が設定閾値を超過したら添付ヒットを除外し Page 結果のみ返す safety net
+- **Config keys**: `app:attachmentFullTextSearch:extractorUri` / `extractorToken` / `timeoutMs` / `maxFileSizeBytes` の 4 つを [config-definition.ts](apps/app/src/server/service/config-manager/config-definition.ts) に追加。有効・無効は「検索サービスが設定済み AND URI とトークンが設定済み」の算出値で、`enabled` のキーは無い
+- **検索クエリ**: `facet=all` の 1 ページ目は、ページ検索の後に、本文の抜粋を見せるページの添付だけを検索する (pageId ごとに上位 5 件)。`facet=attachments` は添付 index を検索してから親ページを判定する。2 ページ目以降の添付ヒットは別の API (secondary) で足す
+- **性能 fallback**: 添付の検索が閾値 (800ms) を超えたら添付ヒットを除外し Page 結果のみ返す safety net
 - **rebuildIndex 互換**: チェックボックス追加のみで既存挙動を保つ (OFF 時は Page/Comment のみ処理)
 
 ## Scope
@@ -51,12 +51,13 @@
   - `services/attachment-search-indexer.ts` (attach/detach/reextract 単一窓口)
   - `services/attachment-search-delegator-extension.ts` (ESDelegator 拡張)
   - `services/attachment-reindex-batch.ts` (bulk 再インデックス + Socket.io progress)
-  - `services/extraction-failure-log-service.ts`
-  - `models/extraction-failure-log.ts` (Prisma モデル `extractionfailurelogs` の操作。TTL index は migrate-mongo の migration で作成)
+  - `services/extraction-failure-log-service.ts` (Prisma モデル `extractionfailurelogs` への記録と取得。モデルは `apps/app/prisma/schema.prisma`、index は migrate-mongo の migration で作成)
+  - `services/attachment-search-result-aggregator.ts` / `search-accessible-pages.ts` (検索結果の集約と親ページの権限判定)
   - `mappings/attachments-mappings-es{8,9}.ts`
-  - `queries/build-attachment-search-query.ts` (msearch body builder)
+  - `queries/build-attachment-search-query.ts` / `build-attachments-by-page-ids-query.ts` (添付 index の検索 body の builder)
   - `routes/apiv3/attachment-reextract.ts` (`POST /_api/v3/attachments/:id/reextract`)
   - `routes/apiv3/attachment-search-admin.ts` (`GET /failures`, `GET|PUT /config`)
+  - `routes/apiv3/search-attachments.ts` (`GET /_api/v3/search/attachments`)
   - `middlewares/require-search-attachments-enabled.ts`
   - `index.ts` (initAttachmentFullTextSearch(crowi) — Crowi 初期化から呼ぶ)
 - `apps/app/src/features/search-attachments/interfaces/attachment-search.ts` (DTOs: `IAttachmentHit`, `IAttachmentEsDoc`, `ExtractionFailure` 等)
@@ -66,10 +67,12 @@
 
 #### 既存ファイル修正
 - [apps/app/src/server/crowi/index.ts](apps/app/src/server/crowi/index.ts): `initAttachmentFullTextSearch(this)` を searchService/attachmentService 初期化後に追加
-- [apps/app/src/server/service/search.ts](apps/app/src/server/service/search.ts): `registerUpdateEvent()` に権限変更リスナ + multi-index 検索集約ロジック
-- [apps/app/src/server/service/search-delegator/elasticsearch.ts](apps/app/src/server/service/search-delegator/elasticsearch.ts): 拡張モジュールとの合成
-- [apps/app/src/server/service/config-manager/config-definition.ts](apps/app/src/server/service/config-manager/config-definition.ts): 新規 Config キー 5 件
-- [apps/app/src/interfaces/search.ts](apps/app/src/interfaces/search.ts): `IPageWithSearchMeta.attachmentHits[]` optional 追加
+- [apps/app/src/server/service/search.ts](apps/app/src/server/service/search.ts): facet 付きの検索の入口と集約ロジック。本文の抜粋の表示規則を `search/can-show-snippet.ts` に切り出し、添付検索と共有 (権限変更リスナは足さない)
+- [apps/app/src/server/routes/search.ts](apps/app/src/server/routes/search.ts): `GET /_api/search` に optional な `facet` / `resolve` を追加
+- [apps/app/src/server/service/config-manager/config-definition.ts](apps/app/src/server/service/config-manager/config-definition.ts): 新規 Config キー 4 件
+- [apps/app/src/interfaces/search.ts](apps/app/src/interfaces/search.ts): `IPageSearchMeta.attachmentHits[]` optional 追加 (検索結果の各項目では `meta.attachmentHits`)
+- [apps/app/src/interfaces/activity.ts](apps/app/src/interfaces/activity.ts): 監査ログの action 2 つ (設定の更新、個別再抽出)
+- [apps/app/prisma/schema.prisma](apps/app/prisma/schema.prisma) と `apps/app/src/migrations/`: 抽出失敗ログのモデルと index
 - [apps/app/src/server/routes/apiv3/search.js](apps/app/src/server/routes/apiv3/search.js): `PUT /search/indices` に `includeAttachments` フラグ受理。添付を含む作り直しは裏で実行して即応答し、完了・失敗は Socket.io で通知
 
 ### Out
@@ -85,11 +88,11 @@
 
 1. **TS クライアントパッケージ** (`packages/attachment-text-extractor-client/`) — OpenAPI 消費 → orval 生成、server 専用依存として apps/app に渡される
 2. **抽出クライアント wrapper** (`attachment-text-extractor.ts`) — 到達不可/エラー正規化層
-3. **Indexer 層** (`attachment-search-indexer.ts` + grant-sync + reindex-batch) — ES への書き込み責務
-4. **ES 契約層** (`delegator-extension` + `mappings/*` + `queries/build-attachment-search-query.ts`) — Elasticsearch との接続責務
-5. **永続化層** (`models/extraction-failure-log.ts` + `services/extraction-failure-log-service.ts`)
+3. **Indexer 層** (`attachment-search-indexer.ts` + reindex-batch) — ES への書き込み責務
+4. **ES 契約層** (`delegator-extension` + `mappings/*` + `queries/*`) — Elasticsearch との接続責務
+5. **永続化層** (Prisma モデル `extractionfailurelogs` + `services/extraction-failure-log-service.ts`)
 6. **API 層** (`routes/apiv3/*`) — HTTP エンドポイント
-7. **SearchService extension** — 検索クエリの multi-index 集約と fallback
+7. **SearchService extension** — ページと添付の検索の集約、親ページの権限判定、fallback
 8. **Config + Crowi wiring** — 有効化ゲートと初期化
 
 ## Out of Boundary
@@ -108,7 +111,7 @@
 - 既存 `apps/pdf-converter` + `packages/pdf-converter-client` (orval パターンの参考)
 
 ### Downstream (影響先)
-- `attachment-search-ui` spec: 本 spec の API 応答型 (`IPageWithSearchMeta.attachmentHits[]`) と apiv3 エンドポイント契約を消費
+- `attachment-search-ui` spec: 本 spec の API 応答型 (各項目の `meta.attachmentHits[]`) と apiv3 エンドポイント契約を消費
 - GROWI.cloud 運用 (新 ES インデックス、新 Config キー、admin API)
 - 既存 Page 検索の応答型 (後方互換を保つ optional 拡張のみ)
 
@@ -129,6 +132,6 @@
 - **非互換ゼロ**: 機能無効時は既存検索 API のレイテンシ・結果順序・応答形式を機能導入前と同一にする (R14.1)
 - **マルチテナント**: 共有 ES クラスタの ingest ノード上では抽出処理を実行しない (apps/app 側で完結)。抽出サービスの同時実行上限で他テナント影響を抑える
 - **ハンドラの fire-and-forget 特性**: 例外は pino ログと FailureLog 永続化で確実に捕捉する (UI に通知する経路は別 spec の admin UI が担当)
-- **API 後方互換**: `IPageWithSearchMeta.attachmentHits` は optional に限定、既存クライアントが破壊的変更を受けないこと
+- **API 後方互換**: `meta.attachmentHits` は optional に限定、既存クライアントが破壊的変更を受けないこと
 - **OpenAPI drift 検知**: CI で `apps/attachment-text-extractor` が route 定義から生成する OpenAPI spec と `packages/attachment-text-extractor-client/openapi.json` の差分を検知し、古いクライアントでのビルドを防ぐ
-- **rebuildIndex 中断時の方針**: best-effort 冪等バッチ (alias swap 未実行で旧 index 維持、admin の再実行で最初からやり直し)。チェックポイント再開は初期実装では採用しない
+- **rebuildIndex 中断時の方針**: best-effort 冪等バッチ (alias swap 未実行で旧 index 維持、admin の再実行で最初からやり直し)。抽出サービスや保存先の障害を疑う失敗が続いた場合も、同じく旧 index を残して止める。チェックポイント再開は初期実装では採用しない

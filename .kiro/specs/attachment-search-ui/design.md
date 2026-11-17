@@ -299,7 +299,7 @@ sequenceDiagram
 
 Key decisions:
 - 再抽出結果は toast で通知し、UI リストは SWR mutate で最新化
-- 再抽出の応答は上流 spec の `ReextractResponse` (`{ outcome: { kind } }`。抽出テキストは含まれない)。本 spec は `outcome.kind` の分岐を i18n キーにマッピングするだけ。拒否は status ではなくエラーの code で扱う: 404 `notfound_or_forbidden` (添付なし・親ページなし・権限なしを区別しない)、503 `feature_disabled` / `reextract_busy`、429 (回数制限)
+- 再抽出の応答は上流 spec の `ReextractResponse` (`{ outcome: { kind } }`。抽出テキストは含まれない)。本 spec は `outcome.kind` の分岐を i18n キーにマッピングするだけ。拒否と失敗は status ではなくエラーの code で扱う: 404 `notfound_or_forbidden` (添付なし・親ページなし・権限なしを区別しない)、500 `reextract_failed` (再抽出を最後まで進められなかった)、503 `feature_disabled` / `reextract_timeout` (制限時間内に終わらなかった。抽出の順番待ちを含む)、429 (回数制限)
 - 機能無効時は `ReextractButton` 自体が render されない
 
 ### 3. 管理画面 rebuild with attachments
@@ -339,6 +339,7 @@ sequenceDiagram
 Key decisions:
 - PUT の 200 は「作り直しを受け付けた」ことだけを意味する。完了・失敗の判断は Socket.io イベントだけで行い、PUT の応答を完了とみなさない
 - 添付を含む作り直しの進行中表示は `FinishAddAttachment` か `AttachmentRebuildingFailed` を受けるまで続ける (Page 側の `FinishAddPage` では解除しない。Page の作り直しの後に添付の作り直しが続くため)
+- 作り直しが失敗した理由は `AttachmentRebuildingFailed` の `error` (文字列) で届く。いまは英語の文である。翻訳して出すために理由コードを送る形にするかどうかは、この設計を今の API に合わせて見直すときに決める
 
 ## Requirements Traceability
 
