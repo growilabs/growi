@@ -2,7 +2,8 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-import { parse } from './identity.ts';
+import { buildPlaywrightKey, parse } from './identity.ts';
+import { extractPlaywrightRuns } from './job-log.ts';
 
 const readFixtureJson = (relativePath: string): unknown =>
   JSON.parse(
@@ -139,6 +140,54 @@ describe('identity.parse — the other two shapes (constructed; no real example 
       browser: null,
       specPath: 'src/foo.spec.ts',
       testTitle: 'some test',
+    });
+  });
+});
+
+describe('identity.buildPlaywrightKey', () => {
+  it('builds, from the flaky test read out of a real job log, the identity key the tracking issue for that run carries', () => {
+    const log = readFileSync(
+      fileURLToPath(
+        new URL(
+          '../fixtures/job-logs/11914-playwright-flaky-excerpt.txt',
+          import.meta.url,
+        ),
+      ),
+      'utf8',
+    );
+    const flaky = extractPlaywrightRuns(log)[0]?.flaky;
+    if (flaky?.kind !== 'read') {
+      throw new Error('fixture must carry a readable flaky list');
+    }
+
+    expect(flaky.tests.map(buildPlaywrightKey)).toEqual([
+      'playwright:chromium:playwright/20-basic-features/inline-comment.spec.ts:Inline comment - hover/click/tap on a saved body highlight opens a preview popover with simple reply (Req 2.1-2.5) > Requirement 2.3: submitting a reply from the popover posts it, and it appears nested under the origin item in the bottom list',
+    ]);
+  });
+
+  it('uses only the part of the project name before its first "/" as the browser', () => {
+    expect(
+      buildPlaywrightKey({
+        project: 'chromium/guest-mode',
+        specPath: 'playwright/a.spec.ts',
+        testTitle: 'works',
+      }),
+    ).toBe('playwright:chromium:playwright/a.spec.ts:works');
+  });
+
+  it('builds a key that parse reads back unchanged even when the test title contains ":"', () => {
+    const key = buildPlaywrightKey({
+      project: 'firefox',
+      specPath: 'playwright/a.spec.ts',
+      testTitle: 'refresh: capture > open: popover',
+    });
+
+    expect(parse(key)).toEqual({
+      shape: 'precise',
+      kind: 'playwright',
+      browser: 'firefox',
+      specPath: 'playwright/a.spec.ts',
+      testTitle: 'refresh: capture > open: popover',
     });
   });
 });
