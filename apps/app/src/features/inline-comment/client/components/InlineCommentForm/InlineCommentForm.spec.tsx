@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { IMAGE_TOKEN } from '../../services/rendered-text';
 import { InlineCommentForm } from './InlineCommentForm';
 
 // --- @growi/editor mocks -------------------------------------------------
@@ -260,6 +261,18 @@ describe('InlineCommentForm', () => {
         // suite locates the quote by `.inline-comment-form-quote`.
         'inline-comment-form-quote',
       );
+    });
+
+    it('reads each image in the quote out as [Image]', () => {
+      render(
+        <InlineCommentForm
+          pageId="page-1"
+          anchorOriginRevisionId="rev-1"
+          anchor={{ ...validAnchor, quote: `see ${IMAGE_TOKEN} here` }}
+        />,
+      );
+
+      expect(screen.getByText('see [Image] here').tagName).toBe('BLOCKQUOTE');
     });
 
     it('hides the editor toolbar, line numbers and fold gutter (design.md 決定5)', () => {

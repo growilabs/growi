@@ -17,6 +17,7 @@ import { useTranslation } from 'react-i18next';
 
 import { useCurrentUser } from '~/states/global';
 
+import { quoteForDisplay } from '../../services/quote-for-display';
 import { useSWRxInlineComments } from '../../stores/inline-comment';
 import { MentionAwareCommentInput } from '../MentionAwareCommentInput/MentionAwareCommentInput';
 import { useCommentInputControls } from '../MentionAwareCommentInput/use-comment-input-controls';
@@ -122,7 +123,7 @@ export const InlineCommentForm = (
     >
       {/* Plain class, not CSS-module: the Playwright suite locates the quote by this selector. */}
       <blockquote className="inline-comment-form-quote visually-hidden">
-        {anchor.quote}
+        {quoteForDisplay(anchor.quote)}
       </blockquote>
       <div className="d-flex align-items-start gap-2">
         <UserPicture user={currentUser} noLink noTooltip />

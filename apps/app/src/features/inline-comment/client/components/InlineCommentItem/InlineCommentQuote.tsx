@@ -1,5 +1,7 @@
 import type { JSX } from 'react';
 
+import { quoteForDisplay } from '../../services/quote-for-display';
+
 type InlineCommentQuoteProps = {
   quote: string;
   onClick: () => void;
@@ -11,6 +13,7 @@ export const InlineCommentQuote = (
   props: InlineCommentQuoteProps,
 ): JSX.Element => {
   const { quote, onClick, clamped = false } = props;
+  const shownQuote = quoteForDisplay(quote);
 
   // Both class names are `:global(...)` in the CSS module, so they are
   // referenced as plain strings -- `styles[...]` would be undefined. A real
@@ -29,9 +32,9 @@ export const InlineCommentQuote = (
     >
       <blockquote className="inline-comment-quote bg-body-tertiary rounded-end small text-body-secondary my-2 p-2">
         {clamped ? (
-          <div className="inline-comment-quote-clamped">{quote}</div>
+          <div className="inline-comment-quote-clamped">{shownQuote}</div>
         ) : (
-          quote
+          shownQuote
         )}
       </blockquote>
     </button>

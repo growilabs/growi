@@ -2,8 +2,12 @@
 
 import { act, renderHook } from '@testing-library/react';
 
-import { renderedTextOf } from '../../services/rendered-text';
-import { captureSelection, useTextSelection } from './use-text-selection';
+import { IMAGE_TOKEN, renderedTextOf } from '../../services/rendered-text';
+import {
+  captureRange,
+  captureSelection,
+  useTextSelection,
+} from './use-text-selection';
 
 /**
  * Builds a container element holding `text` as a single text node, appended
@@ -233,6 +237,113 @@ describe('captureSelection', () => {
     expect(container.textContent).toContain('edit_square');
     expect(result?.prefix).toBe('HEAD');
     expect(result?.suffix).toBe('TAIL');
+  });
+});
+
+describe('captureSelection with images', () => {
+  const mountImageContainer = (): {
+    container: HTMLDivElement;
+    image: HTMLImageElement;
+  } => {
+    const container = document.createElement('div');
+    container.innerHTML =
+      '<p>Item beta <button type="button"><img src="/a.png" alt="a"></button> END here</p>';
+    document.body.appendChild(container);
+    return {
+      container,
+      image: container.querySelector('img') as HTMLImageElement,
+    };
+  };
+
+  const selectNodeContents = (
+    start: Node,
+    startOffset: number,
+    end: Node,
+    endOffset: number,
+  ): Selection => {
+    const range = document.createRange();
+    range.setStart(start, startOffset);
+    range.setEnd(end, endOffset);
+    const selection = window.getSelection();
+    if (selection == null) {
+      throw new Error('window.getSelection() returned null');
+    }
+    selection.removeAllRanges();
+    selection.addRange(range);
+    return selection;
+  };
+
+  it('captures a selection of only an image, with the image as IMAGE_TOKEN in the quote', () => {
+    const { container, image } = mountImageContainer();
+    const wrapper = image.parentNode as Node;
+    const selection = selectNodeContents(wrapper, 0, wrapper, 1);
+
+    const result = captureSelection(selection, container);
+
+    expect(result?.quote).toBe(IMAGE_TOKEN);
+    expect(result?.prefix).toBe('Item beta ');
+    expect(result?.suffix).toBe(' END here');
+  });
+
+  it('captures an image together with only the spaces around it', () => {
+    const { container } = mountImageContainer();
+    const paragraph = container.querySelector('p') as HTMLElement;
+    const before = paragraph.childNodes[0] as Text;
+    const after = paragraph.childNodes[2] as Text;
+    const selection = selectNodeContents(before, 'Item beta'.length, after, 1);
+
+    const result = captureSelection(selection, container);
+
+    expect(result?.quote).toBe(` ${IMAGE_TOKEN} `);
+  });
+
+  it('includes the image token in the quote of a selection spanning text and an image', () => {
+    const { container } = mountImageContainer();
+    const paragraph = container.querySelector('p') as HTMLElement;
+    const before = paragraph.childNodes[0] as Text;
+    const after = paragraph.childNodes[2] as Text;
+    const selection = selectNodeContents(
+      before,
+      'Item '.length,
+      after,
+      ' END'.length,
+    );
+
+    const result = captureSelection(selection, container);
+
+    expect(result?.quote).toBe(`beta ${IMAGE_TOKEN} END`);
+    expect(result?.approxOffset).toBe('Item '.length);
+  });
+});
+
+describe('captureRange', () => {
+  it('captures a range around just an image without touching the document selection', () => {
+    const container = document.createElement('div');
+    container.innerHTML =
+      '<p>Item beta <button type="button"><img src="/a.png" alt="a"></button> END here</p>';
+    document.body.appendChild(container);
+    window.getSelection()?.removeAllRanges();
+    const range = document.createRange();
+    range.selectNode(container.querySelector('img') as HTMLImageElement);
+
+    const result = captureRange(range, container);
+
+    expect(result).toEqual({
+      quote: IMAGE_TOKEN,
+      prefix: 'Item beta ',
+      suffix: ' END here',
+      approxOffset: 'Item beta '.length,
+    });
+    expect(window.getSelection()?.rangeCount).toBe(0);
+  });
+
+  it('returns null for a range outside the container', () => {
+    const container = mountContainer('inside');
+    const outside = mountContainer('outside');
+    const range = document.createRange();
+    range.selectNodeContents(outside);
+
+    expect(captureRange(range, container)).toBeNull();
   });
 });
 

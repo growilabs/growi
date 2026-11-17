@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ResolvedRange } from '../../../interfaces';
 import { imageOutlineSelector } from '../../services/image-in-range';
+import { IMAGE_TOKEN } from '../../services/rendered-text';
 import { InlineCommentHighlight } from './InlineCommentHighlight';
 
 /**
@@ -89,7 +90,7 @@ describe('InlineCommentHighlight', () => {
         {
           status: 'exact',
           startOffset: 0,
-          endOffset: 'Before  after'.length,
+          endOffset: `Before ${IMAGE_TOKEN} after`.length,
         },
       ],
     ]);
@@ -108,6 +109,31 @@ describe('InlineCommentHighlight', () => {
 
     unmount();
     expect(image.matches(imageOutlineSelector('saved'))).toBe(false);
+  });
+
+  it('outlines the image of a comment on only an image, painting no text', () => {
+    container.innerHTML = 'Before <img alt="pic"> after.';
+    const image = container.querySelector('img') as HTMLImageElement;
+    const resolvedRanges = new Map<string, ResolvedRange>([
+      [
+        'c1',
+        {
+          status: 'exact',
+          startOffset: 'Before '.length,
+          endOffset: `Before ${IMAGE_TOKEN}`.length,
+        },
+      ],
+    ]);
+
+    render(
+      <InlineCommentHighlight
+        containerRef={containerRef}
+        resolvedRanges={resolvedRanges}
+      />,
+    );
+
+    expect(rangesOf()).toHaveLength(0);
+    expect(image.matches(imageOutlineSelector('saved'))).toBe(true);
   });
 
   it('registers no highlight when the resolved range is not_found', () => {

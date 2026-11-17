@@ -1,5 +1,6 @@
 import React, { useCallback } from 'react';
 import Image from 'next/image';
+import { GROWI_DECORATION_ATTR } from '@growi/core/dist/consts';
 import { UserPicture } from '@growi/ui/dist/components';
 import { useTranslation } from 'next-i18next';
 import prettyBytes from 'pretty-bytes';
@@ -80,7 +81,10 @@ export const RichAttachment = React.memo((props: RichAttachmentProps) => {
     >
       <div className="my-2 p-2 card">
         <div className="p-1 card-body d-flex align-items-center">
-          <div className="me-2 px-0 d-flex align-items-center justify-content-center">
+          <div
+            className="me-2 px-0 d-flex align-items-center justify-content-center"
+            {...{ [GROWI_DECORATION_ATTR]: '' }}
+          >
             <Image
               width={20}
               height={20}
@@ -115,7 +119,9 @@ export const RichAttachment = React.memo((props: RichAttachmentProps) => {
               )}
             </div>
             <div className="d-flex align-items-center">
-              <UserPicture user={creator} size="sm" />
+              <span className="d-flex" {...{ [GROWI_DECORATION_ATTR]: '' }}>
+                <UserPicture user={creator} size="sm" />
+              </span>
               <span className="ms-2 text-muted">
                 {new Date(createdAt).toLocaleString('en-US')}
               </span>

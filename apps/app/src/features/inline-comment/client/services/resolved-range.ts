@@ -51,9 +51,10 @@ export const rangesById = (
 
 /**
  * The Range a comment saved from `selection` will be restored to after a
- * reload. Only text offsets are saved, so an image at either edge of the
- * selection is not part of it; painting the pending highlight with this
- * Range keeps it identical to the saved one.
+ * reload. Only offsets into the rendered text are saved, so anything at either
+ * edge of the selection that adds no characters to it (a `<video>`, an
+ * `<svg>`) is not part of it; painting the pending highlight with this Range
+ * keeps it identical to the saved one.
  */
 export const savedRangeOf = (
   container: HTMLElement,

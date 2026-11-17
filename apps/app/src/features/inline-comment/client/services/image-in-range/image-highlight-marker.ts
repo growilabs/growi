@@ -59,5 +59,11 @@ export const imageOutlineSelector = (state: ImageHighlightState): string => {
   return `img[${ATTRIBUTE}~="${state}"]${exclusions}`;
 };
 
+/** Whether `state` is among the states `image` is currently in, whatever its priority. */
+export const isImageInState = (
+  image: HTMLImageElement,
+  state: ImageHighlightState,
+): boolean => statesOf(image).includes(state);
+
 const statesOf = (image: HTMLImageElement): string[] =>
   (image.getAttribute(ATTRIBUTE) ?? '').split(' ').filter((s) => s !== '');

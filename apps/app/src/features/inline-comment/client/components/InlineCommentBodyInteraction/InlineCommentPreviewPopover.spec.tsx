@@ -170,6 +170,7 @@ vi.mock('../InlineCommentForm/MentionPickerButton', () => ({
   ),
 }));
 
+import { IMAGE_TOKEN } from '../../services/rendered-text';
 import { InlineCommentPreviewPopover } from './InlineCommentPreviewPopover';
 
 // ---------------------------------------------------------------------------
@@ -1210,6 +1211,21 @@ describe('InlineCommentPreviewPopover', () => {
     // Distinct from the comment body: the quote text never appears inside
     // the body's own rendered markdown.
     expect(quoteStrip).not.toHaveTextContent('the comment body');
+  });
+
+  it('shows each image in the quote as [Image]', () => {
+    renderPopover({
+      anchor: {
+        quote: IMAGE_TOKEN,
+        prefix: '',
+        suffix: '',
+        approxOffset: 0,
+      },
+    });
+
+    expect(
+      screen.getByTestId('inline-comment-preview-popover-quote'),
+    ).toHaveTextContent('[Image]');
   });
 
   it('unifies the quote block class composition with the list item (Req 1.7) and drops the inline style', () => {

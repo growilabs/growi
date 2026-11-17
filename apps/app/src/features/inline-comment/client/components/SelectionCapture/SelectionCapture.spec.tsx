@@ -3,6 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mock } from 'vitest-mock-extended';
 
+import { IMAGE_TOKEN } from '../../services/rendered-text';
 import { SelectionCapture } from './SelectionCapture';
 import type { CapturedSelection } from './use-text-selection';
 
@@ -39,8 +40,32 @@ const textSelectionStore = vi.hoisted(() => ({
   captured: null as CapturedSelection | null,
 }));
 
-vi.mock('./use-text-selection', () => ({
+vi.mock('./use-text-selection', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./use-text-selection')>()),
   useTextSelection: () => textSelectionStore.captured,
+}));
+
+// Which image the hover button offers is ImageCommentButton.spec.tsx's job;
+// here it is a plain button handing over a range of the body's only image.
+vi.mock('./ImageCommentButton', () => ({
+  ImageCommentButton: (props: {
+    containerRef: { current: HTMLElement | null };
+    onCommit: (range: Range) => void;
+  }) => (
+    <button
+      type="button"
+      data-testid="image-comment-button"
+      onClick={() => {
+        const range = document.createRange();
+        range.selectNode(
+          props.containerRef.current?.querySelector('img') as HTMLImageElement,
+        );
+        props.onCommit(range);
+      }}
+    >
+      comment on image
+    </button>
+  ),
 }));
 
 // The form itself is out of this task's boundary; it is stubbed down to the
@@ -595,5 +620,45 @@ describe('SelectionCapture', () => {
       screen.queryByTestId('not-available-for-read-only-user'),
     ).not.toBeInTheDocument();
     expect(screen.getByTestId('selection-action-button')).toBeInTheDocument();
+  });
+  describe('image comment button', () => {
+    const mountImageBody = (): HTMLImageElement => {
+      const body = document.createElement('div');
+      body.innerHTML =
+        '<p>Before <button type="button"><img src="/a.png" alt="a"></button> after</p>';
+      document.body.appendChild(body);
+      (containerRef as { current: HTMLDivElement | null }).current = body;
+      return body.querySelector('img') as HTMLImageElement;
+    };
+
+    afterEach(() => {
+      containerRef.current?.remove();
+      (containerRef as { current: HTMLDivElement | null }).current = null;
+    });
+
+    it('opens the form on the chosen image, with the image as the quote', () => {
+      const image = mountImageBody();
+      renderCapture();
+
+      fireEvent.click(screen.getByTestId('image-comment-button'));
+
+      expect(screen.getByTestId('form-quote')).toHaveTextContent(IMAGE_TOKEN);
+      const painted = pendingHighlightCalls.at(-1)?.range;
+      expect(painted?.intersectsNode(image)).toBe(true);
+      expect(painted?.toString()).toBe('');
+    });
+
+    it('is offered only while nothing is selected', () => {
+      mountImageBody();
+      const { live } = buildLiveRange();
+      setLiveSelection(live);
+      textSelectionStore.captured = ANCHOR;
+
+      renderCapture();
+
+      expect(
+        screen.queryByTestId('image-comment-button'),
+      ).not.toBeInTheDocument();
+    });
   });
 });

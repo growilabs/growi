@@ -8,7 +8,7 @@ import {
   type InlineCommentAnchor,
   matchQuote,
 } from './quote-matcher';
-import { renderedTextOf } from './rendered-text';
+import { IMAGE_TOKEN, renderedTextOf } from './rendered-text';
 
 const anchorOf = (
   quote: string,
@@ -173,6 +173,65 @@ describe('matchQuote', () => {
       expect(atCap.status).toBe('fuzzy');
       expect(atCap.startOffset).toBe(4);
       expect(beyondCap.status).toBe('not_found');
+    });
+
+    it('never lets a one-character quote match a different character', () => {
+      const result = matchQuote('Before after', anchorOf('q', 7));
+
+      expect(result.status).toBe('not_found');
+    });
+  });
+
+  describe('a quote of only images', () => {
+    const I = IMAGE_TOKEN;
+
+    it('picks the image whose surrounding text matches, even when another image is nearer approxOffset', () => {
+      const text = `Intro ${I} more. Before ${I} after`;
+      const anchor = anchorOf(I, 0, { prefix: 'Before ', suffix: ' after' });
+
+      const result = matchQuote(text, anchor);
+
+      expect(result.status).toBe('exact');
+      expect(result.startOffset).toBe(text.lastIndexOf(I));
+    });
+
+    it('does not move to another image once the commented image is removed', () => {
+      const text = `Intro ${I} more. Before after`;
+      const anchor = anchorOf(I, 16, { prefix: 'Before ', suffix: ' after' });
+
+      expect(matchQuote(text, anchor).status).toBe('not_found');
+    });
+
+    it('does not move to a neighbour when the middle one of adjacent images is removed', () => {
+      const anchor = anchorOf(I, 8, {
+        prefix: `Gallery ${I}`,
+        suffix: `${I} end`,
+      });
+
+      expect(matchQuote(`Gallery ${I}${I} end`, anchor).status).toBe(
+        'not_found',
+      );
+      expect(matchQuote(`Gallery ${I}${I}${I} end`, anchor)).toMatchObject({
+        status: 'exact',
+        startOffset: 'Gallery '.length + 1,
+      });
+    });
+
+    it('never falls back to a fuzzy match', () => {
+      const anchor = anchorOf(` ${I} `, 6, {
+        prefix: 'Before',
+        suffix: 'after',
+      });
+
+      expect(matchQuote('Before x after', anchor).status).toBe('not_found');
+      expect(matchQuote(`Before ${I} after`, anchor)).toMatchObject({
+        status: 'exact',
+        startOffset: 'Before'.length,
+      });
+    });
+
+    it('resolves an image with no surrounding text', () => {
+      expect(matchQuote(I, anchorOf(I, 0)).status).toBe('exact');
     });
   });
 

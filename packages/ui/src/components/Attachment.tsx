@@ -1,5 +1,6 @@
 import type { JSX } from 'react';
 import type { IAttachmentHasId } from '@growi/core';
+import { GROWI_DECORATION_ATTR } from '@growi/core/dist/consts';
 import { format } from 'date-fns/format';
 
 import { UserPicture } from './UserPicture.js';
@@ -58,7 +59,10 @@ export const Attachment = (props: AttachmentProps): JSX.Element => {
 
   return (
     <div className="attachment mb-2">
-      <span className="me-1 attachment-userpicture">
+      <span
+        className="me-1 attachment-userpicture"
+        {...{ [GROWI_DECORATION_ATTR]: '' }}
+      >
         <UserPicture user={attachment.creator} size="sm" />
       </span>
       <a

@@ -160,6 +160,7 @@ vi.mock('~/client/components/PageComment/CommentEditor', () => ({
   },
 }));
 
+import { IMAGE_TOKEN } from '../../services/rendered-text';
 import { InlineCommentItem } from './InlineCommentItem';
 
 // ---------------------------------------------------------------------------
@@ -317,6 +318,21 @@ describe('InlineCommentItem', () => {
   });
 
   describe('the quote (Req 13.6 / 13.10)', () => {
+    it('shows each image in the quote as [Image]', () => {
+      const { container } = renderItem({
+        anchor: {
+          quote: `before ${IMAGE_TOKEN} after`,
+          prefix: '',
+          suffix: '',
+          approxOffset: 0,
+        },
+      });
+
+      expect(
+        container.querySelector('blockquote.inline-comment-quote'),
+      ).toHaveTextContent('before [Image] after');
+    });
+
     it('places the quote, then the body — both inside the shared box', () => {
       const { container } = renderItem();
 

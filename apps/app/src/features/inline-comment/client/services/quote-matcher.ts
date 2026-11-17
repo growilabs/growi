@@ -1,6 +1,7 @@
 import search from 'approx-string-match';
 
 import { createNormalizedOffsetMapper } from './normalized-offset-mapping';
+import { IMAGE_TOKEN } from './rendered-text';
 
 /**
  * The stored anchor of an inline comment: the exact quote as it was selected,
@@ -52,7 +53,8 @@ const graphemeSegmenter = new Intl.Segmenter(undefined, {
 
 /**
  * Locates an anchor's quote in `text`: exact matches first, then a fuzzy match
- * over the NFC-normalized forms, and finally `not_found`.
+ * over the NFC-normalized forms, and finally `not_found`. A quote of only
+ * images is the exception: it is located by its context windows instead.
  *
  * `text` is the rendered page text as it is right now, which may have been
  * edited since the anchor was captured — hence the tolerance. Re-anchoring is
@@ -68,6 +70,10 @@ export function matchQuote(
     return NOT_FOUND;
   }
 
+  if (isImageOnlyQuote(quote)) {
+    return matchImagesInContext(text, anchor) ?? NOT_FOUND;
+  }
+
   const exact = matchExactly(text, quote, anchor.approxOffset);
   if (exact != null) {
     return exact;
@@ -75,6 +81,47 @@ export function matchQuote(
 
   return matchApproximately(text, anchor);
 }
+
+/** A quote with no text of its own: images, possibly with whitespace around them. */
+const isImageOnlyQuote = (quote: string): boolean =>
+  quote.includes(IMAGE_TOKEN) &&
+  quote.replaceAll(IMAGE_TOKEN, '').trim() === '';
+
+/**
+ * Every image is the same `IMAGE_TOKEN`, so an image-only quote alone cannot
+ * tell one image from another. Only an occurrence whose surrounding text
+ * still matches BOTH context windows is accepted, and there is no fuzzy
+ * fallback: a removed image loses its highlight instead of moving to a
+ * neighbour (see research.md).
+ */
+const matchImagesInContext = (
+  text: string,
+  anchor: InlineCommentAnchor,
+): QuoteMatchResult | null => {
+  const { quote, prefix, suffix, approxOffset } = anchor;
+  const starts = occurrencesOf(text, quote).filter(
+    (start) =>
+      text.slice(0, start).endsWith(prefix) &&
+      text.startsWith(suffix, start + quote.length),
+  );
+
+  const start = closestTo(approxOffset, starts);
+  return start == null
+    ? null
+    : { status: 'exact', startOffset: start, endOffset: start + quote.length };
+};
+
+const occurrencesOf = (text: string, quote: string): number[] => {
+  const starts: number[] = [];
+  for (
+    let index = text.indexOf(quote);
+    index !== -1;
+    index = text.indexOf(quote, index + 1)
+  ) {
+    starts.push(index);
+  }
+  return starts;
+};
 
 /**
  * Enumerates every exact occurrence and keeps the one starting closest to
@@ -86,16 +133,7 @@ const matchExactly = (
   quote: string,
   approxOffset: number,
 ): QuoteMatchResult | null => {
-  const starts: number[] = [];
-  for (
-    let index = text.indexOf(quote);
-    index !== -1;
-    index = text.indexOf(quote, index + 1)
-  ) {
-    starts.push(index);
-  }
-
-  const start = closestTo(approxOffset, starts);
+  const start = closestTo(approxOffset, occurrencesOf(text, quote));
   return start == null
     ? null
     : { status: 'exact', startOffset: start, endOffset: start + quote.length };
@@ -116,10 +154,12 @@ const matchApproximately = (
   const normalizedQuote = anchor.quote.normalize('NFC');
 
   // The un-normalized length is what the contract's formula names, and it is
-  // the length a human would recognize as "the quote's length".
+  // the length a human would recognize as "the quote's length". Fewer errors
+  // than characters, or a short quote would match any text of its length.
   const maxErrors = Math.min(
     Math.ceil(anchor.quote.length * FUZZY_MATCH_ERROR_RATE),
     FUZZY_MATCH_MAX_ERRORS,
+    anchor.quote.length - 1,
   );
 
   const matches = search(mapper.normalizedText, normalizedQuote, maxErrors);

@@ -2,7 +2,8 @@
  * Owns the three-stage state machine that carries a text selection from
  * "something is selected" to "the comment form is open". It decides *when*
  * each piece is shown; `SelectionPopover` decides *where*, and
- * `InlineCommentForm` owns *what* gets submitted.
+ * `InlineCommentForm` owns *what* gets submitted. An image chosen from
+ * `ImageCommentButton` skips the selecting stage and goes straight to the form.
  */
 
 import type { JSX, RefObject } from 'react';
@@ -14,10 +15,11 @@ import { InlineCommentForm } from '../InlineCommentForm/InlineCommentForm';
 import { PendingSelectionHighlight } from '../PendingSelectionHighlight/PendingSelectionHighlight';
 import { SelectionPopover } from '../SelectionPopover/SelectionPopover';
 import type { SelectionEdge } from '../SelectionPopover/selection-virtual-element';
+import { ImageCommentButton } from './ImageCommentButton';
 import { SelectionActionButton } from './SelectionActionButton';
 import { cursorEdgeOf } from './selection-cursor-edge';
 import type { CapturedSelection } from './use-text-selection';
-import { useTextSelection } from './use-text-selection';
+import { captureRange, useTextSelection } from './use-text-selection';
 
 type SelectionCaptureProps = {
   /** Ref to the page-body container whose text selection is monitored. */
@@ -114,6 +116,23 @@ export const SelectionCapture = (
     });
   }, []);
 
+  const commitImage = useCallback(
+    (range: Range) => {
+      const container = containerRef.current;
+      const anchor = container == null ? null : captureRange(range, container);
+      if (anchor == null) {
+        return;
+      }
+      setState({
+        stage: 'composing',
+        committedAnchor: anchor,
+        committedRange: range,
+        cursorEdge: 'end',
+      });
+    },
+    [containerRef],
+  );
+
   const closeForm = useCallback(() => {
     setState(IDLE_STATE);
     // Clear the browser selection too, so re-selecting the same range later
@@ -125,7 +144,15 @@ export const SelectionCapture = (
   // that this client-only bundle has actually mounted, and Playwright specs
   // wait on it before firing a text-selection helper with no built-in retry.
   if (state.stage === 'idle') {
-    return <span data-testid="inline-comment-ready" hidden />;
+    return (
+      <>
+        <span data-testid="inline-comment-ready" hidden />
+        <ImageCommentButton
+          containerRef={containerRef}
+          onCommit={commitImage}
+        />
+      </>
+    );
   }
 
   if (state.stage === 'selecting') {

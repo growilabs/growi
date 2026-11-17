@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 
 import type { ResolvedRange } from '../../interfaces';
-import { renderedTextOf } from './rendered-text';
+import { IMAGE_TOKEN, renderedTextOf } from './rendered-text';
 import { rangeForResolved, rangesById, savedRangeOf } from './resolved-range';
 
 const createContainer = (): HTMLElement => {
@@ -79,7 +79,7 @@ describe('rangeForResolved next to an image', () => {
 
   it('starts after an image that directly precedes the commented text', () => {
     const container = containerWithImage();
-    const start = 'Before bold'.length;
+    const start = `Before bold${IMAGE_TOKEN}`.length;
     const range = rangeForResolved(renderedTextOf(container), {
       status: 'exact',
       startOffset: start,
@@ -176,7 +176,7 @@ describe('savedRangeOf', () => {
     document.body.innerHTML = '';
   });
 
-  it('drops an image at the start edge of the selection, as a reload would', () => {
+  it('keeps an image at the start edge of the selection, as a reload would', () => {
     const { container, image } = setup();
     const selection = document.createRange();
     selection.setStartBefore(image);
@@ -185,10 +185,10 @@ describe('savedRangeOf', () => {
     const saved = savedRangeOf(container, selection);
 
     expect(saved?.toString()).toBe(' after');
-    expect(saved?.intersectsNode(image)).toBe(false);
+    expect(saved?.intersectsNode(image)).toBe(true);
   });
 
-  it('drops an image at the end edge of the selection, as a reload would', () => {
+  it('keeps an image at the end edge of the selection, as a reload would', () => {
     const { container, image } = setup();
     const selection = document.createRange();
     selection.setStart(container.firstChild as Node, 0);
@@ -197,7 +197,7 @@ describe('savedRangeOf', () => {
     const saved = savedRangeOf(container, selection);
 
     expect(saved?.toString()).toBe('Before ');
-    expect(saved?.intersectsNode(image)).toBe(false);
+    expect(saved?.intersectsNode(image)).toBe(true);
   });
 
   it('keeps an image that has selected text on both sides', () => {

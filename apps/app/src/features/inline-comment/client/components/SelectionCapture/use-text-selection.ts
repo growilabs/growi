@@ -8,7 +8,11 @@ import { renderedTextOf } from '../../services/rendered-text';
  * into the container's extracted text (see `renderedTextOf`).
  */
 export interface CapturedSelection {
-  /** The exact, unnormalized selected text; NFC normalization happens later, at match time, in quote-matcher. */
+  /**
+   * The exact, unnormalized selected text as `renderedTextOf` extracts it (an
+   * image is one `IMAGE_TOKEN`); NFC normalization happens later, at match
+   * time, in quote-matcher.
+   */
   quote: string;
   prefix: string;
   suffix: string;
@@ -42,9 +46,8 @@ export interface CaptureSelectionOptions {
 
 /**
  * Builds a CapturedSelection from a live DOM Selection, scoped to
- * `containerEl`. Returns null for a collapsed selection, an empty selected
- * string, or a selection outside the given container. Pure with respect to
- * the DOM: only reads, never mutates.
+ * `containerEl`. Returns null when nothing is selected; otherwise behaves as
+ * `captureRange` on the selection's first range.
  */
 export function captureSelection(
   selection: Selection | null,
@@ -54,12 +57,21 @@ export function captureSelection(
   if (selection == null || containerEl == null || selection.rangeCount === 0) {
     return null;
   }
+  return captureRange(selection.getRangeAt(0), containerEl, options);
+}
 
-  const range = selection.getRangeAt(0);
-  const quote = range.toString();
-  if (quote.trim() === '') {
-    // Covers a collapsed selection, an empty selected string, and a selection
-    // of only whitespace (e.g. an image plus the spaces around it).
+/**
+ * Builds a CapturedSelection from `range`, scoped to `containerEl`. Returns
+ * null for a collapsed range, a range of only whitespace, or a range outside
+ * the given container. Pure with respect to the DOM: only reads, never
+ * mutates (the document selection included).
+ */
+export function captureRange(
+  range: Range,
+  containerEl: HTMLElement,
+  options: CaptureSelectionOptions = {},
+): CapturedSelection | null {
+  if (range.collapsed) {
     return null;
   }
 
@@ -81,6 +93,10 @@ export function captureSelection(
     range.startOffset,
   );
   const endOffset = rendered.textOffsetOf(range.endContainer, range.endOffset);
+  const quote = fullText.slice(startOffset, endOffset);
+  if (quote.trim() === '') {
+    return null;
+  }
 
   return {
     quote,

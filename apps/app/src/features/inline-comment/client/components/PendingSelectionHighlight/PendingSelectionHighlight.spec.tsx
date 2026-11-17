@@ -102,7 +102,7 @@ describe('PendingSelectionHighlight', () => {
     expect(image.matches(imageOutlineSelector('pending'))).toBe(false);
   });
 
-  it('does not outline an image at the edge of the selection, matching how the comment is restored once saved', () => {
+  it('outlines an image at the edge of the selection, matching how the comment is restored once saved', () => {
     container.innerHTML = 'Before <img alt="pic"> after.';
     const image = container.querySelector('img') as HTMLImageElement;
     const range = new Range();
@@ -114,7 +114,7 @@ describe('PendingSelectionHighlight', () => {
     );
 
     expect(rangesOf().map((r) => r.toString())).toEqual([' after']);
-    expect(image.matches(imageOutlineSelector('pending'))).toBe(false);
+    expect(image.matches(imageOutlineSelector('pending'))).toBe(true);
   });
 
   it('removes both the CSS highlight and the scope attribute on unmount', () => {

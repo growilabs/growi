@@ -37,6 +37,7 @@ import type { RendererOptions } from '~/interfaces/renderer-options';
 import { useCurrentUser } from '~/states/global';
 
 import type { InlineCommentWithReplies } from '../../../interfaces';
+import { quoteForDisplay } from '../../services/quote-for-display';
 import { MentionPickerButton } from '../InlineCommentForm/MentionPickerButton';
 import { MentionAwareCommentInput } from '../MentionAwareCommentInput/MentionAwareCommentInput';
 import { useCommentInputControls } from '../MentionAwareCommentInput/use-comment-input-controls';
@@ -241,7 +242,7 @@ export const InlineCommentPreviewPopover: FC<
                 data-testid="inline-comment-preview-popover-quote"
                 className={`inline-comment-quote bg-body-tertiary rounded-end small text-body-secondary mt-3 mb-0 p-2 ${styles['inline-comment-preview-popover-quote-clamp']}`}
               >
-                {comment.anchor.quote}
+                {quoteForDisplay(comment.anchor.quote)}
               </blockquote>
             }
             headerExtra={

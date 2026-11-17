@@ -1,6 +1,8 @@
 // @vitest-environment happy-dom
 
-import { renderedTextOf } from './rendered-text';
+import { GROWI_DECORATION_ATTR } from '@growi/core/dist/consts';
+
+import { IMAGE_TOKEN, isCountedImage, renderedTextOf } from './rendered-text';
 
 /**
  * Builds a container whose structure mirrors what GROWI's markdown renderer produces
@@ -208,5 +210,94 @@ describe('renderedTextOf', () => {
         textOffsetOf(headingText, (headingText.nodeValue ?? '').length),
       );
     });
+  });
+});
+
+describe('renderedTextOf with images', () => {
+  const createContainerWithImage = (): HTMLElement => {
+    const container = document.createElement('div');
+    container.innerHTML =
+      '<p>Before <button type="button"><img src="/a.png" alt="a"></button> after</p>';
+    return container;
+  };
+
+  it('counts each image as a single IMAGE_TOKEN at its position', () => {
+    const { text } = renderedTextOf(createContainerWithImage());
+
+    expect(text).toBe(`Before ${IMAGE_TOKEN} after`);
+  });
+
+  it('does not count an image inside an aria-hidden="true" subtree', () => {
+    const container = document.createElement('div');
+    container.innerHTML =
+      '<p>Text<span aria-hidden="true"><img src="/icon.png" alt=""></span></p>';
+
+    const { text } = renderedTextOf(container);
+
+    expect(text).toBe('Text');
+  });
+
+  it('does not count an image or text inside a decoration subtree', () => {
+    const container = document.createElement('div');
+    container.innerHTML = `<p>Text<span ${GROWI_DECORATION_ATTR}><img src="/avatar.png" alt="Alice">Alice</span> after</p>`;
+
+    const { text } = renderedTextOf(container);
+
+    expect(text).toBe('Text after');
+  });
+
+  it("resolves the token's start and end to a Range that holds exactly the image", () => {
+    const container = createContainerWithImage();
+    const { resolveDomPosition } = renderedTextOf(container);
+    const tokenStart = 'Before '.length;
+
+    const start = resolveDomPosition(tokenStart);
+    const end = resolveDomPosition(tokenStart + 1, 'end');
+    const range = document.createRange();
+    range.setStart(start?.node as Node, start?.offset as number);
+    range.setEnd(end?.node as Node, end?.offset as number);
+
+    expect(range.toString()).toBe('');
+    expect(range.cloneContents().querySelectorAll('img')).toHaveLength(1);
+  });
+
+  it('maps the boundaries just before and just after an image to the two sides of its token', () => {
+    const container = createContainerWithImage();
+    const { textOffsetOf } = renderedTextOf(container);
+    const wrapper = container.querySelector('button') as HTMLElement;
+
+    expect(textOffsetOf(wrapper, 0)).toBe('Before '.length);
+    expect(textOffsetOf(wrapper, 1)).toBe('Before '.length + 1);
+  });
+});
+
+describe('isCountedImage', () => {
+  it('accepts exactly the images that renderedTextOf counts as IMAGE_TOKEN', () => {
+    const container = document.createElement('div');
+    container.innerHTML = `
+      <p>A <button type="button"><img data-name="content" src="/a.png" alt=""></button></p>
+      <p><span aria-hidden="true"><img data-name="hidden" src="/b.png" alt=""></span></p>
+      <p><span ${GROWI_DECORATION_ATTR}><span><img data-name="decoration" src="/c.png" alt=""></span></span></p>
+      <p><span class="katex"><img data-name="katex" src="/d.png" alt=""></span></p>
+      <p>B <img data-name="inline" src="/e.png" alt=""></p>
+    `;
+    const images = Array.from(container.querySelectorAll('img'));
+
+    const counted = images.filter((image) => isCountedImage(image, container));
+
+    expect(counted.map((image) => image.dataset.name)).toEqual([
+      'content',
+      'inline',
+    ]);
+    expect(renderedTextOf(container).text.split(IMAGE_TOKEN)).toHaveLength(
+      counted.length + 1,
+    );
+  });
+
+  it('rejects an image outside the container', () => {
+    const container = document.createElement('div');
+    const outside = document.createElement('img');
+
+    expect(isCountedImage(outside, container)).toBe(false);
   });
 });
