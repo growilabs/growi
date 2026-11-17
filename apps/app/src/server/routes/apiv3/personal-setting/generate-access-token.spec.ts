@@ -7,7 +7,7 @@ import express, {
 } from 'express';
 import { Types } from 'mongoose';
 import request from 'supertest';
-import { mockDeep } from 'vitest-mock-extended';
+import { mock } from 'vitest-mock-extended';
 
 import type Crowi from '~/server/crowi';
 import { AccessToken } from '~/server/models/access-token';
@@ -53,7 +53,13 @@ const buildApp = (user: TestUser) => {
   });
   app.post(
     '/generate-access-token',
-    generateAccessTokenHandlerFactory(mockDeep<Crowi>()),
+    generateAccessTokenHandlerFactory(
+      mock<Crowi>({
+        events: mock<Crowi['events']>({
+          activity: mock<Crowi['events']['activity']>(),
+        }),
+      }),
+    ),
   );
   return app;
 };

@@ -35,6 +35,8 @@ vi.mock('~/utils/logger', () => ({
 // Lazy imports after mocks are hoisted
 // ---------------------------------------------------------------------------
 
+type VaultDispatcher = import('./vault-dispatcher').VaultDispatcher;
+
 const getVaultInstruction = async () =>
   (await import('~/features/growi-vault/server/models/vault-instruction'))
     .VaultInstruction;
@@ -79,6 +81,10 @@ const buildMapper = (options: { current: string[]; previous?: string[] }) => ({
     previous: options.previous,
   }),
 });
+
+/** `"<op> <namespace>"` of every written instruction, in write order. */
+const writtenOpsByNamespace = (createSpy: MockInstance): string[] =>
+  createSpy.mock.calls.map((c) => `${c[0].op} ${c[0].payload.namespace}`);
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -323,6 +329,134 @@ describe('VaultDispatcher', () => {
       const removedNs = removes.map((c) => c[0].payload.namespace);
       expect(removedNs).toContain('group-old1');
       expect(removedNs).toContain('group-old2');
+    });
+  });
+
+  describe('onPageChanged — acl-change keeps namespaces the page stays in', () => {
+    it('writes no remove for a previous namespace that is also a current one', async () => {
+      const { createVaultDispatcher } = await import('./vault-dispatcher');
+      const mapper = buildMapper({ current: ['group-kept', 'group-new'] });
+      const dispatcher = createVaultDispatcher(mapper);
+
+      await dispatcher.onPageChanged({
+        type: 'acl-change',
+        page: buildPage(),
+        revisionId: 'rev-acl',
+        previousNamespaces: ['group-kept', 'group-dropped'],
+      });
+      await vi.runAllTimersAsync();
+
+      expect(writtenOpsByNamespace(createSpy)).toEqual([
+        'remove group-dropped',
+        'upsert group-kept',
+        'upsert group-new',
+      ]);
+    });
+
+    it('only upserts when the page left no namespace', async () => {
+      const { createVaultDispatcher } = await import('./vault-dispatcher');
+      const mapper = buildMapper({ current: ['public'] });
+      const dispatcher = createVaultDispatcher(mapper);
+
+      await dispatcher.onPageChanged({
+        type: 'acl-change',
+        page: buildPage(),
+        revisionId: 'rev-acl',
+        previousNamespaces: ['public'],
+      });
+      await vi.runAllTimersAsync();
+
+      expect(writtenOpsByNamespace(createSpy)).toEqual(['upsert public']);
+    });
+  });
+
+  describe('an upsert still waiting in the coalesce window', () => {
+    const bufferUpsertInPublic = async (
+      dispatcher: VaultDispatcher,
+      mapper: ReturnType<typeof buildMapper>,
+    ): Promise<void> => {
+      mapper.computePageNamespaces.mockReturnValueOnce({ current: ['public'] });
+      await dispatcher.onPageChanged({
+        type: 'update',
+        page: buildPage({ path: '/buffered' }),
+        revisionId: 'rev-1',
+      });
+    };
+
+    it('is not written after an acl-change removed the page from that namespace', async () => {
+      const { createVaultDispatcher } = await import('./vault-dispatcher');
+      const mapper = buildMapper({ current: ['user-u1-only-me'] });
+      const dispatcher = createVaultDispatcher(mapper);
+      await bufferUpsertInPublic(dispatcher, mapper);
+
+      await dispatcher.onPageChanged({
+        type: 'acl-change',
+        page: buildPage({ path: '/buffered' }),
+        revisionId: 'rev-1',
+        previousNamespaces: ['public'],
+      });
+      await vi.runAllTimersAsync();
+
+      expect(writtenOpsByNamespace(createSpy)).toEqual([
+        'remove public',
+        'upsert user-u1-only-me',
+      ]);
+    });
+
+    it('is not written after the page was deleted', async () => {
+      const { createVaultDispatcher } = await import('./vault-dispatcher');
+      const mapper = buildMapper({ current: ['public'] });
+      const dispatcher = createVaultDispatcher(mapper);
+      await bufferUpsertInPublic(dispatcher, mapper);
+
+      await dispatcher.onPageChanged({
+        type: 'delete',
+        page: buildPage({ path: '/buffered' }),
+      });
+      await vi.runAllTimersAsync();
+
+      expect(writtenOpsByNamespace(createSpy)).toEqual(['remove public']);
+    });
+
+    it('is not written at the old path after the page was renamed', async () => {
+      const { createVaultDispatcher } = await import('./vault-dispatcher');
+      const mapper = buildMapper({ current: ['public'] });
+      const dispatcher = createVaultDispatcher(mapper);
+      await bufferUpsertInPublic(dispatcher, mapper);
+
+      await dispatcher.onPageRenamed({
+        page: buildPage({ path: '/renamed' }),
+        oldPath: '/buffered',
+        newPath: '/renamed',
+        revisionId: 'rev-1',
+      });
+      await vi.runAllTimersAsync();
+
+      const upsertedPaths = createSpy.mock.calls
+        .filter((c) => c[0].op === 'upsert')
+        .map((c) => c[0].payload.pagePath);
+      expect(upsertedPaths).toEqual(['/renamed']);
+    });
+
+    it('is still written for another page in the same namespace', async () => {
+      const { createVaultDispatcher } = await import('./vault-dispatcher');
+      const mapper = buildMapper({ current: ['public'] });
+      const dispatcher = createVaultDispatcher(mapper);
+      await bufferUpsertInPublic(dispatcher, mapper);
+
+      await dispatcher.onPageChanged({
+        type: 'delete',
+        page: buildPage({
+          _id: { toString: () => 'another-page' },
+          path: '/another',
+        }),
+      });
+      await vi.runAllTimersAsync();
+
+      expect(writtenOpsByNamespace(createSpy)).toEqual([
+        'remove public',
+        'upsert public',
+      ]);
     });
   });
 

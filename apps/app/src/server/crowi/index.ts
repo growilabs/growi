@@ -519,6 +519,13 @@ class Crowi {
       '~/features/mastra/server/services/model-catalog-refresh-jobs'
     );
     startModelCatalogRefreshCronIfEnabled();
+
+    // Change proposal maintenance (expiry, withdrawal while the feature is disabled,
+    // resuming stopped applies); disabled only by an empty schedule
+    const { startChangeProposalMaintenanceCronIfEnabled } = await import(
+      '~/features/change-proposal/server'
+    );
+    startChangeProposalMaintenanceCronIfEnabled(this);
   }
 
   getSlack(): unknown {
@@ -920,7 +927,7 @@ class Crowi {
     await growiPluginService.downloadNotExistPluginRepositories();
   }
 
-  setupPageService(): void {
+  async setupPageService(): Promise<void> {
     if (this.pageGrantService == null) {
       this.pageGrantService = new PageGrantService(this);
     }
@@ -929,6 +936,8 @@ class Crowi {
       this.pageService = new PageService(this);
     }
     this.pageOperationService = instanciatePageOperationService(this);
+    // canOperate() ignores expiry, so a record left by an interrupted operation blocks its paths until removed
+    await this.pageOperationService.init();
   }
 
   setupInAppNotificationService(): void {

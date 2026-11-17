@@ -22,10 +22,14 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
+import { type IPage, PageGrant } from '@growi/core';
 import mongoose from 'mongoose';
 import { afterAll, describe, expect, it } from 'vitest';
+import { mock } from 'vitest-mock-extended';
 
 import { getVaultE2eHandle } from '../../../../test/setup/vault-e2e';
+import { vaultNamespaceMapper } from '../server/services/vault-namespace-mapper';
+import { createVaultPageUpdateHandler } from '../server/services/vault-page-update-handler';
 import { VAULT_E2E_CONFIG, VAULT_E2E_PAGES } from './fixture-contract';
 
 const execFileAsync = promisify(execFile);
@@ -275,6 +279,89 @@ describe('GROWI Vault — clone E2E contract', () => {
     // The relocated blob must carry the original body unchanged.
     const relocatedBody = await readFile(join(afterDir, newFile), 'utf-8');
     expect(relocatedBody).toBe(body);
+  });
+
+  // ----------------------------------------------------------------------
+  // Contract: when a single public page becomes "only me", it disappears
+  // from the clone of everyone except the granted user — including the
+  // page's creator when someone else was granted.
+  // ----------------------------------------------------------------------
+  it("single-page grant change to only-me removes the file from every clone but the granted user's", async () => {
+    const pageId = new mongoose.Types.ObjectId();
+    const revisionId = new mongoose.Types.ObjectId();
+    const path = '/vault-e2e-grant-change/page';
+    const file = 'vault-e2e-grant-change/page.md';
+    const creatorId = new mongoose.Types.ObjectId(
+      VAULT_E2E_CONFIG.admin.userId,
+    );
+    const grantedUserId = new mongoose.Types.ObjectId(
+      VAULT_E2E_CONFIG.member.userId,
+    );
+
+    await db().collection('revisions').insertOne({
+      _id: revisionId,
+      body: '# grant change target\nsentinel:grant-change\n',
+      pageId,
+    });
+
+    const onlyMeGrantState = {
+      grant: PageGrant.GRANT_OWNER,
+      grantedGroups: [],
+      grantedUsers: [grantedUserId],
+    };
+
+    const { dispatcher } = getVaultE2eHandle();
+    const handlePageUpdate = createVaultPageUpdateHandler(
+      dispatcher,
+      vaultNamespaceMapper,
+      // The page is never stored; the grant-changing update reads this back.
+      async () => onlyMeGrantState,
+    );
+    const pageWith = (
+      grantState: Pick<IPage, 'grant' | 'grantedUsers'>,
+    ): Parameters<typeof handlePageUpdate>[0] =>
+      mock<Parameters<typeof handlePageUpdate>[0]>({
+        _id: pageId,
+        path,
+        status: 'published',
+        revision: revisionId,
+        creator: creatorId,
+        grantedGroups: [],
+        ...grantState,
+      });
+    const cloneHasFile = async (pat: string | null): Promise<boolean> => {
+      const dir =
+        pat == null ? await cloneAnonymous() : await cloneAuthenticated(pat);
+      tmpDirs.push(dir);
+      return (await listFiles(dir)).includes(file);
+    };
+    // vault-manager applies instructions asynchronously (and plain upserts
+    // first sit in the coalesce buffer), so clone until the state is reached.
+    const expectCloneEventually = async (
+      pat: string | null,
+      expected: 'has the file' | 'lacks the file',
+    ): Promise<void> => {
+      await expect
+        .poll(() => cloneHasFile(pat), { timeout: 30_000, interval: 500 })
+        .toBe(expected === 'has the file');
+    };
+
+    await handlePageUpdate(
+      pageWith({ grant: PageGrant.GRANT_PUBLIC, grantedUsers: [] }),
+    );
+
+    await expectCloneEventually(null, 'has the file');
+    await expectCloneEventually(VAULT_E2E_CONFIG.admin.pat, 'has the file');
+
+    await handlePageUpdate(pageWith(onlyMeGrantState), {
+      previousGrant: PageGrant.GRANT_PUBLIC,
+      previousGrantedGroups: [],
+      previousGrantedUsers: [],
+    });
+
+    await expectCloneEventually(null, 'lacks the file');
+    await expectCloneEventually(VAULT_E2E_CONFIG.admin.pat, 'lacks the file');
+    await expectCloneEventually(VAULT_E2E_CONFIG.member.pat, 'has the file');
   });
 
   // ----------------------------------------------------------------------

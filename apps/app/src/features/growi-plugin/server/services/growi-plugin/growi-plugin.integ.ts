@@ -5,11 +5,17 @@ import { PLUGIN_STORING_PATH } from '../../consts';
 import { GrowiPlugin } from '../../models';
 import { growiPluginService } from './growi-plugin';
 
-// install() downloads and unzips a real GitHub archive over the network;
-// the default 5000ms test timeout is too tight for that round trip under CI network conditions.
-const NETWORK_INSTALL_TEST_TIMEOUT = 30_000;
+// install() downloads and unzips a real GitHub archive over the network, so a
+// network blip can fail it. An attempt has to be over before the next one
+// starts, or the two would share the same temporary files: the timeout is
+// longer than the 30s download limit in growi-plugin.ts, which makes a stalled
+// attempt reject and clean up within it.
+const NETWORK_INSTALL_TEST_TIMEOUT = 40_000;
+const NETWORK_INSTALL_RETRY = 2;
 
-describe('Installing a GROWI template plugin', () => {
+describe('Installing a GROWI template plugin', {
+  retry: NETWORK_INSTALL_RETRY,
+}, () => {
   it(
     'install() should success',
     async () => {
@@ -73,7 +79,9 @@ describe('Installing a GROWI template plugin', () => {
   );
 });
 
-describe('Installing a GROWI theme plugin', () => {
+describe('Installing a GROWI theme plugin', {
+  retry: NETWORK_INSTALL_RETRY,
+}, () => {
   it(
     'install() should success',
     async () => {

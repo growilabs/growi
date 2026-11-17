@@ -12,7 +12,11 @@ import type { Cursor, HydratedDocument, Types } from 'mongoose';
 
 import type { ExternalUserGroupDocument } from '~/features/external-user-group/server/models/external-user-group';
 import type { SupportedActionType } from '~/interfaces/activity';
-import type { IOptionsForCreate, IOptionsForUpdate } from '~/interfaces/page';
+import type {
+  IOptionsForCreate,
+  IOptionsForInAppNotificationSuppression,
+  IOptionsForUpdate,
+} from '~/interfaces/page';
 import type { PopulatedGrantedGroup } from '~/interfaces/page-grant';
 import type { PageActionOnGroupDelete } from '~/interfaces/user-group';
 import type { CurrentPageYjsData } from '~/interfaces/yjs';
@@ -144,7 +148,7 @@ export interface IPageService {
   revertDeletedPage(
     page,
     user,
-    options,
+    options: IOptionsForInAppNotificationSuppression,
     isRecursively: boolean,
     activityParameters?,
   );
@@ -158,7 +162,7 @@ export interface IPageService {
   deleteCompletely(
     page,
     user,
-    options,
+    options: IOptionsForInAppNotificationSuppression,
     isRecursively: boolean,
     preventEmitting: boolean,
     activityParameters,
@@ -169,7 +173,13 @@ export interface IPageService {
     pageOpId: ObjectIdLike,
     activity?,
   ): Promise<void>;
-  deletePage(page, user, options, isRecursively: boolean, activityParameters);
+  deletePage(
+    page,
+    user,
+    options: IOptionsForInAppNotificationSuppression,
+    isRecursively: boolean,
+    activityParameters,
+  );
   // Deletion requested by a user: judge the deletion authority before deleting
   judgeDeletion(
     page: PageDocument,

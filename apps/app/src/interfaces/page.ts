@@ -2,6 +2,7 @@ import type {
   GroupType,
   IGrantedGroup,
   IPageHasId,
+  IRevisionProposalMark,
   Nullable,
   Origin,
   PageGrant,
@@ -89,6 +90,9 @@ export type IOptionsForUpdate = {
   userRelatedGrantUserGroupIds?: IGrantedGroup[];
   // isSyncRevisionToHackmd?: boolean,
   overwriteScopesOfDescendants?: boolean;
+  // When set, the revision is written only if the page is still at this revision.
+  expectedRevisionId?: string;
+  proposalMark?: IRevisionProposalMark;
 };
 
 export type IOptionsForCreate = {
@@ -99,6 +103,14 @@ export type IOptionsForCreate = {
 
   origin?: Origin;
   wip?: boolean;
+  // Written only on the first revision, never on the page.
+  proposalMark?: IRevisionProposalMark;
+};
+
+// Stops the in-app notification only; the activity is still recorded. Not wired into the
+// recursive (with-children) delete and restore paths.
+export type IOptionsForInAppNotificationSuppression = {
+  isInAppNotificationSuppressed?: boolean;
 };
 
 export type IPagePathWithDescendantCount = {

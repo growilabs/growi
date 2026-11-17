@@ -1,0 +1,23 @@
+{
+  "feature_name": "user-activities",
+  "created_at": "2026-11-10T10:54:25Z",
+  "updated_at": "2026-11-12T16:52:31.949Z",
+  "language": "ja",
+  "phase": "implementation-complete",
+  "cleaned_up_at": "2026-11-12T16:52:31.949Z",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true
+    }
+  },
+  "ready_for_implementation": true
+}
