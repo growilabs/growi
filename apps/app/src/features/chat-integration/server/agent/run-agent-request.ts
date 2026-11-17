@@ -188,7 +188,8 @@ const summaryAnswerOf = async (
     now: deps.now(),
     auditContext: row.auditContext,
   });
-  if (context.signal.aborted) return TIMEOUT;
+  // No deadline check here: a page that exists is linked even when it was
+  // finished after the limit (otherwise the person never learns where it is).
   if (page.kind === 'failed') return failedAnswer(page.reason);
 
   return pageCreatedAnswerOf({

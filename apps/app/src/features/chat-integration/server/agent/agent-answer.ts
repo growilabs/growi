@@ -20,8 +20,8 @@ const SOURCES_MAX = 20;
 const SOURCE_TITLE_MAX = 500;
 const SOURCE_URL_MAX = 2000;
 
-const CUT_NOTE =
-  '\n\n…(This answer was cut short because it is too long for chat.)';
+// Japanese like the proxy's own answer wording.
+const CUT_NOTE = '\n\n…（チャットに収まらないため、答えを途中で切りました）';
 
 export const failedAnswer = (
   reason: AgentFailureReason,

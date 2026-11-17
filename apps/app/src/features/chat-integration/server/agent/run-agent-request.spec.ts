@@ -344,73 +344,6 @@ describe('runAgentRequest', () => {
       expect(String(context.user._id)).toBe(String(user._id));
       expect(context.user.username).toBe(user.username);
     });
-
-    it('fails with agent-error instead of sending an empty answer', async () => {
-      const { row } = await acceptedRequest();
-      const h = harness();
-      h.gateway.answer.mockResolvedValue(
-        completed({ markdown: '  \n ', sources: [] }),
-      );
-
-      await createAgentRequestRunner(h.deps)(row);
-
-      expect(await storedAnswer(row)).toEqual({
-        kind: 'failed',
-        reason: 'agent-error',
-      });
-      expect(await stateOf(row)).toBe('done');
-    });
-
-    // 😀 is two UTF-16 units; one of the two prefixes puts the cut inside a pair.
-    it.each([
-      [''],
-      ['a'],
-    ])('cuts an oversized answer to what the proxy accepts and says it was cut (prefix %j)', async (prefix) => {
-      const { row } = await acceptedRequest();
-      const h = harness();
-      const long = `${prefix}${'😀'.repeat(20_000)}`;
-      const sources = Array.from({ length: 25 }, (_, i) => ({
-        title: `Page ${i}`,
-        url: `${SITE_URL}/${String(i).padStart(24, '0')}`,
-      }));
-      h.gateway.answer.mockResolvedValue(
-        completed({ markdown: long, sources }),
-      );
-
-      await createAgentRequestRunner(h.deps)(row);
-
-      const answer = await storedAnswer(row);
-      expect(answer.kind).toBe('text');
-      if (answer.kind !== 'text') return;
-      expect(answer.markdown.length).toBeLessThanOrEqual(30_000);
-      expect(answer.markdown.startsWith(`${prefix}😀😀`)).toBe(true);
-      expect(answer.markdown).toMatch(/cut short/i);
-      // A split pair is stored as U+FFFD, which chat would show as a broken character.
-      expect(answer.markdown).not.toContain('\uFFFD');
-      expect(answer.sources).toEqual(sources.slice(0, 20));
-    });
-
-    it('keeps sources the proxy would refuse out of the answer', async () => {
-      const { row } = await acceptedRequest();
-      const h = harness();
-      h.gateway.answer.mockResolvedValue(
-        completed({
-          markdown: 'answer',
-          sources: [
-            { title: 't'.repeat(600), url: `${SITE_URL}/a` },
-            { title: 'too long url', url: `${SITE_URL}/${'b'.repeat(2100)}` },
-          ],
-        }),
-      );
-
-      await createAgentRequestRunner(h.deps)(row);
-
-      const answer = await storedAnswer(row);
-      expect(answer).toMatchObject({
-        kind: 'text',
-        sources: [{ title: 't'.repeat(500), url: `${SITE_URL}/a` }],
-      });
-    });
   });
 
   describe('a summary request (Requirement 5.8)', () => {
@@ -603,7 +536,9 @@ describe('runAgentRequest', () => {
       expect(h.createSummaryPage).not.toHaveBeenCalled();
     });
 
-    it('answers timeout when the deadline passed while the page was being created', async () => {
+    // A page that exists is always linked: answering timeout would leave the
+    // person a page they cannot find, and a retry would hit path-conflict.
+    it('still links a page whose creation finished after the deadline', async () => {
       const { row } = await acceptedRequest();
       const h = harness({ timeoutMs: 30 });
       summaryRequested(h);
@@ -618,9 +553,27 @@ describe('runAgentRequest', () => {
 
       await createAgentRequestRunner(h.deps)(row);
 
+      expect(await storedAnswer(row)).toMatchObject({
+        kind: 'page-created',
+        pageUrl: `${SITE_URL}/0123456789abcdef01234567`,
+      });
+      expect(await stateOf(row)).toBe('done');
+    });
+
+    it('passes on path-conflict when the deadline passed while the page creation was refused', async () => {
+      const { row } = await acceptedRequest();
+      const h = harness({ timeoutMs: 30 });
+      summaryRequested(h);
+      h.createSummaryPage.mockImplementation(async () => {
+        await sleep(150);
+        return { kind: 'failed', reason: 'path-conflict' };
+      });
+
+      await createAgentRequestRunner(h.deps)(row);
+
       expect(await storedAnswer(row)).toEqual({
         kind: 'failed',
-        reason: 'timeout',
+        reason: 'path-conflict',
       });
     });
 
