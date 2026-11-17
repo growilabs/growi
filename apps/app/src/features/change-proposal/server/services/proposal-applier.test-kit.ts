@@ -272,7 +272,16 @@ export const createApplierTestKit = (args: {
       $or: [{ target: { $in: pageIds } }, { target: { $in: proposalIds } }],
     });
     await Subscription.deleteMany({ target: { $in: pageIds } });
-    await prisma.activities.deleteMany({ where: { ip } });
+    // An apply set off by an approval records no ip, so its rows go by proposal and operator.
+    await prisma.activities.deleteMany({
+      where: {
+        OR: [
+          { ip },
+          { target: { in: proposalIds } },
+          { userId: { in: Object.values(users).map((u) => u._id.toString()) } },
+        ],
+      },
+    });
     await prisma.changeproposals.deleteMany({
       where: { id: { in: proposalIds } },
     });

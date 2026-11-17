@@ -51,6 +51,10 @@ import {
 import { createRevertAction, type RevertAction } from './revert-action';
 import { createReviewNotifier, type ReviewNotifier } from './review-notifier';
 import {
+  createReviewerActions,
+  type ReviewerActions,
+} from './reviewer-actions';
+import {
   type ChangeProposalSettings,
   readChangeProposalSettings,
 } from './settings';
@@ -62,6 +66,7 @@ const logger = loggerFactory(
 const BASED_ON_RELATIONS: readonly string[] = ['follow-up', 'rework'];
 
 export type ChangeProposalService = RequesterActions &
+  ReviewerActions &
   RevertAction &
   MaintenanceActions &
   ProposalQuery & {
@@ -320,7 +325,8 @@ export const createChangeProposalService = (
   };
 
   return {
-    ...createRequesterActions({ applier, now }),
+    ...createRequesterActions(),
+    ...createReviewerActions({ crowi, applier, reviewNotifier, now }),
     ...createRevertAction({
       applier,
       now,

@@ -64,8 +64,5 @@ export type RequestParameters = {
   readonly endpoint?: string;
 };
 
-// Operation keys; a chosen key also approves the other pending operations on its page.
-export type ApprovalTargets = readonly string[] | 'all';
-
 // Operation keys, or every applied operation the user may see.
 export type RevertTargets = readonly string[] | 'all-visible';

@@ -3,6 +3,7 @@ import { ErrorV3 } from '@growi/core/dist/models';
 import type { RequestHandler } from 'express';
 
 import type Crowi from '~/server/crowi';
+import type { AccessTokenParserReq } from '~/server/middlewares/access-token-parser';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import loggerFactory from '~/utils/logger';
@@ -12,6 +13,7 @@ import type {
   GetChangeProposalService,
 } from './read-access';
 import {
+  detectChannel,
   operationKeysValidator,
   requestTrigger,
   respondWithServiceError,
@@ -23,7 +25,7 @@ const logger = loggerFactory('growi:features:change-proposal:routes:approve');
 type Req = AuthenticatedRequest<
   Record<string, string>,
   { operationKeys?: string[] },
-  unknown
+  AccessTokenParserReq['query']
 >;
 
 /**
@@ -106,9 +108,8 @@ export const approveRouteHandlersFactory = (
       // The service settles the activity before it returns — see rules/activity-recording.md.
       const result = await getService().approve(
         req.params.id,
-        user,
-        req.body.operationKeys ?? 'all',
-        requestTrigger(res),
+        { user, channel: detectChannel(req), trigger: requestTrigger(res) },
+        req.body.operationKeys,
       );
       if (!result.ok) {
         return respondWithServiceError(res, result.error);

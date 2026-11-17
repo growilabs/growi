@@ -12,6 +12,7 @@ import {
   createChangeProposalService,
 } from './change-proposal-service';
 import { createApplierTestKit } from './proposal-applier.test-kit';
+import type { ReviewActor } from './reviewer-actions';
 
 const TEST_IP = '10.0.0.153';
 const PREFIX = '/cp-service-approve-integ';
@@ -31,6 +32,12 @@ describe('ChangeProposalService.approve', () => {
     },
   });
   const { users } = kit;
+
+  const asRequester = (): ReviewActor => ({
+    user: users.requester,
+    channel: 'ui',
+    trigger: BACKGROUND,
+  });
 
   const storeWaiting = (operations: readonly CreateOperationInput[]) =>
     kit.storeProposal(operations, { approve: false });
@@ -110,12 +117,9 @@ describe('ChangeProposalService.approve', () => {
       ]);
       const chosen = keyOf(proposal, 0);
 
-      const result = await service.approve(
-        proposal._id,
-        users.requester,
-        [chosen],
-        BACKGROUND,
-      );
+      const result = await service.approve(proposal._id, asRequester(), [
+        chosen,
+      ]);
 
       expect(result).toEqual({
         ok: true,
@@ -151,12 +155,9 @@ describe('ChangeProposalService.approve', () => {
         },
       ]);
 
-      const result = await service.approve(
-        proposal._id,
-        users.requester,
-        [keyOf(proposal, 0)],
-        BACKGROUND,
-      );
+      const result = await service.approve(proposal._id, asRequester(), [
+        keyOf(proposal, 0),
+      ]);
 
       expect(result.ok).toBe(true);
       const stored = await kit.reload(proposal._id);
@@ -175,12 +176,7 @@ describe('ChangeProposalService.approve', () => {
         createInput('all-new'),
       ]);
 
-      const result = await service.approve(
-        proposal._id,
-        users.requester,
-        'all',
-        BACKGROUND,
-      );
+      const result = await service.approve(proposal._id, asRequester());
 
       expect(result).toEqual({
         ok: true,
@@ -200,7 +196,7 @@ describe('ChangeProposalService.approve', () => {
       ]);
     });
 
-    it('does not re-apply an operation that is no longer pending', async () => {
+    it('does not re-apply an operation that is no longer pending, and reports it as it stands (Reviewers Req 2.11)', async () => {
       const page = await kit.createPage('twice');
       const other = await kit.createPage('twice-other');
       const proposal = await storeWaiting([
@@ -208,19 +204,14 @@ describe('ChangeProposalService.approve', () => {
         kit.editInput(other),
       ]);
       const first = keyOf(proposal, 0);
-      await service.approve(proposal._id, users.requester, [first], BACKGROUND);
+      await service.approve(proposal._id, asRequester(), [first]);
       const revisionAfterFirst = (await kit.findPage(page._id)).revision;
 
-      const again = await service.approve(
-        proposal._id,
-        users.requester,
-        [first],
-        BACKGROUND,
-      );
+      const again = await service.approve(proposal._id, asRequester(), [first]);
 
       expect(again).toEqual({
         ok: true,
-        value: { type: 'done', results: [] },
+        value: { type: 'done', results: [{ key: first, status: 'applied' }] },
       });
       expect(await kit.markedRevisions(proposal._id, first)).toHaveLength(1);
       expect((await kit.findPage(page._id)).revision).toEqual(
@@ -240,12 +231,9 @@ describe('ChangeProposalService.approve', () => {
       const page = await kit.createPage('unknown-key');
       const proposal = await storeWaiting([kit.editInput(page)]);
 
-      const result = await service.approve(
-        proposal._id,
-        users.requester,
-        ['no-such-key'],
-        BACKGROUND,
-      );
+      const result = await service.approve(proposal._id, asRequester(), [
+        'no-such-key',
+      ]);
 
       expect(result).toEqual({
         ok: true,
@@ -267,14 +255,15 @@ describe('ChangeProposalService.approve', () => {
       ).toBe(true);
 
       try {
-        const result = await service.approve(
-          proposal._id,
-          users.requester,
-          'all',
-          BACKGROUND,
-        );
+        const result = await service.approve(proposal._id, asRequester());
 
-        expect(result).toEqual({ ok: true, value: { type: 'in-progress' } });
+        expect(result).toEqual({
+          ok: true,
+          value: {
+            type: 'in-progress',
+            results: [{ key: keyOf(proposal, 0), status: 'pending' }],
+          },
+        });
         const op = kit.operationOf(
           await kit.reload(proposal._id),
           keyOf(proposal, 0),
@@ -292,12 +281,10 @@ describe('ChangeProposalService.approve', () => {
       const page = await kit.createPage('other-user');
       const proposal = await storeWaiting([kit.editInput(page)]);
 
-      const result = await service.approve(
-        proposal._id,
-        users.other,
-        'all',
-        BACKGROUND,
-      );
+      const result = await service.approve(proposal._id, {
+        ...asRequester(),
+        user: users.other,
+      });
 
       expect(result).toEqual({ ok: false, error: { code: 'not-found' } });
       expect(await approvalsOf(proposal._id)).toEqual([undefined]);
@@ -309,12 +296,10 @@ describe('ChangeProposalService.approve', () => {
     it('answers "not found" to another user even when the proposal is no longer open', async () => {
       const proposal = await storeClosed('expired');
 
-      const result = await service.approve(
-        proposal._id,
-        users.other,
-        'all',
-        BACKGROUND,
-      );
+      const result = await service.approve(proposal._id, {
+        ...asRequester(),
+        user: users.other,
+      });
 
       expect(result).toEqual({ ok: false, error: { code: 'not-found' } });
     });
@@ -323,9 +308,10 @@ describe('ChangeProposalService.approve', () => {
       ['a malformed id', 'not-an-object-id'],
       ['an id no proposal has', new mongoose.Types.ObjectId().toString()],
     ])('answers "not found" for %s', async (_label, id) => {
-      expect(
-        await service.approve(id, users.requester, 'all', BACKGROUND),
-      ).toEqual({ ok: false, error: { code: 'not-found' } });
+      expect(await service.approve(id, asRequester())).toEqual({
+        ok: false,
+        error: { code: 'not-found' },
+      });
     });
 
     it.each([
@@ -334,12 +320,7 @@ describe('ChangeProposalService.approve', () => {
     ] as const)('refuses a %s proposal as "not open" and approves nothing', async (closing) => {
       const proposal = await storeClosed(closing);
 
-      const result = await service.approve(
-        proposal._id,
-        users.requester,
-        'all',
-        BACKGROUND,
-      );
+      const result = await service.approve(proposal._id, asRequester());
 
       expect(result).toEqual({ ok: false, error: { code: 'not-open' } });
       const stored = await kit.reload(proposal._id);
@@ -352,12 +333,13 @@ describe('ChangeProposalService.approve', () => {
     it('refuses a settled proposal as "not open"', async () => {
       const page = await kit.createPage('settled');
       const proposal = await storeWaiting([kit.editInput(page)]);
-      await service.approve(proposal._id, users.requester, 'all', BACKGROUND);
+      await service.approve(proposal._id, asRequester());
       expect((await kit.reload(proposal._id)).lifecycle).toBe('settled');
 
-      expect(
-        await service.approve(proposal._id, users.requester, 'all', BACKGROUND),
-      ).toEqual({ ok: false, error: { code: 'not-open' } });
+      expect(await service.approve(proposal._id, asRequester())).toEqual({
+        ok: false,
+        error: { code: 'not-open' },
+      });
     });
 
     it('refuses a discarded proposal as "not open"', async () => {
@@ -368,9 +350,10 @@ describe('ChangeProposalService.approve', () => {
         value: undefined,
       });
 
-      expect(
-        await service.approve(proposal._id, users.requester, 'all', BACKGROUND),
-      ).toEqual({ ok: false, error: { code: 'not-open' } });
+      expect(await service.approve(proposal._id, asRequester())).toEqual({
+        ok: false,
+        error: { code: 'not-open' },
+      });
       expect(await approvalsOf(proposal._id)).toEqual([undefined]);
     });
   });

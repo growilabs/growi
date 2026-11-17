@@ -93,9 +93,8 @@ describe('change proposal flow: create, approve page by page and apply', () => {
   ) => {
     const result = await service.approve(
       proposalId,
-      users.requester,
-      keys,
-      BACKGROUND,
+      { user: users.requester, channel: 'ui', trigger: BACKGROUND },
+      keys === 'all' ? undefined : keys,
     );
     await kit.waitForPageOperationsToFinish();
     if (!result.ok) throw new Error(JSON.stringify(result.error));
