@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
  * The facts `detect-flaky-ci/SKILL.md` Step 2 and Step 3 read out of one CI
- * job log: vitest failure blocks, Playwright `::error` annotations and the
- * shard's count summary, and which failures match the infrastructure-noise
- * denylist.
+ * job log: vitest failure blocks, each Playwright run's counts with its flaky
+ * and failed test lists (every listed test carrying its identity key), and
+ * which failures match the infrastructure-noise denylist.
  *
  * Replaces the literal-pattern greps and the ANSI `sed` the procedure used to
  * spell out. Every judgment stays there: which identity tier a failure gets,
@@ -18,9 +18,8 @@
  *
  * Usage: node parse-job-log.ts < job.log
  *
- * Output fields (exit 0): vitest.failBlocks[], playwright.annotations[],
- * playwright.summary (or null when the log carried no count line at all),
- * denylistHits[].
+ * Output fields (exit 0): vitest.failBlocks[], playwright.runs[] (empty when
+ * the log carried no Playwright summary), denylistHits[].
  * Exit 2: stdin was empty or whitespace only — nothing was measured, which
  * must not be reported as "no failures".
  */
@@ -31,10 +30,13 @@ import {
   INFRA_NOISE_PATTERNS,
   match as matchDenylist,
 } from '../lib/denylist.ts';
+import { buildPlaywrightKey } from '../lib/identity.ts';
 import {
   extractFailBlocks,
-  extractPlaywrightAnnotations,
-  extractSummary,
+  extractPlaywrightRuns,
+  type PlaywrightListedTest,
+  type PlaywrightTestList,
+  type Summary,
 } from '../lib/job-log.ts';
 import { emit, type ScriptResult } from '../lib/output.ts';
 
@@ -46,9 +48,16 @@ and returns the facts Step 2 and Step 3 of detect-flaky-ci read from it.
 
 Output fields (exit 0):
   vitest.failBlocks[]        project, specPath, testTitle, sharedSetupHook, excerpt
-  playwright.annotations[]   file, title (both raw; repeats kept, in order)
-  playwright.summary         failed / flaky / passed / skipped, or null when
-                             the log carried no count line at all
+  playwright.runs[]          one element per Playwright run in the log, in
+                             printed order (an empty array when the log has no
+                             Playwright summary):
+                               counts   failed / flaky / passed / skipped
+                               flaky    { kind: "read", tests[] } or
+                                        { kind: "unreadable", reason }
+                               failed   same shape as flaky
+                               excerpt  the lines read as this run's summary
+                             each test in a "read" list: project, specPath,
+                             testTitle, identityKey
   denylistHits[]             blockIndex, specPath, testTitle, pattern, needle,
                              scope ("job" only inside a shared setup hook)
 
@@ -72,6 +81,35 @@ export const parseArgv = (argv: readonly string[]): ParsedArgv => {
   }
   return { kind: 'args' };
 };
+
+export type ListWithKeys =
+  | {
+      readonly kind: 'read';
+      readonly tests: readonly (PlaywrightListedTest & {
+        readonly identityKey: string;
+      })[];
+    }
+  | Extract<PlaywrightTestList, { kind: 'unreadable' }>;
+
+export type ParseJobLogPlaywright = {
+  readonly runs: readonly {
+    readonly counts: Summary;
+    readonly flaky: ListWithKeys;
+    readonly failed: ListWithKeys;
+    readonly excerpt: string;
+  }[];
+};
+
+const withKeys = (list: PlaywrightTestList): ListWithKeys =>
+  list.kind === 'unreadable'
+    ? list
+    : {
+        kind: 'read',
+        tests: list.tests.map((test) => ({
+          ...test,
+          identityKey: buildPlaywrightKey(test),
+        })),
+      };
 
 export const run = (logText: string): ScriptResult => {
   if (logText.trim() === '') {
@@ -108,14 +146,20 @@ export const run = (logText: string): ScriptResult => {
         ];
   });
 
+  const playwright: ParseJobLogPlaywright = {
+    runs: extractPlaywrightRuns(logText).map((playwrightRun) => ({
+      counts: playwrightRun.counts,
+      flaky: withKeys(playwrightRun.flaky),
+      failed: withKeys(playwrightRun.failed),
+      excerpt: playwrightRun.excerpt,
+    })),
+  };
+
   return {
     ok: true,
     facts: {
       vitest: { failBlocks },
-      playwright: {
-        annotations: extractPlaywrightAnnotations(logText),
-        summary: extractSummary(logText),
-      },
+      playwright,
       denylistHits,
     },
   };

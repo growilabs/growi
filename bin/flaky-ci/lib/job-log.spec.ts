@@ -4,9 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   extractFailBlocks,
-  extractPlaywrightAnnotations,
   extractPlaywrightRuns,
-  extractSummary,
   isSharedSetupHookBlock,
   parsePlaywrightTestLine,
 } from './job-log.ts';
@@ -222,127 +220,6 @@ describe('job-log.isSharedSetupHookBlock', () => {
         'Error: Hook timed out in 10000ms.\n ❯ src/server/service/user-group.integ.ts:60:3',
       ),
     ).toBe(false);
-  });
-});
-
-describe('job-log.extractPlaywrightAnnotations', () => {
-  it('reads file and title out of a real mid-line ::error annotation', () => {
-    const annotations = extractPlaywrightAnnotations(PLAYWRIGHT_11903);
-
-    expect(annotations).toEqual([
-      {
-        file: 'apps/app/playwright/20-basic-features/inline-comment.spec.ts',
-        title:
-          '[chromium] › playwright/20-basic-features/inline-comment.spec.ts:4758:3 › Inline comment - visual refresh: mockup cross-check captures › Capture popover states 5 (normal) and 6 (edit mode) in DARK mode (Req 4.4)',
-      },
-    ]);
-  });
-
-  it('returns an empty list when the log carries no annotation', () => {
-    expect(extractPlaywrightAnnotations(PLAYWRIGHT_11914)).toEqual([]);
-  });
-
-  it('reports an annotation with no title= as title null instead of dropping it', () => {
-    // Tier 2's third fallback case ("a file but no test to name") only
-    // exists if this shape survives extraction.
-    const annotations = extractPlaywrightAnnotations(
-      '2026-09-14T09:41:02.5Z ::error file=apps/app/playwright/60-home/home.spec.ts,line=31,col=3::Error: page.goto: Timeout',
-    );
-
-    expect(annotations).toEqual([
-      { file: 'apps/app/playwright/60-home/home.spec.ts', title: null },
-    ]);
-  });
-
-  it('keeps a repeated annotation as two entries, in the order observed', () => {
-    // The procedure's tier-1 rule counts *distinct* annotations, so it needs
-    // to see the repeats rather than be handed a deduplicated list.
-    const line =
-      '::error file=apps/app/playwright/a.spec.ts,title=[chromium] › a › one,line=3,col=1::boom';
-    const other =
-      '::error file=apps/app/playwright/b.spec.ts,title=[chromium] › b › two,line=9,col=1::boom';
-
-    const annotations = extractPlaywrightAnnotations(
-      [line, other, line].join('\n'),
-    );
-
-    expect(annotations.map((a) => a.file)).toEqual([
-      'apps/app/playwright/a.spec.ts',
-      'apps/app/playwright/b.spec.ts',
-      'apps/app/playwright/a.spec.ts',
-    ]);
-  });
-
-  it('keeps two annotations printed on the same line, in the order printed', () => {
-    // A real annotation is printed mid-line with its message trailing after
-    // `::` (#11903), so two of them can share a line.
-    const annotations = extractPlaywrightAnnotations(
-      '::error file=apps/app/playwright/a.spec.ts,title=[chromium] › a › one,line=3,col=1::boom ::error file=apps/app/playwright/b.spec.ts,title=[chromium] › b › two,line=9,col=1::bang',
-    );
-
-    expect(annotations).toEqual([
-      { file: 'apps/app/playwright/a.spec.ts', title: '[chromium] › a › one' },
-      { file: 'apps/app/playwright/b.spec.ts', title: '[chromium] › b › two' },
-    ]);
-  });
-
-  it('keeps a comma inside the title instead of cutting the title there', () => {
-    const annotations = extractPlaywrightAnnotations(
-      '::error file=apps/app/playwright/a.spec.ts,title=[chromium] › a › writes one, then two,line=3,col=1::boom',
-    );
-
-    expect(annotations[0]?.title).toBe('[chromium] › a › writes one, then two');
-  });
-});
-
-describe('job-log.extractSummary', () => {
-  it('reads a real `0 failed / 1 flaky` shard summary, with the absent failed line as 0', () => {
-    expect(extractSummary(PLAYWRIGHT_11903)).toEqual({
-      failed: 0,
-      flaky: 1,
-      passed: 106,
-      skipped: 0,
-    });
-  });
-
-  it('reads a `1 failed / 0 flaky` shard summary', () => {
-    expect(extractSummary(PLAYWRIGHT_ONE_FAILED)).toEqual({
-      failed: 1,
-      flaky: 0,
-      passed: 105,
-      skipped: 0,
-    });
-  });
-
-  it('does not add up a count line the runner echoed a second time under ##[notice]', () => {
-    expect(extractSummary(PLAYWRIGHT_11914)).toEqual({
-      failed: 0,
-      flaky: 1,
-      passed: 106,
-      skipped: 0,
-    });
-  });
-
-  it('returns null — not zeros — when the log carries no count line at all', () => {
-    expect(extractSummary(REPRO_11849)).toBeNull();
-  });
-
-  it('does not read vitest’s own `Test Files` / `Tests` totals as a shard summary', () => {
-    // The real fixture ends with ` Test Files  1 failed | 309 passed (310)`
-    // and ` Tests  5 failed | 4151 passed (4156)`; reading either as the
-    // Playwright summary would make the tier-1 count test fire on a vitest
-    // job.
-    expect(CI_APP_TEST).toContain('1 failed');
-    expect(extractSummary(CI_APP_TEST)).toBeNull();
-  });
-
-  it('reads a summary that carries exactly one of the four count lines', () => {
-    expect(extractSummary('2026-09-14T09:41:02.5Z   2 skipped')).toEqual({
-      failed: 0,
-      flaky: 0,
-      passed: 0,
-      skipped: 2,
-    });
   });
 });
 

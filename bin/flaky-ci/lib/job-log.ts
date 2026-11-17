@@ -1,23 +1,17 @@
 /**
- * Reading facts out of one CI job log: vitest failure blocks, Playwright
- * `::error` annotations, a Playwright shard's own count summary, and each
+ * Reading facts out of one CI job log: vitest failure blocks, and each
  * Playwright run's end-of-run summary with its flaky and failed test lists.
  *
- * This replaces the literal-pattern greps `detect-flaky-ci/SKILL.md` Step 2
- * and Step 3 used to spell out (`FAIL `, `::error`, ` flaky`, and
- * `grep -E '[0-9]+ (failed|flaky|passed|skipped)'`). Everything here is a
- * fact; which tier an identity gets, which failures fold into one identity,
- * and whether a denylist hit drops a failure or the whole job all stay in the
- * procedure.
+ * Everything here is a fact; which tier an identity gets, which failures fold
+ * into one identity, and whether a denylist hit drops a failure or the whole
+ * job all stay in the procedure.
  *
  * Every function normalizes its input with `ansi.strip` first (which is
  * idempotent), so a caller may hand over either a raw log or an already
  * stripped one. Timestamps are deliberately **not** removed from the text:
  * they are part of the evidence excerpt a tracking issue quotes. Instead,
- * every pattern here is position-independent — the endpoint prefixes each
- * line with `2026-09-14T09:22:51.3976078Z `, and Playwright prints an
- * annotation mid-line, so a line-start anchor matches nothing (measured in
- * the procedure: anchored `error file=`, 0 matches; unanchored, 1).
+ * each line's timestamp prefix (`2026-09-14T09:22:51.3976078Z `) is skipped
+ * when the line is matched.
  */
 import { strip } from './ansi.ts';
 
@@ -36,12 +30,6 @@ export type FailBlock = {
   readonly sharedSetupHook: boolean;
   /** The FAIL line plus the error and stack lines printed under it. */
   readonly excerpt: string;
-};
-
-export type PlaywrightAnnotation = {
-  readonly file: string | null;
-  /** `null` when the annotation carries no `title=` — tier 2's third case. */
-  readonly title: string | null;
 };
 
 export type Summary = {
@@ -179,106 +167,6 @@ export const extractFailBlocks = (text: string): readonly FailBlock[] => {
       excerpt,
     };
   });
-};
-
-/**
- * Only the `::error ` spelling is matched, deliberately. The runner echoes
- * some workflow commands in `##[…]` form (real example: `##[notice]  1 flaky`
- * in `fixtures/job-logs/11914-playwright-flaky-excerpt.txt`), but no material
- * collected for this spec contains an error annotation in that form, so
- * accepting one would be guesswork — and guesswork with a cost: if a log ever
- * carried both spellings of one annotation, the procedure's tier-1 rule
- * ("exactly one **distinct** annotation") would see two and drop to the
- * coarse identity. The failure mode of not matching a form that does exist is
- * the safer one: zero annotations also sends the procedure to the coarse
- * identity, and never to a precise-but-wrong one.
- */
-const ANNOTATION_MARKER = '::error ';
-/** `file=` runs until the next known key, so a value may contain `,`. */
-const ANNOTATION_FILE =
-  /(?:^|,)file=(.*?)(?=,(?:title|line|col|endLine|endColumn)=|$)/;
-const ANNOTATION_TITLE =
-  /(?:^|,)title=(.*?)(?=,(?:line|col|endLine|endColumn)=|$)/;
-
-/**
- * Every `::error file=…,title=…` annotation, in the order printed and with
- * repeats kept: the procedure's tier-1 rule counts **distinct** annotations,
- * so it has to see the repeats rather than be handed a deduplicated list.
- * The raw values are returned unchanged — normalizing them into an identity
- * key (dropping `apps/app/`, the `[browser] › file:line:col › ` prefix, and
- * rewriting ` › `) belongs to the identity step, not here.
- */
-export const extractPlaywrightAnnotations = (
-  text: string,
-): readonly PlaywrightAnnotation[] => {
-  const annotations: PlaywrightAnnotation[] = [];
-  for (const line of strip(text).split('\n')) {
-    let searchFrom = 0;
-    for (;;) {
-      const start = line.indexOf(ANNOTATION_MARKER, searchFrom);
-      if (start === -1) {
-        break;
-      }
-      const paramsStart = start + ANNOTATION_MARKER.length;
-      // The annotation's parameters end at the `::` that starts its message.
-      const paramsEnd = line.indexOf('::', paramsStart);
-      const params =
-        paramsEnd === -1
-          ? line.slice(paramsStart)
-          : line.slice(paramsStart, paramsEnd);
-      annotations.push({
-        file: params.match(ANNOTATION_FILE)?.[1] ?? null,
-        title: params.match(ANNOTATION_TITLE)?.[1] ?? null,
-      });
-      searchFrom = paramsEnd === -1 ? line.length : paramsEnd + 2;
-    }
-  }
-  return annotations;
-};
-
-const SUMMARY_KEYS = ['failed', 'flaky', 'passed', 'skipped'] as const;
-type SummaryKey = (typeof SUMMARY_KEYS)[number];
-
-/**
- * A Playwright shard's count line: the number starts the line (after the
- * timestamp), as in `  1 flaky` / `  106 passed (5.7m)`. The anchor is what
- * keeps vitest's own totals out — ` Test Files  1 failed | 309 passed (310)`
- * starts with a word, so it never matches, and reading it as a shard summary
- * would fire the tier-1 count test on a vitest job.
- */
-const SUMMARY_LINE = /^\s*(\d+)\s+(failed|flaky|passed|skipped)\b/;
-
-/**
- * The shard's summary counts, or `null` when the log carries no count line at
- * all. The distinction matters: `null` means "not measured" and sends the
- * procedure to its coarse identity, while a captured summary with an absent
- * line legitimately reads that line as `0` (a shard with no failures prints
- * no `failed` line).
- *
- * The **first** occurrence of each keyword wins. The runner echoes the whole
- * summary a second time under `##[notice]` (real example:
- * `fixtures/job-logs/11914-playwright-flaky-excerpt.txt`), and adding the
- * echo to the first reading would double every count.
- */
-export const extractSummary = (text: string): Summary | null => {
-  const counts = new Map<SummaryKey, number>();
-  for (const rawLine of strip(text).split('\n')) {
-    const found = withoutTimestamp(rawLine).match(SUMMARY_LINE);
-    const key = found?.[2] as SummaryKey | undefined;
-    if (found?.[1] == null || key == null || counts.has(key)) {
-      continue;
-    }
-    counts.set(key, Number.parseInt(found[1], 10));
-  }
-  if (counts.size === 0) {
-    return null;
-  }
-  return {
-    failed: counts.get('failed') ?? 0,
-    flaky: counts.get('flaky') ?? 0,
-    passed: counts.get('passed') ?? 0,
-    skipped: counts.get('skipped') ?? 0,
-  };
 };
 
 export type PlaywrightListedTest = {
