@@ -554,6 +554,9 @@ model pagelinkbackfilljobs {
   // The last `_id` processed in the current run; reset when a run starts.
   progressMarker String?                             @db.ObjectId
   processed      Int                                 @default(0)
+  // Pages of the current run skipped rather than indexed (body over the size cap, or every
+  // write attempt failed); each is also logged, so the gap is visible rather than silent.
+  skippedPages   Int                                 @default(0)
   completedAt    DateTime?
   lastError      String?
   claimedBy      String?

@@ -35,8 +35,10 @@ export const extension = Prisma.defineExtension((client) => {
           // Two raw commands, not one bulkWrite: Prisma has no bulk-upsert API, and no
           // portable single command mixes upserts with a delete pre-MongoDB-8.0. That puts
           // a round trip between them, so two concurrent replaces of the same fromPage
-          // could interleave and drop rows — safe only because PageLinkUpsertQueue never
-          // drains a page concurrently with itself.
+          // can interleave and leave only the rows both sets share. PageLinkUpsertQueue
+          // never drains a page concurrently with itself, but the backfill and the live
+          // drain can meet on one page; design.md (PageLinkBackfillCron, write ordering)
+          // accepts that window.
           if (resolvedRows.length > 0) {
             const upsertResult = await client.$runCommandRaw({
               update: 'pagelinks',

@@ -5,9 +5,12 @@ import type { PageLinkUpsertQueuePacing } from './page-link-upsert-queue';
 
 const logger = loggerFactory('growi:features:backlinks:upsert-queue-pacing');
 
-type PacingConfigKey =
+export type PacingConfigKey =
   | 'backlinks:drainIntervalMs'
-  | 'backlinks:dutyCyclePercent';
+  | 'backlinks:dutyCyclePercent'
+  | 'backlinks:backfillDutyCyclePercent'
+  | 'backlinks:backfillMaxPagesPerSecond'
+  | 'backlinks:backfillMaxBodyKiB';
 
 const fallbackToDefault = (
   value: number,
@@ -21,7 +24,7 @@ const fallbackToDefault = (
   return defaultValue;
 };
 
-const positiveIntOrDefault = (
+export const positiveIntOrDefault = (
   value: number,
   configKey: PacingConfigKey,
 ): number =>
@@ -30,7 +33,10 @@ const positiveIntOrDefault = (
     : fallbackToDefault(value, configKey);
 
 /** A duty cycle over 100% is not expressible — 100 already means "never rest". */
-const percentOrDefault = (value: number, configKey: PacingConfigKey): number =>
+export const percentOrDefault = (
+  value: number,
+  configKey: PacingConfigKey,
+): number =>
   Number.isInteger(value) && value > 0 && value <= 100
     ? value
     : fallbackToDefault(value, configKey);

@@ -42,6 +42,9 @@ export const SocketEventName = {
   FinishAddAuditlog: 'finishAddAuditlog',
   AuditlogRebuildingFailed: 'auditlogRebuildingFailed',
 
+  // Backlinks backfill of pre-existing pages
+  BacklinksBackfillProgress: 'backlinksBackfillProgress',
+
   // External user group sync
   externalUserGroup: generateGroupSyncEvents(),
 

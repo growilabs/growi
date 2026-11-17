@@ -2,17 +2,10 @@ import { performance } from 'node:perf_hooks';
 
 import loggerFactory from '~/utils/logger';
 
+import { restMsFor } from './duty-cycle-rest';
 import { handlePageUpsertById } from './page-link-service-handlers';
 
 const logger = loggerFactory('growi:features:backlinks:page-link-upsert-queue');
-
-/**
- * Ceiling on the work one page may be charged for, well above any real parse cost. Bounding the
- * charge rather than the resulting rest keeps the configured duty exact for every legitimate
- * measurement — clamping the rest instead raised the effective duty for expensive pages, worst at
- * a deliberately low duty, which is where the knob matters most.
- */
-const MAX_CHARGED_EXTRACTION_MS = 5000;
 
 /** Enough to ride out a replica-set failover, few enough not to chase a permanent fault. */
 const MAX_UPSERT_ATTEMPTS = 5;
@@ -58,8 +51,6 @@ export class PageLinkUpsertQueue {
    * its page was abandoned cannot be recalled, but its failure must not re-queue the id.
    */
   private abandonedThisDrain: Set<string> | null = null;
-  /** Rest milliseconds owed per millisecond worked. */
-  private restRatio: number;
   /** Failures so far per page; cleared on success or on giving up. */
   private attemptsByPage: Map<string, number>;
 
@@ -72,7 +63,6 @@ export class PageLinkUpsertQueue {
     this.pagesToUpsert = new Set<string>();
     this.draining = false;
     this.drainTimer = null;
-    this.restRatio = (100 - pacing.dutyCyclePercent) / pacing.dutyCyclePercent;
     this.attemptsByPage = new Map<string, number>();
   }
 
@@ -133,12 +123,6 @@ export class PageLinkUpsertQueue {
     return false;
   }
 
-  private restMsFor(extractionMs: number): number {
-    if (!Number.isFinite(extractionMs) || extractionMs <= 0) return 0;
-    const charged = Math.min(extractionMs, MAX_CHARGED_EXTRACTION_MS);
-    return charged * this.restRatio;
-  }
-
   private rest(ms: number): Promise<void> {
     return new Promise((resolve) => {
       setTimeout(resolve, ms).unref();
@@ -197,7 +181,7 @@ export class PageLinkUpsertQueue {
           }
         }
 
-        const restMs = this.restMsFor(extractionMs);
+        const restMs = restMsFor(extractionMs, this.pacing.dutyCyclePercent);
         if (restMs > 0) await this.rest(restMs);
       }
     } finally {

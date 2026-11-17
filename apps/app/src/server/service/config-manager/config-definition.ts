@@ -385,6 +385,9 @@ export const CONFIG_KEYS = [
   // Backlinks Settings
   'backlinks:drainIntervalMs',
   'backlinks:dutyCyclePercent',
+  'backlinks:backfillDutyCyclePercent',
+  'backlinks:backfillMaxPagesPerSecond',
+  'backlinks:backfillMaxBodyKiB',
 
   // Change Proposal Settings
   'app:changeProposalEnabled',
@@ -1644,6 +1647,22 @@ export const CONFIG_DEFINITIONS = {
   'backlinks:dutyCyclePercent': defineConfig<number>({
     envVarName: 'BACKLINKS_DUTY_CYCLE_PERCENT',
     defaultValue: 20,
+  }),
+  // Pacing of the backfill of pre-existing pages, separate from the live queue's above. The
+  // defaults are provisional until the backfill performance run (design.md, PageLinkBackfillCron).
+  'backlinks:backfillDutyCyclePercent': defineConfig<number>({
+    envVarName: 'BACKLINKS_BACKFILL_DUTY_CYCLE_PERCENT',
+    defaultValue: 25,
+  }),
+  // Floor on the interval between backfilled pages, bounding the per-app database operation rate.
+  'backlinks:backfillMaxPagesPerSecond': defineConfig<number>({
+    envVarName: 'BACKLINKS_BACKFILL_MAX_PAGES_PER_SECOND',
+    defaultValue: 20,
+  }),
+  // Bodies larger than this (UTF-8 KiB) are skipped by the backfill rather than parsed.
+  'backlinks:backfillMaxBodyKiB': defineConfig<number>({
+    envVarName: 'BACKLINKS_BACKFILL_MAX_BODY_KIB',
+    defaultValue: 256,
   }),
 
   // Change Proposal Settings
