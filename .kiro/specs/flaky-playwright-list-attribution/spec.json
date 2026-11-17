@@ -1,0 +1,22 @@
+{
+  "feature_name": "flaky-playwright-list-attribution",
+  "created_at": "2026-11-17T17:24:34Z",
+  "updated_at": "2026-11-17T17:52:35Z",
+  "language": "ja",
+  "phase": "tasks-generated",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true
+    }
+  },
+  "ready_for_implementation": true
+}
