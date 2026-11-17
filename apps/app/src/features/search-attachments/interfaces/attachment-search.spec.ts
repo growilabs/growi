@@ -294,16 +294,16 @@ describe('AttachmentSearchConfig', () => {
     expect(config.extractorUri).toBe('http://localhost:8000');
   });
 
-  test('accepts extractorUri as undefined', () => {
+  test('accepts extractorUri as null', () => {
     const config: AttachmentSearchConfig = {
-      extractorUri: undefined,
+      extractorUri: null,
       hasExtractorToken: false,
       timeoutMs: 30000,
       maxFileSizeBytes: 52428800,
       isAttachmentFullTextSearchEnabled: false,
       requiresReindex: false,
     };
-    expect(config.extractorUri).toBeUndefined();
+    expect(config.extractorUri).toBeNull();
   });
 });
 

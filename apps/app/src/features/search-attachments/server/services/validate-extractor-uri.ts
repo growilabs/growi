@@ -10,7 +10,7 @@ const BLOCKED_METADATA_ADDRESSES = (() => {
   // link-local: AWS / GCP / Azure / OpenStack metadata live here
   list.addSubnet('169.254.0.0', 16, 'ipv4');
   list.addAddress('100.100.100.200', 'ipv4'); // Alibaba Cloud
-  list.addAddress('192.0.0.192', 'ipv4'); // GCP internal metadata
+  list.addAddress('192.0.0.192', 'ipv4'); // Oracle Cloud metadata
   list.addAddress('fd00:ec2::254', 'ipv6'); // AWS IPv6
   return list;
 })();

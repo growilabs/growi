@@ -22,6 +22,7 @@ import {
 } from '~/server/service/search-delegator/elasticsearch.testing';
 import { prisma } from '~/utils/prisma';
 
+import { ATTACHMENT_HITS_PER_PAGE } from '../queries/build-attachments-by-page-ids-query';
 import {
   AttachmentSearchDelegatorExtension,
   attachmentIndexNames,
@@ -876,7 +877,7 @@ describe.skipIf(esUri == null)(
         for (const counts of [firstCounts, secondaryCounts]) {
           expect(Object.keys(counts).sort()).toEqual(['crowded', 'crowdedOut']);
           expect(counts.crowdedOut).toBe(1);
-          expect(counts.crowded).toBeLessThan(25);
+          expect(counts.crowded).toBe(ATTACHMENT_HITS_PER_PAGE);
         }
       }, 30_000);
     });

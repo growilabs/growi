@@ -1,6 +1,6 @@
 /**
  * DTO / interface definitions for the attachment full-text search feature.
- * This file is type-only — no runtime code is included.
+ * Types only, apart from the FILE_READ_FAILED constant.
  */
 
 // ---- Extraction types ----
@@ -102,7 +102,7 @@ export interface ExtractionFailureEntry {
 // ---- Configuration ----
 
 export interface AttachmentSearchConfig {
-  readonly extractorUri: string | undefined;
+  readonly extractorUri: string | null;
   readonly hasExtractorToken: boolean;
   readonly timeoutMs: number;
   readonly maxFileSizeBytes: number;

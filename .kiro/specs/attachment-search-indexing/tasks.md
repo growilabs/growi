@@ -94,8 +94,8 @@
 ## 4. Core: ES delegator 拡張と query builder 群
 
 - [x] 4.1 (P) `attachment-search-delegator-extension` に index ライフサイクル / bulk 操作を実装する
-  - `ensureAttachmentIndex()` / `createRebuildIndex()` / `swapAttachmentAlias(index)` / `dropRebuildIndex(index)` (alias の裏の 2 つの実 index を交互に使う) と `syncAttachmentIndexed(..., targetIndexes)` / `syncAttachmentRemoved(..., targetIndexes)` を追加する
-  - doc ID を `${attachmentId}_${pageNumber ?? 0}` で決定し、`targetIndexes` 複数指定時は 1 回の `_bulk` で書き切る (2 回別 API コールにしない)
+  - `ensureAttachmentIndex()` / `createRebuildIndex()` / `swapAttachmentAlias(index)` / `dropRebuildIndex(index)` (alias の裏の 2 つの実 index を交互に使う) と `syncAttachmentIndexed(..., targetIndex)` / `syncAttachmentRemoved(..., targetIndexes)` を追加する (`syncAttachmentIndexed` が受け取る index は 1 つで、indexer が対象の index ごとに呼ぶ)
+  - doc ID を `${attachmentId}_${pageNumber ?? 0}` で決定し、`syncAttachmentIndexed` は 1 つの index に 1 回の `_bulk` で書き切る (ページごとに別 API コールにしない)
   - 既存 `ElasticsearchDelegator` と composition で合成し、既存 Page 系メソッドは不変であることを確認する
   - _Requirements: 2.2, 2.5, 3.1, 6.1, 9.2_
   - _Boundary: ESDelegator extension_
@@ -178,6 +178,7 @@
 - [ ] 6.4 親ページが 10,000 を超える添付 index でも orphan sweep が全ページを確かめるようにする
   - いまは terms aggregation (`size: 10000`) で pageId を集めるので、添付を持つページが 10,000 を超えると、超えた分の pageId は確かめられず、親ページの無い文書が残る (検索結果には出ない。research.md 10.10)
   - composite aggregation などで pageId を最後まで順に取り出し、MongoDB との照合と削除を分割して行う
+  - あわせて、sweep が自前で持つ削除 (`server/index.ts` の `runDeleteByPageId`) を、`attachment-search-delegator-extension.ts` の共通の削除に揃える
   - _Requirements: 3.2_
   - _Boundary: features/search-attachments/server/services_
 
@@ -243,7 +244,7 @@
   - `PUT /_api/v3/admin/attachment-search/config`: `extractorUri` (null / 空文字で soft-disable、allowlist 検証 400 `invalid_extractor_uri`) / `extractorToken` (write-only。前後の空白を除いて保存し、null・空文字・空白だけで削除。DB には平文で保存される) / `timeoutMs` (1,000〜600,000) / `maxFileSizeBytes` (1〜500MiB) を受理し、空の本文 `{}` を返す。保存後に機能が有効なら添付 index を作る (4.2)
   - `PUT` は `adminRequired` の後に `addActivity` を通し、成功時に監査ログの記録を `ADMIN_ATTACHMENT_SEARCH_SETTINGS_UPDATE` (Large のグループ) に確定する。記録にトークンの値を含めない。拒否・失敗は `UNSETTLED` のまま
   - `requiresReindex` は「ページに属する添付の数 (`prisma.attachments.count`)」> 「添付 index の `attachmentId` の cardinality」の算出、**Config collection に persist しない**、30 秒 TTL in-memory cache + `PUT config` 成功時 invalidate
-  - `extractorToken` の値が GET 応答に含まれないことを、route を通すテスト (保存 → GET) で固定する
+  - `extractorToken` の値が GET 応答に含まれないことを、route を通すテスト (設定値にトークンを入れ、GET を呼んで応答に含まれないことを確かめる) で固定する
   - _Requirements: 5.1, 5.2, 5.3, 5.6_
   - _Boundary: features/search-attachments/server/routes/apiv3, Config service_
   - _Depends: 2.1, 3.1, 4.1_
@@ -310,7 +311,7 @@
 - [x] 10.2 query-time permission lookup (facet=all secondary / facet=attachments primary) を integ test で固定する (`attachment-search-permission.integ.ts`: 本物の ES と MongoDB で、7 種類の閲覧者 × 公開範囲 × 一覧ポリシー 4 通り × 3 経路を、ページ検索そのものを正解として比較)
   - 親ページ権限変更直後に ES を触らずに次回検索で添付ヒット可視性が更新されること (MongoDB の権限確認で、page_index の同期が遅れていても即座に反映される)
   - 親ページ削除後 rebuildIndex 前でも添付ヒットが primary の権限判定により除外されること
-  - rebuildIndex 実行後に `AttachmentOrphanSweeper` が親 Page 不在の doc を実削除していること
+  - `AttachmentOrphanSweeper` が親 Page 不在の doc を削除することは、ES を mock した単体テスト (`attachment-orphan-sweeper.spec.ts`) で確かめている。本物の ES を使うテストは無い
   - `GET /search/attachments?q=...&pageIds=...` (secondary endpoint) が `pageIds.length` 超過で 400、消失/権限失効ページを権限判定で除外すること
   - _Requirements: 3.2, 3.3, 4.1, 4.2, 4.3, 4.4, 9.1, 9.3_
   - _Boundary: integration_

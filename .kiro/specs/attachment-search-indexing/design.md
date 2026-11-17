@@ -970,8 +970,8 @@ resolveAttachmentSecondary(
 - `facet=all` の primary は既存 Page 検索そのものなので演算子は最初から効いており、添付ヒットは primary の pageId に限定されるため演算子の追加処理は要らない
 - `facet=all` の 1 ページ目の権限判定は、primary のページ検索の結果だけで行う (`snippetVisiblePageIds`)。ページ検索は viewer filter (`filterPagesByViewer`)・演算子・`security:disableUserPages` (`parseSearchQuery` で演算子に変換済み) をすでに当てており、結果の各項目はページ検索が本文の断片の表示を決めたのと同じ MongoDB のページ文書を持っている。そこで各項目に `canShowSnippetOfPage` (`SearchService.canShowSnippet` と同じ関数) を当て、本文の断片が見せられるページの添付ヒットだけを残す。page_index と MongoDB への問い合わせ (`searchAccessiblePages`) はこの経路では行わない。権限情報 (`grant`) を持たない項目のヒットは捨てる (fail-close)
 - page_index 側の権限項目でも同じ規則を当てる `searchAccessiblePages` の判定は、MongoDB 側が見せると判断したページを、page_index が古いときに余計に落とすだけなので、「ページ検索が本文の断片を見せるページだけ」という規則の上では要らない
-- 本文語が空 (例: `author:jim` だけのクエリ) のときは、添付 index には問い合わせない。`facet=attachments` は空 items を返し、`facet=all` は添付ヒットを付けない
-- 検索クエリが named query (`nq:`) により DEFAULT 以外の delegator に解決された場合は、facet の指定にかかわらず `pages` として扱い aggregator を呼ばない (添付 index は DEFAULT の全文検索 delegator にだけ存在するため)
+- 本文語に否定でない語 (`match` / `phrase`) が 1 つも無いとき (例: `author:jim` だけのクエリ、`-foo` のような否定語だけのクエリ) は、添付 index には問い合わせない。`facet=attachments` は空 items を返し、`facet=all` は添付ヒットを付けない
+- `nq` パラメータが付いている要求は、`nq` の中身を見ずに、facet の指定にかかわらず `pages` として扱い aggregator を呼ばない (名前付きクエリは別の delegator で動き、添付 index は DEFAULT の全文検索 delegator にだけ存在するため)
 
 **添付ヒットの数と問い合わせの数の上限**:
 - 1 ページあたりの添付ヒットは、`facet=all` の 1 ページ目と secondary では最大 5 件 (`ATTACHMENT_HITS_PER_PAGE`)。`facet=attachments` では、窓の中でそのページに当たったヒットの数になる
@@ -994,9 +994,9 @@ resolveAttachmentSecondary(
 
 | Method | Endpoint | Request | Response | Errors |
 |--------|----------|---------|----------|--------|
-| GET | /_api/search (既存 apiv1 の拡張) | `?q=&facet=all\|pages\|attachments&offset=&limit=&resolve=primary\|full` (`facet` 省略時は `pages` = 従来どおり。facet を処理するのは機能が有効で `nq` が無いときだけ。`resolve` は `facet` があるときだけ読む) | `facet` 省略時・`facet=pages`・機能無効・`nq` 付きは既存の `IFormattedSearchResult`。それ以外は `IFacetedSearchResult` (下記) | 既存どおり。`facet` / `resolve` が決まった値でなければ `{ ok: false, code: 400 }` (apiv1 の慣習どおり HTTP 200。機能が無効でも返る)。facet を処理するときは、`limit` が 1〜200 の整数 (既定 50)、`offset` が 0 以上の整数でなければ同じく 400 |
+| GET | /_api/search (既存 apiv1 の拡張) | `?q=&facet=all\|pages\|attachments&offset=&limit=&resolve=primary\|full` (`facet` 省略時は `pages` = 従来どおり。facet を処理するのは機能が有効で `nq` が無いときだけ。`resolve` は `facet` があるときだけ読む) | `facet` 省略時・`facet=pages`・機能無効・`nq` 付きは既存の `IFormattedSearchResult`。それ以外は `IFacetedSearchResult` (下記) | 既存どおり。`facet` / `resolve` が決まった値でなければ `{ ok: false, code: 400 }` (apiv1 の慣習どおり HTTP 200。機能が無効でも返る)。facet を処理するときは、`limit` が 1〜200 の整数 (既定 50)、`offset` が 0 以上の整数でなければ同じく 400。`limit + offset` が 10,000 を超えると、facet の検査より前に、既存のページ検索と同じ `{ ok: false, error: '(limit + offset) must be less than or equal to 10000' }` を返す (`code` は付かず、HTTP 200) |
 | GET | /_api/v3/search/attachments | `?q=&pageIds=id1,id2,...` (`pageIds` はコンマ区切りか繰り返し。重複を除いて 1〜20 件の ObjectId) | `IResolvedSecondaryResult` (`{ facet: 'all', enrichments }`) | 400 `invalid_query` / `invalid_page_ids`, 403 (未ログインでゲストの閲覧が許可されていない), 500, 503 `feature_disabled` |
-| POST | /_api/v3/attachments/:id/reextract | — | `{ outcome: { kind } }` (`ReextractResponse`。抽出テキストは返さない) | 400 (id が ObjectId でない), 404 `notfound_or_forbidden` (添付なし・ページに属さない・親ページなし・admin でもページを閲覧できる利用者でもない、を区別しない同一応答), 429 (回数制限: 添付ごとに 1 分あたり 5 回), 500 `reextract_failed` (最後まで進められなかった) / `internal_server_error`, 503 `feature_disabled` / `reextract_timeout` (`timeoutMs × 2 + 30 秒` を超えた。抽出の順番待ちを含む) |
+| POST | /_api/v3/attachments/:id/reextract | — | `{ outcome: { kind } }` (`ReextractResponse`。抽出テキストは返さない) | 400 (id が ObjectId でない), 404 `notfound_or_forbidden` (添付なし・ページに属さない・親ページなし・admin でもページを閲覧できる利用者でもない、を区別しない同一応答), 429 (回数制限: 添付ごとに 1 分あたり 5 回。rate-limiter が `res.sendStatus(429)` で返すので、本文は `Too Many Requests` の文字だけで、エラーコードは無い), 500 `reextract_failed` (最後まで進められなかった) / `internal_server_error`, 503 `feature_disabled` / `reextract_timeout` (`timeoutMs × 2 + 30 秒` を超えた。抽出の順番待ちを含む) |
 | GET | /_api/v3/admin/attachment-search/failures | `?limit=N&since=iso` (`limit` は 1〜200、既定 50) | `{ items: ExtractionFailureEntry[], total: number }` (新しい順。`total` は `since` 以降の全件数) | 400 validation, 403 forbidden |
 | GET | /_api/v3/admin/attachment-search/config | — | `{ config: AttachmentSearchConfig }` | 403 forbidden |
 | PUT | /_api/v3/admin/attachment-search/config | `AttachmentSearchConfigUpdate` | `{}` (更新後の値は GET で読む) | 400 validation / `invalid_extractor_uri`, 403 forbidden |

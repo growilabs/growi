@@ -530,12 +530,24 @@ describe('POST /_api/v3/attachments/:id/reextract', () => {
       const upper = attachmentIds.public.toUpperCase();
       expect(upper).not.toBe(lower);
 
-      const first = reextract(lower, users.admin).then((r) => r);
-      const second = reextract(upper, users.admin).then((r) => r);
-      await vi.waitFor(() => expect(indexer.reindex).toHaveBeenCalled());
-      await new Promise((r) => setTimeout(r, 200));
-      running.resolve({ ...done, outcome: { ...done.outcome, pages: [] } });
-      const responses = await Promise.all([first, second]);
+      // both callers pass the grant check, the last step before the extraction
+      const grantCheck = vi.spyOn(
+        mongoose.model<IPage, PageModel>('Page'),
+        'isAccessiblePageByViewer',
+      );
+      let responses: Awaited<ReturnType<typeof reextract>>[];
+      try {
+        const first = reextract(lower, users.other).then((r) => r);
+        const second = reextract(upper, users.other).then((r) => r);
+        await vi.waitFor(() =>
+          expect(grantCheck.mock.settledResults).toHaveLength(2),
+        );
+        await new Promise(setImmediate);
+        running.resolve({ ...done, outcome: { ...done.outcome, pages: [] } });
+        responses = await Promise.all([first, second]);
+      } finally {
+        grantCheck.mockRestore();
+      }
 
       expect(responses.map((r) => r.status)).toEqual([200, 200]);
       expect(indexer.reindex).toHaveBeenCalledTimes(1);
@@ -554,6 +566,34 @@ describe('POST /_api/v3/attachments/:id/reextract', () => {
       const settled = await Promise.all(inFlight);
 
       expect(settled.map((r) => r.status)).toEqual([200, 200, 200, 200]);
+    });
+  });
+
+  describe('deadline', () => {
+    it('answers 503 reextract_timeout and aborts the run when the indexer never settles', async () => {
+      indexer.reindex.mockReturnValue(new Promise(() => {}));
+      const deadlineMs =
+        configManager.getConfig('app:attachmentFullTextSearch:timeoutMs') * 2 +
+        30 * 1000;
+
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      try {
+        const pending = reextract(attachmentIds.public, users.admin).then(
+          (r) => r,
+        );
+        await vi.waitFor(() => expect(indexer.reindex).toHaveBeenCalled());
+        const { signal } = indexer.reindex.mock.calls[0][1] ?? {};
+        expect(signal?.aborted).toBe(false);
+
+        await vi.advanceTimersByTimeAsync(deadlineMs);
+        const res = await pending;
+
+        expect(res.status).toBe(503);
+        expect(res.body.errors[0].code).toBe('reextract_timeout');
+        expect(signal?.aborted).toBe(true);
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 
@@ -586,15 +626,6 @@ describe('POST /_api/v3/attachments/:id/reextract', () => {
       } finally {
         recorded.mockRestore();
       }
-    });
-
-    it('answers 503 when the feature was enabled after boot (no indexer yet)', async () => {
-      crowi.attachmentSearchIndexer = undefined;
-
-      const res = await reextract(attachmentIds.public, users.admin);
-
-      expect(res.status).toBe(503);
-      expect(res.body.errors[0].code).toBe('feature_disabled');
     });
   });
 });

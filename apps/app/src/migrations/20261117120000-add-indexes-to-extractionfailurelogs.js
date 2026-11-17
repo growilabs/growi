@@ -6,8 +6,8 @@ const logger = loggerFactory(
 
 const COLLECTION = 'extractionfailurelogs';
 
-// Same names and options as the Mongoose schema that used to create them, so
-// a database that already has them is left as is.
+// createIndex is a no-op for an index that already exists with the same name
+// and options.
 const INDEXES = [
   {
     key: { occurredAt: 1 },

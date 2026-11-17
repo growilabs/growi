@@ -21,6 +21,7 @@ import { ErrorV3 } from '@growi/core/dist/models';
 import express from 'express';
 import { body, query } from 'express-validator';
 
+import type { AttachmentSearchConfig } from '~/features/search-attachments/interfaces/attachment-search';
 import { ExtractionFailureLogService } from '~/features/search-attachments/server/services/extraction-failure-log-service';
 import { indexableAttachments } from '~/features/search-attachments/server/services/indexable-attachments';
 import { isAttachmentFullTextSearchEnabled } from '~/features/search-attachments/server/services/is-attachment-full-text-search-enabled';
@@ -143,19 +144,6 @@ export const computeRequiresReindex = async (
   requiresReindexCache = { value, computedAt: Date.now() };
   return value;
 };
-
-// ---------------------------------------------------------------------------
-// Response DTO
-// ---------------------------------------------------------------------------
-
-export interface AttachmentSearchConfig {
-  extractorUri: string | null;
-  hasExtractorToken: boolean;
-  timeoutMs: number;
-  maxFileSizeBytes: number;
-  isAttachmentFullTextSearchEnabled: boolean;
-  requiresReindex: boolean;
-}
 
 // ---------------------------------------------------------------------------
 // Validators

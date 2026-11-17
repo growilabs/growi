@@ -20,8 +20,7 @@ import {
 
 /**
  * Sends a search request with top-level parameters (`query`, `size`,
- * `highlight`, ...). Both the v8 and the v9 clients accept this shape; the v9
- * client no longer reads a `body` wrapper.
+ * `highlight`, ...), a shape both the v8 and the v9 clients accept.
  */
 const searchWithTopLevelParams = (
   client: ElasticsearchClientDelegator,

@@ -24,11 +24,11 @@ vi.mock(
   }),
 );
 
-const logs = vi.hoisted(() => ({ warn: vi.fn() }));
+const logs = vi.hoisted(() => ({ warn: vi.fn(), error: vi.fn() }));
 vi.mock('~/utils/logger', () => ({
   default: () => ({
     warn: logs.warn,
-    error: vi.fn(),
+    error: logs.error,
     info: vi.fn(),
     debug: vi.fn(),
   }),
@@ -598,33 +598,19 @@ describe('AttachmentTextExtractorService', () => {
   // -----------------------------------------------------------------------
   // 10. unauthorized — 401 → serviceUnreachable + pino ERROR
   // -----------------------------------------------------------------------
-  it('returns serviceUnreachable on 401 unauthorized and logs pino ERROR without token', async () => {
+  it('returns serviceUnreachable on 401 unauthorized and never logs the token', async () => {
     postExtract.mockRejectedValue(makeAxiosError(401, 'unauthorized'));
 
-    // Import the module to get logger reference
-    const { AttachmentTextExtractorService } = await import(
-      './attachment-text-extractor'
-    );
-
-    // We can verify logger.error was called via spying on the module's logger
-    // Use a spy approach via the module
-    const service = new AttachmentTextExtractorService(mockFileUploader as any);
-    const result = await service.extractAttachment('attachment-id-1');
-
-    expect(result).toEqual({ kind: 'serviceUnreachable' });
-  });
-
-  it('does not log the token value in the 401 error case', async () => {
-    postExtract.mockRejectedValue(makeAxiosError(401, 'unauthorized'));
-
-    // Capture all log calls - we can't easily spy on the pino logger,
-    // but we can verify the result and that no token appears in process output
     const service = await getService();
     const result = await service.extractAttachment('attachment-id-1');
 
     expect(result).toEqual({ kind: 'serviceUnreachable' });
-    // Token value should not be accessible through the service interface
-    // The implementation contract requires no token logging
+    expect(logs.error).toHaveBeenCalled();
+    const logged = JSON.stringify([
+      ...logs.error.mock.calls,
+      ...logs.warn.mock.calls,
+    ]);
+    expect(logged).not.toContain('test-token');
   });
 
   // -----------------------------------------------------------------------

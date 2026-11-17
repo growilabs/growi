@@ -253,10 +253,9 @@ describe('AttachmentSearchIndexer', () => {
 
       await indexer.onAttach('page-42', attachment, makeMullerFile());
 
-      expect(extractor.extractAttachment).toHaveBeenCalledWith(
-        'att-001',
-        expect.anything(),
-      );
+      expect(extractor.extractAttachment).toHaveBeenCalledWith('att-001', {
+        signal: undefined,
+      });
       expect(delegator.syncAttachmentIndexed).toHaveBeenCalledOnce();
 
       const [calledAttachmentId, calledPageId, calledDocs, calledIndexes] =
@@ -790,15 +789,15 @@ describe('AttachmentSearchIndexer', () => {
         makeSearchService(true),
       );
 
-      const result = await indexer.reindex('att-001');
+      const abort = new AbortController();
+      const result = await indexer.reindex('att-001', { signal: abort.signal });
 
       expect(result.ok).toBe(true);
       expect(result.outcome.kind).toBe('success');
 
-      expect(extractor.extractAttachment).toHaveBeenCalledWith(
-        'att-001',
-        expect.anything(),
-      );
+      expect(extractor.extractAttachment).toHaveBeenCalledWith('att-001', {
+        signal: abort.signal,
+      });
       expect(delegator.syncAttachmentIndexed).toHaveBeenCalledOnce();
 
       // pageId is read from the attachment row and propagated to the ES docs

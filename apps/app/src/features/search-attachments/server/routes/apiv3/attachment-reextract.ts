@@ -75,7 +75,8 @@ type Req = Request<{ id: string }, ApiV3Response, void> & {
  * The deadline is timeoutMs × 2 plus this margin. It does not cover the worst
  * case of one run (waiting for an extraction slot, then the file read, the
  * extractor call and its busy retry, each bounded by timeoutMs): such a run
- * answers 503 but keeps going, and a late success is still indexed.
+ * answers 503 and is abandoned, its abort signal is fired, and the indexer
+ * skips the work it has not started yet.
  */
 const REEXTRACT_DEADLINE_MARGIN_MS = 30 * 1000;
 
@@ -126,18 +127,14 @@ export function createAttachmentReextractRouter(crowi: Crowi): express.Router {
         return res.apiv3Err(new ErrorV3('Unauthorized', 'unauthorized'), 401);
       }
 
-      const indexer = crowi.attachmentSearchIndexer;
-      if (indexer == null) {
-        return res.apiv3Err(
-          new ErrorV3(
-            'Attachment full-text search feature is disabled',
-            'feature_disabled',
-          ),
-          503,
-        );
-      }
-
       try {
+        // Registered at boot whenever the search service is configured, which
+        // the feature gate above already requires.
+        const indexer = crowi.attachmentSearchIndexer;
+        if (indexer == null) {
+          throw new Error('Attachment search indexer is not registered');
+        }
+
         const attachment = await prisma.attachments.findUnique({
           where: { id: attachmentId },
         });
@@ -194,21 +191,25 @@ export function createAttachmentReextractRouter(crowi: Crowi): express.Router {
         }
 
         // emit before res.apiv3() — see rules/activity-recording.md
-        activityEvent.emit('update', res.locals.activity._id, {
-          action: SupportedAction.ACTION_ATTACHMENT_REEXTRACT,
-          target: canonicalId,
-          targetModel: MODEL_ATTACHMENT,
-          snapshot: buildAttachmentSnapshot(
-            {
-              _id: canonicalId,
-              originalName: attachment.originalName ?? undefined,
-              fileSize: attachment.fileSize,
-              pageId,
-            },
-            page.path,
-            user.username,
-          ),
-        });
+        const activityId: unknown = res.locals.activity?._id;
+        // addActivity is best-effort; without its id there is no row to settle.
+        if (typeof activityId === 'string') {
+          activityEvent.emit('update', activityId, {
+            action: SupportedAction.ACTION_ATTACHMENT_REEXTRACT,
+            target: canonicalId,
+            targetModel: MODEL_ATTACHMENT,
+            snapshot: buildAttachmentSnapshot(
+              {
+                _id: canonicalId,
+                originalName: attachment.originalName ?? undefined,
+                fileSize: attachment.fileSize,
+                pageId,
+              },
+              page.path,
+              user.username,
+            ),
+          });
+        }
 
         const body: ReextractResponse = {
           outcome: { kind: result.outcome.kind },
