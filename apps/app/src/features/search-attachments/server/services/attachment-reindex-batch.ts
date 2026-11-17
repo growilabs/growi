@@ -29,7 +29,10 @@ import type { AttachmentIndexOperations } from './attachment-search-delegator-ex
 import type { AttachmentTextExtractorService } from './attachment-text-extractor';
 import type { ExtractionFailureLogServiceInterface } from './extraction-failure-log-service';
 import { indexableAttachments } from './indexable-attachments';
-import { createRebuildFailureBudget } from './rebuild-failure-budget';
+import {
+  createRebuildFailureBudget,
+  type RebuildItemResult,
+} from './rebuild-failure-budget';
 
 const logger = loggerFactory('growi:service:search-attachments:reindex-batch');
 
@@ -51,18 +54,11 @@ export interface AttachmentReindexBatchInterface {
 /** Number of attachment rows fetched from MongoDB per page during a rebuild. */
 export const REINDEX_PAGE_SIZE = 100;
 
-/** Its message reaches the admin through AttachmentRebuildingFailed. */
-export class RebuildOutageError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'RebuildOutageError';
-  }
-}
-
+// Reach the admin through AttachmentRebuildingFailed
 const OVER_BUDGET_MESSAGE =
-  'Too many attachments could not be read or extracted (the text extractor or the file storage may be down), so the rebuild stopped and the existing attachment index was kept.';
+  'Too many attachments could not be read, extracted or indexed (the text extractor, the file storage or Elasticsearch may be down), so the rebuild stopped and the existing attachment index was kept.';
 const NOTHING_READ_MESSAGE =
-  'No attachment could be read or extracted (the text extractor or the file storage may be down), so the existing attachment index was kept.';
+  'No attachment could be read, extracted or indexed (the text extractor, the file storage or Elasticsearch may be down), so the existing attachment index was kept.';
 
 // ---- Internal helpers -------------------------------------------------------
 
@@ -354,8 +350,8 @@ export class AttachmentReindexBatch implements AttachmentReindexBatchInterface {
   /**
    * Extracts and indexes every attachment into `targetIndex`, then removes
    * docs whose page no longer exists. A failure on one attachment is logged
-   * and skipped; rejects with RebuildOutageError when the failure budget
-   * says so (used up mid-run, or nothing read at all).
+   * and skipped; rejects when the failure budget says so (used up mid-run,
+   * or nothing read at all).
    */
   async addAllAttachments(
     targetIndex: string,
@@ -373,18 +369,19 @@ export class AttachmentReindexBatch implements AttachmentReindexBatchInterface {
     let processed = 0;
     const budget = createRebuildFailureBudget(total);
     for await (const attachmentId of iterateAllAttachmentIds()) {
-      let outcome: ExtractionOutcome | null = null;
+      let result: RebuildItemResult | null;
       try {
-        outcome = await this.indexAttachment(attachmentId, targetIndex);
+        result = await this.indexAttachment(attachmentId, targetIndex);
       } catch (err) {
         logger.error(
           { err, attachmentId },
           'addAllAttachments: skipping attachment due to unexpected error',
         );
+        result = { kind: 'unexpectedError' };
       }
 
-      if (outcome != null && budget.record(outcome)) {
-        throw new RebuildOutageError(OVER_BUDGET_MESSAGE);
+      if (result != null && budget.record(result)) {
+        throw new Error(OVER_BUDGET_MESSAGE);
       }
 
       processed += 1;
@@ -395,7 +392,7 @@ export class AttachmentReindexBatch implements AttachmentReindexBatchInterface {
     }
 
     if (budget.shouldAbortAtEnd()) {
-      throw new RebuildOutageError(NOTHING_READ_MESSAGE);
+      throw new Error(NOTHING_READ_MESSAGE);
     }
 
     const sweepResult = await this.orphanSweeper.sweep(targetIndex);

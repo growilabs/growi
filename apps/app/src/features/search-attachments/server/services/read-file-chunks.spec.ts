@@ -44,7 +44,9 @@ describe('readFileChunks', () => {
     await new Promise(setImmediate);
     caller.abort();
 
-    await expect(reading).rejects.toThrow();
+    await expect(reading).rejects.toThrow(
+      'Reading the stored file was abandoned',
+    );
     expect(stream.destroyed).toBe(true);
   });
 });

@@ -375,7 +375,7 @@ describe('AttachmentReindexBatch', () => {
         SocketEventName.AttachmentRebuildingFailed,
         {
           error:
-            'Too many attachments could not be read or extracted (the text extractor or the file storage may be down), so the rebuild stopped and the existing attachment index was kept.',
+            'Too many attachments could not be read, extracted or indexed (the text extractor, the file storage or Elasticsearch may be down), so the rebuild stopped and the existing attachment index was kept.',
         },
       );
     });
@@ -411,9 +411,33 @@ describe('AttachmentReindexBatch', () => {
         SocketEventName.AttachmentRebuildingFailed,
         {
           error:
-            'No attachment could be read or extracted (the text extractor or the file storage may be down), so the existing attachment index was kept.',
+            'No attachment could be read, extracted or indexed (the text extractor, the file storage or Elasticsearch may be down), so the existing attachment index was kept.',
         },
       );
+    });
+
+    it('fails a run in which every attachment ended in an exception, keeping the alias', async () => {
+      setupAttachmentMock(attachments(3), ['a00', 'a01', 'a02']);
+
+      batch.startRebuild(() => Promise.resolve());
+      await waitUntilFinished();
+
+      expectAborted();
+    });
+
+    it('stops once attachments ending in exceptions reach the budget, also after a successful extraction', async () => {
+      // 40 attachments: the budget is 22; every index write fails
+      setupAttachmentMock(attachments(40));
+      extractor.extractAttachment.mockResolvedValue(successOutcome);
+      delegatorExt.syncAttachmentIndexed.mockRejectedValue(
+        new Error('index is read-only'),
+      );
+
+      batch.startRebuild(() => Promise.resolve());
+      await waitUntilFinished();
+
+      expect(extractor.extractAttachment).toHaveBeenCalledTimes(22);
+      expectAborted();
     });
 
     it('swaps in a run in which the extractor judged every file, even if none could be indexed', async () => {
@@ -740,10 +764,12 @@ describe('AttachmentReindexBatch', () => {
         {
           outcome: { kind: 'serviceBusy' } as const,
           expectedCode: 'serviceBusy',
+          runFails: true,
         },
         {
           outcome: { kind: 'serviceUnreachable' } as const,
           expectedCode: 'serviceUnreachable',
+          runFails: true,
         },
         {
           outcome: { kind: 'encrypted' } as const,
@@ -763,7 +789,7 @@ describe('AttachmentReindexBatch', () => {
         },
       ];
 
-      for (const { outcome, expectedCode } of failureKinds) {
+      for (const { outcome, expectedCode, runFails } of failureKinds) {
         vi.clearAllMocks();
 
         const attachment = makeAttachment({ id: 'attach-kind-test' });
@@ -771,9 +797,12 @@ describe('AttachmentReindexBatch', () => {
 
         extractor.extractAttachment.mockResolvedValueOnce(outcome);
 
+        const run = batch.addAllAttachments('attachments-tmp');
         // A run of one outage-like outcome fails at the end; the record is kept
         // biome-ignore lint/performance/noAwaitInLoops: sequential iteration is intentional in this test
-        await batch.addAllAttachments('attachments-tmp').catch(() => {});
+        await (runFails
+          ? expect(run).rejects.toThrow('No attachment could be read')
+          : expect(run).resolves.toEqual({ totalCount: 1, count: 1 }));
 
         expect(failureLogService.record).toHaveBeenCalledOnce();
         expect(failureLogService.record.mock.calls[0][0].reasonCode).toBe(

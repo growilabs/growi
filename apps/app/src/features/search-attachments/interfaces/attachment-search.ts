@@ -11,6 +11,9 @@ export interface ExtractedPage {
   readonly content: string;
 }
 
+/** reasonCode of a `failed` outcome whose stored file could not be read. */
+export const FILE_READ_FAILED = 'file_read_failed';
+
 /**
  * Discriminated union representing every possible outcome of a text-extraction
  * attempt against a single attachment file.

@@ -5,9 +5,10 @@ import {
   postExtract,
 } from '@growi/attachment-text-extractor-client';
 
-import type {
-  ExtractedPage,
-  ExtractionOutcome,
+import {
+  type ExtractedPage,
+  type ExtractionOutcome,
+  FILE_READ_FAILED,
 } from '~/features/search-attachments/interfaces/attachment-search';
 import type { AttachmentWithComputed } from '~/server/models/attachment';
 import { configManager } from '~/server/service/config-manager';
@@ -26,9 +27,6 @@ import {
 } from './validate-extractor-uri';
 
 const logger = loggerFactory('growi:service:search-attachments:extractor');
-
-/** reasonCode of a `failed` outcome whose stored file could not be read. */
-export const FILE_READ_FAILED = 'file_read_failed';
 
 // Retry configuration — exported for testability
 export const RETRY_BASE_DELAY_MS = 500;
@@ -345,8 +343,7 @@ export class AttachmentTextExtractorService {
         { attachmentId: attachment.id, error },
         'Failed to read the stored file',
       );
-      // Not `serviceUnreachable`: the extractor is fine. A rebuild still
-      // counts it towards its outage budget (see rebuild-failure-budget).
+      // Not `serviceUnreachable`: the extractor itself is fine
       return {
         kind: 'failed',
         reasonCode: FILE_READ_FAILED,

@@ -3,6 +3,7 @@ import type { ExtractionOutcome } from '~/features/search-attachments/interfaces
 import {
   createRebuildFailureBudget,
   outageFailureLimit,
+  type RebuildItemResult,
 } from './rebuild-failure-budget';
 
 const success: ExtractionOutcome = {
@@ -17,6 +18,7 @@ const unreadable: ExtractionOutcome = {
   reasonCode: 'file_read_failed',
   message: 'The stored file could not be read',
 };
+const crashed: RebuildItemResult = { kind: 'unexpectedError' };
 const brokenFile: ExtractionOutcome = {
   kind: 'failed',
   reasonCode: 'extraction_failed',
@@ -26,7 +28,7 @@ const brokenFile: ExtractionOutcome = {
 /** Feeds the outcomes in order; the 1-based position of the first stop, or null. */
 const stopsAt = (
   total: number,
-  outcomes: ExtractionOutcome[],
+  outcomes: RebuildItemResult[],
 ): number | null => {
   const budget = createRebuildFailureBudget(total);
   const index = outcomes.findIndex((outcome) => budget.record(outcome));
@@ -52,6 +54,7 @@ describe('createRebuildFailureBudget', () => {
     { what: 'the extractor is unreachable', outage: unreachable },
     { what: 'the extractor is busy', outage: busy },
     { what: 'a stored file cannot be read', outage: unreadable },
+    { what: 'an attachment ended in an exception', outage: crashed },
   ])('stops exactly when outage-like failures, counted over the whole run, reach the limit ($what)', ({
     outage,
   }) => {
@@ -81,14 +84,14 @@ describe('createRebuildFailureBudget', () => {
 });
 
 describe('the verdict at the end of a run (shouldAbortAtEnd)', () => {
-  const verdictAfter = (outcomes: ExtractionOutcome[]): boolean => {
+  const verdictAfter = (outcomes: RebuildItemResult[]): boolean => {
     const budget = createRebuildFailureBudget(outcomes.length);
     for (const outcome of outcomes) budget.record(outcome);
     return budget.shouldAbortAtEnd();
   };
 
   it('fails a run in which every outcome was outage-like', () => {
-    expect(verdictAfter([unreachable, busy, unreadable])).toBe(true);
+    expect(verdictAfter([unreachable, busy, unreadable, crashed])).toBe(true);
   });
 
   it.each([
