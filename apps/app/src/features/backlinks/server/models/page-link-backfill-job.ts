@@ -53,10 +53,15 @@ const progressFields = (progress: BackfillProgress) => ({
   skippedPages: progress.skippedPages,
 });
 
-/** Fields every ending writes: the claim is released so the next claim needs no lease expiry. */
-const releaseFields = {
+/** Released by every ending, so the next claim needs no lease expiry. */
+const releaseClaimFields = {
   claimedBy: null,
   leaseExpiresAt: null,
+};
+
+/** Written by the endings that settle a Stop: the run is over, so a pending one is moot. */
+const settledEndingFields = {
+  ...releaseClaimFields,
   stopRequested: false,
 };
 
@@ -251,7 +256,7 @@ export const createPageLinkBackfillJobModel = (
     ): Promise<boolean> {
       const value = await fencedWrite(owner, 'finishStopped', {
         ...progressFields(progress),
-        ...releaseFields,
+        ...settledEndingFields,
         status: 'stopped',
       });
       return value != null;
@@ -265,7 +270,7 @@ export const createPageLinkBackfillJobModel = (
     ): Promise<boolean> {
       const value = await fencedWrite(owner, 'finishComplete', {
         ...progressFields(progress),
-        ...releaseFields,
+        ...settledEndingFields,
         status: 'complete',
         coverage,
         coveredSince: toDate(coveredSince),
@@ -278,11 +283,12 @@ export const createPageLinkBackfillJobModel = (
     /**
      * End the run on an error. The claim is released, so the next idle tick claims the `failed`
      * job again and resumes from the marker saved at the last checkpoint; the in-memory progress
-     * is not written, so pages skipped since then are redone.
+     * is not written, so pages skipped since then are redone. A pending Stop is kept: the retry
+     * claim keeps it too (`tryClaim`), so the retry stops at its first checkpoint.
      */
     async finishFailed(owner: string, lastError: string): Promise<boolean> {
       const value = await fencedWrite(owner, 'finishFailed', {
-        ...releaseFields,
+        ...releaseClaimFields,
         status: 'failed',
         lastError: { $literal: lastError },
       });
