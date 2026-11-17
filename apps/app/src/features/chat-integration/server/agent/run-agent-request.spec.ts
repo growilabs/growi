@@ -361,11 +361,14 @@ describe('runAgentRequest', () => {
       expect(await stateOf(row)).toBe('done');
     });
 
-    it('cuts an oversized answer to what the proxy accepts and says it was cut', async () => {
+    // 😀 is two UTF-16 units; one of the two prefixes puts the cut inside a pair.
+    it.each([
+      [''],
+      ['a'],
+    ])('cuts an oversized answer to what the proxy accepts and says it was cut (prefix %j)', async (prefix) => {
       const { row } = await acceptedRequest();
       const h = harness();
-      // 😀 is two UTF-16 units: a cut at an odd offset must not split it.
-      const long = `${'a'.repeat(1)}${'😀'.repeat(20_000)}`;
+      const long = `${prefix}${'😀'.repeat(20_000)}`;
       const sources = Array.from({ length: 25 }, (_, i) => ({
         title: `Page ${i}`,
         url: `${SITE_URL}/${String(i).padStart(24, '0')}`,
@@ -380,9 +383,10 @@ describe('runAgentRequest', () => {
       expect(answer.kind).toBe('text');
       if (answer.kind !== 'text') return;
       expect(answer.markdown.length).toBeLessThanOrEqual(30_000);
-      expect(answer.markdown.startsWith('a😀😀')).toBe(true);
+      expect(answer.markdown.startsWith(`${prefix}😀😀`)).toBe(true);
       expect(answer.markdown).toMatch(/cut short/i);
-      expect(answer.markdown).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/);
+      // A split pair is stored as U+FFFD, which chat would show as a broken character.
+      expect(answer.markdown).not.toContain('\uFFFD');
       expect(answer.sources).toEqual(sources.slice(0, 20));
     });
 
