@@ -551,6 +551,11 @@ export const CONFIG_DEFINITIONS = {
     envVarName: 'ACTIVITY_EXPIRATION_SECONDS',
     defaultValue: 2592000,
   }),
+  'app:checkConfigurationValueStrictly': defineConfig<boolean>({
+    envVarName: 'CHECK_CONFIGURATION_VALUE_STRICTLY',
+    defaultValue: true,
+  }),
+
   // Changes Index API: how far back (seconds from now) a request may look. Each cursor
   // page recomputes runs over the window, so this bounds the worst-case scan. Finite by
   // default (30 days); operators may tune it via the env var.
