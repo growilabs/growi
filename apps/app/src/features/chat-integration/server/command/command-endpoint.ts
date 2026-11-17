@@ -55,8 +55,8 @@ import {
 } from '../account-link/create-link-order';
 import {
   type AgentRequestRunner,
+  agentRequestRunnerFor,
   handleAgentCommand,
-  notYetWiredAgentRunner,
 } from '../agent';
 import {
   buildHelpContent,
@@ -609,15 +609,14 @@ export interface CommandEndpointDependencies {
   readonly runAgentRequest: AgentRequestRunner;
 }
 
-// Task 5.6 replaces the interim runner here with the real one.
-const DEFAULT_DEPENDENCIES: CommandEndpointDependencies = {
-  runAgentRequest: notYetWiredAgentRunner,
-};
+const defaultDependenciesFor = (crowi: Crowi): CommandEndpointDependencies => ({
+  runAgentRequest: agentRequestRunnerFor(crowi),
+});
 
 /** Builds the `CommandEndpoint` this GROWI serves `command` requests with. */
 export const createCommandEndpoint = (
   crowi: Crowi,
-  dependencies: CommandEndpointDependencies = DEFAULT_DEPENDENCIES,
+  dependencies: CommandEndpointDependencies = defaultDependenciesFor(crowi),
 ): CommandEndpoint => ({
   handle: async (
     request: CommandRequest,

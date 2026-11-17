@@ -28,10 +28,17 @@ import { configManager } from '~/server/service/config-manager';
 import { ChatAccountLink } from '../account-link/models/chat-account-link';
 import { ChatAccountLinkOrder } from '../account-link/models/chat-account-link-order';
 import { createCommandEndpoint } from '../command/command-endpoint';
+import { resolveActor } from '../command/resolve-actor';
 import { ChatProcessedRequest } from '../models/chat-processed-request';
+import { createChatOutbox } from '../outbox/chat-outbox';
+import { outboxDispatcher } from '../outbox/deliverers';
+import { ChatOutboxRow } from '../outbox/models/chat-outbox';
+import type { OutboxDispatcher } from '../outbox/outbox-dispatcher';
 import { ChatChannelPermission } from '../settings/models/chat-channel-permission';
+import type { GrowiAiGateway } from './growi-ai-gateway-types';
 import type { AgentRequestRunner } from './handle-agent-command';
 import { ChatAgentRequest } from './models/chat-agent-request';
+import { createAgentRequestRunner } from './run-agent-request';
 
 const RELATION_ID = 'relation-agent';
 const CHANNEL: ChannelRef = {
@@ -135,6 +142,7 @@ describe('accepting an agent request', () => {
       ChatChannelPermission.deleteMany({}),
       ChatProcessedRequest.deleteMany({}),
       ChatAgentRequest.deleteMany({}),
+      ChatOutboxRow.deleteMany({}),
       getUserModel().deleteMany({}),
     ]);
     // The indexes of chat_agent_requests come from the migration alone.
@@ -471,24 +479,86 @@ describe('accepting an agent request', () => {
     });
   });
 
-  // Until task 5.6 wires the real runner, production uses an interim one
-  // that produces no answer; it must at least not leave the person busy.
-  describe('with the runner production uses until task 5.6', () => {
-    it('accepts the next request of the same person after the previous one', async () => {
-      const actor = nextActor();
-      await createLinkedUser(actor);
-      const endpoint = createCommandEndpoint(buildCrowi({ aiReady: true }));
+  describe('with the real runner', () => {
+    const answerRowsOf = (requestId: string) =>
+      ChatOutboxRow.find({ kind: 'command-answer', requestId }).lean();
 
-      const first = await endpoint.handle(agentRequest(actor));
-      await vi.waitFor(async () => {
+    const untilFinished = () =>
+      vi.waitFor(async () => {
         expect(
           await ChatAgentRequest.countDocuments({ state: 'running' }),
         ).toBe(0);
       });
+
+    it('answers the accepted request and frees the person for the next one (fake AI)', async () => {
+      const actor = nextActor();
+      await createLinkedUser(actor);
+      const gateway = mock<GrowiAiGateway>();
+      gateway.classify.mockResolvedValue({
+        kind: 'completed',
+        value: { intent: 'answer' },
+      });
+      gateway.answer.mockResolvedValue({
+        kind: 'completed',
+        value: { markdown: 'The release notes added X.', sources: [] },
+      });
+      const runAgentRequest = createAgentRequestRunner({
+        gateway,
+        fetchConversation: vi.fn(),
+        outbox: createChatOutbox({
+          dispatcher: mock<OutboxDispatcher>({
+            requestDrain: vi.fn(async () => {}),
+          }),
+        }),
+        requests: ChatAgentRequest,
+        resolveActor,
+        isAiReady: () => true,
+        createSummaryPage: vi.fn(),
+        siteUrl: () => 'https://wiki.example.test',
+        now: () => new Date(),
+      });
+      const endpoint = createCommandEndpoint(buildCrowi({ aiReady: true }), {
+        runAgentRequest,
+      });
+      const request = agentRequest(actor);
+
+      const first = await endpoint.handle(request);
+      await untilFinished();
       const next = await endpoint.handle(agentRequest(actor));
 
       expect(first).toEqual({ kind: 'accepted' });
+      expect(await answerRowsOf(request.requestId)).toMatchObject([
+        {
+          relationId: RELATION_ID,
+          answer: {
+            kind: 'text',
+            markdown: 'The release notes added X.',
+            sources: [],
+          },
+        },
+      ]);
       expect(next).toEqual({ kind: 'accepted' });
+    });
+
+    it('is what production uses: AI turned off after acceptance still gets an answer', async () => {
+      const actor = nextActor();
+      await createLinkedUser(actor);
+      const crowi = mock<Crowi>({
+        isAiReady: vi.fn().mockReturnValueOnce(true).mockReturnValue(false),
+        appService: { getAppTitle: vi.fn(() => 'Test GROWI') },
+      });
+      const request = agentRequest(actor);
+
+      const response = await createCommandEndpoint(crowi).handle(request);
+      await untilFinished();
+      // The real outbox starts sending right away; let it settle (no relation
+      // row exists, so it stops before any network call).
+      await outboxDispatcher.requestDrain();
+
+      expect(response).toEqual({ kind: 'accepted' });
+      expect(await answerRowsOf(request.requestId)).toMatchObject([
+        { answer: { kind: 'failed', reason: 'agent-error' } },
+      ]);
     });
   });
 

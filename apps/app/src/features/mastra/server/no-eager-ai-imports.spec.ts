@@ -117,6 +117,9 @@ const CHAT_INTEGRATION_AI_ENTRY_ROOTS = [
   'features/chat-integration/server/agent/load-growi-ai-runtime.ts',
   'features/chat-integration/server/agent/conversation-thread-id.ts',
   'features/chat-integration/server/agent/opened-pages.ts',
+  'features/chat-integration/server/agent/run-agent-request.ts',
+  'features/chat-integration/server/agent/agent-answer.ts',
+  'features/chat-integration/server/agent/agent-request-runner-for.ts',
 ] as const;
 
 describe('import boundary for the chat integration AI entry', () => {
