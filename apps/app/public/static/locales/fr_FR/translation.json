@@ -935,7 +935,10 @@
     "feature_is_unavailable": "Fonctionnalité indisponible.",
     "incorrect_token_or_expired_url": "Le jeton est invalide ou l'URL est expirée. Effectuer une nouvelle réinitialisation via le lien ci-dessous.",
     "password_and_confirm_password_does_not_match": "Le mot de passe ne correspond pas",
-    "please_enable_mailer_alert": "La réinitialisation de mot de passe est désactivée, car la configuration d'envois de courriels est incomplète."
+    "please_enable_mailer_alert": "La réinitialisation de mot de passe est désactivée, car la configuration d'envois de courriels est incomplète.",
+    "email_address": "Adresse e-mail",
+    "error_notice_after_send": "Si un problème système survient après l'envoi, nous vous en informerons sur cet écran dans les 18 secondes.",
+    "check_spam_folder_notice": "Si vous ne recevez pas d'e-mail d'ici quelques minutes, vérifiez votre dossier de courrier indésirable puis renvoyez la demande."
   },
   "maintenance_mode": {
     "maintenance_mode": "Mode maintenance",

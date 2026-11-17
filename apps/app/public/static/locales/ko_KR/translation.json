@@ -900,7 +900,10 @@
     "feature_is_unavailable": "이 기능은 사용할 수 없습니다.",
     "incorrect_token_or_expired_url": "토큰이 올바르지 않거나 URL이 만료되었습니다. 아래 링크를 통해 비밀번호 재설정 요청을 다시 보내십시오.",
     "password_and_confirm_password_does_not_match": "비밀번호와 비밀번호 확인이 일치하지 않습니다.",
-    "please_enable_mailer_alert": "이메일 설정이 완료되지 않아 비밀번호 재설정 기능이 비활성화되었습니다. 관리자에게 이메일 설정을 완료하도록 요청하십시오."
+    "please_enable_mailer_alert": "이메일 설정이 완료되지 않아 비밀번호 재설정 기능이 비활성화되었습니다. 관리자에게 이메일 설정을 완료하도록 요청하십시오.",
+    "email_address": "이메일 주소",
+    "error_notice_after_send": "전송 후 시스템에 문제가 발생하면 18초 이내에 이 화면에서 알려 드립니다.",
+    "check_spam_folder_notice": "몇 분이 지나도 메일이 도착하지 않으면 스팸 메일함을 확인한 후 다시 전송해 주세요."
   },
   "maintenance_mode": {
     "maintenance_mode": "유지 보수 모드",
