@@ -34,6 +34,7 @@ import { type JSX, useCallback, useState } from 'react';
 import {
   type CapabilityReport,
   COMMAND_NAMES,
+  COMMAND_TRAITS,
   type CommandName,
   type ConnectionStatusView,
   type NativeChannelId,
@@ -137,30 +138,48 @@ interface CommandFormState {
   readonly scope: ScopeChoice;
   /** Free text while editing; split into channel ids on save. */
   readonly channelIds: string;
+  /** Meaningful only for a command whose `directMessagePolicy` is 'separate-flag'. */
+  readonly allowedInDirectMessage: boolean;
 }
 
-const ALL_COMMAND_NAMES: ReadonlyArray<CommandName> = Object.values(
+// One row per command GROWI offers; a command it no longer offers has no row.
+const OFFERED_COMMAND_NAMES: ReadonlyArray<CommandName> = Object.values(
   COMMAND_NAMES,
-) as ReadonlyArray<CommandName>;
+).filter((name) => COMMAND_TRAITS[name].offered);
+
+const hasSeparateDmFlag = (commandName: CommandName): boolean =>
+  COMMAND_TRAITS[commandName].directMessagePolicy === 'separate-flag';
 
 const toFormState = (
   channelPermissions: RelationSettings['channelPermissions'],
 ): Record<CommandName, CommandFormState> => {
   const byCommand = new Map(
-    channelPermissions.map((row) => [row.commandName, row.allowedChannels]),
+    channelPermissions.map((row) => [row.commandName, row]),
   );
-  const entries = ALL_COMMAND_NAMES.map(
+  const entries = OFFERED_COMMAND_NAMES.map(
     (commandName): [CommandName, CommandFormState] => {
-      const allowedChannels = byCommand.get(commandName);
+      const row = byCommand.get(commandName);
+      const allowedInDirectMessage = row?.allowedInDirectMessage === true;
+      const allowedChannels = row?.allowedChannels;
       if (allowedChannels == null) {
-        return [commandName, { scope: 'unset', channelIds: '' }];
+        return [
+          commandName,
+          { scope: 'unset', channelIds: '', allowedInDirectMessage },
+        ];
       }
       if (allowedChannels === 'all' || allowedChannels === 'none') {
-        return [commandName, { scope: allowedChannels, channelIds: '' }];
+        return [
+          commandName,
+          { scope: allowedChannels, channelIds: '', allowedInDirectMessage },
+        ];
       }
       return [
         commandName,
-        { scope: 'listed', channelIds: allowedChannels.join(', ') },
+        {
+          scope: 'listed',
+          channelIds: allowedChannels.join(', '),
+          allowedInDirectMessage,
+        },
       ];
     },
   );
@@ -209,20 +228,42 @@ const toChannelPermissions = (
   const channelPermissions: Array<
     RelationSettings['channelPermissions'][number]
   > = [];
-  for (const commandName of ALL_COMMAND_NAMES) {
-    const { scope, channelIds } = form[commandName];
+  for (const commandName of OFFERED_COMMAND_NAMES) {
+    const { scope, channelIds, allowedInDirectMessage } = form[commandName];
+    // The server rejects the flag, even `false`, for any other command.
+    const dmFlag = hasSeparateDmFlag(commandName)
+      ? { allowedInDirectMessage }
+      : {};
     if (scope === 'unset') {
+      // A direct-message permission needs a row to live in. Not configured
+      // already denies a write command in channels, so `none` changes nothing
+      // there.
+      if (allowedInDirectMessage && hasSeparateDmFlag(commandName)) {
+        channelPermissions.push({
+          commandName,
+          allowedChannels: 'none',
+          ...dmFlag,
+        });
+      }
       continue;
     }
     if (scope !== 'listed') {
-      channelPermissions.push({ commandName, allowedChannels: scope });
+      channelPermissions.push({
+        commandName,
+        allowedChannels: scope,
+        ...dmFlag,
+      });
       continue;
     }
     const parsed = parseChannelIds(commandName, channelIds);
     if (!parsed.ok) {
       return parsed;
     }
-    channelPermissions.push({ commandName, allowedChannels: parsed.ids });
+    channelPermissions.push({
+      commandName,
+      allowedChannels: parsed.ids,
+      ...dmFlag,
+    });
   }
   return { ok: true, channelPermissions };
 };
@@ -257,6 +298,7 @@ const ChannelPermissionsForm = ({
   const [form, setForm] = useState<Record<CommandName, CommandFormState>>(() =>
     toFormState(initialPermissions),
   );
+  const { t } = useTranslation('admin');
   const [isSaving, setIsSaving] = useState(false);
   const [inputError, setInputError] = useState<string | null>(null);
 
@@ -277,6 +319,17 @@ const ChannelPermissionsForm = ({
       setForm((prev) => ({
         ...prev,
         [commandName]: { ...prev[commandName], channelIds },
+      }));
+    },
+    [],
+  );
+
+  const handleDmChange = useCallback(
+    (commandName: CommandName) => (e: React.ChangeEvent<HTMLInputElement>) => {
+      const allowedInDirectMessage = e.target.checked;
+      setForm((prev) => ({
+        ...prev,
+        [commandName]: { ...prev[commandName], allowedInDirectMessage },
       }));
     },
     [],
@@ -314,7 +367,7 @@ const ChannelPermissionsForm = ({
       data-testid="grw-chat-integration-permissions-form"
     >
       <p className="text-muted mb-2">Settings version: {version}</p>
-      {ALL_COMMAND_NAMES.map((commandName) => (
+      {OFFERED_COMMAND_NAMES.map((commandName) => (
         <div
           className="row align-items-center mb-2"
           key={commandName}
@@ -354,6 +407,33 @@ const ChannelPermissionsForm = ({
               />
             )}
           </div>
+          {(COMMAND_TRAITS[commandName].mayCreatePages ||
+            hasSeparateDmFlag(commandName)) && (
+            <div className="col-12 mt-1 ps-4">
+              {COMMAND_TRAITS[commandName].mayCreatePages && (
+                <p className="text-muted small mb-1">
+                  {t('chat_integration.permissions.creates_pages_notice')}
+                </p>
+              )}
+              {hasSeparateDmFlag(commandName) && (
+                <div className="form-check">
+                  <input
+                    type="checkbox"
+                    className="form-check-input"
+                    id={`${relationId}-${commandName}-dm`}
+                    checked={form[commandName].allowedInDirectMessage}
+                    onChange={handleDmChange(commandName)}
+                  />
+                  <label
+                    className="form-check-label"
+                    htmlFor={`${relationId}-${commandName}-dm`}
+                  >
+                    {t('chat_integration.permissions.allow_in_direct_message')}
+                  </label>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       ))}
       {inputError != null && (

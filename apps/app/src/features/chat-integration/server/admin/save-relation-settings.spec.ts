@@ -117,7 +117,7 @@ describe('saveRelationSettings', () => {
 
     const outcome = await saveRelationSettings(RELATION_ID, [
       { commandName: 'create-page', allowedChannels: 'all' },
-      { commandName: 'keep', allowedChannels: ['C0001'] },
+      { commandName: 'link-preview', allowedChannels: ['C0001'] },
     ]);
 
     expect(outcome).toEqual({
@@ -132,7 +132,7 @@ describe('saveRelationSettings', () => {
         relationId: RELATION_ID,
         channelPermissions: [
           { commandName: 'create-page', allowedChannels: 'all' },
-          { commandName: 'keep', allowedChannels: ['C0001'] },
+          { commandName: 'link-preview', allowedChannels: ['C0001'] },
         ],
       },
     });

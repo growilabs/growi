@@ -14,6 +14,7 @@
 
 import {
   act,
+  cleanup,
   fireEvent,
   render,
   screen,
@@ -102,12 +103,29 @@ const CONNECTION_STATUS = {
   since: '2026-01-01T00:00:00.000Z',
 };
 
-const SETTINGS = {
+interface SettingsView {
+  settings: {
+    relationId: string;
+    channelPermissions: Array<{
+      commandName: string;
+      allowedChannels: string | string[];
+      allowedInDirectMessage?: boolean;
+    }>;
+  };
+  version: number;
+}
+
+const SETTINGS: SettingsView = {
   settings: {
     relationId: ACTIVE_RELATION.relationId,
     channelPermissions: [
       { commandName: 'create-page', allowedChannels: 'all' },
-      { commandName: 'keep', allowedChannels: ['C0001', 'C0002'] },
+      { commandName: 'link-preview', allowedChannels: ['C0001', 'C0002'] },
+      {
+        commandName: 'agent',
+        allowedChannels: 'none',
+        allowedInDirectMessage: true,
+      },
     ],
   },
   version: 4,
@@ -169,12 +187,14 @@ const stubApi = ({
   encryptionReason = 'unset',
   relations = [ACTIVE_RELATION],
   destinations = DESTINATIONS,
+  settings = SETTINGS,
   connectionStatus = () => Promise.resolve({ data: CONNECTION_STATUS }),
 }: {
   encryptionConfigured?: boolean;
   encryptionReason?: 'unset' | 'invalid-key' | 'invalid-generation';
   relations?: AdminRelationListItem[];
   destinations?: DestinationsView;
+  settings?: SettingsView;
   connectionStatus?: () => Promise<unknown>;
 } = {}) => {
   mocks.apiv3Get.mockImplementation((url: string) => {
@@ -195,7 +215,7 @@ const stubApi = ({
       return connectionStatus();
     }
     if (url.endsWith('/settings')) {
-      return Promise.resolve({ data: SETTINGS });
+      return Promise.resolve({ data: settings });
     }
     if (url.endsWith('/notification-destinations')) {
       return Promise.resolve({ data: destinations });
@@ -418,10 +438,10 @@ describe('AdminChatIntegration', () => {
       // the two apart, an administrator would silently narrow a command that
       // was allowed everywhere.
       expect(scopeSelectFor('create-page')).toHaveValue('all');
-      expect(scopeSelectFor('keep')).toHaveValue('listed');
-      expect(screen.getByLabelText(/channel ids for keep/i)).toHaveValue(
-        'C0001, C0002',
-      );
+      expect(scopeSelectFor('link-preview')).toHaveValue('listed');
+      expect(
+        screen.getByLabelText(/channel ids for link-preview/i),
+      ).toHaveValue('C0001, C0002');
       // A command with no stored row must stay "not configured" rather than
       // being shown (and later saved) as an explicit rule.
       expect(scopeSelectFor('search')).toHaveValue('unset');
@@ -453,12 +473,34 @@ describe('AdminChatIntegration', () => {
             channelPermissions: [
               { commandName: 'search', allowedChannels: ['C0009', 'C0010'] },
               { commandName: 'create-page', allowedChannels: 'all' },
-              { commandName: 'keep', allowedChannels: ['C0001', 'C0002'] },
+              {
+                commandName: 'agent',
+                allowedChannels: 'none',
+                allowedInDirectMessage: true,
+              },
+              {
+                commandName: 'link-preview',
+                allowedChannels: ['C0001', 'C0002'],
+              },
             ],
           },
         );
       });
       expect(mocks.toastSuccess).toHaveBeenCalled();
+    });
+
+    it('lists a row only for each command GROWI offers, so no keep row is shown', async () => {
+      stubApi({ relations: [ACTIVE_RELATION] });
+
+      renderScreen();
+
+      await screen.findByTestId('grw-chat-integration-permissions-form');
+      const labels = screen
+        .getAllByTestId('grw-chat-integration-permission-row')
+        .map((row) => within(row).getByText(/^[a-z-]+$/).textContent);
+      expect([...labels].sort()).toEqual(
+        ['agent', 'create-page', 'help', 'link-preview', 'search'].sort(),
+      );
     });
 
     it('refuses to submit a channel id in a chat adapter encoding, and says which entry is wrong', async () => {
@@ -506,6 +548,172 @@ describe('AdminChatIntegration', () => {
         );
       });
       expect(mocks.toastError).not.toHaveBeenCalled();
+    });
+
+    describe('direct-message permission and page-creation notice (task 5.8)', () => {
+      const NOTICE = 'chat_integration.permissions.creates_pages_notice';
+      const DM_FIELD = 'chat_integration.permissions.allow_in_direct_message';
+
+      const rowFor = (commandName: string) => {
+        const row = scopeSelectFor(commandName).closest(
+          '[data-testid="grw-chat-integration-permission-row"]',
+        );
+        if (!(row instanceof HTMLElement)) {
+          throw new Error(`no row for ${commandName}`);
+        }
+        return row;
+      };
+
+      const savedPayload = () => {
+        const call = mocks.apiv3Post.mock.calls.at(-1);
+        return call?.[1] as { channelPermissions: unknown[] };
+      };
+
+      const stubSave = () =>
+        mocks.apiv3Post.mockResolvedValue({
+          data: { status: 'saved', version: 5, push: { ok: true } },
+        });
+
+      const settingsWith = (
+        channelPermissions: SettingsView['settings']['channelPermissions'],
+      ): SettingsView => ({
+        settings: {
+          relationId: ACTIVE_RELATION.relationId,
+          channelPermissions,
+        },
+        version: 4,
+      });
+
+      it('shows the notice and the direct-message field on the agent row only', async () => {
+        stubApi();
+
+        renderScreen();
+
+        await screen.findByTestId('grw-chat-integration-permissions-form');
+        expect(within(rowFor('agent')).getByText(NOTICE)).toBeInTheDocument();
+        expect(
+          within(rowFor('agent')).getByLabelText(DM_FIELD),
+        ).toBeInTheDocument();
+        for (const other of ['search', 'create-page', 'link-preview', 'help']) {
+          expect(within(rowFor(other)).queryByText(NOTICE)).toBeNull();
+          expect(within(rowFor(other)).queryByLabelText(DM_FIELD)).toBeNull();
+        }
+      });
+
+      it('shows the stored direct-message permission as checked, and a row without one as unchecked', async () => {
+        stubApi({
+          settings: settingsWith([
+            { commandName: 'agent', allowedChannels: 'all' },
+          ]),
+        });
+
+        renderScreen();
+
+        await screen.findByTestId('grw-chat-integration-permissions-form');
+        expect(
+          within(rowFor('agent')).getByLabelText(DM_FIELD),
+        ).not.toBeChecked();
+        cleanup();
+        stubApi();
+        renderScreen();
+        await screen.findByTestId('grw-chat-integration-permissions-form');
+        expect(within(rowFor('agent')).getByLabelText(DM_FIELD)).toBeChecked();
+      });
+
+      it('saving without touching the field carries the stored permission, and only on the agent row', async () => {
+        stubApi();
+        stubSave();
+        const user = userEvent.setup();
+
+        renderScreen();
+
+        await screen.findByTestId('grw-chat-integration-permissions-form');
+        await user.click(
+          screen.getByRole('button', { name: /save channel permissions/i }),
+        );
+
+        await waitFor(() => expect(mocks.apiv3Post).toHaveBeenCalled());
+        expect(savedPayload().channelPermissions).toEqual([
+          { commandName: 'create-page', allowedChannels: 'all' },
+          {
+            commandName: 'agent',
+            allowedChannels: 'none',
+            allowedInDirectMessage: true,
+          },
+          { commandName: 'link-preview', allowedChannels: ['C0001', 'C0002'] },
+        ]);
+      });
+
+      it('sends false explicitly when the admin unchecks the field', async () => {
+        stubApi();
+        stubSave();
+        const user = userEvent.setup();
+
+        renderScreen();
+
+        await screen.findByTestId('grw-chat-integration-permissions-form');
+        await user.click(within(rowFor('agent')).getByLabelText(DM_FIELD));
+        await user.click(
+          screen.getByRole('button', { name: /save channel permissions/i }),
+        );
+
+        await waitFor(() => expect(mocks.apiv3Post).toHaveBeenCalled());
+        expect(savedPayload().channelPermissions).toContainEqual({
+          commandName: 'agent',
+          allowedChannels: 'none',
+          allowedInDirectMessage: false,
+        });
+      });
+
+      it('sends true after the admin checks the field on a row that had none', async () => {
+        stubApi({
+          settings: settingsWith([
+            { commandName: 'agent', allowedChannels: ['C0001'] },
+          ]),
+        });
+        stubSave();
+        const user = userEvent.setup();
+
+        renderScreen();
+
+        await screen.findByTestId('grw-chat-integration-permissions-form');
+        await user.click(within(rowFor('agent')).getByLabelText(DM_FIELD));
+        await user.click(
+          screen.getByRole('button', { name: /save channel permissions/i }),
+        );
+
+        await waitFor(() => expect(mocks.apiv3Post).toHaveBeenCalled());
+        expect(savedPayload().channelPermissions).toEqual([
+          {
+            commandName: 'agent',
+            allowedChannels: ['C0001'],
+            allowedInDirectMessage: true,
+          },
+        ]);
+      });
+
+      it('keeps a direct-message-only permission when the channel setting is not configured', async () => {
+        stubApi({ settings: settingsWith([]) });
+        stubSave();
+        const user = userEvent.setup();
+
+        renderScreen();
+
+        await screen.findByTestId('grw-chat-integration-permissions-form');
+        await user.click(within(rowFor('agent')).getByLabelText(DM_FIELD));
+        await user.click(
+          screen.getByRole('button', { name: /save channel permissions/i }),
+        );
+
+        await waitFor(() => expect(mocks.apiv3Post).toHaveBeenCalled());
+        expect(savedPayload().channelPermissions).toEqual([
+          {
+            commandName: 'agent',
+            allowedChannels: 'none',
+            allowedInDirectMessage: true,
+          },
+        ]);
+      });
     });
 
     it('does not offer a permission editor for an unpaired relation', async () => {

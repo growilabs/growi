@@ -156,7 +156,7 @@ describe('relation-settings-store', () => {
   it("replaces the relation's rows wholesale, leaving no row from an earlier save", async () => {
     await writeRelationSettings(RELATION_ID, [
       { commandName: 'search', allowedChannels: [toNativeChannelId('C0001')] },
-      { commandName: 'keep', allowedChannels: 'all' },
+      { commandName: 'create-page', allowedChannels: 'all' },
     ]);
 
     await writeRelationSettings(RELATION_ID, [
@@ -198,8 +198,14 @@ describe('relation-settings-store', () => {
     // unique index, so the row write fails mid-transaction. Whatever the
     // cause, the guarantee is the same: no half-written save.
     const duplicated = [
-      { commandName: 'keep', allowedChannels: [toNativeChannelId('C0002')] },
-      { commandName: 'keep', allowedChannels: [toNativeChannelId('C0003')] },
+      {
+        commandName: 'create-page',
+        allowedChannels: [toNativeChannelId('C0002')],
+      },
+      {
+        commandName: 'create-page',
+        allowedChannels: [toNativeChannelId('C0003')],
+      },
     ] as unknown as RelationSettings['channelPermissions'];
 
     await expect(

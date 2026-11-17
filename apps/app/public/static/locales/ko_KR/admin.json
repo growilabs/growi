@@ -1433,6 +1433,10 @@
     "connection_lost": {
       "badge": "연결이 끊어졌습니다",
       "detail": "proxy가 더 이상 이 GROWI를 받아들이지 않습니다. 채팅 쪽에서 연결이 해제되었을 수 있으며(예: `unregister`), 알림과 명령을 사용할 수 없습니다. 시계 차이나 키 불일치로도 같은 상태가 될 수 있습니다. GROWI 쪽 관계를 정리하려면 아래의 \"Disconnect\"를 누르거나, 다시 페어링을 시도하세요."
+    },
+    "permissions": {
+      "creates_pages_notice": "이 명령은 GROWI에 페이지를 만들 수 있습니다. 페이지 생성을 허용해도 되는 채널에서만 허용하세요.",
+      "allow_in_direct_message": "다이렉트 메시지(Slack의 AI 앱 화면 포함)에서 사용 허용"
     }
   }
 }

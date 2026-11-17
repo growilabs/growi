@@ -1430,6 +1430,10 @@
     "connection_lost": {
       "badge": "Connexion perdue",
       "detail": "Le proxy n'accepte plus ce GROWI. L'association a peut-être été supprimée côté chat (par exemple avec `unregister`) : les notifications et les commandes sont alors indisponibles. Un décalage d'horloge ou une clé différente peut produire le même état. Pour nettoyer cette relation côté GROWI, cliquez sur « Disconnect » ci-dessous, ou essayez de refaire l'association."
+    },
+    "permissions": {
+      "creates_pages_notice": "Cette commande peut créer des pages dans GROWI. Ne l'autorisez que dans les canaux où la création de pages est acceptable.",
+      "allow_in_direct_message": "Autoriser l'utilisation dans les messages privés (y compris l'écran de l'application IA de Slack)"
     }
   }
 }

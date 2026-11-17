@@ -340,7 +340,7 @@ describe('peer-router (task 3.5 -- the 6 entry points, wired for real)', () => {
       );
       await ChatChannelPermission.create({
         relationId: RELATION_ID,
-        commandName: 'keep',
+        commandName: 'link-preview',
         allowedChannels: ['C0003'],
       });
 
@@ -353,7 +353,7 @@ describe('peer-router (task 3.5 -- the 6 entry points, wired for real)', () => {
       expect(response.status).toBe(200);
       expect(response.body.version).toBe(8);
       expect(response.body.settings.channelPermissions).toEqual([
-        { commandName: 'keep', allowedChannels: ['C0003'] },
+        { commandName: 'link-preview', allowedChannels: ['C0003'] },
       ]);
     });
   });

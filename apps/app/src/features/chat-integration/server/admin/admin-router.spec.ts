@@ -384,7 +384,7 @@ describe('admin-router', () => {
       const app = buildApp(adminUser);
       const channelPermissions = [
         { commandName: 'create-page', allowedChannels: 'all' },
-        { commandName: 'keep', allowedChannels: 'none' },
+        { commandName: 'link-preview', allowedChannels: 'none' },
         { commandName: 'search', allowedChannels: ['C0001', 'C0002'] },
       ];
 
