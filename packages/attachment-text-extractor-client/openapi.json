@@ -205,6 +205,16 @@
               }
             }
           },
+          "401": {
+            "description": "unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "408": {
             "description": "extraction_timeout",
             "content": {

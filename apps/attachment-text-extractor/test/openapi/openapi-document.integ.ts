@@ -21,7 +21,7 @@ import { responseChecker, schemaChecker, textAt } from './openapi-support';
 // (Req 7.1, 7.2): the request fields and whether they are required, the
 // answer types, the ErrorCode values; (2) real answers fit the documented
 // schemas, read in the strict view (17.7 2 (iv)): an undocumented field or
-// status fails, and only the authentication 401 may go undocumented.
+// status fails.
 // Node only (these are not the FastAPI document's shapes), so not in the
 // black-box tests. Python test_schemas.py maps here.
 
@@ -123,14 +123,22 @@ describe('what a client generated from the document keeps (Req 7.1, 7.2)', () =>
     expect(ok({ ...EXTRACTED, engine: 'x' })).not.toEqual([]);
   });
 
-  it('every error answer of POST /extract is an ErrorResponse, under the statuses the FastAPI document had', async () => {
+  it('every error answer of POST /extract is an ErrorResponse, under the statuses the FastAPI document had plus the 401 of the Bearer check', async () => {
     const doc = await served();
     const statuses = Object.keys(
       recordOf(textAt(doc, [...EXTRACT, 'responses'])),
     ).filter((status) => status !== '200');
     const check = responseChecker(doc);
 
-    expect(statuses.sort()).toEqual(['400', '408', '413', '422', '500', '503']);
+    expect(statuses.sort()).toEqual([
+      '400',
+      '401',
+      '408',
+      '413',
+      '422',
+      '500',
+      '503',
+    ]);
     for (const status of statuses.map(Number)) {
       const error = (body: unknown) => check('/extract', 'post', status, body);
       expect(
@@ -145,7 +153,7 @@ describe('what a client generated from the document keeps (Req 7.1, 7.2)', () =>
     }
   });
 
-  it('the check lets only the authentication 401 go undocumented', async () => {
+  it('the check accepts only documented statuses', async () => {
     const check = responseChecker(await served());
 
     expect(

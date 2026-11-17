@@ -75,6 +75,13 @@ export const REFUSAL_TABLE: Readonly<Record<Refusal, ErrorAnswer>> = {
   client_disconnected: { code: 'extraction_failed', status: 422 },
 };
 
+/** The Bearer check's refusal; it answers before any route runs. */
+export const UNAUTHORIZED_ANSWER: ErrorAnswer & { readonly message: string } = {
+  code: 'unauthorized',
+  status: 401,
+  message: 'Missing or invalid Bearer token',
+};
+
 /** Each error status of POST /extract, ascending, with the codes it carries. */
 export const extractErrorStatuses = (): ReadonlyMap<
   number,
@@ -83,6 +90,7 @@ export const extractErrorStatuses = (): ReadonlyMap<
   const answers: readonly ErrorAnswer[] = [
     ...Object.values(ERROR_TABLE),
     ...Object.values(REFUSAL_TABLE),
+    UNAUTHORIZED_ANSWER,
   ];
   const statuses = [...new Set(answers.map(({ status }) => status))].toSorted(
     (a, b) => a - b,

@@ -36,11 +36,6 @@ const toDefs = (schema: Json): Json =>
     ),
   );
 
-// The authentication 401 answers every path before any route runs, so no
-// operation documents it (nor did the FastAPI document); it is an ErrorResponse.
-const undocumentedSchema = (status: number): Json | undefined =>
-  status === 401 ? { $ref: '#/components/schemas/ErrorResponse' } : undefined;
-
 /** Why `value` does not fit the schema (empty when it fits). */
 export type SchemaCheck = (value: unknown) => readonly string[];
 
@@ -86,7 +81,7 @@ export const responseChecker = (document: unknown): ResponseCheck => {
       'application/json',
       'schema',
     );
-    const schema = documented ?? undocumentedSchema(status);
+    const schema = documented;
     if (schema === undefined) {
       return [`${method} ${path} ${status} is not documented`];
     }

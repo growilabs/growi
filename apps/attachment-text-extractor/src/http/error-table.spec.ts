@@ -1,5 +1,9 @@
 import { ERROR_CODES } from '../contract/error-code';
-import { ERROR_TABLE } from './error-table';
+import {
+  ERROR_TABLE,
+  extractErrorStatuses,
+  UNAUTHORIZED_ANSWER,
+} from './error-table';
 
 // The one table from a failure kind to ErrorCode, HTTP status and the fixed
 // message (Req 1.3, 1.8, 5.5). A missing kind is a type error (Record over
@@ -71,5 +75,16 @@ describe('ERROR_CODES', () => {
       'file_encrypted',
       'resource_limit_exceeded',
     ]);
+  });
+});
+
+describe('extractErrorStatuses', () => {
+  it('lists the 401 unauthorized answer of the Bearer check', () => {
+    expect(extractErrorStatuses().get(401)).toEqual(['unauthorized']);
+    expect(UNAUTHORIZED_ANSWER).toEqual({
+      code: 'unauthorized',
+      status: 401,
+      message: 'Missing or invalid Bearer token',
+    });
   });
 });

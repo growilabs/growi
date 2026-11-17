@@ -3,6 +3,7 @@ import type { MiddlewareHandler } from 'hono';
 
 import type { AppEnv } from './app-env';
 import { errorAnswer } from './early-answer';
+import { UNAUTHORIZED_ANSWER } from './error-table';
 
 // The only paths answered without a token (Req 1.6); every other one, an
 // unknown one included, needs it, and is checked before anything else runs.
@@ -43,12 +44,8 @@ export const bearerAuth = (token: string): MiddlewareHandler<AppEnv> => {
       ? digest(Buffer.from(header.slice(SCHEME.length), 'latin1'))
       : null;
     if (sent === null || !timingSafeEqual(sent, expected)) {
-      return errorAnswer(
-        c,
-        401,
-        'unauthorized',
-        'Missing or invalid Bearer token',
-      );
+      const { status, code, message } = UNAUTHORIZED_ANSWER;
+      return errorAnswer(c, status, code, message);
     }
     await next();
   };
