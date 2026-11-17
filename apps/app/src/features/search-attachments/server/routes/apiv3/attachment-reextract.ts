@@ -21,10 +21,12 @@
  *     route applies)
  *   - 503 if the feature is disabled, or the run did not finish within its
  *     deadline (waiting for an extraction slot counts towards it)
- *   - 500 reextract_failed if the run could not complete (e.g. the index
- *     write failed, or the attachment went away meanwhile)
- *   - 200 { outcome: { kind } } otherwise (ReextractResponse); the outcome
- *     may still be an extraction failure the extractor reported
+ *   - 500 reextract_failed if the indexer could not finish the run: by the
+ *     time it ran the attachment was gone or on no page, or the feature was
+ *     turned off, or an unexpected error occurred (e.g. the index write
+ *     failed)
+ *   - 200 { outcome: { kind } } when the run finished (ReextractResponse),
+ *     including when the extractor reported a failure for the file
  *
  * Concurrent authorized requests for one attachment share one extraction.
  */

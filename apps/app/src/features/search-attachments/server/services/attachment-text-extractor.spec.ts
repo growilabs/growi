@@ -919,25 +919,6 @@ describe('AttachmentTextExtractorService', () => {
     });
   });
 
-  it('reports a file the storage says does not exist as file_not_found', async () => {
-    const { AttachmentFileNotFoundError } = await import(
-      '~/server/service/file-uploader/attachment-file-not-found'
-    );
-    mockFileUploader.findDeliveryFile.mockRejectedValue(
-      new AttachmentFileNotFoundError('does not exist in local fs'),
-    );
-
-    const service = await getService();
-    const result = await service.extractAttachment('attachment-id-1');
-
-    expect(result).toEqual({
-      kind: 'failed',
-      reasonCode: 'file_not_found',
-      message: expect.any(String),
-    });
-    expect(postExtract).not.toHaveBeenCalled();
-  });
-
   it('reports a file that cannot be read from storage as a failure of that file, not as an extractor outage', async () => {
     mockFileUploader.findDeliveryFile.mockRejectedValue(
       new Error('Storage unavailable'),

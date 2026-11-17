@@ -574,16 +574,18 @@ describe('POST /_api/v3/attachments/:id/reextract', () => {
       const endpoint = `${MOUNT}/${attachmentId}/reextract`;
       const responded = afterResponseTo(endpoint);
       const recorded = vi.spyOn(prisma.activities, 'createByParameters');
+      try {
+        const res = await reextract(attachmentId, users.admin);
+        await responded;
 
-      const res = await reextract(attachmentId, users.admin);
-      await responded;
-
-      expect(res.status).toBe(503);
-      expect(res.body.errors[0].code).toBe('feature_disabled');
-      expect(recorded).not.toHaveBeenCalledWith(
-        expect.objectContaining({ endpoint }),
-      );
-      recorded.mockRestore();
+        expect(res.status).toBe(503);
+        expect(res.body.errors[0].code).toBe('feature_disabled');
+        expect(recorded).not.toHaveBeenCalledWith(
+          expect.objectContaining({ endpoint }),
+        );
+      } finally {
+        recorded.mockRestore();
+      }
     });
 
     it('answers 503 when the feature was enabled after boot (no indexer yet)', async () => {

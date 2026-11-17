@@ -8,6 +8,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { ExtractionOutcome } from '~/features/search-attachments/interfaces/attachment-search';
 import { SocketEventName } from '~/interfaces/websocket';
 import type { AttachmentWithComputed } from '~/server/models/attachment';
 import { prisma } from '~/utils/prisma';
@@ -330,37 +331,8 @@ describe('AttachmentReindexBatch', () => {
       Array.from({ length: n }, (_, i) =>
         makeAttachment({ id: `a${String(i).padStart(2, '0')}` }),
       );
-    const unreadable = {
-      kind: 'failed' as const,
-      reasonCode: 'file_read_failed',
-      message: 'The stored file could not be read',
-    };
-
-    it.each([
-      {
-        what: 'the extractor is unreachable',
-        outage: { kind: 'serviceUnreachable' as const },
-      },
-      {
-        what: 'the extractor answers busy',
-        outage: { kind: 'serviceBusy' as const },
-      },
-      {
-        what: 'the file storage does not answer properly',
-        outage: unreadable,
-      },
-    ])('keeps the alias and drops the new index when $what for 10 attachments in a row', async ({
-      outage,
-    }) => {
-      setupAttachmentMock(attachments(15));
-      extractor.extractAttachment
-        .mockResolvedValueOnce(successOutcome)
-        .mockResolvedValue(outage);
-
-      batch.startRebuild(() => Promise.resolve());
-      await waitUntilFinished();
-
-      expect(extractor.extractAttachment).toHaveBeenCalledTimes(11);
+    const unreachable = { kind: 'serviceUnreachable' as const };
+    const expectAborted = () => {
       expect(delegatorExt.swapAttachmentAlias).not.toHaveBeenCalled();
       expect(delegatorExt.dropRebuildIndex).toHaveBeenCalledWith(
         'attachments-2',
@@ -371,46 +343,93 @@ describe('AttachmentReindexBatch', () => {
       expect(emittedEvents()).not.toContain(
         SocketEventName.FinishAddAttachment,
       );
+    };
+
+    const unreadable = {
+      kind: 'failed' as const,
+      reasonCode: 'file_read_failed',
+      message: 'The stored file could not be read',
+    };
+    const outcomesInOrder = (outcomes: ExtractionOutcome[]) => {
+      for (const outcome of outcomes) {
+        extractor.extractAttachment.mockResolvedValueOnce(outcome);
+      }
+      extractor.extractAttachment.mockResolvedValue(successOutcome);
+    };
+
+    // 40 attachments: the budget is 20 + ceil(40 × 5%) = 22
+    it('keeps the alias and drops the new index once outage-like failures reach the budget', async () => {
+      setupAttachmentMock(attachments(40));
+      outcomesInOrder(
+        Array.from({ length: 22 }, (_, i) =>
+          i % 2 === 0 ? unreachable : unreadable,
+        ),
+      );
+
+      batch.startRebuild(() => Promise.resolve());
+      await waitUntilFinished();
+
+      expect(extractor.extractAttachment).toHaveBeenCalledTimes(22);
+      expectAborted();
+      expect(socketIoService._emit).toHaveBeenCalledWith(
+        SocketEventName.AttachmentRebuildingFailed,
+        {
+          error:
+            'Too many attachments could not be read or extracted (the text extractor or the file storage may be down), so the rebuild stopped and the existing attachment index was kept.',
+        },
+      );
     });
 
-    it('finishes the rebuild however many stored files are missing in a row', async () => {
-      setupAttachmentMock(attachments(15));
+    it('finishes the rebuild when outage-like failures stay under the budget', async () => {
+      setupAttachmentMock(attachments(40));
+      outcomesInOrder(
+        Array.from({ length: 40 }, (_, i) =>
+          i % 2 === 0 ? unreachable : successOutcome,
+        ),
+      );
+
+      batch.startRebuild(() => Promise.resolve());
+      await waitUntilFinished();
+
+      expect(extractor.extractAttachment).toHaveBeenCalledTimes(40);
+      expect(failureLogService.record).toHaveBeenCalledTimes(20);
+      expect(delegatorExt.swapAttachmentAlias).toHaveBeenCalledWith(
+        'attachments-2',
+      );
+    });
+
+    it('fails a run too small to reach the budget when nothing could be read or extracted, keeping the alias', async () => {
+      setupAttachmentMock(attachments(3));
+      outcomesInOrder([unreachable, { kind: 'serviceBusy' }, unreadable]);
+
+      batch.startRebuild(() => Promise.resolve());
+      await waitUntilFinished();
+
+      expect(extractor.extractAttachment).toHaveBeenCalledTimes(3);
+      expectAborted();
+      expect(socketIoService._emit).toHaveBeenCalledWith(
+        SocketEventName.AttachmentRebuildingFailed,
+        {
+          error:
+            'No attachment could be read or extracted (the text extractor or the file storage may be down), so the existing attachment index was kept.',
+        },
+      );
+    });
+
+    it('swaps in a run in which the extractor judged every file, even if none could be indexed', async () => {
+      setupAttachmentMock(attachments(3));
       extractor.extractAttachment.mockResolvedValue({
-        kind: 'failed',
-        reasonCode: 'file_not_found',
-        message: 'The stored file does not exist',
+        kind: 'unsupported',
+        mimeType: 'image/png',
       });
 
       batch.startRebuild(() => Promise.resolve());
       await waitUntilFinished();
 
-      expect(extractor.extractAttachment).toHaveBeenCalledTimes(15);
-      expect(failureLogService.record).toHaveBeenCalledTimes(15);
       expect(delegatorExt.swapAttachmentAlias).toHaveBeenCalledWith(
         'attachments-2',
       );
-    });
-
-    it('finishes the rebuild when such failures are interrupted by a success', async () => {
-      setupAttachmentMock(attachments(19));
-      for (let i = 0; i < 9; i++) {
-        extractor.extractAttachment.mockResolvedValueOnce({
-          kind: 'serviceUnreachable',
-        });
-      }
-      extractor.extractAttachment.mockResolvedValueOnce(successOutcome);
-      for (let i = 0; i < 9; i++) {
-        extractor.extractAttachment.mockResolvedValueOnce(unreadable);
-      }
-
-      batch.startRebuild(() => Promise.resolve());
-      await waitUntilFinished();
-
-      expect(extractor.extractAttachment).toHaveBeenCalledTimes(19);
-      expect(failureLogService.record).toHaveBeenCalledTimes(18);
-      expect(delegatorExt.swapAttachmentAlias).toHaveBeenCalledWith(
-        'attachments-2',
-      );
+      expect(emittedEvents()).toContain(SocketEventName.FinishAddAttachment);
     });
 
     it('removes attachments deleted while they were being extracted from the new index before the swap', async () => {
@@ -752,8 +771,9 @@ describe('AttachmentReindexBatch', () => {
 
         extractor.extractAttachment.mockResolvedValueOnce(outcome);
 
+        // A run of one outage-like outcome fails at the end; the record is kept
         // biome-ignore lint/performance/noAwaitInLoops: sequential iteration is intentional in this test
-        await batch.addAllAttachments('attachments-tmp');
+        await batch.addAllAttachments('attachments-tmp').catch(() => {});
 
         expect(failureLogService.record).toHaveBeenCalledOnce();
         expect(failureLogService.record.mock.calls[0][0].reasonCode).toBe(

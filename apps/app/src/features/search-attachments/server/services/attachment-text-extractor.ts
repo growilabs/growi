@@ -11,7 +11,6 @@ import type {
 } from '~/features/search-attachments/interfaces/attachment-search';
 import type { AttachmentWithComputed } from '~/server/models/attachment';
 import { configManager } from '~/server/service/config-manager';
-import { AttachmentFileNotFoundError } from '~/server/service/file-uploader/attachment-file-not-found';
 import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 
@@ -30,8 +29,6 @@ const logger = loggerFactory('growi:service:search-attachments:extractor');
 
 /** reasonCode of a `failed` outcome whose stored file could not be read. */
 export const FILE_READ_FAILED = 'file_read_failed';
-/** reasonCode of a `failed` outcome whose stored file does not exist. */
-export const FILE_NOT_FOUND = 'file_not_found';
 
 // Retry configuration — exported for testability
 export const RETRY_BASE_DELAY_MS = 500;
@@ -43,15 +40,13 @@ export const RETRY_JITTER_MAX_MS = 500;
  */
 const sleep = (ms: number, signal?: AbortSignal): Promise<void> =>
   new Promise((resolve) => {
-    const timer = setTimeout(resolve, ms);
-    signal?.addEventListener(
-      'abort',
-      () => {
-        clearTimeout(timer);
-        resolve();
-      },
-      { once: true },
-    );
+    const done = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', done);
+      resolve();
+    };
+    const timer = setTimeout(done, ms);
+    signal?.addEventListener('abort', done, { once: true });
   });
 
 const ERROR_CODES: readonly string[] = Object.values(ErrorCode);
@@ -350,20 +345,13 @@ export class AttachmentTextExtractorService {
         { attachmentId: attachment.id, error },
         'Failed to read the stored file',
       );
-      // A missing file is a fact about this file; any other read failure
-      // (no answer, timeout, denied) is the storage's and counts towards a
-      // rebuild's outage limit (see attachment-reindex-batch).
-      return error instanceof AttachmentFileNotFoundError
-        ? {
-            kind: 'failed',
-            reasonCode: FILE_NOT_FOUND,
-            message: 'The stored file does not exist',
-          }
-        : {
-            kind: 'failed',
-            reasonCode: FILE_READ_FAILED,
-            message: 'The stored file could not be read',
-          };
+      // Not `serviceUnreachable`: the extractor is fine. A rebuild still
+      // counts it towards its outage budget (see rebuild-failure-budget).
+      return {
+        kind: 'failed',
+        reasonCode: FILE_READ_FAILED,
+        message: 'The stored file could not be read',
+      };
     }
 
     // --- Step 7: Call extractor (with built-in retry for 503) ---

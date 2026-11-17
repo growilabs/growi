@@ -12,7 +12,6 @@ import type {
 import loggerFactory from '~/utils/logger';
 
 import { configManager } from '../config-manager';
-import { AttachmentFileNotFoundError } from './attachment-file-not-found';
 import {
   AbstractFileUploader,
   type SaveFileParam,
@@ -294,7 +293,7 @@ export const setup = (crowi: Crowi) => {
     });
 
     if (attachmentFile == null) {
-      throw new AttachmentFileNotFoundError(
+      throw new Error(
         `Any AttachmentFile that relate to the Attachment (${attachment._id.toString()}) does not exist in GridFS`,
       );
     }

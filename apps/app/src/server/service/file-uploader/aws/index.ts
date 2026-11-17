@@ -35,10 +35,6 @@ import loggerFactory from '~/utils/logger';
 
 import { configManager } from '../../config-manager';
 import {
-  AttachmentFileNotFoundError,
-  isMissingS3Object,
-} from '../attachment-file-not-found';
-import {
   AbstractFileUploader,
   type SaveFileParam,
   type TemporaryUrl,
@@ -63,7 +59,7 @@ const isFileExists = async (s3: S3Client, params: HeadObjectCommandInput) => {
   try {
     await s3.send(new HeadObjectCommand(params));
   } catch (err) {
-    if (isMissingS3Object(err)) {
+    if (err != null && err.code === 'NotFound') {
       return false;
     }
     throw err;
@@ -336,7 +332,7 @@ class AwsFileUploader extends AbstractFileUploader {
     // check file exists
     const isExists = await isFileExists(s3, params);
     if (!isExists) {
-      throw new AttachmentFileNotFoundError(
+      throw new Error(
         `Any object that relate to the Attachment (${filePath}) does not exist in AWS S3`,
       );
     }

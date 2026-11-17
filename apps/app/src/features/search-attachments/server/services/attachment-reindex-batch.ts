@@ -5,9 +5,10 @@
  * sweeps orphans from it and only then moves the alias onto it, so the live
  * index stays as it was until the swap (see design.md Flow 5).
  *
- * - A failure of one attachment is logged and skipped. A run of failures
- *   that point at an outage (RebuildOutageError) aborts the rebuild instead,
- *   so the alias never moves to an index of empty docs.
+ * - A failure of one attachment is logged and skipped. Once outage-like
+ *   failures use up the rebuild's failure budget (rebuild-failure-budget),
+ *   the rebuild aborts instead, so the alias never moves to an index of
+ *   empty docs.
  * - NO permission fields stored in any ES document.
  * - Socket events are emitted to the admin namespace so the admin UI can display progress.
  */
@@ -25,12 +26,10 @@ import { prisma } from '~/utils/prisma';
 
 import type { AttachmentOrphanSweeper } from './attachment-orphan-sweeper';
 import type { AttachmentIndexOperations } from './attachment-search-delegator-extension';
-import {
-  type AttachmentTextExtractorService,
-  FILE_READ_FAILED,
-} from './attachment-text-extractor';
+import type { AttachmentTextExtractorService } from './attachment-text-extractor';
 import type { ExtractionFailureLogServiceInterface } from './extraction-failure-log-service';
 import { indexableAttachments } from './indexable-attachments';
+import { createRebuildFailureBudget } from './rebuild-failure-budget';
 
 const logger = loggerFactory('growi:service:search-attachments:reindex-batch');
 
@@ -52,30 +51,18 @@ export interface AttachmentReindexBatchInterface {
 /** Number of attachment rows fetched from MongoDB per page during a rebuild. */
 export const REINDEX_PAGE_SIZE = 100;
 
-/**
- * Failures that say nothing about the file itself: the extractor did not
- * answer or was busy, or the file storage did not answer properly (a missing
- * file is a per-file failure and does not count). One alone is often a single large file (a client
- * timeout, a dropped connection); this many in a row with no success between
- * them is an outage, and every later attachment would fail the same way.
- * The scan is sequential, so waiting for the evidence costs at most this
- * many extraction timeouts.
- */
-export const MAX_CONSECUTIVE_OUTAGE_FAILURES = 10;
-
-const isOutageFailure = (outcome: ExtractionOutcome): boolean =>
-  outcome.kind === 'serviceUnreachable' ||
-  outcome.kind === 'serviceBusy' ||
-  (outcome.kind === 'failed' && outcome.reasonCode === FILE_READ_FAILED);
-
+/** Its message reaches the admin through AttachmentRebuildingFailed. */
 export class RebuildOutageError extends Error {
-  constructor() {
-    super(
-      `${MAX_CONSECUTIVE_OUTAGE_FAILURES} attachments in a row could not be read or extracted; the extractor or the file storage looks down`,
-    );
+  constructor(message: string) {
+    super(message);
     this.name = 'RebuildOutageError';
   }
 }
+
+const OVER_BUDGET_MESSAGE =
+  'Too many attachments could not be read or extracted (the text extractor or the file storage may be down), so the rebuild stopped and the existing attachment index was kept.';
+const NOTHING_READ_MESSAGE =
+  'No attachment could be read or extracted (the text extractor or the file storage may be down), so the existing attachment index was kept.';
 
 // ---- Internal helpers -------------------------------------------------------
 
@@ -367,7 +354,8 @@ export class AttachmentReindexBatch implements AttachmentReindexBatchInterface {
   /**
    * Extracts and indexes every attachment into `targetIndex`, then removes
    * docs whose page no longer exists. A failure on one attachment is logged
-   * and skipped; a run of outage failures rejects with RebuildOutageError.
+   * and skipped; rejects with RebuildOutageError when the failure budget
+   * says so (used up mid-run, or nothing read at all).
    */
   async addAllAttachments(
     targetIndex: string,
@@ -383,15 +371,11 @@ export class AttachmentReindexBatch implements AttachmentReindexBatchInterface {
     );
 
     let processed = 0;
-    let consecutiveOutageFailures = 0;
+    const budget = createRebuildFailureBudget(total);
     for await (const attachmentId of iterateAllAttachmentIds()) {
+      let outcome: ExtractionOutcome | null = null;
       try {
-        const outcome = await this.indexAttachment(attachmentId, targetIndex);
-        if (outcome != null) {
-          consecutiveOutageFailures = isOutageFailure(outcome)
-            ? consecutiveOutageFailures + 1
-            : 0;
-        }
+        outcome = await this.indexAttachment(attachmentId, targetIndex);
       } catch (err) {
         logger.error(
           { err, attachmentId },
@@ -399,8 +383,8 @@ export class AttachmentReindexBatch implements AttachmentReindexBatchInterface {
         );
       }
 
-      if (consecutiveOutageFailures >= MAX_CONSECUTIVE_OUTAGE_FAILURES) {
-        throw new RebuildOutageError();
+      if (outcome != null && budget.record(outcome)) {
+        throw new RebuildOutageError(OVER_BUDGET_MESSAGE);
       }
 
       processed += 1;
@@ -408,6 +392,10 @@ export class AttachmentReindexBatch implements AttachmentReindexBatchInterface {
         totalCount: total,
         count: processed,
       });
+    }
+
+    if (budget.shouldAbortAtEnd()) {
+      throw new RebuildOutageError(NOTHING_READ_MESSAGE);
     }
 
     const sweepResult = await this.orphanSweeper.sweep(targetIndex);

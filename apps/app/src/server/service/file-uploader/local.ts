@@ -22,10 +22,6 @@ import loggerFactory from '~/utils/logger';
 
 import { configManager } from '../config-manager';
 import {
-  AttachmentFileNotFoundError,
-  isMissingLocalFile,
-} from './attachment-file-not-found';
-import {
   AbstractFileUploader,
   type SaveFileParam,
   type TemporaryUrl,
@@ -250,10 +246,9 @@ export const setup = (crowi: Crowi) => {
     try {
       fs.statSync(filePath);
     } catch (err) {
-      const message = `Any AttachmentFile that relate to the Attachment (${attachment._id.toString()}) does not exist in local fs`;
-      throw isMissingLocalFile(err)
-        ? new AttachmentFileNotFoundError(message)
-        : new Error(message, { cause: err });
+      throw new Error(
+        `Any AttachmentFile that relate to the Attachment (${attachment._id.toString()}) does not exist in local fs`,
+      );
     }
 
     // return stream.Readable
