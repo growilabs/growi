@@ -48,6 +48,7 @@ export interface AttachmentSearchIndexerInterface {
   onDetach(attachmentId: string): Promise<void>;
   reindex(
     attachmentId: string,
+    options?: { signal?: AbortSignal },
   ): Promise<{ ok: boolean; outcome: ExtractionOutcome }>;
 }
 
@@ -222,8 +223,9 @@ export class AttachmentSearchIndexer
    * 1. Write to live index first.
    * 2. Attempt write to tmp index — failure is logged as WARN and does not throw.
    *
-   * `replace` first deletes every doc the attachment has in that index, so
-   * docs of an earlier extraction (another page count, a failure doc) go.
+   * `replace` then deletes the other docs the attachment has in that index
+   * (another page count, a failure doc). Doc ids are deterministic, so the
+   * docs just written stay, and a failed write leaves the old ones.
    */
   private async writeToIndexes(
     targetIndexes: string[],
@@ -244,18 +246,19 @@ export class AttachmentSearchIndexer
     const hasLive = targetIndexes.includes(liveIndex);
 
     const writeTo = async (index: string): Promise<void> => {
-      if (replace) {
-        await this.delegatorExt.removeAttachmentsFromIndex(
-          [attachmentId],
-          index,
-        );
-      }
       await this.delegatorExt.syncAttachmentIndexed(
         attachmentId,
         pageId,
         docs,
         index,
       );
+      if (replace) {
+        await this.delegatorExt.removeStaleAttachmentDocs(
+          attachmentId,
+          docs,
+          index,
+        );
+      }
     };
 
     // Always write to live first (if present)
@@ -297,10 +300,18 @@ export class AttachmentSearchIndexer
     attachment: AttachmentWithComputed,
     pageId: string,
     mode: 'upload' | 'reextract',
+    signal?: AbortSignal,
   ): Promise<ExtractionOutcome> {
     const attachmentId = attachment._id.toString();
 
-    const outcome = await this.extractor.extractAttachment(attachmentId);
+    const outcome = await this.extractor.extractAttachment(attachmentId, {
+      signal,
+    });
+    // No one waits for this run any more; a failure here is mostly the
+    // extraction skipped for that reason, not a fact about the file
+    if (signal?.aborted && outcome.kind !== 'success') {
+      return outcome;
+    }
     // Resolved after the extraction: a rebuild may have started meanwhile
     const targetIndexes = this.getTargetIndexes();
 
@@ -474,6 +485,7 @@ export class AttachmentSearchIndexer
    */
   async reindex(
     attachmentId: string,
+    { signal }: { signal?: AbortSignal } = {},
   ): Promise<{ ok: boolean; outcome: ExtractionOutcome }> {
     try {
       if (!this.isFeatureEnabled()) {
@@ -502,6 +514,7 @@ export class AttachmentSearchIndexer
         attachment,
         pageId,
         'reextract',
+        signal,
       );
 
       return { ok: true, outcome };

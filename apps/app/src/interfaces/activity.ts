@@ -96,6 +96,7 @@ const ACTION_SHARE_LINK_NOT_FOUND = 'SHARE_LINK_NOT_FOUND';
 const ACTION_ATTACHMENT_ADD = 'ATTACHMENT_ADD';
 const ACTION_ATTACHMENT_REMOVE = 'ATTACHMENT_REMOVE';
 const ACTION_ATTACHMENT_DOWNLOAD = 'ATTACHMENT_DOWNLOAD';
+const ACTION_ATTACHMENT_REEXTRACT = 'ATTACHMENT_REEXTRACT';
 const ACTION_SEARCH_PAGE = 'SEARCH_PAGE';
 const ACTION_SEARCH_PAGE_VIEW = 'SEARCH_PAGE_VIEW';
 const ACTION_ADMIN_APP_SETTINGS_UPDATE = 'ADMIN_APP_SETTING_UPDATE';
@@ -356,6 +357,7 @@ export const SupportedAction = {
   ACTION_ATTACHMENT_ADD,
   ACTION_ATTACHMENT_REMOVE,
   ACTION_ATTACHMENT_DOWNLOAD,
+  ACTION_ATTACHMENT_REEXTRACT,
   ACTION_SEARCH_PAGE,
   ACTION_SEARCH_PAGE_VIEW,
   ACTION_ADMIN_APP_SETTINGS_UPDATE,
@@ -594,6 +596,7 @@ export const MediumActionGroup = {
   ACTION_ATTACHMENT_ADD,
   ACTION_ATTACHMENT_REMOVE,
   ACTION_ATTACHMENT_DOWNLOAD,
+  ACTION_ATTACHMENT_REEXTRACT,
   ACTION_SEARCH_PAGE,
   ACTION_SEARCH_PAGE_VIEW,
   ACTION_CHANGE_PROPOSAL_CREATE,
@@ -807,7 +810,8 @@ export type DefaultSnapshot = Partial<Pick<IUser, 'username'>>;
 
 /**
  * Canonical snapshot variant shared by every attachment activity
- * (ACTION_ATTACHMENT_ADD / ACTION_ATTACHMENT_REMOVE / ACTION_ATTACHMENT_DOWNLOAD).
+ * (ACTION_ATTACHMENT_ADD / ACTION_ATTACHMENT_REMOVE / ACTION_ATTACHMENT_DOWNLOAD /
+ * ACTION_ATTACHMENT_REEXTRACT).
  * Every field is optional: snapshot builders omit fields they cannot resolve
  * (e.g. pagePath when the page is gone, username on guest downloads).
  */
@@ -875,6 +879,16 @@ export const isAttachmentDownloadActivity = (
 ): activity is Pick<IActivity, 'action' | 'snapshot'> & {
   snapshot?: AttachmentSnapshot;
 } => activity.action === SupportedAction.ACTION_ATTACHMENT_DOWNLOAD;
+
+/**
+ * Narrows an ATTACHMENT_REEXTRACT activity's snapshot to AttachmentSnapshot.
+ * Same pattern as isAttachmentRemoveActivity: `action` is the sole discriminant.
+ */
+export const isAttachmentReextractActivity = (
+  activity: Pick<IActivity, 'action' | 'snapshot'>,
+): activity is Pick<IActivity, 'action' | 'snapshot'> & {
+  snapshot?: AttachmentSnapshot;
+} => activity.action === SupportedAction.ACTION_ATTACHMENT_REEXTRACT;
 
 export type IActivityHasId = IActivity & HasObjectId;
 

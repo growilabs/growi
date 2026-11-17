@@ -83,7 +83,7 @@ function makeDelegator(): AttachmentIndexOperations {
     aliasName: 'attachments-alias',
     syncAttachmentIndexed: vi.fn().mockResolvedValue(undefined),
     syncAttachmentRemoved: vi.fn().mockResolvedValue(undefined),
-    removeAttachmentsFromIndex: vi.fn().mockResolvedValue(undefined),
+    removeStaleAttachmentDocs: vi.fn().mockResolvedValue(undefined),
   } as unknown as AttachmentIndexOperations;
 }
 
@@ -253,7 +253,10 @@ describe('AttachmentSearchIndexer', () => {
 
       await indexer.onAttach('page-42', attachment, makeMullerFile());
 
-      expect(extractor.extractAttachment).toHaveBeenCalledWith('att-001');
+      expect(extractor.extractAttachment).toHaveBeenCalledWith(
+        'att-001',
+        expect.anything(),
+      );
       expect(delegator.syncAttachmentIndexed).toHaveBeenCalledOnce();
 
       const [calledAttachmentId, calledPageId, calledDocs, calledIndexes] =
@@ -792,7 +795,10 @@ describe('AttachmentSearchIndexer', () => {
       expect(result.ok).toBe(true);
       expect(result.outcome.kind).toBe('success');
 
-      expect(extractor.extractAttachment).toHaveBeenCalledWith('att-001');
+      expect(extractor.extractAttachment).toHaveBeenCalledWith(
+        'att-001',
+        expect.anything(),
+      );
       expect(delegator.syncAttachmentIndexed).toHaveBeenCalledOnce();
 
       // pageId is read from the attachment row and propagated to the ES docs
@@ -837,19 +843,41 @@ describe('AttachmentSearchIndexer', () => {
       expect(failureLog.record).toHaveBeenCalledOnce();
       // What is indexed stays: a failure doc would blank a single-doc text
       expect(delegator.syncAttachmentIndexed).not.toHaveBeenCalled();
-      expect(delegator.removeAttachmentsFromIndex).not.toHaveBeenCalled();
+      expect(delegator.removeStaleAttachmentDocs).not.toHaveBeenCalled();
     });
 
-    it('clears the earlier docs of the attachment in every target index before writing the new ones', async () => {
+    it('records nothing for a run its caller abandoned before it got to extract', async () => {
+      enableFeature();
+      vi.spyOn(prisma.attachments, 'findUnique').mockResolvedValue(
+        makeAttachment({ pageId: 'page-77' }),
+      );
+      const failureLog = makeFailureLog();
+      const abandoned = new AbortController();
+      abandoned.abort();
+
+      const indexer = makeIndexer(
+        makeExtractor({ kind: 'timeout' }),
+        makeDelegator(),
+        failureLog,
+        makeReindexBatch(),
+        makeSearchService(true),
+      );
+
+      await indexer.reindex('att-001', { signal: abandoned.signal });
+
+      expect(failureLog.record).not.toHaveBeenCalled();
+    });
+
+    it('writes the new docs and then drops the stale ones, in every target index', async () => {
       enableFeature();
       vi.spyOn(prisma.attachments, 'findUnique').mockResolvedValue(
         makeAttachment({ pageId: 'page-77' }),
       );
       const delegator = makeDelegator();
       const calls: string[] = [];
-      vi.mocked(delegator.removeAttachmentsFromIndex).mockImplementation(
-        (_ids, index) => {
-          calls.push(`remove ${index}`);
+      vi.mocked(delegator.removeStaleAttachmentDocs).mockImplementation(
+        (_id, _docs, index) => {
+          calls.push(`remove stale ${index}`);
           return Promise.resolve();
         },
       );
@@ -872,35 +900,11 @@ describe('AttachmentSearchIndexer', () => {
 
       expect(result.outcome.kind).toBe('success');
       expect(calls).toEqual([
-        'remove attachments-alias',
         'write attachments-alias',
-        'remove attachments-tmp',
+        'remove stale attachments-alias',
         'write attachments-tmp',
+        'remove stale attachments-tmp',
       ]);
-    });
-
-    it('writes nothing and keeps the earlier docs when clearing them from the live index fails', async () => {
-      enableFeature();
-      vi.spyOn(prisma.attachments, 'findUnique').mockResolvedValue(
-        makeAttachment({ pageId: 'page-77' }),
-      );
-      const delegator = makeDelegator();
-      vi.mocked(delegator.removeAttachmentsFromIndex).mockRejectedValue(
-        new Error('es down'),
-      );
-
-      const indexer = makeIndexer(
-        makeExtractor(),
-        delegator,
-        makeFailureLog(),
-        makeReindexBatch(),
-        makeSearchService(true),
-      );
-
-      const result = await indexer.reindex('att-001');
-
-      expect(result.ok).toBe(false);
-      expect(delegator.syncAttachmentIndexed).not.toHaveBeenCalled();
     });
 
     it('returns { ok: false } when feature is disabled', async () => {

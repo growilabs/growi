@@ -75,6 +75,24 @@ describe('createReextractGate', () => {
       await assertion;
     });
 
+    it('tells an abandoned task that no one waits for it any more', async () => {
+      const gate = createReextractGate<string>(1000);
+      let seen: AbortSignal | undefined;
+      const hung = gate.run('a', (signal) => {
+        seen = signal;
+        return new Promise<string>(() => {});
+      });
+      const assertion = expect(hung).rejects.toBeInstanceOf(
+        ReextractDeadlineError,
+      );
+      expect(seen?.aborted).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(1000);
+      await assertion;
+
+      expect(seen?.aborted).toBe(true);
+    });
+
     it('starts a fresh run for the same key after the deadline', async () => {
       const gate = createReextractGate<string>(1000);
       const hung = gate.run('a', () => new Promise<string>(() => {}));

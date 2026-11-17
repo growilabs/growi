@@ -1170,6 +1170,7 @@
     "ATTACHMENT_ADD": "Ajouter une pièce jointe",
     "ATTACHMENT_REMOVE": "Supprimer une pièce jointe",
     "ATTACHMENT_DOWNLOAD": "Télécharger une pièce jointe",
+    "ATTACHMENT_REEXTRACT": "Réextraire le texte d'une pièce jointe",
     "SEARCH_PAGE": "Rechercher une page",
     "SEARCH_PAGE_VIEW": "Résultats de recherche",
     "ADMIN_APP_SETTING_UPDATE": "Modifier les paramètres d'application",

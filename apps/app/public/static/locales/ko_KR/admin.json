@@ -1173,6 +1173,7 @@
     "ATTACHMENT_ADD": "첨부 파일 추가",
     "ATTACHMENT_REMOVE": "첨부 파일 제거",
     "ATTACHMENT_DOWNLOAD": "첨부 파일 다운로드",
+    "ATTACHMENT_REEXTRACT": "첨부 파일 텍스트 재추출",
     "SEARCH_PAGE": "페이지 검색",
     "SEARCH_PAGE_VIEW": "페이지 보기(검색 결과 페이지)",
     "ADMIN_APP_SETTING_UPDATE": "앱 설정 업데이트",

@@ -65,6 +65,12 @@ export interface AttachmentIndexOperations {
     docs: IAttachmentEsDoc[],
     targetIndex: string,
   ): Promise<void>;
+  /** Deletes the docs of the attachment in `index` other than `currentDocs`. */
+  removeStaleAttachmentDocs(
+    attachmentId: string,
+    currentDocs: IAttachmentEsDoc[],
+    index: string,
+  ): Promise<void>;
   syncAttachmentRemoved(
     attachmentId: string,
     targetIndexes: string[],
@@ -79,20 +85,19 @@ const buildDocId = (attachmentId: string, pageNumber: number | null): string =>
   `${attachmentId}_${pageNumber ?? 0}`;
 
 /**
- * Deletes every doc of the given attachments from `index`. Rejects when
+ * Deletes the docs matching `query` from `index`. Rejects when
  * Elasticsearch reports docs it could not delete.
  */
-const deleteAttachmentDocs = async (
+const deleteDocsByQuery = async (
   client: ElasticsearchClientDelegator,
   index: string,
-  attachmentIds: string[],
+  query: Record<string, unknown>,
 ): Promise<void> => {
   const params = {
     index,
     // The alias is missing while the feature has never been enabled
     ignore_unavailable: true,
   };
-  const query = { terms: { attachmentId: attachmentIds } };
 
   // delete-by-query only sees docs made searchable by a refresh
   let failures: unknown[] | undefined;
@@ -120,6 +125,13 @@ const deleteAttachmentDocs = async (
     );
   }
 };
+
+const deleteAttachmentDocs = (
+  client: ElasticsearchClientDelegator,
+  index: string,
+  attachmentIds: string[],
+): Promise<void> =>
+  deleteDocsByQuery(client, index, { terms: { attachmentId: attachmentIds } });
 
 /**
  * AttachmentSearchDelegatorExtension wraps an existing ElasticsearchClientDelegator
@@ -324,6 +336,27 @@ export class AttachmentSearchDelegatorExtension
     index: string,
   ): Promise<void> {
     return deleteAttachmentDocs(this.client, index, attachmentIds);
+  }
+
+  removeStaleAttachmentDocs(
+    attachmentId: string,
+    currentDocs: IAttachmentEsDoc[],
+    index: string,
+  ): Promise<void> {
+    return deleteDocsByQuery(this.client, index, {
+      bool: {
+        filter: [{ term: { attachmentId } }],
+        must_not: [
+          {
+            ids: {
+              values: currentDocs.map((doc) =>
+                buildDocId(attachmentId, doc.pageNumber),
+              ),
+            },
+          },
+        ],
+      },
+    });
   }
 
   /**

@@ -2,9 +2,14 @@ export type ReextractGate<T> = {
   /**
    * Runs `task` for `key`, or joins the run already in flight for `key`.
    * A run that has not settled after `deadlineMs` is abandoned: its key is
-   * freed and its callers are rejected with ReextractDeadlineError.
+   * freed, its callers are rejected with ReextractDeadlineError and the
+   * signal handed to `task` is aborted, so work not yet started can skip.
    */
-  run(key: string, task: () => Promise<T>, deadlineMs?: number): Promise<T>;
+  run(
+    key: string,
+    task: (signal: AbortSignal) => Promise<T>,
+    deadlineMs?: number,
+  ): Promise<T>;
 };
 
 /** Thrown to the callers of a run that did not settle within its deadline. */
@@ -36,12 +41,13 @@ export const createReextractGate = <T>(
       }
 
       let timer: ReturnType<typeof setTimeout> | undefined;
+      const abandoned = new AbortController();
       const started: Promise<T> = new Promise<T>((resolve, reject) => {
-        timer = setTimeout(
-          () => reject(new ReextractDeadlineError()),
-          deadlineMs,
-        );
-        (async () => task())().then(resolve, reject);
+        timer = setTimeout(() => {
+          abandoned.abort();
+          reject(new ReextractDeadlineError());
+        }, deadlineMs);
+        (async () => task(abandoned.signal))().then(resolve, reject);
       }).finally(() => {
         clearTimeout(timer);
         // Runs once, when `started` settles (result or deadline); a late

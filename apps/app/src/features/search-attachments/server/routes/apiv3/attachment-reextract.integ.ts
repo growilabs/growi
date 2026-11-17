@@ -13,7 +13,11 @@ import { mock } from 'vitest-mock-extended';
 
 import { getInstance } from '^/test/setup/crowi';
 
-import { SupportedAction } from '~/interfaces/activity';
+import {
+  ActionGroupSize,
+  MODEL_ATTACHMENT,
+  SupportedAction,
+} from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
 import { AttachmentType } from '~/server/interfaces/attachment';
 import type { PageModel } from '~/server/models/page';
@@ -83,6 +87,11 @@ describe('POST /_api/v3/attachments/:id/reextract', () => {
         key === 'app:attachmentFullTextSearch:extractorToken'
       ) {
         return featureEnabled ? 'configured' : undefined;
+      }
+      // The re-extraction action belongs to the medium audit-log group
+      if (key === 'app:auditLogEnabled') return true;
+      if (key === 'app:auditLogActionGroupSize') {
+        return ActionGroupSize.Medium;
       }
       return originalGetConfig(key, source);
     });
@@ -211,7 +220,43 @@ describe('POST /_api/v3/attachments/:id/reextract', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.outcome.kind).toBe('success');
-      expect(indexer.reindex).toHaveBeenCalledWith(attachmentIds[attachment]);
+      expect(indexer.reindex).toHaveBeenCalledWith(
+        attachmentIds[attachment],
+        expect.anything(),
+      );
+    });
+
+    it('records the re-extraction in the audit log with its operator and attachment', async () => {
+      const attachmentId = await createAttachment(pageIds[0]);
+      const endpoint = `${MOUNT}/${attachmentId}/reextract`;
+      try {
+        const res = await reextract(attachmentId, users.other);
+        expect(res.status).toBe(200);
+
+        await vi.waitFor(
+          async () =>
+            expect(
+              await prisma.activities.findMany({ where: { endpoint } }),
+            ).toEqual([
+              expect.objectContaining({
+                action: SupportedAction.ACTION_ATTACHMENT_REEXTRACT,
+                userId: users.other._id.toString(),
+                target: attachmentId,
+                targetModel: MODEL_ATTACHMENT,
+                snapshot: expect.objectContaining({
+                  username: users.other.username,
+                  originalName: 'a.txt',
+                  pageId: pageIds[0],
+                  pagePath: `/reextract-integ-${RUN}/public`,
+                }),
+              }),
+            ]),
+          { timeout: 3_000, interval: 50 },
+        );
+      } finally {
+        await prisma.activities.deleteMany({ where: { endpoint } });
+        await prisma.attachments.deleteMany({ where: { id: attachmentId } });
+      }
     });
 
     it.each([
@@ -449,7 +494,7 @@ describe('POST /_api/v3/attachments/:id/reextract', () => {
 
       expect(responses.map((r) => r.status)).toEqual([200, 200]);
       expect(indexer.reindex).toHaveBeenCalledTimes(1);
-      expect(indexer.reindex).toHaveBeenCalledWith(lower);
+      expect(indexer.reindex).toHaveBeenCalledWith(lower, expect.anything());
     });
 
     it('accepts any number of different attachments at once (the extractor queues their work)', async () => {
@@ -478,13 +523,20 @@ describe('POST /_api/v3/attachments/:id/reextract', () => {
       expect(res.text).not.toContain(id);
     });
 
-    it('answers 503 while the feature is disabled', async () => {
+    it('answers 503 while the feature is disabled, leaving nothing in the audit log', async () => {
       featureEnabled = false;
+      const attachmentId = new mongoose.Types.ObjectId().toString();
+      const endpoint = `${MOUNT}/${attachmentId}/reextract`;
 
-      const res = await reextract(attachmentIds.public, users.admin);
+      const res = await reextract(attachmentId, users.admin);
 
       expect(res.status).toBe(503);
       expect(res.body.errors[0].code).toBe('feature_disabled');
+      // The fail-safe row would be written right after the response
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      expect(await prisma.activities.findMany({ where: { endpoint } })).toEqual(
+        [],
+      );
     });
 
     it('answers 503 when the feature was enabled after boot (no indexer yet)', async () => {

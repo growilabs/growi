@@ -7,10 +7,9 @@
  *   accessTokenParser([SCOPE.WRITE.FEATURES.ATTACHMENT])
  *   + loginRequiredStrictly
  *   + excludeReadOnlyUser
- *   + addActivity (a refused or failed request leaves an ACTION_UNSETTLED
- *     row; no SupportedAction names a re-extraction, so a success records
- *     nothing yet)
  *   + requireSearchAttachmentsEnabled
+ *   + addActivity (rules/activity-recording.md: a success records
+ *     ACTION_ATTACHMENT_REEXTRACT, a later refusal or failure ACTION_UNSETTLED)
  *   + id validation
  *
  * Permission check (re-checked from the current Page grant on every request):
@@ -35,6 +34,7 @@ import express from 'express';
 import { param } from 'express-validator';
 import mongoose from 'mongoose';
 
+import { MODEL_ATTACHMENT, SupportedAction } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
@@ -43,6 +43,7 @@ import { excludeReadOnlyUser } from '~/server/middlewares/exclude-read-only-user
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import type { PageModel } from '~/server/models/page';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
+import { buildAttachmentSnapshot } from '~/server/service/attachment/attachment-snapshot';
 import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
@@ -66,9 +67,10 @@ type Req = Request<{ id: string }, ApiV3Response, void> & {
 };
 
 /**
- * One run may read the file, call the extractor and, on a busy answer, call
- * it once more, each call bounded by timeoutMs; this adds the time for the
- * storage read and the retry delay.
+ * The deadline is timeoutMs × 2 plus this margin. It does not cover the worst
+ * case of one run (waiting for an extraction slot, then the file read, the
+ * extractor call and its busy retry, each bounded by timeoutMs): such a run
+ * answers 503 but keeps going, and a late success is still indexed.
  */
 const REEXTRACT_DEADLINE_MARGIN_MS = 30 * 1000;
 
@@ -96,6 +98,7 @@ export function createAttachmentReextractRouter(crowi: Crowi): express.Router {
 
   const loginRequiredStrictly = loginRequiredFactory(crowi);
   const addActivity = generateAddActivityMiddleware();
+  const activityEvent = crowi.events.activity;
   const requireSearchAttachmentsEnabled = createRequireSearchAttachmentsEnabled(
     () => crowi.searchService?.isConfigured === true,
   );
@@ -105,8 +108,8 @@ export function createAttachmentReextractRouter(crowi: Crowi): express.Router {
     accessTokenParser([SCOPE.WRITE.FEATURES.ATTACHMENT]),
     loginRequiredStrictly,
     excludeReadOnlyUser,
-    addActivity,
     requireSearchAttachmentsEnabled,
+    addActivity,
     param('id').isMongoId().withMessage('id must be an attachment id'),
     apiV3FormValidator,
     async (req: Req, res: ApiV3Response) => {
@@ -143,8 +146,8 @@ export function createAttachmentReextractRouter(crowi: Crowi): express.Router {
         }
 
         const Page = mongoose.model<IPage, PageModel>('Page');
-        const pageExists = (await Page.exists({ _id: pageId })) != null;
-        if (!pageExists) {
+        const page = await Page.findById(pageId).select('path').lean();
+        if (page == null) {
           return notFoundOrForbidden(res);
         }
 
@@ -164,7 +167,7 @@ export function createAttachmentReextractRouter(crowi: Crowi): express.Router {
         );
         const result = await gate.run(
           canonicalId,
-          () => indexer.reindex(canonicalId),
+          (signal) => indexer.reindex(canonicalId, { signal }),
           timeoutMs * 2 + REEXTRACT_DEADLINE_MARGIN_MS,
         );
 
@@ -177,6 +180,23 @@ export function createAttachmentReextractRouter(crowi: Crowi): express.Router {
           },
           'Attachment reextraction completed',
         );
+
+        // emit before res.apiv3() — see rules/activity-recording.md
+        activityEvent.emit('update', res.locals.activity._id, {
+          action: SupportedAction.ACTION_ATTACHMENT_REEXTRACT,
+          target: canonicalId,
+          targetModel: MODEL_ATTACHMENT,
+          snapshot: buildAttachmentSnapshot(
+            {
+              _id: canonicalId,
+              originalName: attachment.originalName ?? undefined,
+              fileSize: attachment.fileSize,
+              pageId,
+            },
+            page.path,
+            user.username,
+          ),
+        });
 
         const body: ReextractResponse = {
           outcome: { kind: result.outcome.kind },

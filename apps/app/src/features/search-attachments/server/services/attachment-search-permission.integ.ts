@@ -56,6 +56,7 @@ const PAGING_TOKEN = `zzpaging${RUN}`;
 const OP_TOKEN = `zzoperator${RUN}`;
 const DRIFT_TOKEN = `zzdrift${RUN}`;
 const RANK_TOKEN = `zzrank${RUN}`;
+const CROWD_TOKEN = `zzcrowd${RUN}`;
 const TAG_A = `attperm-tag-${RUN}`;
 const PAGE_INDEX = `fix_attperm_pages_${RUN}`;
 const ATTACHMENT_NAMES = attachmentIndexNames(PAGE_INDEX);
@@ -456,6 +457,10 @@ describe.skipIf(esUri == null)(
         grantedUsers: [users.creator],
       });
 
+      // --- one page with many matching attachments beside another ---------
+      await seedPage('crowded', { body: `crowded ${CROWD_TOKEN}` });
+      await seedPage('crowdedOut', { body: `other ${CROWD_TOKEN}` });
+
       // A page whose attachments stay indexed but which is no longer in the page index.
       pageIds.deleted = new mongoose.Types.ObjectId().toString();
       idToKind.set(pageIds.deleted, 'deleted');
@@ -527,6 +532,16 @@ describe.skipIf(esUri == null)(
         'att-rankHidden',
         Array(12).fill(RANK_TOKEN).join(' '),
       );
+
+      for (let i = 0; i < 25; i++) {
+        // biome-ignore lint/performance/noAwaitInLoops: fixture docs
+        await indexAttachment(
+          'crowded',
+          `att-crowded-${i}`,
+          Array(12).fill(CROWD_TOKEN).join(' '),
+        );
+      }
+      await indexAttachment('crowdedOut', 'att-crowdedOut', CROWD_TOKEN);
 
       await refresh(PAGE_INDEX);
       await refresh(ATTACHMENT_INDEX);
@@ -825,6 +840,44 @@ describe.skipIf(esUri == null)(
         expect(
           result.items[0].meta?.attachmentHits?.map((h) => h.attachmentId),
         ).toEqual(['att-rankVisible']);
+      }, 30_000);
+    });
+
+    describe('a page with many matching attachments', () => {
+      const hitCounts = (
+        entries: [string, { attachmentHits?: unknown[] } | undefined][],
+      ) =>
+        Object.fromEntries(
+          entries
+            .filter(([, v]) => (v?.attachmentHits?.length ?? 0) > 0)
+            .map(([id, v]) => [idToKind.get(id), v?.attachmentHits?.length]),
+        );
+
+      it('does not crowd out the hits of the other pages, on the first page and in the secondary search', async () => {
+        const viewer = await viewerOf('other');
+
+        const first = await searchService.searchByFacet(CROWD_TOKEN, viewer, {
+          facet: 'all',
+          from: 0,
+          size: 20,
+        });
+        const secondary = await searchService.resolveAttachmentSecondary(
+          CROWD_TOKEN,
+          viewer,
+          { primaryIds: [pageIds.crowded, pageIds.crowdedOut] },
+        );
+
+        const firstCounts = hitCounts(
+          first.items.map((i) => [String(i.data._id), i.meta]),
+        );
+        const secondaryCounts = hitCounts(
+          Object.entries(secondary.enrichments),
+        );
+        for (const counts of [firstCounts, secondaryCounts]) {
+          expect(Object.keys(counts).sort()).toEqual(['crowded', 'crowdedOut']);
+          expect(counts.crowdedOut).toBe(1);
+          expect(counts.crowded).toBeLessThan(25);
+        }
       }, 30_000);
     });
 

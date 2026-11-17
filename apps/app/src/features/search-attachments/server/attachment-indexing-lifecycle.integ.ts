@@ -316,6 +316,53 @@ describe.skipIf(process.env.ELASTICSEARCH_URI == null)(
           (await docsOfAttachment(NAMES.alias, id)).map((d) => d._id),
         ).toEqual([`${id}_1`, `${id}_2`]);
       });
+
+      it('drops the pages a shorter re-extraction no longer has', async () => {
+        const id = await upload(
+          fixtureFileContent({ pages: 3, word: `zzshrink${RUN}` }),
+        );
+        extractor.setReply(() => ({
+          status: 200,
+          body: {
+            mimeType: 'text/plain',
+            extractedCharacters: 9,
+            pages: [{ pageNumber: 1, label: null, content: `zzshrunk${RUN}` }],
+          },
+        }));
+
+        await reextract(id);
+
+        const docs = await docsOfAttachment(NAMES.alias, id);
+        expect(docs.map((d) => [d._id, d._source.content])).toEqual([
+          [`${id}_1`, `zzshrunk${RUN}`],
+        ]);
+      });
+
+      it('keeps the indexed text when writing the re-extracted pages fails', async () => {
+        const id = await upload(
+          fixtureFileContent({ pages: 2, word: `zzkeep${RUN}` }),
+        );
+        // Elasticsearch rejects the doc: pageNumber is mapped as a number
+        extractor.setReply(() => ({
+          status: 200,
+          body: {
+            mimeType: 'text/plain',
+            extractedCharacters: 3,
+            pages: [
+              { pageNumber: 'not-a-number', label: null, content: 'new' },
+            ],
+          },
+        }));
+
+        const result = await reextract(id);
+
+        expect(result.ok).toBe(false);
+        const docs = await docsOfAttachment(NAMES.alias, id);
+        expect(docs.map((d) => d._source.content)).toEqual([
+          `zzkeep${RUN} page 1`,
+          `zzkeep${RUN} page 2`,
+        ]);
+      });
     });
 
     describe('during a rebuild', () => {

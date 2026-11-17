@@ -38,6 +38,7 @@ import { buildAttachmentSearchQuery } from '../queries/build-attachment-search-q
 import {
   buildAttachmentsByPageIdsQuery,
   DEFAULT_PAGE_SIZE,
+  PAGE_HITS,
 } from '../queries/build-attachments-by-page-ids-query';
 import { buildSnippetSegments } from '../queries/build-snippet-segments';
 import {
@@ -102,6 +103,8 @@ export interface AttachmentEsHit {
     fileName?: string[];
     originalName?: string[];
   };
+  /** Set on the collapsed hits of buildAttachmentsByPageIdsQuery. */
+  inner_hits?: Record<string, { hits: { hits: AttachmentEsHit[] } }>;
 }
 
 /**
@@ -362,13 +365,16 @@ export class AttachmentSearchResultAggregator {
     const responses = await Promise.all(
       chunks.map((ids) =>
         this.attachmentClient.searchAttachments(
-          buildAttachmentsByPageIdsQuery(keywords, ids, { highlight: true }),
+          buildAttachmentsByPageIdsQuery(keywords, ids),
         ),
       ),
     );
 
     const allowed = new Set(pageIds);
-    for (const hit of responses.flatMap((r) => r.hits.hits)) {
+    const hits = responses
+      .flatMap((r) => r.hits.hits)
+      .flatMap((group) => group.inner_hits?.[PAGE_HITS]?.hits.hits ?? []);
+    for (const hit of hits) {
       const pageId = hit._source.pageId;
       // The query filters by these ids; this re-check keeps the gate
       // independent of that query being correct.

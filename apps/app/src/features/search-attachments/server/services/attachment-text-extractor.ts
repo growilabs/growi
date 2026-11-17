@@ -19,12 +19,16 @@ import {
   createConcurrencyLimit,
 } from './concurrency-limit';
 import { buildExtractRequestBody } from './extract-request-body';
+import { readFileChunks } from './read-file-chunks';
 import {
   isCloudMetadataAddress,
   stripIpv6Brackets,
 } from './validate-extractor-uri';
 
 const logger = loggerFactory('growi:service:search-attachments:extractor');
+
+/** reasonCode of a `failed` outcome whose stored file could not be read. */
+export const FILE_READ_FAILED = 'file_read_failed';
 
 // Retry configuration — exported for testability
 export const RETRY_BASE_DELAY_MS = 500;
@@ -36,20 +40,6 @@ export const RETRY_JITTER_MAX_MS = 500;
  */
 const sleep = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
-
-/**
- * Collects the chunks of a readable stream. They are not joined: the request
- * body copies them once, and a joined Buffer would be a second copy.
- */
-async function streamToChunks(
-  stream: NodeJS.ReadableStream,
-): Promise<Buffer[]> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of stream) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as string));
-  }
-  return chunks;
-}
 
 const ERROR_CODES: readonly string[] = Object.values(ErrorCode);
 
@@ -219,7 +209,14 @@ export class AttachmentTextExtractorService {
     this.limit = createConcurrencyLimit(maxConcurrentExtractions);
   }
 
-  async extractAttachment(attachmentId: string): Promise<ExtractionOutcome> {
+  /**
+   * `signal`: once aborted, an extraction still waiting for a slot returns
+   * `timeout` without reading the file (its caller no longer waits for it).
+   */
+  async extractAttachment(
+    attachmentId: string,
+    { signal }: { signal?: AbortSignal } = {},
+  ): Promise<ExtractionOutcome> {
     try {
       // --- Step 1: Load config (fresh read every call for hot-reload safety) ---
       const extractorUri = configManager.getConfig(
@@ -289,11 +286,13 @@ export class AttachmentTextExtractorService {
 
       // The slot is held from reading the file to the last answer, retry included
       return await this.limit(() =>
-        this.readAndExtract(attachment, {
-          extractorUri,
-          token: extractorToken,
-          timeoutMs,
-        }),
+        signal?.aborted
+          ? Promise.resolve<ExtractionOutcome>({ kind: 'timeout' })
+          : this.readAndExtract(attachment, {
+              extractorUri,
+              token: extractorToken,
+              timeoutMs,
+            }),
       );
     } catch (error) {
       // Catch-all: ensure the method never throws regardless of what goes wrong
@@ -316,10 +315,15 @@ export class AttachmentTextExtractorService {
     // --- Step 6: Fetch file bytes ---
     let body: PostExtractBody;
     try {
-      const stream = await this.fileUploader.findDeliveryFile(attachment);
       // The chunks are not kept in a variable, so only the body's copy
       // stays in memory while the request runs.
-      body = buildExtractRequestBody(await streamToChunks(stream), attachment);
+      body = buildExtractRequestBody(
+        await readFileChunks(
+          () => this.fileUploader.findDeliveryFile(attachment),
+          settings.timeoutMs,
+        ),
+        attachment,
+      );
     } catch (error) {
       // One missing file must not read as an extractor outage, which aborts
       // a whole rebuild.
@@ -329,7 +333,7 @@ export class AttachmentTextExtractorService {
       );
       return {
         kind: 'failed',
-        reasonCode: 'file_read_failed',
+        reasonCode: FILE_READ_FAILED,
         message: 'The stored file could not be read',
       };
     }

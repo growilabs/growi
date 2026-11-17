@@ -1172,6 +1172,7 @@
     "ATTACHMENT_ADD": "添加附件",
     "ATTACHMENT_REMOVE": "删除附件",
     "ATTACHMENT_DOWNLOAD": "下载附件",
+    "ATTACHMENT_REEXTRACT": "重新提取附件文本",
     "SEARCH_PAGE": "页面搜索",
     "SEARCH_PAGE_VIEW": "页面浏览量（搜索结果页面）",
     "ADMIN_APP_SETTING_UPDATE": "更新应用设置",

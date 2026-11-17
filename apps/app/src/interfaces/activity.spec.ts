@@ -15,9 +15,11 @@ import {
   AllSmallGroupActions,
   AllSupportedActions,
   AllSupportedTargetModels,
+  AttachmentActions,
   ChangeProposalActions,
   isAttachmentAddActivity,
   isAttachmentDownloadActivity,
+  isAttachmentReextractActivity,
   isAttachmentRemoveActivity,
   isAuditlogSuggestionField,
   MODEL_ATTACHMENT,
@@ -426,6 +428,27 @@ describe('isAttachmentDownloadActivity', () => {
     };
 
     expect(isAttachmentDownloadActivity(activity)).toBe(false);
+  });
+});
+
+describe('isAttachmentReextractActivity', () => {
+  it('accepts only ATTACHMENT_REEXTRACT, which is an attachment action in the medium group', () => {
+    const of = (action: IActivity['action']) => ({ action });
+
+    expect(
+      isAttachmentReextractActivity(
+        of(SupportedAction.ACTION_ATTACHMENT_REEXTRACT),
+      ),
+    ).toBe(true);
+    for (const action of [
+      SupportedAction.ACTION_ATTACHMENT_ADD,
+      SupportedAction.ACTION_ATTACHMENT_REMOVE,
+      SupportedAction.ACTION_ATTACHMENT_DOWNLOAD,
+    ]) {
+      expect(isAttachmentReextractActivity(of(action))).toBe(false);
+    }
+    expect(AttachmentActions).toContain('ATTACHMENT_REEXTRACT');
+    expect(AllMediumGroupActions).toContain('ATTACHMENT_REEXTRACT');
   });
 });
 

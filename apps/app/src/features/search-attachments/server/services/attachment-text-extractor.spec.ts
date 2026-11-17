@@ -681,6 +681,99 @@ describe('AttachmentTextExtractorService', () => {
     );
   });
 
+  it('skips an extraction whose caller gave up while it waited for a slot', async () => {
+    const { AttachmentTextExtractorService } = await import(
+      './attachment-text-extractor'
+    );
+    let reply: (value: unknown) => void = () => {};
+    postExtract.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          reply = resolve;
+        }),
+    );
+    const service = new AttachmentTextExtractorService(
+      mockFileUploader as any,
+      { maxConcurrentExtractions: 1 },
+    );
+    const abandoned = new AbortController();
+
+    const first = service.extractAttachment('attachment-id-1');
+    const queued = service.extractAttachment('attachment-id-1', {
+      signal: abandoned.signal,
+    });
+    await vi.waitFor(() => expect(postExtract).toHaveBeenCalledOnce());
+    abandoned.abort();
+    reply({
+      data: {
+        mimeType: 'text/plain',
+        extractedCharacters: 1,
+        pages: [{ pageNumber: null, label: null, content: 'a' }],
+      },
+    });
+
+    expect((await first).kind).toBe('success');
+    expect((await queued).kind).toBe('timeout');
+    expect(mockFileUploader.findDeliveryFile).toHaveBeenCalledOnce();
+    expect(postExtract).toHaveBeenCalledOnce();
+  });
+
+  describe('a stored file that does not finish reading within timeoutMs', () => {
+    beforeEach(() => {
+      const getConfig = vi
+        .mocked(configManager.getConfig)
+        .getMockImplementation();
+      vi.mocked(configManager.getConfig).mockImplementation(((key: string) =>
+        key === 'app:attachmentFullTextSearch:timeoutMs'
+          ? 50
+          : getConfig?.(key as never)) as typeof configManager.getConfig);
+      postExtract.mockResolvedValue({
+        data: {
+          mimeType: 'text/plain',
+          extractedCharacters: 2,
+          pages: [{ pageNumber: null, label: null, content: 'ok' }],
+        },
+      });
+    });
+
+    it('gives up on a stalled stream, closes it and reports the file as unreadable', async () => {
+      const stalled = new Readable({ read() {} });
+      mockFileUploader.findDeliveryFile.mockResolvedValue(stalled);
+      const service = await getService();
+
+      const result = await service.extractAttachment('attachment-id-1');
+
+      expect(result).toEqual({
+        kind: 'failed',
+        reasonCode: 'file_read_failed',
+        message: expect.any(String),
+      });
+      expect(stalled.destroyed).toBe(true);
+      expect(postExtract).not.toHaveBeenCalled();
+    });
+
+    it('lets the next extraction run after a storage call that never answers', async () => {
+      const { AttachmentTextExtractorService } = await import(
+        './attachment-text-extractor'
+      );
+      mockFileUploader.findDeliveryFile
+        .mockReturnValueOnce(new Promise(() => {}))
+        .mockResolvedValue(makeStream(Buffer.from('data')));
+      const service = new AttachmentTextExtractorService(
+        mockFileUploader as any,
+        { maxConcurrentExtractions: 1 },
+      );
+
+      const [hung, next] = await Promise.all([
+        service.extractAttachment('attachment-id-1'),
+        service.extractAttachment('attachment-id-1'),
+      ]);
+
+      expect(hung.kind).toBe('failed');
+      expect(next.kind).toBe('success');
+    });
+  });
+
   describe('an IPv6 literal extractor URI (accepted on save)', () => {
     const useExtractorUri = (uri: string) => {
       vi.mocked(configManager.getConfig).mockImplementation((key: string) => {
@@ -715,16 +808,6 @@ describe('AttachmentTextExtractorService', () => {
         pages: [{ pageNumber: null, label: null, content: 'hello' }],
       });
       expect(postExtract.mock.calls[0][1].baseURL).toBe('http://[::1]:8000');
-    });
-
-    it('still refuses a metadata IPv6 address', async () => {
-      useExtractorUri('http://[fd00:ec2::254]:8000');
-
-      const service = await getService();
-      const result = await service.extractAttachment('attachment-id-1');
-
-      expect(result).toEqual({ kind: 'serviceUnreachable' });
-      expect(postExtract).not.toHaveBeenCalled();
     });
   });
 

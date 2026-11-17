@@ -5,9 +5,9 @@
  * sweeps orphans from it and only then moves the alias onto it, so the live
  * index stays as it was until the swap (see design.md Flow 5).
  *
- * - A failure of one attachment is logged and skipped; an unreachable
- *   extractor aborts the rebuild instead (ExtractorUnreachableError), so the
- *   alias never moves to an index of empty docs.
+ * - A failure of one attachment is logged and skipped. A run of failures
+ *   that point at an outage (RebuildOutageError) aborts the rebuild instead,
+ *   so the alias never moves to an index of empty docs.
  * - NO permission fields stored in any ES document.
  * - Socket events are emitted to the admin namespace so the admin UI can display progress.
  */
@@ -25,7 +25,10 @@ import { prisma } from '~/utils/prisma';
 
 import type { AttachmentOrphanSweeper } from './attachment-orphan-sweeper';
 import type { AttachmentIndexOperations } from './attachment-search-delegator-extension';
-import type { AttachmentTextExtractorService } from './attachment-text-extractor';
+import {
+  type AttachmentTextExtractorService,
+  FILE_READ_FAILED,
+} from './attachment-text-extractor';
 import type { ExtractionFailureLogServiceInterface } from './extraction-failure-log-service';
 import { indexableAttachments } from './indexable-attachments';
 
@@ -49,11 +52,26 @@ export interface AttachmentReindexBatchInterface {
 /** Number of attachment rows fetched from MongoDB per page during a rebuild. */
 export const REINDEX_PAGE_SIZE = 100;
 
-/** Every later attachment would fail the same way; aborts the rebuild. */
-export class ExtractorUnreachableError extends Error {
-  constructor(attachmentId: string) {
-    super(`The text extractor was unreachable while indexing ${attachmentId}`);
-    this.name = 'ExtractorUnreachableError';
+/**
+ * Failures that say nothing about the file itself: the extractor or the file
+ * storage did not answer. One alone is often a single large file (a client
+ * timeout, a dropped connection); this many in a row with no success between
+ * them is an outage, and every later attachment would fail the same way.
+ * The scan is sequential, so waiting for the evidence costs at most this
+ * many extraction timeouts.
+ */
+export const MAX_CONSECUTIVE_OUTAGE_FAILURES = 10;
+
+const isOutageFailure = (outcome: ExtractionOutcome): boolean =>
+  outcome.kind === 'serviceUnreachable' ||
+  (outcome.kind === 'failed' && outcome.reasonCode === FILE_READ_FAILED);
+
+export class RebuildOutageError extends Error {
+  constructor() {
+    super(
+      `${MAX_CONSECUTIVE_OUTAGE_FAILURES} attachments in a row could not be read or extracted; the extractor or the file storage looks down`,
+    );
+    this.name = 'RebuildOutageError';
   }
 }
 
@@ -294,24 +312,24 @@ export class AttachmentReindexBatch implements AttachmentReindexBatchInterface {
     return this._tmpIndexName;
   }
 
-  /** Loads one attachment, extracts its text and upserts its ES docs. */
+  /**
+   * Loads one attachment, extracts its text and upserts its ES docs. Returns
+   * the extraction outcome, or null when the attachment was deleted.
+   */
   private async indexAttachment(
     attachmentId: string,
     targetIndex: string,
-  ): Promise<void> {
+  ): Promise<ExtractionOutcome | null> {
     const attachment = await prisma.attachments.findUnique({
       where: { id: attachmentId },
     });
     // Deleted after its id was paged
     if (attachment?.pageId == null) {
-      return;
+      return null;
     }
     const { pageId } = attachment;
 
     const outcome = await this.extractor.extractAttachment(attachmentId);
-    if (outcome.kind === 'serviceUnreachable') {
-      throw new ExtractorUnreachableError(attachmentId);
-    }
     const docs = buildDocs(attachment, pageId, outcome);
 
     // Upsert ES docs (success and failure alike get a metadata doc)
@@ -339,6 +357,7 @@ export class AttachmentReindexBatch implements AttachmentReindexBatchInterface {
         occurredAt: new Date(),
       });
     }
+    return outcome;
   }
 
   // ---- Bulk indexing ---------------------------------------------------------
@@ -346,7 +365,7 @@ export class AttachmentReindexBatch implements AttachmentReindexBatchInterface {
   /**
    * Extracts and indexes every attachment into `targetIndex`, then removes
    * docs whose page no longer exists. A failure on one attachment is logged
-   * and skipped; an unreachable extractor rejects with ExtractorUnreachableError.
+   * and skipped; a run of outage failures rejects with RebuildOutageError.
    */
   async addAllAttachments(
     targetIndex: string,
@@ -362,17 +381,24 @@ export class AttachmentReindexBatch implements AttachmentReindexBatchInterface {
     );
 
     let processed = 0;
+    let consecutiveOutageFailures = 0;
     for await (const attachmentId of iterateAllAttachmentIds()) {
       try {
-        await this.indexAttachment(attachmentId, targetIndex);
-      } catch (err) {
-        if (err instanceof ExtractorUnreachableError) {
-          throw err;
+        const outcome = await this.indexAttachment(attachmentId, targetIndex);
+        if (outcome != null) {
+          consecutiveOutageFailures = isOutageFailure(outcome)
+            ? consecutiveOutageFailures + 1
+            : 0;
         }
+      } catch (err) {
         logger.error(
           { err, attachmentId },
           'addAllAttachments: skipping attachment due to unexpected error',
         );
+      }
+
+      if (consecutiveOutageFailures >= MAX_CONSECUTIVE_OUTAGE_FAILURES) {
+        throw new RebuildOutageError();
       }
 
       processed += 1;

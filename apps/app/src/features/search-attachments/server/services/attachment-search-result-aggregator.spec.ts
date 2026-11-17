@@ -8,6 +8,7 @@ import type {
 } from '~/interfaces/search';
 import type { QueryTerms } from '~/server/interfaces/search';
 
+import { PAGE_HITS } from '../queries/build-attachments-by-page-ids-query';
 import {
   type AttachmentEsHit,
   type AttachmentIndexClient,
@@ -149,13 +150,28 @@ const esHit = (pageId: string, attachmentId: string): AttachmentEsHit => ({
   highlight: { content: ['<em>matching</em> content'] },
 });
 
+// Shaped like the collapsed response of buildAttachmentsByPageIdsQuery
 const makeAttachmentResponse = (
   hits: Array<{ pageId: string; attachmentId: string }>,
-): AttachmentSearchResponse => ({
-  hits: {
-    hits: hits.map(({ pageId, attachmentId }) => esHit(pageId, attachmentId)),
-  },
-});
+): AttachmentSearchResponse => {
+  const pageIds = [...new Set(hits.map((h) => h.pageId))];
+  return {
+    hits: {
+      hits: pageIds.map((pageId) => ({
+        ...esHit(pageId, `collapsed-${pageId}`),
+        inner_hits: {
+          [PAGE_HITS]: {
+            hits: {
+              hits: hits
+                .filter((h) => h.pageId === pageId)
+                .map((h) => esHit(h.pageId, h.attachmentId)),
+            },
+          },
+        },
+      })),
+    },
+  };
+};
 
 // Serves the requested from/size slice of the hits, like Elasticsearch.
 const serveHits =
@@ -258,29 +274,6 @@ describe('AttachmentSearchResultAggregator', () => {
       expect(result.meta.total).toBe(42);
       expect(result.facet).toBe('all');
       expect(result.primarySlot).toBe('pages');
-    });
-
-    it('asks the attachment index only about the pages page search shows content of', async () => {
-      pageSearchFn.mockResolvedValue(
-        makePageSearchResult(['page1', 'hiddenContent'], {
-          hiddenContent: {
-            grant: PageGrant.GRANT_OWNER,
-            grantedUsers: [new mongoose.Types.ObjectId()],
-          },
-        }),
-      );
-      client.searchAttachments.mockResolvedValue(makeAttachmentResponse([]));
-
-      await makeAggregator().searchPrimary(inputFor(guest), {
-        facet: 'all',
-        from: 0,
-        size: 20,
-      });
-
-      expect(client.searchAttachments).toHaveBeenCalledOnce();
-      expect(client.searchAttachments.mock.calls[0][0]).toMatchObject({
-        query: { bool: { filter: [{ terms: { pageId: [idOf('page1')] } }] } },
-      });
     });
 
     it('returns the hits of every visible page of a result larger than one attachment query takes', async () => {

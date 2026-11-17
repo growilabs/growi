@@ -326,22 +326,34 @@ describe('AttachmentReindexBatch', () => {
       expect(batch.startRebuild(() => new Promise<void>(() => {}))).toBe(true);
     });
 
-    it('keeps the alias and drops the new index when the extractor becomes unreachable', async () => {
-      setupAttachmentMock([
-        makeAttachment({ id: 'a1' }),
-        makeAttachment({ id: 'a2' }),
-        makeAttachment({ id: 'a3' }),
-      ]);
+    const attachments = (n: number) =>
+      Array.from({ length: n }, (_, i) =>
+        makeAttachment({ id: `a${String(i).padStart(2, '0')}` }),
+      );
+    const unreadable = {
+      kind: 'failed' as const,
+      reasonCode: 'file_read_failed',
+      message: 'The stored file could not be read',
+    };
+
+    it.each([
+      {
+        what: 'the extractor is unreachable',
+        outage: { kind: 'serviceUnreachable' as const },
+      },
+      { what: 'stored files cannot be read', outage: unreadable },
+    ])('keeps the alias and drops the new index when $what for 10 attachments in a row', async ({
+      outage,
+    }) => {
+      setupAttachmentMock(attachments(15));
       extractor.extractAttachment
         .mockResolvedValueOnce(successOutcome)
-        .mockResolvedValue({ kind: 'serviceUnreachable' });
+        .mockResolvedValue(outage);
 
       batch.startRebuild(() => Promise.resolve());
       await waitUntilFinished();
 
-      expect(extractor.extractAttachment).toHaveBeenCalledTimes(2);
-      expect(delegatorExt.syncAttachmentIndexed).toHaveBeenCalledOnce();
-      expect(failureLogService.record).not.toHaveBeenCalled();
+      expect(extractor.extractAttachment).toHaveBeenCalledTimes(11);
       expect(delegatorExt.swapAttachmentAlias).not.toHaveBeenCalled();
       expect(delegatorExt.dropRebuildIndex).toHaveBeenCalledWith(
         'attachments-2',
@@ -351,6 +363,28 @@ describe('AttachmentReindexBatch', () => {
       );
       expect(emittedEvents()).not.toContain(
         SocketEventName.FinishAddAttachment,
+      );
+    });
+
+    it('finishes the rebuild when such failures are interrupted by a success', async () => {
+      setupAttachmentMock(attachments(19));
+      for (let i = 0; i < 9; i++) {
+        extractor.extractAttachment.mockResolvedValueOnce({
+          kind: 'serviceUnreachable',
+        });
+      }
+      extractor.extractAttachment.mockResolvedValueOnce(successOutcome);
+      for (let i = 0; i < 9; i++) {
+        extractor.extractAttachment.mockResolvedValueOnce(unreadable);
+      }
+
+      batch.startRebuild(() => Promise.resolve());
+      await waitUntilFinished();
+
+      expect(extractor.extractAttachment).toHaveBeenCalledTimes(19);
+      expect(failureLogService.record).toHaveBeenCalledTimes(18);
+      expect(delegatorExt.swapAttachmentAlias).toHaveBeenCalledWith(
+        'attachments-2',
       );
     });
 
@@ -662,6 +696,10 @@ describe('AttachmentReindexBatch', () => {
         {
           outcome: { kind: 'serviceBusy' } as const,
           expectedCode: 'serviceBusy',
+        },
+        {
+          outcome: { kind: 'serviceUnreachable' } as const,
+          expectedCode: 'serviceUnreachable',
         },
         {
           outcome: { kind: 'encrypted' } as const,

@@ -1183,6 +1183,7 @@
     "ATTACHMENT_ADD": "Add Attachment",
     "ATTACHMENT_REMOVE": "Delete Attachment",
     "ATTACHMENT_DOWNLOAD": "Download Attachment",
+    "ATTACHMENT_REEXTRACT": "Re-extract Attachment Text",
     "SEARCH_PAGE": "Page Search",
     "SEARCH_PAGE_VIEW": "Page view(Search results page)",
     "ADMIN_APP_SETTING_UPDATE": "Update App Settings",

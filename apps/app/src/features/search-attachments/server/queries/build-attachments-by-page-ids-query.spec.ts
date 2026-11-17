@@ -60,29 +60,14 @@ describe('buildAttachmentsByPageIdsQuery', () => {
     expect(bodyStr).toContain('content.en');
   });
 
-  it('does NOT include highlight by default', () => {
+  it('highlights the hits of each page', () => {
     const body = buildAttachmentsByPageIdsQuery(
       kw('test'),
       samplePageIds,
     ) as any;
-    expect(body.highlight).toBeUndefined();
-  });
-
-  it('includes highlight when highlight=true', () => {
-    const body = buildAttachmentsByPageIdsQuery(kw('test'), samplePageIds, {
-      highlight: true,
-    }) as any;
-    expect(body.highlight).toBeDefined();
-    const highlightStr = JSON.stringify(body.highlight);
+    const highlightStr = JSON.stringify(body.collapse.inner_hits.highlight);
     expect(highlightStr).toContain('<em');
     expect(highlightStr).toContain('</em>');
-  });
-
-  it('respects custom size option', () => {
-    const body = buildAttachmentsByPageIdsQuery(kw('test'), samplePageIds, {
-      size: 5,
-    }) as any;
-    expect(body.size).toBe(5);
   });
 
   it('throws when pageIds.length exceeds DEFAULT_PAGE_SIZE (20)', () => {
@@ -109,28 +94,18 @@ describe('buildAttachmentsByPageIdsQuery', () => {
   });
 
   it('leaves the extracted text out of the returned hits (only highlights are read)', () => {
-    const body = buildAttachmentsByPageIdsQuery(kw('test'), samplePageIds, {
-      highlight: true,
-    });
-    expect(body._source).toEqual({ excludes: ['content'] });
+    const body = buildAttachmentsByPageIdsQuery(
+      kw('test'),
+      samplePageIds,
+    ) as any;
+    expect(body._source).toBe(false);
+    expect(body.collapse.inner_hits._source).toEqual({ excludes: ['content'] });
   });
 
   it('matches snapshot', () => {
     const body = buildAttachmentsByPageIdsQuery(
       kw('hello', 'world'),
       samplePageIds,
-    );
-    expect(body).toMatchSnapshot();
-  });
-
-  it('matches snapshot with highlight', () => {
-    const body = buildAttachmentsByPageIdsQuery(
-      kw('hello', 'world'),
-      samplePageIds,
-      {
-        highlight: true,
-        size: 10,
-      },
     );
     expect(body).toMatchSnapshot();
   });

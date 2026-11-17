@@ -368,8 +368,8 @@ describe.skipIf(esUri == null)(
           'accessTokenParserMw',
           'loginRequired',
           'excludeReadOnlyUser',
-          'addActivity',
           'requireSearchAttachmentsEnabled',
+          'addActivity',
         ]);
         for (const [method, path] of [
           ['GET', '/_api/v3/admin/attachment-search/config'],
