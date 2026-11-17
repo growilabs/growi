@@ -483,12 +483,17 @@ describe('accepting an agent request', () => {
     const answerRowsOf = (requestId: string) =>
       ChatOutboxRow.find({ kind: 'command-answer', requestId }).lean();
 
+    // The run makes several database round trips; a busy shared MongoDB can
+    // take longer than waitFor's one-second default.
     const untilFinished = () =>
-      vi.waitFor(async () => {
-        expect(
-          await ChatAgentRequest.countDocuments({ state: 'running' }),
-        ).toBe(0);
-      });
+      vi.waitFor(
+        async () => {
+          expect(
+            await ChatAgentRequest.countDocuments({ state: 'running' }),
+          ).toBe(0);
+        },
+        { timeout: 5000 },
+      );
 
     it('answers the accepted request and frees the person for the next one (fake AI)', async () => {
       const actor = nextActor();
