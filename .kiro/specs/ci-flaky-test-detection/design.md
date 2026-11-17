@@ -798,7 +798,7 @@ interface ReproResult {
   ない — check-run の名前が `flaky-repro (<値>)` に変わり、ルーティンの
   完全一致の探索が外れる
 - `file` モードは対象 spec を **1 回ずつ別プロセスで** 実行する。統合系は
-  `--poolOptions.forks.maxForks=4` を `test:integ` と揃える
+  `--poolOptions.forks.maxForks=3` を `test:integ` と揃える
 - テストが落ちても job は落とさない（結果を変数に集計して最後に `exit 0`）。
   job が落ちるのは前処理の失敗だけ。**1 回目の実行が
   `No test files found` なら「測定できなかった」として job を失敗させる**

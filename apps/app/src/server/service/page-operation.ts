@@ -33,6 +33,7 @@ const {
 } = PageActionType;
 
 export interface IPageOperationService {
+  init(): Promise<void>;
   generateProcessInfo(
     pageOperations: PageOperationDocument[],
   ): IPageOperationProcessInfo;

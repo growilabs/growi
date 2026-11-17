@@ -1,0 +1,114 @@
+import assert from 'node:assert';
+import { ErrorV3 } from '@growi/core/dist/models';
+import type { RequestHandler } from 'express';
+import { body } from 'express-validator';
+
+import type Crowi from '~/server/crowi';
+import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
+import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
+import loggerFactory from '~/utils/logger';
+
+import {
+  type AuthenticatedRequest,
+  type GetChangeProposalService,
+  readAccessChain,
+} from './read-access';
+
+const logger = loggerFactory(
+  'growi:features:change-proposal:routes:revision-marks',
+);
+
+const MAX_REVISION_IDS = 100;
+
+type Req = AuthenticatedRequest<
+  Record<string, string>,
+  { revisionIds: string[] },
+  unknown
+>;
+
+const validator = [
+  body('revisionIds')
+    .isArray({ max: MAX_REVISION_IDS })
+    .withMessage(`revisionIds must be an array of at most ${MAX_REVISION_IDS}`),
+  body('revisionIds.*')
+    .isString()
+    .bail()
+    .isMongoId()
+    .withMessage('revisionIds must hold revision ids'),
+];
+
+/**
+ * @swagger
+ *
+ *    /change-proposals/revision-marks:
+ *      post:
+ *        tags: [ChangeProposals]
+ *        summary: Find the change proposals that created the given revisions
+ *        description: >
+ *          Returns a mark only for revisions whose operation the caller may see. A read
+ *          sent as POST because the id list can be long. Requires the
+ *          `read:features:page` scope.
+ *        requestBody:
+ *          required: true
+ *          content:
+ *            application/json:
+ *              schema:
+ *                type: object
+ *                required:
+ *                  - revisionIds
+ *                properties:
+ *                  revisionIds:
+ *                    type: array
+ *                    maxItems: 100
+ *                    items:
+ *                      type: string
+ *        responses:
+ *          200:
+ *            description: The marks
+ *            content:
+ *              application/json:
+ *                schema:
+ *                  type: object
+ *                  properties:
+ *                    marks:
+ *                      type: array
+ *                      items:
+ *                        type: object
+ *                        properties:
+ *                          revisionId:
+ *                            type: string
+ *                          proposalId:
+ *                            type: string
+ *                          isRevert:
+ *                            type: boolean
+ *          400:
+ *            description: Invalid revision id list
+ *          403:
+ *            description: Not authenticated or insufficient scope
+ */
+// A read despite POST (the id list can be long): no addActivity, read scope.
+export const revisionMarksRouteHandlersFactory = (
+  crowi: Crowi,
+  getService: GetChangeProposalService,
+): RequestHandler[] => [
+  ...readAccessChain(crowi),
+  ...validator,
+  apiV3FormValidator,
+  async (req: Req, res: ApiV3Response) => {
+    const { user } = req;
+    assert(user != null, 'ensured by loginRequired');
+    try {
+      const marks = await getService().getRevisionMarks(
+        user,
+        req.body.revisionIds,
+      );
+      return res.apiv3({ marks });
+    } catch (err) {
+      logger.error({ err }, 'Failed to get revision marks');
+      return res.apiv3Err(
+        new ErrorV3('Failed to get revision marks', 'revision-marks-failed'),
+        500,
+      );
+    }
+  },
+];

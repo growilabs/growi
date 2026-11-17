@@ -12,14 +12,8 @@ import {
 } from '@growi/core/dist/utils/path-utils';
 import assert from 'assert';
 import type mongoose from 'mongoose';
-import type {
-  AnyObject,
-  Document,
-  HydratedDocument,
-  Model,
-  Types,
-} from 'mongoose';
-import { Schema } from 'mongoose';
+import type { AnyObject, Document, HydratedDocument, Model } from 'mongoose';
+import { Error as MongooseError, Schema, Types } from 'mongoose';
 import mongoosePaginate from 'mongoose-paginate-v2';
 import uniqueValidator from 'mongoose-unique-validator';
 import nodePath from 'path';
@@ -37,6 +31,7 @@ import loggerFactory from '../../utils/logger';
 import type Crowi from '../crowi';
 import { collectAncestorPaths } from '../util/collect-ancestor-paths';
 import { getOrCreateModel } from '../util/mongoose-utils';
+import { RevisionConflictError } from './errors';
 import {
   extractToAncestorsPaths,
   getPageSchema,
@@ -1086,11 +1081,16 @@ schema.statics.findParentByPath = async function (
 /*
  * Utils from obsolete-page.js
  */
+/**
+ * Resolves with the stored page; its `revision` is the new revision's id,
+ * left unpopulated.
+ */
 export async function pushRevision(
   pageData: HydratedDocument<PageDocument>,
   newRevisionData,
   user,
-) {
+  options?: { readonly expectedRevisionId?: ObjectIdLike },
+): Promise<HydratedDocument<PageDocument>> {
   const newRevision = await prisma.revisions.create({ data: newRevisionData });
 
   pageData.revision = newRevision._id;
@@ -1098,14 +1098,48 @@ export async function pushRevision(
   pageData.lastUpdateUser = user?._id ?? user;
   pageData.updatedAt = new Date();
 
-  const savedPage = await pageData.save();
-  // Setting `revision` to a bare id (above) leaves the path unpopulated.
-  // The old Mongoose flow assigned a hydrated Revision document here instead,
-  // which Mongoose treats as already-populated; recreate that by populating
-  // for real -- the 'Revision' mongoose model still queries the same
-  // `revisions` collection that Prisma writes to.
-  // biome-ignore lint/plugin: allow populate for backward compatibility
-  return savedPage.populate<HydratedDocument<PageDocument>>('revision');
+  // `$where` is applied as-is, so it needs the stored type (ObjectId).
+  // One save writes the revision together with any pending field changes
+  // (grant, wip, ...), and matches nothing when another save got there first.
+  const expectedRevisionId = options?.expectedRevisionId;
+  if (expectedRevisionId != null) {
+    pageData.$where = {
+      revision: new Types.ObjectId(expectedRevisionId.toString()),
+    };
+  }
+
+  try {
+    return await pageData.save();
+  } catch (err) {
+    if (
+      expectedRevisionId != null &&
+      (err instanceof MongooseError.DocumentNotFoundError ||
+        err instanceof MongooseError.VersionError) &&
+      !(await pageStillAtRevision(pageData, expectedRevisionId))
+    ) {
+      await prisma.revisions.delete({ where: { id: newRevision.id } });
+      throw new RevisionConflictError(
+        pageData._id.toString(),
+        expectedRevisionId.toString(),
+      );
+    }
+    throw err;
+  } finally {
+    pageData.$where = {};
+  }
+}
+
+// True while the page still points at the expected revision, i.e. a failed
+// save was not caused by another save having moved the page forward.
+async function pageStillAtRevision(
+  pageData: HydratedDocument<PageDocument>,
+  expectedRevisionId: ObjectIdLike,
+): Promise<boolean> {
+  const Page = pageData.$model<Model<PageDocument>>('Page');
+  return (
+    (await Page.exists({ _id: pageData._id, revision: expectedRevisionId })) !=
+    null
+  );
 }
 
 /**

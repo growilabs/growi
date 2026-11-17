@@ -548,6 +548,30 @@
     "azure_api_version_help": "Optional. Leave empty to use the default. Set only when a specific deployment requires a particular API version.",
     "azure_model_deployment_label": "Deployment name"
   },
+  "change_proposal_settings": {
+    "change_proposal_settings": "Change Proposal Settings",
+    "description": "Settings for writing to the wiki through Change Proposals, such as changes requested from the AI chat.",
+    "env_only_mode_notice": "Change Proposal settings are fixed by environment variables and cannot be edited here.",
+    "is_enabled": "Enable Change Proposals",
+    "is_enabled_desc": "When turned off, all Change Proposals waiting for approval are withdrawn.",
+    "enabled_operation_types": "Allowed operations",
+    "operation_type_edit": "Edit pages",
+    "operation_type_create": "Create pages",
+    "operation_type_move": "Move pages",
+    "auto_apply_policy": "Automatic apply",
+    "auto_apply_policy_none": "Do not apply automatically (always wait for approval)",
+    "auto_apply_policy_own_pages": "Apply automatically only for new pages and pages the requester created",
+    "auto_apply_policy_all": "Apply all operations automatically",
+    "max_operations_per_proposal": "Maximum operations per Change Proposal",
+    "max_operations_per_proposal_unlimited": "No limit",
+    "max_proposals_per_user_per_day": "Maximum Change Proposals per user per day",
+    "max_proposals_per_user_per_day_unlimited": "No limit",
+    "limit_invalid": "Enter a whole number of 1 or more, or leave it empty for no limit.",
+    "per_page_notifications_enabled": "Send per-page notifications when applying",
+    "per_page_notifications_enabled_desc": "When on, applying a Change Proposal sends the same per-page notifications as a manual save (in-app notifications to page subscribers and global notifications). The requester can turn them off for each Change Proposal. The combined notification is always sent.",
+    "save": "Update",
+    "save_success": "Change Proposal settings updated successfully."
+  },
   "markdown_settings": {
     "markdown_settings": "Markdown Settings",
     "lineBreak_header": "Line break setting",
@@ -1096,7 +1120,8 @@
     "ShareLink": "ShareLink",
     "Search": "Search",
     "User": "User",
-    "Admin": "Admin"
+    "Admin": "Admin",
+    "ChangeProposal": "Change Proposal"
   },
   "audit_log_action": {
     "USER_REGISTRATION_SUCCESS": "User Creation",
@@ -1163,6 +1188,10 @@
     "ADMIN_APP_SETTING_UPDATE": "Update App Settings",
     "ADMIN_AI_SETTING_UPDATE": "Update AI Settings",
     "ADMIN_AI_MODEL_CATALOG_REFRESH": "Refresh model catalog",
+    "CHANGE_PROPOSAL_CREATE": "Create Change Proposal",
+    "CHANGE_PROPOSAL_APPLY": "Apply Change Proposal",
+    "CHANGE_PROPOSAL_REVERT": "Revert Change Proposal",
+    "ADMIN_CHANGE_PROPOSAL_SETTINGS_UPDATE": "Update Change Proposal settings",
     "ADMIN_SITE_URL_UPDATE": "Update Site URL Settings",
     "ADMIN_MAIL_SMTP_UPDATE": "Update E-mail(SMTP) Settings",
     "ADMIN_MAIL_SES_UPDATE": "Update E-mail(SES) Settings",

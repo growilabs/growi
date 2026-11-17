@@ -12,6 +12,11 @@ export type Origin = (typeof Origin)[keyof typeof Origin];
 
 export const allOrigin = Object.values(Origin);
 
+export type IRevisionProposalMark = {
+  proposalId: string;
+  proposalOperationKey: string;
+};
+
 export type IRevision = {
   pageId: Ref<IPage>;
   body: string;
@@ -19,6 +24,8 @@ export type IRevision = {
   format: string;
   hasDiffToPrev?: boolean;
   origin?: Origin;
+  proposalId?: string;
+  proposalOperationKey?: string;
   createdAt: Date;
   updatedAt: Date;
 };

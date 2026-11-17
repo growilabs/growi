@@ -526,6 +526,30 @@
     "azure_api_version_help": "선택 사항입니다. 비워 두면 기본값이 사용됩니다. 특정 배포가 특정 API 버전을 요구하는 경우에만 설정하세요.",
     "azure_model_deployment_label": "배포 이름"
   },
+  "change_proposal_settings": {
+    "change_proposal_settings": "Change Proposal 설정",
+    "description": "AI 채팅에서 요청한 변경 등, Change Proposal을 통해 위키에 쓰는 기능의 설정입니다.",
+    "env_only_mode_notice": "Change Proposal 설정은 환경 변수로 고정되어 있어 여기에서 편집할 수 없습니다.",
+    "is_enabled": "Change Proposal 사용",
+    "is_enabled_desc": "끄면 승인 대기 중인 Change Proposal이 모두 철회됩니다.",
+    "enabled_operation_types": "허용할 작업",
+    "operation_type_edit": "페이지 편집",
+    "operation_type_create": "페이지 새로 만들기",
+    "operation_type_move": "페이지 이동",
+    "auto_apply_policy": "자동 반영",
+    "auto_apply_policy_none": "자동으로 반영하지 않음(항상 승인을 기다림)",
+    "auto_apply_policy_own_pages": "새 페이지와 요청한 사람이 만든 페이지만 자동으로 반영",
+    "auto_apply_policy_all": "모든 작업을 자동으로 반영",
+    "max_operations_per_proposal": "Change Proposal 1건당 작업 수 상한",
+    "max_operations_per_proposal_unlimited": "제한 없음",
+    "max_proposals_per_user_per_day": "사용자 1명당 하루 Change Proposal 건수 상한",
+    "max_proposals_per_user_per_day_unlimited": "제한 없음",
+    "limit_invalid": "1 이상의 정수를 입력하세요. 제한 없음으로 하려면 비워 두세요.",
+    "per_page_notifications_enabled": "반영할 때 페이지별 알림 보내기",
+    "per_page_notifications_enabled_desc": "켜면 Change Proposal을 반영할 때 직접 저장한 경우와 같은 페이지별 알림(페이지 구독자에게 보내는 앱 내 알림과 전역 알림)을 보냅니다. 요청한 사람은 Change Proposal마다 끌 수 있습니다. 묶음 알림은 설정과 관계없이 항상 보냅니다.",
+    "save": "업데이트",
+    "save_success": "Change Proposal 설정이 업데이트되었습니다."
+  },
   "markdown_settings": {
     "markdown_settings": "마크다운 설정",
     "lineBreak_header": "줄 바꿈 설정",
@@ -1086,7 +1110,8 @@
     "ShareLink": "공유 링크",
     "Search": "검색",
     "User": "사용자",
-    "Admin": "관리자"
+    "Admin": "관리자",
+    "ChangeProposal": "Change Proposal"
   },
   "audit_log_action": {
     "USER_REGISTRATION_SUCCESS": "사용자 생성",
@@ -1153,6 +1178,10 @@
     "ADMIN_APP_SETTING_UPDATE": "앱 설정 업데이트",
     "ADMIN_AI_SETTING_UPDATE": "AI 설정 업데이트",
     "ADMIN_AI_MODEL_CATALOG_REFRESH": "모델 카탈로그 새로고침",
+    "CHANGE_PROPOSAL_CREATE": "Change Proposal 생성",
+    "CHANGE_PROPOSAL_APPLY": "Change Proposal 반영",
+    "CHANGE_PROPOSAL_REVERT": "Change Proposal 되돌리기",
+    "ADMIN_CHANGE_PROPOSAL_SETTINGS_UPDATE": "Change Proposal 설정 업데이트",
     "ADMIN_SITE_URL_UPDATE": "사이트 URL 설정 업데이트",
     "ADMIN_MAIL_SMTP_UPDATE": "이메일(SMTP) 설정 업데이트",
     "ADMIN_MAIL_SES_UPDATE": "이메일(SES) 설정 업데이트",

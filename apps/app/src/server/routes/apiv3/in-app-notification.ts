@@ -197,7 +197,9 @@ export const setup = (crowi: Crowi): Router => {
         },
       );
       const serializedDocs =
-        await inAppNotificationService.populateTargetAttachments(docObjs);
+        await inAppNotificationService.populateTargetAttachments(
+          inAppNotificationService.hideChangeProposalTargets(docObjs),
+        );
 
       const serializedPaginationResult = {
         ...paginationResult,
