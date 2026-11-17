@@ -38,7 +38,15 @@ export const createSummaryPage = async (params: {
   readonly auditContext: CommandAuditContext;
 }): Promise<SummaryPageResult> => {
   const { crowi, user, requestedPath, title, body, now, auditContext } = params;
-  const target = decideSummaryPath({ requestedPath, user, title, now });
+  const target = decideSummaryPath({
+    requestedPath,
+    user,
+    title,
+    now,
+    disableUserPages: crowi.configManager.getConfig(
+      'security:disableUserPages',
+    ),
+  });
 
   const result = await performWriteCommand({
     path: target.path,

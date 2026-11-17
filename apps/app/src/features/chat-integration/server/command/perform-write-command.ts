@@ -185,7 +185,7 @@ export const performWriteCommand = async (params: {
     );
 
     if (clearWipExpiry) {
-      await removeWipExpiry(createdPage._id);
+      await removeWipExpiry(createdPage._id.toString(), createdPage.path);
     }
 
     // Emit before returning the response -- the intent of
@@ -232,15 +232,19 @@ export const performWriteCommand = async (params: {
  * answering "not created" would be false, and a retry would only meet a
  * path conflict.
  */
-const removeWipExpiry = async (pageId: PageDocument['_id']): Promise<void> => {
+const removeWipExpiry = async (pageId: string, path: string): Promise<void> => {
   try {
     await mongoose
       .model<PageDocument>('Page')
       .updateOne({ _id: pageId, wip: true }, { $unset: { wipExpiredAt: 1 } });
   } catch (error) {
+    const { name, message } =
+      error instanceof Error
+        ? error
+        : { name: 'Error', message: String(error) };
     logger.error(
+      { pageId, path, name, message },
       'Created a WIP page but could not remove its auto-delete expiry',
-      error,
     );
   }
 };

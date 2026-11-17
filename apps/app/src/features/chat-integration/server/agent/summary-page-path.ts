@@ -1,9 +1,10 @@
 // Where the summary page goes (design.md SummaryPage, Requirement 5.10).
 
 import { type IUser, PageGrant } from '@growi/core';
-import { userHomepagePath } from '@growi/core/dist/utils/page-path-utils';
 import { normalizePath } from '@growi/core/dist/utils/path-utils';
 import { format } from 'date-fns';
+
+import { memoAreaPath } from '~/features/ai-tools/suggest-path/server/services/memo-area-path';
 
 export interface SummaryPageTarget {
   readonly path: string;
@@ -35,14 +36,18 @@ const toPageTitle = (title: string): string => {
 
 /**
  * A requested path is only normalised here; whether a page may be created
- * there is judged by page creation, the same way as for `create-page`. The
- * date is the server's local date of `now`.
+ * there is judged by page creation, the same way as for `create-page`.
+ * Without one, the page goes to the user's memo area, the same place
+ * suggest-path offers (`/memo/<username>/` when user pages are disabled).
+ * The date is the server's local date of `now`.
  */
 export const decideSummaryPath = (input: {
   readonly requestedPath: string | null;
   readonly user: Pick<IUser, 'username'>;
   readonly title: string;
   readonly now: Date;
+  /** The `security:disableUserPages` setting. */
+  readonly disableUserPages: boolean;
 }): SummaryPageTarget => {
   const requestedPath = input.requestedPath?.trim() ?? '';
   if (requestedPath !== '') {
@@ -51,7 +56,7 @@ export const decideSummaryPath = (input: {
 
   const date = format(input.now, 'yyyy-MM-dd');
   return {
-    path: `${userHomepagePath(input.user)}/memo/${date} ${toPageTitle(input.title)}`,
+    path: `${memoAreaPath(input.user, input.disableUserPages)}${date} ${toPageTitle(input.title)}`,
     grant: PageGrant.GRANT_OWNER,
   };
 };

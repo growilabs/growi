@@ -10,7 +10,13 @@ const NOW = new Date(2026, 10, 16, 9, 30);
 const MEMO = '/user/alice/memo/2026-11-16';
 
 const memoPathFor = (title: string): string =>
-  decideSummaryPath({ requestedPath: null, user, title, now: NOW }).path;
+  decideSummaryPath({
+    requestedPath: null,
+    user,
+    title,
+    now: NOW,
+    disableUserPages: false,
+  }).path;
 
 describe('decideSummaryPath', () => {
   describe('without a requested path', () => {
@@ -21,6 +27,7 @@ describe('decideSummaryPath', () => {
           user,
           title: 'Weekly sync',
           now: NOW,
+          disableUserPages: false,
         }),
       ).toEqual({
         path: `${MEMO} Weekly sync`,
@@ -28,13 +35,45 @@ describe('decideSummaryPath', () => {
       });
     });
 
-    it.each([
-      new Date(2026, 10, 16, 0, 0, 0),
-      new Date(2026, 10, 16, 23, 59, 59),
-    ])('uses the local date of the clock (%s)', (now) => {
+    it('puts the page in /memo/<username>/ when user pages are disabled, visible to the user only', () => {
       expect(
-        decideSummaryPath({ requestedPath: null, user, title: 'T', now }).path,
-      ).toBe(`${MEMO} T`);
+        decideSummaryPath({
+          requestedPath: null,
+          user,
+          title: 'Weekly sync',
+          now: NOW,
+          disableUserPages: true,
+        }),
+      ).toEqual({
+        path: '/memo/alice/2026-11-16 Weekly sync',
+        grant: PageGrant.GRANT_OWNER,
+      });
+    });
+
+    describe('in a time zone ahead of UTC', () => {
+      beforeEach(() => {
+        vi.stubEnv('TZ', 'Pacific/Kiritimati');
+      });
+
+      afterEach(() => {
+        vi.unstubAllEnvs();
+      });
+
+      it.each([
+        // Still 2026-11-15 in UTC, already 2026-11-16 at UTC+14.
+        new Date('2026-11-15T10:30:00Z'),
+        new Date('2026-11-16T09:59:59Z'),
+      ])('uses the local date of the clock (%s), not the UTC date', (now) => {
+        expect(
+          decideSummaryPath({
+            requestedPath: null,
+            user,
+            title: 'T',
+            now,
+            disableUserPages: false,
+          }).path,
+        ).toBe(`${MEMO} T`);
+      });
     });
 
     it.each([
@@ -102,7 +141,13 @@ describe('decideSummaryPath', () => {
 
     it('treats a blank requested path as none', () => {
       expect(
-        decideSummaryPath({ requestedPath: '  ', user, title: 'T', now: NOW }),
+        decideSummaryPath({
+          requestedPath: '  ',
+          user,
+          title: 'T',
+          now: NOW,
+          disableUserPages: false,
+        }),
       ).toEqual({ path: `${MEMO} T`, grant: PageGrant.GRANT_OWNER });
     });
   });
@@ -114,8 +159,26 @@ describe('decideSummaryPath', () => {
       ['  /team/notes/  ', '/team/notes'],
     ])('uses %j as %j and leaves the grant to the default', (requestedPath, path) => {
       expect(
-        decideSummaryPath({ requestedPath, user, title: 'ignored', now: NOW }),
+        decideSummaryPath({
+          requestedPath,
+          user,
+          title: 'ignored',
+          now: NOW,
+          disableUserPages: false,
+        }),
       ).toEqual({ path, grant: undefined });
+    });
+
+    it('keeps the requested path when user pages are disabled', () => {
+      expect(
+        decideSummaryPath({
+          requestedPath: '/user/alice/notes',
+          user,
+          title: 'ignored',
+          now: NOW,
+          disableUserPages: true,
+        }),
+      ).toEqual({ path: '/user/alice/notes', grant: undefined });
     });
   });
 });

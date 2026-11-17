@@ -138,6 +138,49 @@ describe('createSummaryPage (real page creation)', () => {
     });
   });
 
+  describe('without a requested path, when user pages are disabled', () => {
+    beforeAll(async () => {
+      await crowi.configManager.updateConfig('security:disableUserPages', true);
+    });
+
+    afterAll(async () => {
+      await crowi.configManager.updateConfigs(
+        { 'security:disableUserPages': undefined },
+        { removeIfUndefined: true },
+      );
+    });
+
+    it('creates the page in /memo/<username>/, where the user can open it and others cannot', async () => {
+      const user = await createGrowiUser();
+      const otherUser = await createGrowiUser();
+
+      const result = await createSummaryPage({
+        crowi,
+        user,
+        requestedPath: null,
+        title: 'Weekly sync',
+        body: 'summary body',
+        now: NOW,
+        auditContext: auditContext(),
+      });
+
+      const expectedPath = `/memo/${user.username}/${DATE_SEGMENT} Weekly sync`;
+      expect(result).toMatchObject({ kind: 'created', path: expectedPath });
+      if (result.kind !== 'created') return;
+      const saved = await readBack(result.pageId);
+      expect(saved?.creator?.toString()).toBe(user._id.toString());
+      expect(saved?.grant).toBe(PageGrant.GRANT_OWNER);
+      expect(saved?.wip).toBe(true);
+      expect(saved?.wipExpiredAt).toBeUndefined();
+      expect(await Page.isAccessiblePageByViewer(result.pageId, user)).toBe(
+        true,
+      );
+      expect(
+        await Page.isAccessiblePageByViewer(result.pageId, otherUser),
+      ).toBe(false);
+    });
+  });
+
   describe('with a requested path', () => {
     const createOwnerOnlyPage = async (
       path: string,
