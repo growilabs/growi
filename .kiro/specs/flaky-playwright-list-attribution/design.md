@@ -469,6 +469,11 @@ export const buildPlaywrightKey: (test: PlaywrightListedTest) => string;
   には `N flaky` のような見出しが無いので、`extractPlaywrightRuns` では
   読めない。テスト名の各行を `parsePlaywrightTestLine` で分解し、
   `buildPlaywrightKey` で識別に変える。
+- `--list` は spec のパスを `testDir`（`apps/app/playwright`）からの相対で
+  書く。CI のログの一覧は、作業ディレクトリ（`apps/app`）からの相対で書く。
+  そのため、`--list` の行から取り出したパスには、`testDir` を `apps/app`
+  からの相対にしたもの（`playwright/`）を前に付けてから識別を作る。この
+  値は `--list --reporter=json` が返す `rootDir` から求める。
 - 作業の最初に、既知のテスト 1 件について、`--list` の行から作った識別と、
   CI のログの一覧から作った識別が同じ文字列になることを確かめる。
 - 題名の `{BROWSER}`・`{SPEC_PATH}` が一致し、テスト名の末尾が題名の
