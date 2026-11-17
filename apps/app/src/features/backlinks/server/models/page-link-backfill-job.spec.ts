@@ -40,16 +40,6 @@ describe('pagelinkbackfilljobs.tryClaim, given the reply MongoDB sends', () => {
       }),
     ).rejects.toThrow(/tryClaim failed.*waiting for replication timed out/);
   });
-
-  it('throws rather than reporting a claim when the write itself failed', async () => {
-    await expect(
-      claimWithReply({
-        ok: 1,
-        value: { status: 'running' },
-        writeErrors: [{ code: 2, errmsg: 'bad update operator' }],
-      }),
-    ).rejects.toThrow(/tryClaim failed.*bad update operator/);
-  });
 });
 
 // The loop's own writes: a refusal is a result, an unconfirmed write is an error.

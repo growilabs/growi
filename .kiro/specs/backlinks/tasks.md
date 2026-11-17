@@ -477,7 +477,7 @@ Independent of B4/B5.
     none`), so a restart never resets coverage or progress and a missing document is recreated
   - Done when a unit test shows the claim succeeds once, is rejected for a second concurrent
     claimant while the lease is live, and succeeds for a new claimant after the lease expires, an
-    `idle`, `stopped` or `complete` job is never claimed, a claim clears a stale `stopRequested`, an
+    `idle`, `stopped` or `complete` job is never claimed, a claim from `requested` clears a stale `stopRequested` while a take-over keeps a live one, an
     unconfirmed write or a non-positive `leaseMs` throws, a second boot leaves existing coverage and progress fields untouched, and a deleted document is
     recreated idle with coverage `none`
   - _Requirements: 4.3, 4.4, 4.7, 4.8_
@@ -510,8 +510,8 @@ Independent of B4/B5.
   - Resolve the requested scope to `runCutoff` once at the first claim (`since`: the date;
     `maxPages`: the `updatedAt` of the Nth newest page, read from the `updatedAt` index) and restrict
     the walk to the run's range (design.md); a scope already covered finishes at once. Check `stopRequested` at each checkpoint; when set, save the
-    marker and counts, release the claim, set `stopped`, clear the flag and end the run. A claim clears a
-    stale `stopRequested`. At the first claim also count the pages in the run's range once and store
+    marker and counts, release the claim, set `stopped`, clear the flag and end the run. A claim from `requested`
+    clears a stale `stopRequested`; a take-over keeps it. At the first claim also count the pages in the run's range once and store
     it as `runTotal`, and emit progress as processed / `runTotal`
   - Settle the remaining open questions and record them in design.md: write ordering against the
     live listener on the same page (can a stale backfill write overwrite fresher rows?), whether to
