@@ -24,41 +24,52 @@ async function streamToChunks(
 }
 
 /**
- * Opens and reads a stored file, giving up after `timeoutMs`: the caller
- * holds an extraction slot meanwhile, and storage that hangs would hold it
- * forever. On expiry the stream is destroyed (also one that opens later)
- * and FileReadTimeoutError is thrown.
+ * Opens and reads a stored file, giving up after `timeoutMs` or once
+ * `signal` aborts: the caller holds an extraction slot meanwhile, and storage
+ * that hangs would hold it forever. Giving up destroys the stream (also one
+ * that opens later) and rejects.
  */
 export const readFileChunks = async (
   open: () => Promise<NodeJS.ReadableStream>,
-  timeoutMs: number,
+  { timeoutMs, signal }: { timeoutMs: number; signal?: AbortSignal },
 ): Promise<Buffer[]> => {
-  let expired = false;
+  let gaveUp = false;
   let stream: NodeJS.ReadableStream | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let onAbort: (() => void) | undefined;
 
   const reading = (async () => {
     stream = await open();
-    if (expired) {
+    if (gaveUp) {
       destroy(stream);
     }
     return streamToChunks(stream);
   })();
-  // A read that settles after the expiry has no one waiting for it
+  // A read that settles after giving up has no one waiting for it
   reading.catch(() => {});
 
+  const giveUp = new Promise<never>((_, reject) => {
+    const stop = (reason: Error) => {
+      gaveUp = true;
+      if (stream != null) destroy(stream);
+      reject(reason);
+    };
+    timer = setTimeout(
+      () => stop(new FileReadTimeoutError(timeoutMs)),
+      timeoutMs,
+    );
+    onAbort = () => stop(new Error('Reading the stored file was abandoned'));
+    if (signal?.aborted) {
+      onAbort();
+    } else {
+      signal?.addEventListener('abort', onAbort, { once: true });
+    }
+  });
+
   try {
-    return await Promise.race([
-      reading,
-      new Promise<never>((_, reject) => {
-        timer = setTimeout(() => {
-          expired = true;
-          if (stream != null) destroy(stream);
-          reject(new FileReadTimeoutError(timeoutMs));
-        }, timeoutMs);
-      }),
-    ]);
+    return await Promise.race([reading, giveUp]);
   } finally {
     clearTimeout(timer);
+    if (onAbort != null) signal?.removeEventListener('abort', onAbort);
   }
 };

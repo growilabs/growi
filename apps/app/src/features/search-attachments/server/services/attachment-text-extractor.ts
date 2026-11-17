@@ -11,6 +11,7 @@ import type {
 } from '~/features/search-attachments/interfaces/attachment-search';
 import type { AttachmentWithComputed } from '~/server/models/attachment';
 import { configManager } from '~/server/service/config-manager';
+import { AttachmentFileNotFoundError } from '~/server/service/file-uploader/attachment-file-not-found';
 import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 
@@ -29,6 +30,8 @@ const logger = loggerFactory('growi:service:search-attachments:extractor');
 
 /** reasonCode of a `failed` outcome whose stored file could not be read. */
 export const FILE_READ_FAILED = 'file_read_failed';
+/** reasonCode of a `failed` outcome whose stored file does not exist. */
+export const FILE_NOT_FOUND = 'file_not_found';
 
 // Retry configuration — exported for testability
 export const RETRY_BASE_DELAY_MS = 500;
@@ -38,8 +41,18 @@ export const RETRY_JITTER_MAX_MS = 500;
  * Returns a promise that resolves after `ms` milliseconds.
  * Extracted as a separate function so tests can control timing.
  */
-const sleep = (ms: number): Promise<void> =>
-  new Promise((resolve) => setTimeout(resolve, ms));
+const sleep = (ms: number, signal?: AbortSignal): Promise<void> =>
+  new Promise((resolve) => {
+    const timer = setTimeout(resolve, ms);
+    signal?.addEventListener(
+      'abort',
+      () => {
+        clearTimeout(timer);
+        resolve();
+      },
+      { once: true },
+    );
+  });
 
 const ERROR_CODES: readonly string[] = Object.values(ErrorCode);
 
@@ -121,6 +134,8 @@ type CallExtractorOptions = {
   token: string;
   timeoutMs: number;
   isRetry: boolean;
+  /** Aborted once no one waits for the result: cancels the request and the retry. */
+  signal?: AbortSignal;
 };
 
 /**
@@ -130,7 +145,8 @@ type CallExtractorOptions = {
 async function callExtractor(
   opts: CallExtractorOptions,
 ): Promise<ExtractionOutcome> {
-  const { attachment, body, extractorUri, token, timeoutMs, isRetry } = opts;
+  const { attachment, body, extractorUri, token, timeoutMs, isRetry, signal } =
+    opts;
 
   try {
     const response = await postExtract(body, {
@@ -139,6 +155,7 @@ async function callExtractor(
       timeout: timeoutMs,
       // A redirect could point the request at an internal address (SSRF)
       maxRedirects: 0,
+      signal,
     });
 
     const pages: ExtractedPage[] = response.data.pages.map((p) => ({
@@ -153,10 +170,13 @@ async function callExtractor(
 
     if (outcome !== null) {
       // Handle 503 service_busy: retry once with exponential backoff + jitter
-      if (outcome.kind === 'serviceBusy' && !isRetry) {
+      if (outcome.kind === 'serviceBusy' && !isRetry && !signal?.aborted) {
         const delay =
           RETRY_BASE_DELAY_MS + Math.floor(Math.random() * RETRY_JITTER_MAX_MS);
-        await sleep(delay);
+        await sleep(delay, signal);
+        if (signal?.aborted) {
+          return outcome;
+        }
         return callExtractor({ ...opts, isRetry: true });
       }
       return outcome;
@@ -292,6 +312,7 @@ export class AttachmentTextExtractorService {
               extractorUri,
               token: extractorToken,
               timeoutMs,
+              signal,
             }),
       );
     } catch (error) {
@@ -309,7 +330,7 @@ export class AttachmentTextExtractorService {
     attachment: AttachmentWithComputed,
     settings: Pick<
       CallExtractorOptions,
-      'extractorUri' | 'token' | 'timeoutMs'
+      'extractorUri' | 'token' | 'timeoutMs' | 'signal'
     >,
   ): Promise<ExtractionOutcome> {
     // --- Step 6: Fetch file bytes ---
@@ -320,22 +341,29 @@ export class AttachmentTextExtractorService {
       body = buildExtractRequestBody(
         await readFileChunks(
           () => this.fileUploader.findDeliveryFile(attachment),
-          settings.timeoutMs,
+          settings,
         ),
         attachment,
       );
     } catch (error) {
-      // One missing file must not read as an extractor outage, which aborts
-      // a whole rebuild.
       logger.warn(
         { attachmentId: attachment.id, error },
         'Failed to read the stored file',
       );
-      return {
-        kind: 'failed',
-        reasonCode: FILE_READ_FAILED,
-        message: 'The stored file could not be read',
-      };
+      // A missing file is a fact about this file; any other read failure
+      // (no answer, timeout, denied) is the storage's and counts towards a
+      // rebuild's outage limit (see attachment-reindex-batch).
+      return error instanceof AttachmentFileNotFoundError
+        ? {
+            kind: 'failed',
+            reasonCode: FILE_NOT_FOUND,
+            message: 'The stored file does not exist',
+          }
+        : {
+            kind: 'failed',
+            reasonCode: FILE_READ_FAILED,
+            message: 'The stored file could not be read',
+          };
     }
 
     // --- Step 7: Call extractor (with built-in retry for 503) ---

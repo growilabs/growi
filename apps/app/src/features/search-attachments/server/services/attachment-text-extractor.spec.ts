@@ -24,6 +24,16 @@ vi.mock(
   }),
 );
 
+const logs = vi.hoisted(() => ({ warn: vi.fn() }));
+vi.mock('~/utils/logger', () => ({
+  default: () => ({
+    warn: logs.warn,
+    error: vi.fn(),
+    info: vi.fn(),
+    debug: vi.fn(),
+  }),
+}));
+
 // Mock configManager
 vi.mock('~/server/service/config-manager', () => ({
   configManager: {
@@ -681,6 +691,62 @@ describe('AttachmentTextExtractorService', () => {
     );
   });
 
+  it('frees the slot of an abandoned extraction at once, so a retry of the same attachment runs', async () => {
+    const { AttachmentTextExtractorService } = await import(
+      './attachment-text-extractor'
+    );
+    // Like axios: a request given an aborted signal rejects with no response
+    postExtract.mockImplementationOnce(
+      (_body: unknown, options: { signal?: AbortSignal }) =>
+        new Promise((_resolve, reject) => {
+          options.signal?.addEventListener('abort', () =>
+            reject(
+              Object.assign(new Error('canceled'), { isAxiosError: true }),
+            ),
+          );
+        }),
+    );
+    postExtract.mockResolvedValueOnce({
+      data: {
+        mimeType: 'text/plain',
+        extractedCharacters: 1,
+        pages: [{ pageNumber: null, label: null, content: 'b' }],
+      },
+    });
+    const service = new AttachmentTextExtractorService(
+      mockFileUploader as any,
+      { maxConcurrentExtractions: 1 },
+    );
+    const abandoned = new AbortController();
+
+    const first = service.extractAttachment('attachment-id-1', {
+      signal: abandoned.signal,
+    });
+    await vi.waitFor(() => expect(postExtract).toHaveBeenCalledOnce());
+    abandoned.abort();
+    const retry = await service.extractAttachment('attachment-id-1');
+
+    expect(retry.kind).toBe('success');
+    expect((await first).kind).not.toBe('success');
+    expect(postExtract).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not retry a busy answer for an abandoned extraction', async () => {
+    const abandoned = new AbortController();
+    postExtract.mockImplementation(() => {
+      abandoned.abort();
+      return Promise.reject(makeAxiosError(503, 'service_busy'));
+    });
+    const service = await getService();
+
+    const result = await service.extractAttachment('attachment-id-1', {
+      signal: abandoned.signal,
+    });
+
+    expect(result.kind).toBe('serviceBusy');
+    expect(postExtract).toHaveBeenCalledOnce();
+  });
+
   it('skips an extraction whose caller gave up while it waited for a slot', async () => {
     const { AttachmentTextExtractorService } = await import(
       './attachment-text-extractor'
@@ -809,6 +875,20 @@ describe('AttachmentTextExtractorService', () => {
       });
       expect(postExtract.mock.calls[0][1].baseURL).toBe('http://[::1]:8000');
     });
+
+    it('blocks a metadata IPv6 address as a metadata address', async () => {
+      useExtractorUri('http://[fd00:ec2::254]:8000');
+
+      const service = await getService();
+      const result = await service.extractAttachment('attachment-id-1');
+
+      expect(result).toEqual({ kind: 'serviceUnreachable' });
+      expect(postExtract).not.toHaveBeenCalled();
+      expect(logs.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ resolvedAddress: 'fd00:ec2::254' }),
+        'Blocked request to metadata IP via DNS rebinding',
+      );
+    });
   });
 
   // -----------------------------------------------------------------------
@@ -837,6 +917,25 @@ describe('AttachmentTextExtractorService', () => {
       kind: 'failed',
       reasonCode: 'attachment_not_found',
     });
+  });
+
+  it('reports a file the storage says does not exist as file_not_found', async () => {
+    const { AttachmentFileNotFoundError } = await import(
+      '~/server/service/file-uploader/attachment-file-not-found'
+    );
+    mockFileUploader.findDeliveryFile.mockRejectedValue(
+      new AttachmentFileNotFoundError('does not exist in local fs'),
+    );
+
+    const service = await getService();
+    const result = await service.extractAttachment('attachment-id-1');
+
+    expect(result).toEqual({
+      kind: 'failed',
+      reasonCode: 'file_not_found',
+      message: expect.any(String),
+    });
+    expect(postExtract).not.toHaveBeenCalled();
   });
 
   it('reports a file that cannot be read from storage as a failure of that file, not as an extractor outage', async () => {

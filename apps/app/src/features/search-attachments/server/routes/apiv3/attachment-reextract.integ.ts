@@ -54,6 +54,13 @@ describe('POST /_api/v3/attachments/:id/reextract', () => {
   let ownerPageId: string;
   let groupId: mongoose.Types.ObjectId;
 
+  // Resolves once everything the response's finish event starts has started
+  const afterResponse = new Map<string, () => void>();
+  const afterResponseTo = (endpoint: string): Promise<void> =>
+    new Promise((resolve) => {
+      afterResponse.set(endpoint, resolve);
+    });
+
   const reextract = (attachmentId: string, user?: IUserHasId) => {
     const req = request(app).post(`${MOUNT}/${attachmentId}/reextract`);
     return user == null ? req : req.set(USER_HEADER, user._id.toString());
@@ -160,6 +167,14 @@ describe('POST /_api/v3/attachments/:id/reextract', () => {
 
     app = express();
     app.use(express.json());
+    // Registered before the route, so its finish listener runs first; the
+    // setImmediate then lands after the audit fail-safe's synchronous start
+    app.use((req, res, next) => {
+      res.on('finish', () =>
+        setImmediate(() => afterResponse.get(req.originalUrl)?.()),
+      );
+      next();
+    });
     app.use((req: express.Request & { user?: IUserHasId }, _res, next) => {
       const id = req.header(USER_HEADER);
       req.user = Object.values(users).find((u) => u._id.toString() === id);
@@ -395,6 +410,36 @@ describe('POST /_api/v3/attachments/:id/reextract', () => {
       }
     });
 
+    it('answers 500 to a re-extraction that could not complete, recording only the attempt', async () => {
+      const attachmentId = await createAttachment(pageIds[0]);
+      const endpoint = `${MOUNT}/${attachmentId}/reextract`;
+      indexer.reindex.mockResolvedValue({
+        ok: false,
+        outcome: { kind: 'serviceUnreachable' },
+      });
+      try {
+        const res = await reextract(attachmentId, users.other);
+        expect(res.status).toBe(500);
+        expect(res.body.errors[0].code).toBe('reextract_failed');
+
+        await vi.waitFor(
+          async () =>
+            expect(
+              await prisma.activities.findMany({ where: { endpoint } }),
+            ).toEqual([
+              expect.objectContaining({
+                action: SupportedAction.ACTION_UNSETTLED,
+                userId: users.other._id.toString(),
+              }),
+            ]),
+          { timeout: 3_000, interval: 50 },
+        );
+      } finally {
+        await prisma.activities.deleteMany({ where: { endpoint } });
+        await prisma.attachments.deleteMany({ where: { id: attachmentId } });
+      }
+    });
+
     it('answers a read-only user the same way whether or not the attachment exists', async () => {
       const existing = await reextract(attachmentIds.owner, users.readOnly);
       const missing = await reextract(
@@ -527,16 +572,18 @@ describe('POST /_api/v3/attachments/:id/reextract', () => {
       featureEnabled = false;
       const attachmentId = new mongoose.Types.ObjectId().toString();
       const endpoint = `${MOUNT}/${attachmentId}/reextract`;
+      const responded = afterResponseTo(endpoint);
+      const recorded = vi.spyOn(prisma.activities, 'createByParameters');
 
       const res = await reextract(attachmentId, users.admin);
+      await responded;
 
       expect(res.status).toBe(503);
       expect(res.body.errors[0].code).toBe('feature_disabled');
-      // The fail-safe row would be written right after the response
-      await new Promise((resolve) => setTimeout(resolve, 300));
-      expect(await prisma.activities.findMany({ where: { endpoint } })).toEqual(
-        [],
+      expect(recorded).not.toHaveBeenCalledWith(
+        expect.objectContaining({ endpoint }),
       );
+      recorded.mockRestore();
     });
 
     it('answers 503 when the feature was enabled after boot (no indexer yet)', async () => {

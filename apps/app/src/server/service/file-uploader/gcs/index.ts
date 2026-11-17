@@ -19,6 +19,7 @@ import axios from '~/utils/axios';
 import loggerFactory from '~/utils/logger';
 
 import { configManager } from '../../config-manager';
+import { AttachmentFileNotFoundError } from '../attachment-file-not-found';
 import {
   AbstractFileUploader,
   type SaveFileParam,
@@ -231,7 +232,7 @@ class GcsFileUploader extends AbstractFileUploader {
     // check file exists
     const isExists = await isFileExists(file);
     if (!isExists) {
-      throw new Error(
+      throw new AttachmentFileNotFoundError(
         `Any object that relate to the Attachment (${filePath}) does not exist in GCS`,
       );
     }

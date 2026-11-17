@@ -868,6 +868,32 @@ describe('AttachmentSearchIndexer', () => {
       expect(failureLog.record).not.toHaveBeenCalled();
     });
 
+    it('still removes the docs of an attachment deleted meanwhile when dropping the stale docs fails', async () => {
+      enableFeature();
+      vi.spyOn(prisma.attachments, 'findUnique')
+        .mockResolvedValueOnce(makeAttachment({ pageId: 'page-77' }))
+        .mockResolvedValueOnce(null);
+      const delegator = makeDelegator();
+      vi.mocked(delegator.removeStaleAttachmentDocs).mockRejectedValue(
+        new Error('es down'),
+      );
+
+      const indexer = makeIndexer(
+        makeExtractor(),
+        delegator,
+        makeFailureLog(),
+        makeReindexBatch(),
+        makeSearchService(true),
+      );
+
+      const result = await indexer.reindex('att-001');
+
+      expect(result.ok).toBe(false);
+      expect(delegator.syncAttachmentRemoved).toHaveBeenCalledWith('att-001', [
+        'attachments-alias',
+      ]);
+    });
+
     it('writes the new docs and then drops the stale ones, in every target index', async () => {
       enableFeature();
       vi.spyOn(prisma.attachments, 'findUnique').mockResolvedValue(

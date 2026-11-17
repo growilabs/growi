@@ -315,58 +315,66 @@ export class AttachmentSearchIndexer
     // Resolved after the extraction: a rebuild may have started meanwhile
     const targetIndexes = this.getTargetIndexes();
 
-    if (outcome.kind === 'success') {
-      const docs = buildSuccessDocs(attachment, pageId, outcome);
-      await this.writeToIndexes(targetIndexes, {
-        attachmentId,
-        pageId,
-        docs,
-        replace: mode === 'reextract',
-      });
+    try {
+      if (outcome.kind === 'success') {
+        const docs = buildSuccessDocs(attachment, pageId, outcome);
+        await this.writeToIndexes(targetIndexes, {
+          attachmentId,
+          pageId,
+          docs,
+          replace: mode === 'reextract',
+        });
 
-      logger.info(
-        { attachmentId, pageId, docCount: docs.length },
-        'Attachment indexed successfully',
-      );
-    } else {
-      const failureEntry: ExtractionFailureEntry = {
-        attachmentId,
-        pageId,
-        fileName: attachment.fileName,
-        fileFormat: attachment.fileFormat,
-        fileSize: attachment.fileSize,
-        reasonCode: outcomeKindToReasonCode(outcome),
-        message: outcomeToMessage(outcome),
-        occurredAt: new Date(),
-      };
+        logger.info(
+          { attachmentId, pageId, docCount: docs.length },
+          'Attachment indexed successfully',
+        );
+      } else {
+        const failureEntry: ExtractionFailureEntry = {
+          attachmentId,
+          pageId,
+          fileName: attachment.fileName,
+          fileFormat: attachment.fileFormat,
+          fileSize: attachment.fileSize,
+          reasonCode: outcomeKindToReasonCode(outcome),
+          message: outcomeToMessage(outcome),
+          occurredAt: new Date(),
+        };
 
-      // Recorded before the write so an Elasticsearch failure cannot hide
-      // the extraction outcome
-      await this.failureLog.record(failureEntry);
+        // Recorded before the write so an Elasticsearch failure cannot hide
+        // the extraction outcome
+        await this.failureLog.record(failureEntry);
 
-      if (mode === 'upload') {
-        try {
-          await this.writeToIndexes(targetIndexes, {
-            attachmentId,
-            pageId,
-            docs: [buildFailureDoc(attachment, pageId)],
-            replace: false,
-          });
-        } catch (err) {
-          logger.warn(
-            { err, attachmentId, pageId },
-            'Failed to index the metadata-only doc for a failed extraction',
-          );
+        if (mode === 'upload') {
+          try {
+            await this.writeToIndexes(targetIndexes, {
+              attachmentId,
+              pageId,
+              docs: [buildFailureDoc(attachment, pageId)],
+              replace: false,
+            });
+          } catch (err) {
+            logger.warn(
+              { err, attachmentId, pageId },
+              'Failed to index the metadata-only doc for a failed extraction',
+            );
+          }
         }
-      }
 
-      logger.info(
-        { attachmentId, pageId, kind: outcome.kind },
-        'Attachment indexing recorded with failure outcome',
+        logger.info(
+          { attachmentId, pageId, kind: outcome.kind },
+          'Attachment indexing recorded with failure outcome',
+        );
+      }
+    } finally {
+      // Also after a failed write: part of it may have landed
+      await this.removeIfDeletedMeanwhile(attachmentId).catch((err) =>
+        logger.error(
+          { err, attachmentId },
+          'Failed to remove the docs of an attachment deleted while being indexed',
+        ),
       );
     }
-
-    await this.removeIfDeletedMeanwhile(attachmentId);
 
     return outcome;
   }

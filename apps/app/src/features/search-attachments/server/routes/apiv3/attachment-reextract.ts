@@ -21,7 +21,10 @@
  *     route applies)
  *   - 503 if the feature is disabled, or the run did not finish within its
  *     deadline (waiting for an extraction slot counts towards it)
- *   - 200 { outcome: { kind } } otherwise (ReextractResponse)
+ *   - 500 reextract_failed if the run could not complete (e.g. the index
+ *     write failed, or the attachment went away meanwhile)
+ *   - 200 { outcome: { kind } } otherwise (ReextractResponse); the outcome
+ *     may still be an extraction failure the extractor reported
  *
  * Concurrent authorized requests for one attachment share one extraction.
  */
@@ -180,6 +183,13 @@ export function createAttachmentReextractRouter(crowi: Crowi): express.Router {
           },
           'Attachment reextraction completed',
         );
+
+        if (!result.ok) {
+          return res.apiv3Err(
+            new ErrorV3('Re-extraction could not complete', 'reextract_failed'),
+            500,
+          );
+        }
 
         // emit before res.apiv3() — see rules/activity-recording.md
         activityEvent.emit('update', res.locals.activity._id, {

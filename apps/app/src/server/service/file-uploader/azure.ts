@@ -33,6 +33,10 @@ import loggerFactory from '~/utils/logger';
 
 import { configManager } from '../config-manager';
 import {
+  AttachmentFileNotFoundError,
+  isMissingAzureBlob,
+} from './attachment-file-not-found';
+import {
   AbstractFileUploader,
   type SaveFileParam,
   type TemporaryUrl,
@@ -294,7 +298,13 @@ class AzureFileUploader extends AbstractFileUploader {
     const filePath = getFilePathOnStorage(attachment);
     const containerClient = await getContainerClient();
     const blobClient: BlobClient = containerClient.getBlobClient(filePath);
-    const downloadResponse = await blobClient.download();
+    const downloadResponse = await blobClient.download().catch((err) => {
+      throw isMissingAzureBlob(err)
+        ? new AttachmentFileNotFoundError(
+            `Any blob that relate to the Attachment (${filePath}) does not exist in Azure`,
+          )
+        : err;
+    });
     if (downloadResponse.errorCode) {
       logger.error(downloadResponse.errorCode);
       throw new Error(downloadResponse.errorCode);

@@ -53,8 +53,9 @@ export interface AttachmentReindexBatchInterface {
 export const REINDEX_PAGE_SIZE = 100;
 
 /**
- * Failures that say nothing about the file itself: the extractor or the file
- * storage did not answer. One alone is often a single large file (a client
+ * Failures that say nothing about the file itself: the extractor did not
+ * answer or was busy, or the file storage did not answer properly (a missing
+ * file is a per-file failure and does not count). One alone is often a single large file (a client
  * timeout, a dropped connection); this many in a row with no success between
  * them is an outage, and every later attachment would fail the same way.
  * The scan is sequential, so waiting for the evidence costs at most this
@@ -64,6 +65,7 @@ export const MAX_CONSECUTIVE_OUTAGE_FAILURES = 10;
 
 const isOutageFailure = (outcome: ExtractionOutcome): boolean =>
   outcome.kind === 'serviceUnreachable' ||
+  outcome.kind === 'serviceBusy' ||
   (outcome.kind === 'failed' && outcome.reasonCode === FILE_READ_FAILED);
 
 export class RebuildOutageError extends Error {

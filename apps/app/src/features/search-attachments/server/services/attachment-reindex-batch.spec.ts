@@ -341,7 +341,14 @@ describe('AttachmentReindexBatch', () => {
         what: 'the extractor is unreachable',
         outage: { kind: 'serviceUnreachable' as const },
       },
-      { what: 'stored files cannot be read', outage: unreadable },
+      {
+        what: 'the extractor answers busy',
+        outage: { kind: 'serviceBusy' as const },
+      },
+      {
+        what: 'the file storage does not answer properly',
+        outage: unreadable,
+      },
     ])('keeps the alias and drops the new index when $what for 10 attachments in a row', async ({
       outage,
     }) => {
@@ -363,6 +370,24 @@ describe('AttachmentReindexBatch', () => {
       );
       expect(emittedEvents()).not.toContain(
         SocketEventName.FinishAddAttachment,
+      );
+    });
+
+    it('finishes the rebuild however many stored files are missing in a row', async () => {
+      setupAttachmentMock(attachments(15));
+      extractor.extractAttachment.mockResolvedValue({
+        kind: 'failed',
+        reasonCode: 'file_not_found',
+        message: 'The stored file does not exist',
+      });
+
+      batch.startRebuild(() => Promise.resolve());
+      await waitUntilFinished();
+
+      expect(extractor.extractAttachment).toHaveBeenCalledTimes(15);
+      expect(failureLogService.record).toHaveBeenCalledTimes(15);
+      expect(delegatorExt.swapAttachmentAlias).toHaveBeenCalledWith(
+        'attachments-2',
       );
     });
 
