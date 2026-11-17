@@ -1,19 +1,5 @@
 /**
  * Tests for attachment-search-admin route utilities.
- *
- * Tests cover:
- *  1. GET /config: hasExtractorToken=true when token is set (never the value)
- *  2. GET /config: hasExtractorToken=false when token not set
- *  3. GET /config: response does NOT contain extractorToken string value
- *  4. PUT /config: valid URI updates config
- *  5. PUT /config: metadata IP URI returns invalid_extractor_uri error
- *  6. PUT /config: file:// URI returns invalid_extractor_uri error
- *  7. requiresReindex: true when mongoCount > esCount
- *  8. requiresReindex: false when disabled
- *  9. requiresReindex cache: PUT invalidates it, next GET recomputes
- * 10. GET /failures: returns items and total
- * 11. GET /failures: with limit and since params
- * 12. GET /failures: non-admin → 403
  */
 
 import type { MockInstance } from 'vitest';
@@ -62,7 +48,6 @@ import { configManager } from '~/server/service/config-manager';
 import { prisma } from '~/utils/prisma';
 
 import {
-  type AttachmentSearchConfig,
   attachmentSearchAdminFactory,
   computeRequiresReindex,
   invalidateRequiresReindexCache,
@@ -110,138 +95,10 @@ describe('attachment-search-admin', () => {
   });
 
   // -------------------------------------------------------------------------
-  // Section 1–3: hasExtractorToken vs actual token value in response
-  // -------------------------------------------------------------------------
-
-  describe('GET /config token exposure', () => {
-    it('1. returns hasExtractorToken=true when token is set — token value MUST NOT be present', () => {
-      const SECRET_TOKEN = 'super-secret-token-value';
-
-      mockGetConfig.mockImplementation((key: string) => {
-        if (key === 'app:attachmentFullTextSearch:extractorUri')
-          return 'http://extractor.example.com';
-        if (key === 'app:attachmentFullTextSearch:extractorToken')
-          return SECRET_TOKEN;
-        if (key === 'app:attachmentFullTextSearch:timeoutMs') return 60000;
-        if (key === 'app:attachmentFullTextSearch:maxFileSizeBytes')
-          return 52428800;
-        return undefined;
-      });
-
-      const extractorUri = configManager.getConfig(
-        'app:attachmentFullTextSearch:extractorUri' as never,
-      );
-      const tokenValue = configManager.getConfig(
-        'app:attachmentFullTextSearch:extractorToken' as never,
-      );
-
-      const hasExtractorToken = tokenValue != null && tokenValue !== '';
-
-      const config: AttachmentSearchConfig = {
-        extractorUri: extractorUri as string | null,
-        hasExtractorToken,
-        timeoutMs: configManager.getConfig(
-          'app:attachmentFullTextSearch:timeoutMs' as never,
-        ) as number,
-        maxFileSizeBytes: configManager.getConfig(
-          'app:attachmentFullTextSearch:maxFileSizeBytes' as never,
-        ) as number,
-        isAttachmentFullTextSearchEnabled:
-          extractorUri != null && extractorUri !== '',
-        requiresReindex: false,
-      };
-
-      // hasExtractorToken should be true
-      expect(config.hasExtractorToken).toBe(true);
-
-      // Serialize to JSON — the secret token must NEVER appear
-      const json = JSON.stringify(config);
-      expect(json).not.toContain(SECRET_TOKEN);
-
-      // The key "extractorToken" itself must NOT appear in the serialized response
-      expect(json).not.toContain('"extractorToken"');
-    });
-
-    it('2. returns hasExtractorToken=false when token is not set', () => {
-      mockGetConfig.mockImplementation((key: string) => {
-        if (key === 'app:attachmentFullTextSearch:extractorUri')
-          return 'http://extractor.example.com';
-        if (key === 'app:attachmentFullTextSearch:extractorToken')
-          return undefined;
-        if (key === 'app:attachmentFullTextSearch:timeoutMs') return 60000;
-        if (key === 'app:attachmentFullTextSearch:maxFileSizeBytes')
-          return 52428800;
-        return undefined;
-      });
-
-      const tokenValue = configManager.getConfig(
-        'app:attachmentFullTextSearch:extractorToken' as never,
-      );
-      const hasExtractorToken = tokenValue != null && tokenValue !== '';
-
-      expect(hasExtractorToken).toBe(false);
-    });
-
-    it('3. GET response JSON does not contain extractorToken key or value in any scenario', () => {
-      const REAL_TOKEN = 'my-real-token-abc123';
-
-      mockGetConfig.mockImplementation((key: string) => {
-        if (key === 'app:attachmentFullTextSearch:extractorToken')
-          return REAL_TOKEN;
-        return undefined;
-      });
-
-      const tokenValue = configManager.getConfig(
-        'app:attachmentFullTextSearch:extractorToken' as never,
-      );
-      const hasExtractorToken = tokenValue != null && tokenValue !== '';
-
-      const config: Partial<AttachmentSearchConfig> & {
-        hasExtractorToken: boolean;
-      } = {
-        extractorUri: null,
-        hasExtractorToken,
-        timeoutMs: 60000,
-        maxFileSizeBytes: 52428800,
-        isAttachmentFullTextSearchEnabled: false,
-        requiresReindex: false,
-      };
-
-      const serialized = JSON.stringify(config);
-
-      // Token value must not leak
-      expect(serialized).not.toContain(REAL_TOKEN);
-      // The key name "extractorToken" must not appear
-      expect(serialized).not.toContain('"extractorToken"');
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // Section 4–6: PUT /config URI validation
+  // Section 5–6: PUT /config URI validation
   // -------------------------------------------------------------------------
 
   describe('PUT /config URI validation', () => {
-    it('4. valid URI updates config without error', async () => {
-      vi.mocked(configManager.updateConfigs).mockResolvedValue(undefined);
-
-      const validUri = 'http://attachment-text-extractor.example.com:8080';
-
-      // Simulate what the route handler does after validation passes
-      await configManager.updateConfigs(
-        {
-          'app:attachmentFullTextSearch:extractorUri': validUri,
-        } as Parameters<typeof configManager.updateConfigs>[0],
-        { removeIfUndefined: true },
-      );
-
-      expect(configManager.updateConfigs).toHaveBeenCalledWith(
-        expect.objectContaining({
-          'app:attachmentFullTextSearch:extractorUri': validUri,
-        }),
-        { removeIfUndefined: true },
-      );
-    });
-
     it('5. metadata IP URI (169.254.169.254) produces invalid_extractor_uri', async () => {
       const { validateExtractorUri } = await import(
         '~/features/search-attachments/server/services/validate-extractor-uri'
@@ -440,6 +297,7 @@ describe('attachment-search-admin', () => {
 // GET /failures — route-level tests using supertest
 // ---------------------------------------------------------------------------
 
+import { EventEmitter } from 'node:events';
 import express from 'express';
 import supertest from 'supertest';
 
@@ -469,6 +327,20 @@ vi.mock('~/server/middlewares/admin-required', () => ({
         return next();
       }
       return res.status(403).json({ error: 'Forbidden' });
+    },
+}));
+
+// The audit record is covered by attachment-search-admin.integ.ts
+vi.mock('~/server/middlewares/add-activity', () => ({
+  generateAddActivityMiddleware:
+    () =>
+    (
+      _req: express.Request,
+      res: express.Response,
+      next: express.NextFunction,
+    ) => {
+      res.locals.activity = { _id: 'activity-id' };
+      next();
     },
 }));
 
@@ -527,6 +399,7 @@ function buildTestApp(
   const crowiStub = {
     searchService: { fullTextSearchDelegator: null, isConfigured: true },
     attachmentIndexOperations: { ensureAttachmentIndex },
+    events: { activity: new EventEmitter() },
   };
 
   const router = attachmentSearchAdminFactory(crowiStub as never);
@@ -626,6 +499,22 @@ describe('GET /failures', () => {
 });
 
 describe('GET /config', () => {
+  it('reports a set token only as hasExtractorToken, never its value', async () => {
+    const token = 'extractor-token-value-4f9c';
+    vi.mocked(configManager.getConfig).mockImplementation(((key: string) =>
+      key === 'app:attachmentFullTextSearch:extractorToken'
+        ? token
+        : undefined) as never);
+
+    const res = await supertest(buildTestApp(true)).get(
+      '/admin/attachment-search/config',
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.body.config.hasExtractorToken).toBe(true);
+    expect(res.text).not.toContain(token);
+  });
+
   it('reports a whitespace-only token as not set', async () => {
     vi.mocked(configManager.getConfig).mockImplementation(((key: string) =>
       key === 'app:attachmentFullTextSearch:extractorToken'

@@ -1,7 +1,7 @@
 import type { ExtractionFailureEntry } from '~/features/search-attachments/interfaces/attachment-search';
+import type { extractionfailurelogs } from '~/generated/prisma/client';
 import loggerFactory from '~/utils/logger';
-
-import { ExtractionFailureLog } from '../models/extraction-failure-log';
+import { prisma } from '~/utils/prisma';
 
 const logger = loggerFactory(
   'growi:service:search-attachments:extraction-failure-log',
@@ -34,19 +34,13 @@ function buildRetentionGroupHash(
   return `${attachmentId}:${reasonCode}`;
 }
 
+const occurredSince = (since?: Date) =>
+  since != null ? { occurredAt: { gte: since } } : {};
+
 /**
- * Maps a MongoDB document to the public ExtractionFailureEntry DTO.
+ * Maps a stored log entry to the public ExtractionFailureEntry DTO.
  */
-function docToEntry(doc: {
-  attachmentId: string;
-  pageId: string | null;
-  fileName: string;
-  fileFormat: string;
-  fileSize: number;
-  reasonCode: string;
-  message: string | null;
-  occurredAt: Date;
-}): ExtractionFailureEntry {
+function docToEntry(doc: extractionfailurelogs): ExtractionFailureEntry {
   return {
     attachmentId: doc.attachmentId,
     pageId: doc.pageId,
@@ -100,14 +94,13 @@ export class ExtractionFailureLogService
       );
       const dedupWindowStart = new Date(Date.now() - DEDUP_WINDOW_MS);
 
-      await ExtractionFailureLog.findOneAndUpdate(
-        {
-          retentionGroupHash,
-          occurredAt: { $gte: dedupWindowStart },
-        },
-        {
-          $set: { occurredAt: entry.occurredAt },
-          $setOnInsert: {
+      const { count } = await prisma.extractionfailurelogs.updateMany({
+        where: { retentionGroupHash, occurredAt: { gte: dedupWindowStart } },
+        data: { occurredAt: entry.occurredAt },
+      });
+      if (count === 0) {
+        await prisma.extractionfailurelogs.create({
+          data: {
             attachmentId: entry.attachmentId,
             pageId: entry.pageId ?? null,
             fileName: entry.fileName,
@@ -115,14 +108,11 @@ export class ExtractionFailureLogService
             fileSize: entry.fileSize,
             reasonCode: entry.reasonCode,
             message: entry.message ?? null,
+            occurredAt: entry.occurredAt,
             retentionGroupHash,
           },
-        },
-        {
-          upsert: true,
-          new: false,
-        },
-      );
+        });
+      }
     } catch (error) {
       // MongoDB errors must not propagate — this is a best-effort persistence layer
       logger.error(
@@ -141,16 +131,11 @@ export class ExtractionFailureLogService
     since?: Date;
   }): Promise<ExtractionFailureEntry[]> {
     try {
-      const filter: Record<string, unknown> = {};
-      if (options.since != null) {
-        filter.occurredAt = { $gte: options.since };
-      }
-
-      const docs = await ExtractionFailureLog.find(filter)
-        .sort({ occurredAt: -1 })
-        .limit(options.limit)
-        .lean();
-
+      const docs = await prisma.extractionfailurelogs.findMany({
+        where: occurredSince(options.since),
+        orderBy: { occurredAt: 'desc' },
+        take: options.limit,
+      });
       return docs.map(docToEntry);
     } catch (error) {
       logger.error({ error }, 'Failed to list recent extraction failure logs');
@@ -164,11 +149,9 @@ export class ExtractionFailureLogService
    */
   async totalRecent(since?: Date): Promise<number> {
     try {
-      const filter: Record<string, unknown> = {};
-      if (since != null) {
-        filter.occurredAt = { $gte: since };
-      }
-      return await ExtractionFailureLog.countDocuments(filter);
+      return await prisma.extractionfailurelogs.count({
+        where: occurredSince(since),
+      });
     } catch (error) {
       logger.error({ error }, 'Failed to count recent extraction failure logs');
       return 0;

@@ -611,3 +611,18 @@ describe('Change Proposal activity declarations', () => {
     expect(AdminActions).toContain('ADMIN_CHANGE_PROPOSAL_SETTINGS_UPDATE');
   });
 });
+
+describe('attachment search settings activity declaration', () => {
+  it('records the admin update only in the Large group, in the Admin category', () => {
+    expect(SupportedAction.ACTION_ADMIN_ATTACHMENT_SEARCH_SETTINGS_UPDATE).toBe(
+      'ADMIN_ATTACHMENT_SEARCH_SETTINGS_UPDATE',
+    );
+    expect(AllMediumGroupActions).not.toContain(
+      'ADMIN_ATTACHMENT_SEARCH_SETTINGS_UPDATE',
+    );
+    expect(AllLargeGroupActions).toContain(
+      'ADMIN_ATTACHMENT_SEARCH_SETTINGS_UPDATE',
+    );
+    expect(AdminActions).toContain('ADMIN_ATTACHMENT_SEARCH_SETTINGS_UPDATE');
+  });
+});

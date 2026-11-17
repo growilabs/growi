@@ -1187,6 +1187,7 @@
     "ADMIN_MAIL_SES_UPDATE": "メール設定（SES）の更新",
     "ADMIN_MAIL_TEST_SUBMIT": "テストメールの送信",
     "ADMIN_FILE_UPLOAD_CONFIG_UPDATE": "ファイルアップロード設定の更新",
+    "ADMIN_ATTACHMENT_SEARCH_SETTINGS_UPDATE": "添付データの全文検索設定の更新",
     "ADMIN_PLUGIN_UPDATE": "プラグイン設定の更新",
     "ADMIN_MAINTENANCEMODE_ENABLED": "メンテナンスモードの開始",
     "ADMIN_MAINTENANCEMODE_DISABLED": "メンテナンスモードの終了",

@@ -7,7 +7,10 @@
  *
  * Every route: accessTokenParser([SCOPE.*.ADMIN.FULL_TEXT_SEARCH]) +
  * loginRequiredStrictly + adminRequired. Not behind the feature gate: these
- * are how an admin turns the feature on.
+ * are how an admin turns the feature on. PUT adds addActivity after
+ * adminRequired (rules/activity-recording.md): a success records
+ * ACTION_ADMIN_ATTACHMENT_SEARCH_SETTINGS_UPDATE, a refusal or failure
+ * ACTION_UNSETTLED.
  *
  * Security note: `extractorToken` is WRITE-ONLY and must never appear in
  * GET responses.  Only `hasExtractorToken: boolean` is exposed.
@@ -22,8 +25,10 @@ import { ExtractionFailureLogService } from '~/features/search-attachments/serve
 import { indexableAttachments } from '~/features/search-attachments/server/services/indexable-attachments';
 import { isAttachmentFullTextSearchEnabled } from '~/features/search-attachments/server/services/is-attachment-full-text-search-enabled';
 import { validateExtractorUri } from '~/features/search-attachments/server/services/validate-extractor-uri';
+import { SupportedAction } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
 import adminRequiredFactory from '~/server/middlewares/admin-required';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import loginRequiredFactory from '~/server/middlewares/login-required';
@@ -217,6 +222,8 @@ export const attachmentSearchAdminFactory = (crowi: Crowi): express.Router => {
 
   const loginRequiredStrictly = loginRequiredFactory(crowi);
   const adminRequired = adminRequiredFactory(crowi);
+  const addActivity = generateAddActivityMiddleware();
+  const activityEvent = crowi.events.activity;
 
   const failureLogService = new ExtractionFailureLogService();
 
@@ -284,6 +291,7 @@ export const attachmentSearchAdminFactory = (crowi: Crowi): express.Router => {
     accessTokenParser([SCOPE.WRITE.ADMIN.FULL_TEXT_SEARCH]),
     loginRequiredStrictly,
     adminRequired,
+    addActivity,
     putConfigValidator,
     apiV3FormValidator,
     async (req, res: ApiV3Response) => {
@@ -355,6 +363,15 @@ export const attachmentSearchAdminFactory = (crowi: Crowi): express.Router => {
           }
         }
 
+        // emit before res.apiv3() — see rules/activity-recording.md
+        const activityId: unknown = res.locals.activity?._id;
+        // addActivity is best-effort; without its id there is no row to settle.
+        if (typeof activityId === 'string') {
+          activityEvent.emit('update', activityId, {
+            action:
+              SupportedAction.ACTION_ADMIN_ATTACHMENT_SEARCH_SETTINGS_UPDATE,
+          });
+        }
         return res.apiv3({});
       } catch (err) {
         logger.error({ err }, 'PUT /config failed');

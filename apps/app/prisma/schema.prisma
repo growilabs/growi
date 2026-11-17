@@ -370,6 +370,26 @@ model externalusergroups {
   @@index([parent], map: "parent_1")
 }
 
+model extractionfailurelogs {
+  id                 String   @id @default(auto()) @map("_id") @db.ObjectId
+  v                  Int      @default(0) @map("__v")
+  attachmentId       String   @db.ObjectId
+  pageId             String?  @db.ObjectId
+  fileName           String
+  fileFormat         String
+  fileSize           Int
+  reasonCode         String
+  message            String?
+  occurredAt         DateTime @db.Date
+  retentionGroupHash String
+
+  // The migration 20261117120000-add-indexes-to-extractionfailurelogs creates
+  // these; occurredAt_1 also carries the 90-day TTL, which Prisma cannot express.
+  @@index([attachmentId], map: "attachmentId_1")
+  @@index([retentionGroupHash], map: "retentionGroupHash_1")
+  @@index([occurredAt], map: "occurredAt_1")
+}
+
 model failedemails {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   createdAt DateTime @default(now())

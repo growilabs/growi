@@ -1188,6 +1188,7 @@
     "ADMIN_MAIL_SES_UPDATE": "이메일(SES) 설정 업데이트",
     "ADMIN_MAIL_TEST_SUBMIT": "테스트 메일 전송",
     "ADMIN_FILE_UPLOAD_CONFIG_UPDATE": "파일 업로드 설정 업데이트",
+    "ADMIN_ATTACHMENT_SEARCH_SETTINGS_UPDATE": "첨부 파일 전문 검색 설정 업데이트",
     "ADMIN_PLUGIN_UPDATE": "플러그인 설정 업데이트",
     "ADMIN_MAINTENANCEMODE_ENABLED": "유지 보수 모드 활성화",
     "ADMIN_MAINTENANCEMODE_DISABLED": "유지 보수 모드 비활성화",

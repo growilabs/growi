@@ -1198,6 +1198,7 @@
     "ADMIN_MAIL_SES_UPDATE": "Update E-mail(SES) Settings",
     "ADMIN_MAIL_TEST_SUBMIT": "Send test mail",
     "ADMIN_FILE_UPLOAD_CONFIG_UPDATE": "Update File Upload Settings",
+    "ADMIN_ATTACHMENT_SEARCH_SETTINGS_UPDATE": "Update Attachment Full-Text Search Settings",
     "ADMIN_PLUGIN_UPDATE": "Update Plugin Settings",
     "ADMIN_MAINTENANCEMODE_ENABLED": "Enable Maintenance Mode",
     "ADMIN_MAINTENANCEMODE_DISABLED": "Disabled Maintenance Mode",

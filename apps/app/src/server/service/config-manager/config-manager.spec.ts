@@ -311,17 +311,6 @@ describe('ConfigManager test', () => {
           .isSecret,
       ).toBe(true);
     });
-
-    test('extractorToken is not persisted as plaintext (isSecret prevents plaintext storage)', () => {
-      const def =
-        CONFIG_DEFINITIONS['app:attachmentFullTextSearch:extractorToken'];
-      // isSecret: true means ConfigManager encrypts the value — plaintext is never stored in DB
-      expect(def.isSecret).toBe(true);
-      // other non-secret fields should NOT have isSecret set
-      const extractorUriDef =
-        CONFIG_DEFINITIONS['app:attachmentFullTextSearch:extractorUri'];
-      expect(extractorUriDef.isSecret).toBeFalsy();
-    });
   });
 
   describe('getConfig()', () => {
