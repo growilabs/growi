@@ -5,7 +5,9 @@
  * sweeps orphans from it and only then moves the alias onto it, so the live
  * index stays as it was until the swap (see design.md Flow 5).
  *
- * - Individual attachment extraction failures NEVER abort the batch — log + continue.
+ * - A failure of one attachment is logged and skipped; an unreachable
+ *   extractor aborts the rebuild instead (ExtractorUnreachableError), so the
+ *   alias never moves to an index of empty docs.
  * - NO permission fields stored in any ES document.
  * - Socket events are emitted to the admin namespace so the admin UI can display progress.
  */
@@ -46,6 +48,14 @@ export interface AttachmentReindexBatchInterface {
 
 /** Number of attachment rows fetched from MongoDB per page during a rebuild. */
 export const REINDEX_PAGE_SIZE = 100;
+
+/** Every later attachment would fail the same way; aborts the rebuild. */
+export class ExtractorUnreachableError extends Error {
+  constructor(attachmentId: string) {
+    super(`The text extractor was unreachable while indexing ${attachmentId}`);
+    this.name = 'ExtractorUnreachableError';
+  }
+}
 
 // ---- Internal helpers -------------------------------------------------------
 
@@ -299,6 +309,9 @@ export class AttachmentReindexBatch implements AttachmentReindexBatchInterface {
     const { pageId } = attachment;
 
     const outcome = await this.extractor.extractAttachment(attachmentId);
+    if (outcome.kind === 'serviceUnreachable') {
+      throw new ExtractorUnreachableError(attachmentId);
+    }
     const docs = buildDocs(attachment, pageId, outcome);
 
     // Upsert ES docs (success and failure alike get a metadata doc)
@@ -333,7 +346,7 @@ export class AttachmentReindexBatch implements AttachmentReindexBatchInterface {
   /**
    * Extracts and indexes every attachment into `targetIndex`, then removes
    * docs whose page no longer exists. A failure on one attachment is logged
-   * and skipped.
+   * and skipped; an unreachable extractor rejects with ExtractorUnreachableError.
    */
   async addAllAttachments(
     targetIndex: string,
@@ -353,6 +366,9 @@ export class AttachmentReindexBatch implements AttachmentReindexBatchInterface {
       try {
         await this.indexAttachment(attachmentId, targetIndex);
       } catch (err) {
+        if (err instanceof ExtractorUnreachableError) {
+          throw err;
+        }
         logger.error(
           { err, attachmentId },
           'addAllAttachments: skipping attachment due to unexpected error',

@@ -84,6 +84,11 @@ describe('buildAttachmentSearchQuery', () => {
     expect(body.track_total_hits).toBe(false);
   });
 
+  it('leaves the extracted text out of the returned hits (only highlights are read)', () => {
+    const body = buildAttachmentSearchQuery(kw('test'), { highlight: true });
+    expect(body._source).toEqual({ excludes: ['content'] });
+  });
+
   it('matches snapshot (default options)', () => {
     const body = buildAttachmentSearchQuery(kw('hello', 'world'));
     expect(body).toMatchSnapshot();

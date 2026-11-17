@@ -359,60 +359,6 @@ describe('AttachmentSearchDelegatorExtension', () => {
   });
 
   // ----------------------------------------------------------------
-  // searchAttachmentsBody
-  // ----------------------------------------------------------------
-  describe('searchAttachmentsBody', () => {
-    it('returns an object (valid body shape)', () => {
-      const body = ext.searchAttachmentsBody('test query', {});
-      expect(typeof body).toBe('object');
-      expect(body).not.toBeNull();
-    });
-
-    it('contains content field references', () => {
-      const body = ext.searchAttachmentsBody('hello', {});
-      const serialized = JSON.stringify(body);
-      expect(serialized).toContain('content');
-    });
-
-    it('does NOT contain permission filter fields', () => {
-      const body = ext.searchAttachmentsBody('test', {});
-      const serialized = JSON.stringify(body);
-      expect(serialized).not.toContain('"grant"');
-      expect(serialized).not.toContain('granted_users');
-      expect(serialized).not.toContain('granted_groups');
-      expect(serialized).not.toContain('"creator"');
-    });
-  });
-
-  // ----------------------------------------------------------------
-  // searchAttachmentsByPageIdsBody
-  // ----------------------------------------------------------------
-  describe('searchAttachmentsByPageIdsBody', () => {
-    it('returns an object', () => {
-      const body = ext.searchAttachmentsByPageIdsBody('test', [
-        'page1',
-        'page2',
-      ]);
-      expect(typeof body).toBe('object');
-    });
-
-    it('includes terms filter on pageId', () => {
-      const body = ext.searchAttachmentsByPageIdsBody('test', ['p1', 'p2']);
-      const serialized = JSON.stringify(body);
-      expect(serialized).toContain('pageId');
-      expect(serialized).toContain('p1');
-      expect(serialized).toContain('p2');
-    });
-
-    it('includes content match clause', () => {
-      const body = ext.searchAttachmentsByPageIdsBody('hello', ['page1']);
-      const serialized = JSON.stringify(body);
-      expect(serialized).toContain('hello');
-      expect(serialized).toContain('content');
-    });
-  });
-
-  // ----------------------------------------------------------------
   // Index lifecycle (alias over two alternating physical indices)
   // ----------------------------------------------------------------
   describe('index lifecycle', () => {

@@ -13,6 +13,7 @@ import { mock } from 'vitest-mock-extended';
 
 import { getInstance } from '^/test/setup/crowi';
 
+import { SupportedAction } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
 import { AttachmentType } from '~/server/interfaces/attachment';
 import type { PageModel } from '~/server/models/page';
@@ -325,6 +326,30 @@ describe('POST /_api/v3/attachments/:id/reextract', () => {
       expect(indexer.reindex).not.toHaveBeenCalled();
     });
 
+    it('leaves an attempt in the audit log for a refused request, naming the caller', async () => {
+      const missingId = new mongoose.Types.ObjectId().toString();
+      const endpoint = `${MOUNT}/${missingId}/reextract`;
+      try {
+        const res = await reextract(missingId, users.other);
+        expect(res.status).toBe(404);
+
+        await vi.waitFor(
+          async () =>
+            expect(
+              await prisma.activities.findMany({ where: { endpoint } }),
+            ).toEqual([
+              expect.objectContaining({
+                action: SupportedAction.ACTION_UNSETTLED,
+                userId: users.other._id.toString(),
+              }),
+            ]),
+          { timeout: 3_000, interval: 50 },
+        );
+      } finally {
+        await prisma.activities.deleteMany({ where: { endpoint } });
+      }
+    });
+
     it('answers a read-only user the same way whether or not the attachment exists', async () => {
       const existing = await reextract(attachmentIds.owner, users.readOnly);
       const missing = await reextract(
@@ -427,22 +452,18 @@ describe('POST /_api/v3/attachments/:id/reextract', () => {
       expect(indexer.reindex).toHaveBeenCalledWith(lower);
     });
 
-    it('refuses a new attachment with 503 while the concurrency cap is reached', async () => {
+    it('accepts any number of different attachments at once (the extractor queues their work)', async () => {
       const running = deferred();
       indexer.reindex.mockReturnValue(running.promise);
 
-      const inFlight = (['public', 'public2', 'group'] as const).map((a) =>
-        reextract(attachmentIds[a], users.admin).then((r) => r),
+      const inFlight = (['public', 'public2', 'group', 'owner'] as const).map(
+        (a) => reextract(attachmentIds[a], users.admin).then((r) => r),
       );
-      await vi.waitFor(() => expect(indexer.reindex).toHaveBeenCalledTimes(3));
-      const refused = await reextract(attachmentIds.owner, users.admin);
+      await vi.waitFor(() => expect(indexer.reindex).toHaveBeenCalledTimes(4));
       running.resolve({ ...done, outcome: { ...done.outcome, pages: [] } });
       const settled = await Promise.all(inFlight);
 
-      expect(refused.status).toBe(503);
-      expect(refused.body.errors[0].code).toBe('reextract_busy');
-      expect(settled.map((r) => r.status)).toEqual([200, 200, 200]);
-      expect(indexer.reindex).toHaveBeenCalledTimes(3);
+      expect(settled.map((r) => r.status)).toEqual([200, 200, 200, 200]);
     });
   });
 

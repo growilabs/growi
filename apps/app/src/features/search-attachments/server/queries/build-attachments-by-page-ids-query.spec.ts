@@ -108,6 +108,13 @@ describe('buildAttachmentsByPageIdsQuery', () => {
     expect(body.track_total_hits).toBe(false);
   });
 
+  it('leaves the extracted text out of the returned hits (only highlights are read)', () => {
+    const body = buildAttachmentsByPageIdsQuery(kw('test'), samplePageIds, {
+      highlight: true,
+    });
+    expect(body._source).toEqual({ excludes: ['content'] });
+  });
+
   it('matches snapshot', () => {
     const body = buildAttachmentsByPageIdsQuery(
       kw('hello', 'world'),

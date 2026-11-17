@@ -363,11 +363,12 @@ describe.skipIf(esUri == null)(
 
       it('mounts re-extraction and the admin endpoints with their auth chains', () => {
         expect(
-          chainOf('POST', '/_api/v3/attachments/:id/reextract').slice(0, 4),
+          chainOf('POST', '/_api/v3/attachments/:id/reextract').slice(0, 5),
         ).toEqual([
           'accessTokenParserMw',
           'loginRequired',
           'excludeReadOnlyUser',
+          'addActivity',
           'requireSearchAttachmentsEnabled',
         ]);
         for (const [method, path] of [

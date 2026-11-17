@@ -3,7 +3,8 @@
  *
  * Implements the priority-slot-driven search model:
  * - facet=pages  : existing page search only (attachments_index not touched)
- * - facet=all    : msearch pages+attachments in parallel (from==0 only); fall back to pages-only for from>0
+ * - facet=all    : from==0: page search, then attachments of the pages it
+ *                  shows content of; from>0: pages-only
  * - facet=attachments: attachment index primary, then searchAccessiblePages on page_index
  *
  * Page items always come from the regular page search pipeline (search +
@@ -12,7 +13,8 @@
  * viewer the content of its parent page:
  * - facet=all first page: decided from the page result items themselves
  *   (page search already applied the viewer filter and the operators, and its
- *   items carry the MongoDB documents it judged snippets by)
+ *   items carry the MongoDB documents it judged snippets by); only those
+ *   pages' attachments are searched, so no hidden hit can take a slot
  * - every other path: searchAccessiblePages for the viewer and the query's
  *   operators; any failure there drops the hits (fail-close)
  * Only the keyword part of the query is matched against attachment content.
@@ -92,7 +94,6 @@ export interface AttachmentEsHit {
     fileSize: number;
     pageNumber: number | null;
     label: string | null;
-    content?: string;
   };
   highlight?: {
     content?: string[];
@@ -287,7 +288,6 @@ export class AttachmentSearchResultAggregator {
       if (from > 0) {
         return await this.searchPrimaryPages(input, from, size);
       }
-      // from==0: parallel pages+attachments with 800ms safety net
       return await this.searchPrimaryAll(input, size);
     }
 
@@ -339,38 +339,82 @@ export class AttachmentSearchResultAggregator {
   }
 
   // --------------------------------------------------------------------------
-  // facet=all, from==0 — parallel page + attachment search with safety net
+  // Attachment hits on pages already judged visible
   // --------------------------------------------------------------------------
 
+  /**
+   * The attachment hits on `pageIds`, which the caller has already judged
+   * visible for the viewer and the query, keyed by page id.
+   */
+  private async searchHitsOnPages(
+    keywords: AttachmentKeywordTerms,
+    pageIds: readonly string[],
+  ): Promise<Map<string, IAttachmentHit[]>> {
+    const hitsByPageId = new Map<string, IAttachmentHit[]>();
+    if (!hasPositiveKeyword(keywords) || pageIds.length === 0) {
+      return hitsByPageId;
+    }
+
+    const chunks: string[][] = [];
+    for (let i = 0; i < pageIds.length; i += DEFAULT_PAGE_SIZE) {
+      chunks.push(pageIds.slice(i, i + DEFAULT_PAGE_SIZE));
+    }
+    const responses = await Promise.all(
+      chunks.map((ids) =>
+        this.attachmentClient.searchAttachments(
+          buildAttachmentsByPageIdsQuery(keywords, ids, { highlight: true }),
+        ),
+      ),
+    );
+
+    const allowed = new Set(pageIds);
+    for (const hit of responses.flatMap((r) => r.hits.hits)) {
+      const pageId = hit._source.pageId;
+      // The query filters by these ids; this re-check keeps the gate
+      // independent of that query being correct.
+      if (!allowed.has(pageId)) continue;
+      hitsByPageId.set(pageId, [
+        ...(hitsByPageId.get(pageId) ?? []),
+        toAttachmentHit(hit),
+      ]);
+    }
+    return hitsByPageId;
+  }
+
+  // --------------------------------------------------------------------------
+  // facet=all, from==0 — page search, then the attachments of its pages
+  // --------------------------------------------------------------------------
+
+  /**
+   * The safety net bounds the page search and the attachment search together
+   * from the start of the request; past it the page result is returned alone.
+   */
   private async searchPrimaryAll(
     input: AttachmentSearchInput,
     size: number,
   ): Promise<IPrimarySearchResult> {
     const split = splitInput(input);
     const pageSearchPromise = this.pageSearchFn(input, { from: 0, size });
-    // No keyword to match attachment content with (e.g. an operator-only query)
-    const attachmentSearchPromise: Promise<AttachmentSearchResponse> =
-      hasPositiveKeyword(split.keywords)
-        ? this.attachmentClient.searchAttachments(
-            buildAttachmentSearchQuery(split.keywords, {
-              highlight: true,
-              size,
-              from: 0,
-            }),
-          )
-        : Promise.resolve({ hits: { hits: [] } });
+    let gaveUp = false;
+    const attachmentHitsPromise = (async () => {
+      // A page search failure is reported by the await below, not here
+      const pageResult = await pageSearchPromise.catch(() => null);
+      if (pageResult == null || gaveUp) {
+        return new Map<string, IAttachmentHit[]>();
+      }
+      return this.searchHitsOnPages(split.keywords, [
+        ...snippetVisiblePageIds(pageResult.data, input.viewer),
+      ]);
+    })();
 
-    let attachmentResponse: AttachmentSearchResponse | null = null;
+    let attachmentHitsByPageId: Map<string, IAttachmentHit[]> | null = null;
     try {
-      const [, attachmentSettled] = await withTimeout(
-        Promise.allSettled([pageSearchPromise, attachmentSearchPromise]),
+      attachmentHitsByPageId = await withTimeout(
+        attachmentHitsPromise,
         this.PRIMARY_TIMEOUT_MS,
       );
-      if (attachmentSettled.status === 'rejected') {
-        throw attachmentSettled.reason;
-      }
-      attachmentResponse = attachmentSettled.value;
     } catch (err) {
+      gaveUp = true;
       logger.warn(
         { err, failure: failureKind(err) },
         'searchPrimaryAll: primary search failed — degrading to pages-only',
@@ -379,34 +423,16 @@ export class AttachmentSearchResultAggregator {
 
     // A failed page search fails the request, as on every other path
     const pageResult = await pageSearchPromise;
-    if (attachmentResponse == null) {
-      return {
-        facet: 'all',
-        primarySlot: 'pages',
-        items: pageResult.data,
-        meta: { total: pageResult.meta.total },
-      };
-    }
-
-    // Interpretation A: only attachment hits on pages of the primary page result
-    const visiblePageIds = snippetVisiblePageIds(pageResult.data, input.viewer);
-
-    const attachmentHitsByPageId = new Map<string, IAttachmentHit[]>();
-    for (const hit of attachmentResponse.hits.hits) {
-      const pageId = hit._source.pageId;
-      if (!visiblePageIds.has(pageId)) continue;
-      attachmentHitsByPageId.set(pageId, [
-        ...(attachmentHitsByPageId.get(pageId) ?? []),
-        toAttachmentHit(hit),
-      ]);
-    }
-
-    const items: IPageWithSearchMeta[] = pageResult.data.map((item) => {
-      const attachmentHits = attachmentHitsByPageId.get(pageIdOf(item));
-      return attachmentHits == null
-        ? item
-        : { ...item, meta: { ...item.meta, attachmentHits } };
-    });
+    const hitsByPageId = attachmentHitsByPageId;
+    const items =
+      hitsByPageId == null
+        ? pageResult.data
+        : pageResult.data.map((item) => {
+            const attachmentHits = hitsByPageId.get(pageIdOf(item));
+            return attachmentHits == null
+              ? item
+              : { ...item, meta: { ...item.meta, attachmentHits } };
+          });
 
     return {
       facet: 'all',
@@ -561,32 +587,16 @@ export class AttachmentSearchResultAggregator {
       split,
       this.SECONDARY_TIMEOUT_MS,
     );
-    const validIds = primaryIds.filter((id) => visiblePageIds.has(id));
-
-    if (validIds.length === 0) {
-      return {};
-    }
-
-    const searchBody = buildAttachmentsByPageIdsQuery(
+    const hitsByPageId = await this.searchHitsOnPages(
       split.keywords,
-      validIds,
-      { highlight: true },
+      primaryIds.filter((id) => visiblePageIds.has(id)),
     );
-    const attachmentResponse =
-      await this.attachmentClient.searchAttachments(searchBody);
 
-    const enrichments: IResolvedSecondaryResult['enrichments'] = {};
-    for (const hit of attachmentResponse.hits.hits) {
-      const pageId = hit._source.pageId;
-      // The attachments query filters by validIds; this re-check keeps the
-      // gate independent of that query being correct.
-      if (!visiblePageIds.has(pageId)) continue;
-      const current = enrichments[pageId]?.attachmentHits ?? [];
-      enrichments[pageId] = {
-        attachmentHits: [...current, toAttachmentHit(hit)],
-      };
-    }
-
-    return enrichments;
+    return Object.fromEntries(
+      [...hitsByPageId].map(([pageId, attachmentHits]) => [
+        pageId,
+        { attachmentHits },
+      ]),
+    );
   }
 }

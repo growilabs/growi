@@ -7,6 +7,9 @@
  *   accessTokenParser([SCOPE.WRITE.FEATURES.ATTACHMENT])
  *   + loginRequiredStrictly
  *   + excludeReadOnlyUser
+ *   + addActivity (a refused or failed request leaves an ACTION_UNSETTLED
+ *     row; no SupportedAction names a re-extraction, so a success records
+ *     nothing yet)
  *   + requireSearchAttachmentsEnabled
  *   + id validation
  *
@@ -17,8 +20,8 @@
  *     has no page, the page is gone, or the caller is neither admin nor able
  *     to edit the page (= can view it, the same rule the attachment upload
  *     route applies)
- *   - 503 if the feature is disabled, or MAX_CONCURRENT_REEXTRACTIONS other
- *     attachments are being re-extracted
+ *   - 503 if the feature is disabled, or the run did not finish within its
+ *     deadline (waiting for an extraction slot counts towards it)
  *   - 200 { outcome: { kind } } otherwise (ReextractResponse)
  *
  * Concurrent authorized requests for one attachment share one extraction.
@@ -34,6 +37,7 @@ import mongoose from 'mongoose';
 
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import { excludeReadOnlyUser } from '~/server/middlewares/exclude-read-only-user';
 import loginRequiredFactory from '~/server/middlewares/login-required';
@@ -68,9 +72,6 @@ type Req = Request<{ id: string }, ApiV3Response, void> & {
  */
 const REEXTRACT_DEADLINE_MARGIN_MS = 30 * 1000;
 
-/** Each run reads the whole file into memory and has it converted. */
-const MAX_CONCURRENT_REEXTRACTIONS = 3;
-
 // One answer for every denial, so it tells neither whether the attachment
 // nor whether its page exists.
 const notFoundOrForbidden = (res: ApiV3Response) =>
@@ -88,11 +89,13 @@ const notFoundOrForbidden = (res: ApiV3Response) =>
  */
 export function createAttachmentReextractRouter(crowi: Crowi): express.Router {
   const router = express.Router();
-  const gate = createReextractGate<{ ok: boolean; outcome: ExtractionOutcome }>(
-    MAX_CONCURRENT_REEXTRACTIONS,
-  );
+  const gate = createReextractGate<{
+    ok: boolean;
+    outcome: ExtractionOutcome;
+  }>();
 
   const loginRequiredStrictly = loginRequiredFactory(crowi);
+  const addActivity = generateAddActivityMiddleware();
   const requireSearchAttachmentsEnabled = createRequireSearchAttachmentsEnabled(
     () => crowi.searchService?.isConfigured === true,
   );
@@ -102,6 +105,7 @@ export function createAttachmentReextractRouter(crowi: Crowi): express.Router {
     accessTokenParser([SCOPE.WRITE.FEATURES.ATTACHMENT]),
     loginRequiredStrictly,
     excludeReadOnlyUser,
+    addActivity,
     requireSearchAttachmentsEnabled,
     param('id').isMongoId().withMessage('id must be an attachment id'),
     apiV3FormValidator,
@@ -158,21 +162,11 @@ export function createAttachmentReextractRouter(crowi: Crowi): express.Router {
         const timeoutMs = configManager.getConfig(
           'app:attachmentFullTextSearch:timeoutMs',
         );
-        const running = gate.run(
+        const result = await gate.run(
           canonicalId,
           () => indexer.reindex(canonicalId),
           timeoutMs * 2 + REEXTRACT_DEADLINE_MARGIN_MS,
         );
-        if (running == null) {
-          return res.apiv3Err(
-            new ErrorV3(
-              'Too many attachments are being re-extracted; try again later',
-              'reextract_busy',
-            ),
-            503,
-          );
-        }
-        const result = await running;
 
         logger.info(
           {

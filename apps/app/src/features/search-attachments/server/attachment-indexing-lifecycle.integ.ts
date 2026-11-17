@@ -17,6 +17,7 @@ import {
   uniqueRunToken,
 } from '^/test/setup/search-attachments/es-inspection';
 import {
+  type ExtractorReply,
   type FakeExtractorServer,
   fixtureFileContent,
   startFakeExtractorServer,
@@ -34,6 +35,8 @@ import { SocketEventName } from '~/interfaces/websocket';
 import type Crowi from '~/server/crowi';
 import { prisma } from '~/utils/prisma';
 
+import { buildAttachmentSearchQuery } from './queries/build-attachment-search-query';
+import { EMPTY_ATTACHMENT_KEYWORD_TERMS } from './queries/split-query-terms';
 import { attachmentIndexNames } from './services/attachment-search-delegator-extension';
 
 vi.mock('~/utils/logger', () => ({
@@ -263,6 +266,58 @@ describe.skipIf(process.env.ELASTICSEARCH_URI == null)(
       });
     });
 
+    describe('re-extraction', () => {
+      const extractionFailed = (): ExtractorReply => ({
+        status: 422,
+        body: { code: 'extraction_failed', message: 'broken file' },
+      });
+
+      const reextract = (attachmentId: string) => {
+        const indexer = crowi.attachmentSearchIndexer;
+        if (indexer == null) throw new Error('not wired');
+        return indexer.reindex(attachmentId);
+      };
+
+      it('keeps the indexed text of a single-doc file when re-extraction fails', async () => {
+        extractor.setReply(() => ({
+          status: 200,
+          body: {
+            mimeType: 'text/plain',
+            extractedCharacters: 14,
+            pages: [
+              { pageNumber: null, label: null, content: `zzsingle${RUN}` },
+            ],
+          },
+        }));
+        const id = await upload(`single-${RUN}`);
+        extractor.setReply(extractionFailed);
+
+        const result = await reextract(id);
+
+        expect(result.outcome.kind).toBe('failed');
+        const docs = await docsOfAttachment(NAMES.alias, id);
+        expect(docs.map((d) => d._source.content)).toEqual([`zzsingle${RUN}`]);
+      });
+
+      it('replaces the doc of an earlier failure with the pages of a later success', async () => {
+        extractor.setReply(extractionFailed);
+        const id = await upload(
+          fixtureFileContent({ pages: 2, word: `zzrecover${RUN}` }),
+        );
+        expect(
+          (await docsOfAttachment(NAMES.alias, id)).map((d) => d._id),
+        ).toEqual([`${id}_0`]);
+        extractor.setReply(null);
+
+        const result = await reextract(id);
+
+        expect(result.outcome.kind).toBe('success');
+        expect(
+          (await docsOfAttachment(NAMES.alias, id)).map((d) => d._id),
+        ).toEqual([`${id}_1`, `${id}_2`]);
+      });
+    });
+
     describe('during a rebuild', () => {
       // A failed test must not leave its rebuild running into the next one
       afterEach(async () => {
@@ -313,15 +368,16 @@ describe.skipIf(process.env.ELASTICSEARCH_URI == null)(
 
         expect(await aliasTargets(NAMES.alias)).toEqual([tmp]);
         expect(emittedEvents()).toContain(SocketEventName.FinishAddAttachment);
-        const extension = crowi.attachmentIndexOperations;
-        if (extension == null) throw new Error('not wired');
         const res = await fetch(
           `${elasticsearchOrigin()}/${NAMES.alias}/_search`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(
-              extension.searchAttachmentsBody(`zzadded${RUN}`, {}),
+              buildAttachmentSearchQuery({
+                ...EMPTY_ATTACHMENT_KEYWORD_TERMS,
+                match: [`zzadded${RUN}`],
+              }),
             ),
           },
         );

@@ -2,6 +2,11 @@
 
 exports[`buildAttachmentsByPageIdsQuery > matches snapshot 1`] = `
 {
+  "_source": {
+    "excludes": [
+      "content",
+    ],
+  },
   "query": {
     "bool": {
       "filter": [
@@ -40,6 +45,11 @@ exports[`buildAttachmentsByPageIdsQuery > matches snapshot 1`] = `
 
 exports[`buildAttachmentsByPageIdsQuery > matches snapshot with highlight 1`] = `
 {
+  "_source": {
+    "excludes": [
+      "content",
+    ],
+  },
   "highlight": {
     "fields": {
       "content": {

@@ -81,3 +81,9 @@ export const buildAttachmentHighlight = (): Record<string, unknown> => ({
   },
   max_analyzed_offset: 1000000 - 1,
 });
+
+/**
+ * Hits are shown through their highlight fragments only; without this every
+ * hit would carry its whole extracted text back in the response.
+ */
+export const ATTACHMENT_HIT_SOURCE = { excludes: ['content'] } as const;

@@ -2,6 +2,11 @@
 
 exports[`buildAttachmentSearchQuery > matches snapshot (default options) 1`] = `
 {
+  "_source": {
+    "excludes": [
+      "content",
+    ],
+  },
   "from": 0,
   "query": {
     "bool": {
@@ -30,6 +35,11 @@ exports[`buildAttachmentSearchQuery > matches snapshot (default options) 1`] = `
 
 exports[`buildAttachmentSearchQuery > matches snapshot (with highlight) 1`] = `
 {
+  "_source": {
+    "excludes": [
+      "content",
+    ],
+  },
   "from": 0,
   "highlight": {
     "fields": {

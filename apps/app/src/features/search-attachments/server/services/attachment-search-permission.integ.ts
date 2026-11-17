@@ -55,6 +55,7 @@ const MISSING_TOKEN = `zzmissing${RUN}`;
 const PAGING_TOKEN = `zzpaging${RUN}`;
 const OP_TOKEN = `zzoperator${RUN}`;
 const DRIFT_TOKEN = `zzdrift${RUN}`;
+const RANK_TOKEN = `zzrank${RUN}`;
 const TAG_A = `attperm-tag-${RUN}`;
 const PAGE_INDEX = `fix_attperm_pages_${RUN}`;
 const ATTACHMENT_NAMES = attachmentIndexNames(PAGE_INDEX);
@@ -443,6 +444,18 @@ describe.skipIf(esUri == null)(
         await seedPage(kind, { body: `${kind} page ${DRIFT_TOKEN}` });
       }
 
+      // --- hidden hits outranking a visible one ----------------------------
+      await seedPage('rankVisible', {
+        path: `/attperm/${RUN}/rank/visible`,
+        body: `visible ${RANK_TOKEN}`,
+      });
+      await seedPage('rankHidden', {
+        path: `/attperm/${RUN}/rank/hidden`,
+        body: `hidden ${RANK_TOKEN}`,
+        grant: PageGrant.GRANT_OWNER,
+        grantedUsers: [users.creator],
+      });
+
       // A page whose attachments stay indexed but which is no longer in the page index.
       pageIds.deleted = new mongoose.Types.ObjectId().toString();
       idToKind.set(pageIds.deleted, 'deleted');
@@ -507,6 +520,13 @@ describe.skipIf(esUri == null)(
         // biome-ignore lint/performance/noAwaitInLoops: a handful of fixture docs
         await indexAttachment(kind, `att-${kind}`, `attached ${DRIFT_TOKEN}`);
       }
+
+      await indexAttachment('rankVisible', 'att-rankVisible', RANK_TOKEN);
+      await indexAttachment(
+        'rankHidden',
+        'att-rankHidden',
+        Array(12).fill(RANK_TOKEN).join(' '),
+      );
 
       await refresh(PAGE_INDEX);
       await refresh(ATTACHMENT_INDEX);
@@ -786,6 +806,25 @@ describe.skipIf(esUri == null)(
           ['paging4'],
           [],
         ]);
+      }, 30_000);
+    });
+
+    describe('facet=all never lets hidden hits change the visible result', () => {
+      it('gives a visible page its attachment hits even when a hidden attachment scores higher (limit=1)', async () => {
+        const viewer = await viewerOf('other');
+
+        const result = await searchService.searchByFacet(
+          `${RANK_TOKEN} prefix:/attperm/${RUN}/rank/visible`,
+          viewer,
+          { facet: 'all', from: 0, size: 1 },
+        );
+
+        expect(kindsOf(result.items.map((i) => i.data._id))).toEqual([
+          'rankVisible',
+        ]);
+        expect(
+          result.items[0].meta?.attachmentHits?.map((h) => h.attachmentId),
+        ).toEqual(['att-rankVisible']);
       }, 30_000);
     });
 

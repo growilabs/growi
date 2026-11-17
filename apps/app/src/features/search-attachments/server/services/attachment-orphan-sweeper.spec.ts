@@ -20,8 +20,6 @@ function makeDelegatorExtStub() {
   return {
     syncAttachmentIndexed: vi.fn(),
     syncAttachmentRemoved: vi.fn(),
-    searchAttachmentsBody: vi.fn(),
-    searchAttachmentsByPageIdsBody: vi.fn(),
   };
 }
 

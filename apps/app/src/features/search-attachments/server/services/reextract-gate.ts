@@ -1,16 +1,10 @@
 export type ReextractGate<T> = {
   /**
    * Runs `task` for `key`, or joins the run already in flight for `key`.
-   * Returns null, without starting `task`, when `maxConcurrent` runs for
-   * other keys are already in flight.
-   * A run that has not settled after `deadlineMs` is abandoned: its slot is
+   * A run that has not settled after `deadlineMs` is abandoned: its key is
    * freed and its callers are rejected with ReextractDeadlineError.
    */
-  run(
-    key: string,
-    task: () => Promise<T>,
-    deadlineMs?: number,
-  ): Promise<T> | null;
+  run(key: string, task: () => Promise<T>, deadlineMs?: number): Promise<T>;
 };
 
 /** Thrown to the callers of a run that did not settle within its deadline. */
@@ -24,13 +18,12 @@ export class ReextractDeadlineError extends Error {
 export const DEFAULT_REEXTRACT_DEADLINE_MS = 5 * 60 * 1000;
 
 /**
- * Bounds re-extraction work in this process: one run per attachment at a
- * time (later callers share its result), at most `maxConcurrent` runs
- * overall, and a total deadline per run so work that hangs cannot hold a
- * slot forever. Callers must authorize each request before calling `run`.
+ * One re-extraction run per attachment at a time (later callers share its
+ * result), with a total deadline per run so a caller never waits forever.
+ * How many files are extracted at once is bounded by the extractor service
+ * itself. Callers must authorize each request before calling `run`.
  */
 export const createReextractGate = <T>(
-  maxConcurrent: number,
   defaultDeadlineMs: number = DEFAULT_REEXTRACT_DEADLINE_MS,
 ): ReextractGate<T> => {
   const inFlight = new Map<string, Promise<T>>();
@@ -40,9 +33,6 @@ export const createReextractGate = <T>(
       const running = inFlight.get(key);
       if (running != null) {
         return running;
-      }
-      if (inFlight.size >= maxConcurrent) {
-        return null;
       }
 
       let timer: ReturnType<typeof setTimeout> | undefined;

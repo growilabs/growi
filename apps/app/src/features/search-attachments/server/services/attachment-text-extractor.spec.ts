@@ -643,6 +643,91 @@ describe('AttachmentTextExtractorService', () => {
     expect(result).toEqual({ kind: 'serviceUnreachable' });
   });
 
+  it('reads and sends at most 3 files at a time; later extractions wait their turn and all complete', async () => {
+    const replies: Array<(value: unknown) => void> = [];
+    postExtract.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          replies.push(resolve);
+        }),
+    );
+    const reply = (i: number) =>
+      replies[i]({
+        data: {
+          mimeType: 'text/plain',
+          extractedCharacters: 1,
+          pages: [{ pageNumber: null, label: null, content: `r${i}` }],
+        },
+      });
+    const service = await getService();
+
+    const results = Promise.all(
+      Array.from({ length: 5 }, () =>
+        service.extractAttachment('attachment-id-1'),
+      ),
+    );
+    await vi.waitFor(() => expect(postExtract).toHaveBeenCalledTimes(3));
+    expect(mockFileUploader.findDeliveryFile).toHaveBeenCalledTimes(3);
+
+    reply(0);
+    await vi.waitFor(() => expect(postExtract).toHaveBeenCalledTimes(4));
+    expect(mockFileUploader.findDeliveryFile).toHaveBeenCalledTimes(4);
+    reply(1);
+    await vi.waitFor(() => expect(postExtract).toHaveBeenCalledTimes(5));
+    for (const i of [2, 3, 4]) reply(i);
+
+    expect((await results).map((r) => r.kind)).toEqual(
+      Array(5).fill('success'),
+    );
+  });
+
+  describe('an IPv6 literal extractor URI (accepted on save)', () => {
+    const useExtractorUri = (uri: string) => {
+      vi.mocked(configManager.getConfig).mockImplementation((key: string) => {
+        if (key === 'app:attachmentFullTextSearch:extractorUri') return uri;
+        if (key === 'app:attachmentFullTextSearch:extractorToken')
+          return 'test-token';
+        if (key === 'app:attachmentFullTextSearch:timeoutMs') return 60000;
+        if (key === 'app:attachmentFullTextSearch:maxFileSizeBytes')
+          return 52428800;
+        return undefined;
+      });
+      // A literal address resolves locally, without any network request
+      vi.mocked(dns.lookup).mockRestore();
+    };
+
+    it('calls the extractor at a loopback IPv6 address', async () => {
+      useExtractorUri('http://[::1]:8000');
+      postExtract.mockResolvedValue({
+        data: {
+          mimeType: 'text/plain',
+          extractedCharacters: 5,
+          pages: [{ pageNumber: null, label: null, content: 'hello' }],
+        },
+      });
+
+      const service = await getService();
+      const result = await service.extractAttachment('attachment-id-1');
+
+      expect(result).toEqual({
+        kind: 'success',
+        mimeType: 'text/plain',
+        pages: [{ pageNumber: null, label: null, content: 'hello' }],
+      });
+      expect(postExtract.mock.calls[0][1].baseURL).toBe('http://[::1]:8000');
+    });
+
+    it('still refuses a metadata IPv6 address', async () => {
+      useExtractorUri('http://[fd00:ec2::254]:8000');
+
+      const service = await getService();
+      const result = await service.extractAttachment('attachment-id-1');
+
+      expect(result).toEqual({ kind: 'serviceUnreachable' });
+      expect(postExtract).not.toHaveBeenCalled();
+    });
+  });
+
   // -----------------------------------------------------------------------
   // 12. never throws — even on unexpected Error, returns ExtractionOutcome
   // -----------------------------------------------------------------------
@@ -671,7 +756,7 @@ describe('AttachmentTextExtractorService', () => {
     });
   });
 
-  it('never throws when fileUploader throws', async () => {
+  it('reports a file that cannot be read from storage as a failure of that file, not as an extractor outage', async () => {
     mockFileUploader.findDeliveryFile.mockRejectedValue(
       new Error('Storage unavailable'),
     );
@@ -679,8 +764,12 @@ describe('AttachmentTextExtractorService', () => {
     const service = await getService();
     const result = await service.extractAttachment('attachment-id-1');
 
-    expect(result.kind).toBeDefined();
-    expect(result.kind).not.toBe(undefined);
+    expect(result).toEqual({
+      kind: 'failed',
+      reasonCode: 'file_read_failed',
+      message: expect.any(String),
+    });
+    expect(postExtract).not.toHaveBeenCalled();
   });
 
   // -----------------------------------------------------------------------

@@ -5,6 +5,7 @@
  */
 
 import {
+  ATTACHMENT_HIT_SOURCE,
   buildAttachmentHighlight,
   buildAttachmentKeywordClauses,
 } from './attachment-keyword-query';
@@ -25,7 +26,7 @@ export type BuildAttachmentSearchQueryOptions = {
  *
  * @param keywords - The keyword part of the parsed query (operators excluded)
  * @param options - Optional: highlight, size, from
- * @returns A full ES request body (query, highlight, size, from)
+ * @returns A full ES request body (query, highlight, size, from, _source)
  */
 export function buildAttachmentSearchQuery(
   keywords: AttachmentKeywordTerms,
@@ -42,6 +43,7 @@ export function buildAttachmentSearchQuery(
     size,
     from,
     track_total_hits: false,
+    _source: ATTACHMENT_HIT_SOURCE,
   };
 
   if (highlight) {

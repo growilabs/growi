@@ -71,8 +71,6 @@ function makeDelegatorExtStub() {
     removeAttachmentsFromIndex: vi.fn().mockResolvedValue(undefined),
     syncAttachmentIndexed: vi.fn().mockResolvedValue(undefined),
     syncAttachmentRemoved: vi.fn().mockResolvedValue(undefined),
-    searchAttachmentsBody: vi.fn(),
-    searchAttachmentsByPageIdsBody: vi.fn(),
   };
 }
 
@@ -326,6 +324,34 @@ describe('AttachmentReindexBatch', () => {
       );
       expect(batch.getTmpIndexName()).toBeNull();
       expect(batch.startRebuild(() => new Promise<void>(() => {}))).toBe(true);
+    });
+
+    it('keeps the alias and drops the new index when the extractor becomes unreachable', async () => {
+      setupAttachmentMock([
+        makeAttachment({ id: 'a1' }),
+        makeAttachment({ id: 'a2' }),
+        makeAttachment({ id: 'a3' }),
+      ]);
+      extractor.extractAttachment
+        .mockResolvedValueOnce(successOutcome)
+        .mockResolvedValue({ kind: 'serviceUnreachable' });
+
+      batch.startRebuild(() => Promise.resolve());
+      await waitUntilFinished();
+
+      expect(extractor.extractAttachment).toHaveBeenCalledTimes(2);
+      expect(delegatorExt.syncAttachmentIndexed).toHaveBeenCalledOnce();
+      expect(failureLogService.record).not.toHaveBeenCalled();
+      expect(delegatorExt.swapAttachmentAlias).not.toHaveBeenCalled();
+      expect(delegatorExt.dropRebuildIndex).toHaveBeenCalledWith(
+        'attachments-2',
+      );
+      expect(emittedEvents()).toContain(
+        SocketEventName.AttachmentRebuildingFailed,
+      );
+      expect(emittedEvents()).not.toContain(
+        SocketEventName.FinishAddAttachment,
+      );
     });
 
     it('removes attachments deleted while they were being extracted from the new index before the swap', async () => {
@@ -636,10 +662,6 @@ describe('AttachmentReindexBatch', () => {
         {
           outcome: { kind: 'serviceBusy' } as const,
           expectedCode: 'serviceBusy',
-        },
-        {
-          outcome: { kind: 'serviceUnreachable' } as const,
-          expectedCode: 'serviceUnreachable',
         },
         {
           outcome: { kind: 'encrypted' } as const,

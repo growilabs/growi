@@ -83,8 +83,7 @@ function makeDelegator(): AttachmentIndexOperations {
     aliasName: 'attachments-alias',
     syncAttachmentIndexed: vi.fn().mockResolvedValue(undefined),
     syncAttachmentRemoved: vi.fn().mockResolvedValue(undefined),
-    searchAttachmentsBody: vi.fn(),
-    searchAttachmentsByPageIdsBody: vi.fn(),
+    removeAttachmentsFromIndex: vi.fn().mockResolvedValue(undefined),
   } as unknown as AttachmentIndexOperations;
 }
 
@@ -405,6 +404,32 @@ describe('AttachmentSearchIndexer', () => {
       const [entry] = vi.mocked(failureLog.record).mock.calls[0];
       expect(entry.reasonCode).toBe(expectedReasonCode);
       expect(entry.attachmentId).toBe('att-001');
+    });
+
+    it('records the extraction failure even when the Elasticsearch write also fails', async () => {
+      enableFeature();
+      vi.spyOn(prisma.attachments, 'findUnique').mockResolvedValue(
+        makeAttachment(),
+      );
+      const delegator = makeDelegator();
+      vi.mocked(delegator.syncAttachmentIndexed).mockRejectedValue(
+        new Error('es down'),
+      );
+      const failureLog = makeFailureLog();
+
+      const indexer = makeIndexer(
+        makeExtractor({ kind: 'timeout' }),
+        delegator,
+        failureLog,
+        makeReindexBatch(),
+        makeSearchService(true),
+      );
+
+      await indexer.onAttach('page-77', makeAttachment(), makeMullerFile());
+
+      expect(failureLog.record).toHaveBeenCalledOnce();
+      const [entry] = vi.mocked(failureLog.record).mock.calls[0];
+      expect(entry.reasonCode).toBe('extractionTimeout');
     });
   });
 
@@ -810,34 +835,72 @@ describe('AttachmentSearchIndexer', () => {
       expect(result.ok).toBe(true);
       expect(result.outcome.kind).toBe('timeout');
       expect(failureLog.record).toHaveBeenCalledOnce();
+      // What is indexed stays: a failure doc would blank a single-doc text
+      expect(delegator.syncAttachmentIndexed).not.toHaveBeenCalled();
+      expect(delegator.removeAttachmentsFromIndex).not.toHaveBeenCalled();
     });
 
-    it('records the extraction failure and returns its outcome even when the Elasticsearch write also fails', async () => {
+    it('clears the earlier docs of the attachment in every target index before writing the new ones', async () => {
       enableFeature();
-
-      const attachment = makeAttachment({ pageId: 'page-77' });
-      vi.spyOn(prisma.attachments, 'findUnique').mockResolvedValue(attachment);
-
-      const delegator = makeDelegator();
-      vi.mocked(delegator.syncAttachmentIndexed).mockRejectedValue(
-        new Error('es down'),
+      vi.spyOn(prisma.attachments, 'findUnique').mockResolvedValue(
+        makeAttachment({ pageId: 'page-77' }),
       );
-      const failureLog = makeFailureLog();
+      const delegator = makeDelegator();
+      const calls: string[] = [];
+      vi.mocked(delegator.removeAttachmentsFromIndex).mockImplementation(
+        (_ids, index) => {
+          calls.push(`remove ${index}`);
+          return Promise.resolve();
+        },
+      );
+      vi.mocked(delegator.syncAttachmentIndexed).mockImplementation(
+        (_id, _pageId, _docs, index) => {
+          calls.push(`write ${index}`);
+          return Promise.resolve();
+        },
+      );
 
       const indexer = makeIndexer(
-        makeExtractor({ kind: 'timeout' }),
+        makeExtractor(),
         delegator,
-        failureLog,
+        makeFailureLog(),
+        makeReindexBatch(true, 'attachments-tmp'),
+        makeSearchService(true),
+      );
+
+      const result = await indexer.reindex('att-001');
+
+      expect(result.outcome.kind).toBe('success');
+      expect(calls).toEqual([
+        'remove attachments-alias',
+        'write attachments-alias',
+        'remove attachments-tmp',
+        'write attachments-tmp',
+      ]);
+    });
+
+    it('writes nothing and keeps the earlier docs when clearing them from the live index fails', async () => {
+      enableFeature();
+      vi.spyOn(prisma.attachments, 'findUnique').mockResolvedValue(
+        makeAttachment({ pageId: 'page-77' }),
+      );
+      const delegator = makeDelegator();
+      vi.mocked(delegator.removeAttachmentsFromIndex).mockRejectedValue(
+        new Error('es down'),
+      );
+
+      const indexer = makeIndexer(
+        makeExtractor(),
+        delegator,
+        makeFailureLog(),
         makeReindexBatch(),
         makeSearchService(true),
       );
 
       const result = await indexer.reindex('att-001');
 
-      expect(result).toEqual({ ok: true, outcome: { kind: 'timeout' } });
-      expect(failureLog.record).toHaveBeenCalledOnce();
-      const [entry] = vi.mocked(failureLog.record).mock.calls[0];
-      expect(entry.reasonCode).toBe('extractionTimeout');
+      expect(result.ok).toBe(false);
+      expect(delegator.syncAttachmentIndexed).not.toHaveBeenCalled();
     });
 
     it('returns { ok: false } when feature is disabled', async () => {

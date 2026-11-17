@@ -7,6 +7,7 @@
  */
 
 import {
+  ATTACHMENT_HIT_SOURCE,
   buildAttachmentHighlight,
   buildAttachmentKeywordClauses,
 } from './attachment-keyword-query';
@@ -52,6 +53,7 @@ export function buildAttachmentsByPageIdsQuery(
     },
     size,
     track_total_hits: false,
+    _source: ATTACHMENT_HIT_SOURCE,
   };
 
   if (highlight) {

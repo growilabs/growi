@@ -27,6 +27,8 @@ describe('AttachmentTextExtractorService redirect handling', () => {
         _id: 'a1',
         fileFormat: 'application/pdf',
         fileSize: 4,
+        fileName: 'a1.pdf',
+        originalName: 'a1.pdf',
       }),
     );
   });

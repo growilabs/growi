@@ -42,39 +42,6 @@ export const attachmentIndexNames = (
   indices: [`${pageIndexName}-attachments-1`, `${pageIndexName}-attachments-2`],
 });
 
-/** Options accepted by `searchAttachmentsBody` and `searchAttachmentsByPageIdsBody`. */
-export type SearchOptions = {
-  readonly size?: number;
-  readonly from?: number;
-  readonly highlight?: boolean;
-};
-
-/**
- * Highlight configuration injected into ES search bodies when `highlight: true`.
- * Uses the same `<em>` tag format as the existing Page search.
- */
-const HIGHLIGHT_CONFIG = {
-  pre_tags: ["<em class='highlighted-keyword'>"],
-  post_tags: ['</em>'],
-  fields: {
-    content: { fragment_size: 150, number_of_fragments: 3 },
-    'content.ja': { fragment_size: 150, number_of_fragments: 3 },
-    'content.en': { fragment_size: 150, number_of_fragments: 3 },
-    fileName: { number_of_fragments: 0 },
-    originalName: { number_of_fragments: 0 },
-  },
-};
-
-/** Default page size used when `size` is not provided. */
-const DEFAULT_SIZE = 20;
-/** Default offset used when `from` is not provided. */
-const DEFAULT_FROM = 0;
-/**
- * Maximum number of page IDs that may be passed to `searchAttachmentsByPageIdsBody`.
- * This equals one page of primary results; callers must enforce this constraint.
- */
-export const MAX_PAGE_IDS_FOR_SECONDARY = DEFAULT_SIZE;
-
 /** Interface that the delegator extension exposes to higher-level services. */
 export interface AttachmentIndexOperations {
   /** Every read and live write goes through this alias. */
@@ -102,15 +69,6 @@ export interface AttachmentIndexOperations {
     attachmentId: string,
     targetIndexes: string[],
   ): Promise<void>;
-  searchAttachmentsBody(
-    query: string,
-    options: SearchOptions,
-  ): Record<string, unknown>;
-  searchAttachmentsByPageIdsBody(
-    query: string,
-    pageIds: string[],
-    options?: SearchOptions,
-  ): Record<string, unknown>;
 }
 
 /**
@@ -119,62 +77,6 @@ export interface AttachmentIndexOperations {
  */
 const buildDocId = (attachmentId: string, pageNumber: number | null): string =>
   `${attachmentId}_${pageNumber ?? 0}`;
-
-/**
- * Builds the multi_match content query used by both primary and secondary search.
- * Returns a bool query clause that matches content, fileName, and originalName fields.
- * Intentionally contains NO permission-related filters.
- */
-const buildContentMatchClause = (query: string): Record<string, unknown> => ({
-  multi_match: {
-    query,
-    type: 'most_fields',
-    fields: [
-      'content^2',
-      'content.ja',
-      'content.en',
-      'fileName',
-      'originalName',
-    ],
-  },
-});
-
-/**
- * Composes the full ES request body for an attachments-index search.
- * Pure function — no side effects, safe to call from any context.
- */
-const composeAttachmentSearchBody = (
-  query: string,
-  options: SearchOptions,
-  additionalFilter?: Record<string, unknown>,
-): Record<string, unknown> => {
-  const {
-    size = DEFAULT_SIZE,
-    from = DEFAULT_FROM,
-    highlight = false,
-  } = options;
-
-  const mustClauses: Record<string, unknown>[] = [
-    buildContentMatchClause(query),
-  ];
-
-  const body: Record<string, unknown> = {
-    query: {
-      bool: {
-        must: mustClauses,
-        ...(additionalFilter != null ? { filter: [additionalFilter] } : {}),
-      },
-    },
-    size,
-    from,
-  };
-
-  if (highlight) {
-    body.highlight = HIGHLIGHT_CONFIG;
-  }
-
-  return body;
-};
 
 /**
  * Deletes every doc of the given attachments from `index`. Rejects when
@@ -461,41 +363,5 @@ export class AttachmentSearchDelegatorExtension
         );
       }
     }
-  }
-
-  // ----------------------------------------------------------------
-  // Query body builders (pure — no ES calls)
-  // ----------------------------------------------------------------
-
-  /**
-   * Builds the ES request body for an attachments-index content search.
-   * No permission filter is included; callers must handle access control separately.
-   *
-   * Used by:
-   * - primary search (facet=attachments)
-   * - parallel msearch (facet=all, page 1)
-   */
-  searchAttachmentsBody(
-    query: string,
-    options: SearchOptions,
-  ): Record<string, unknown> {
-    return composeAttachmentSearchBody(query, options);
-  }
-
-  /**
-   * Builds the ES request body for secondary enrichment — restricts results to docs
-   * whose `pageId` is in `pageIds` (already viewer-permission-checked by the primary).
-   *
-   * Callers MUST ensure `pageIds.length <= MAX_PAGE_IDS_FOR_SECONDARY` to prevent
-   * unbounded terms queries.
-   */
-  searchAttachmentsByPageIdsBody(
-    query: string,
-    pageIds: string[],
-    options: SearchOptions = {},
-  ): Record<string, unknown> {
-    return composeAttachmentSearchBody(query, options, {
-      terms: { pageId: pageIds },
-    });
   }
 }

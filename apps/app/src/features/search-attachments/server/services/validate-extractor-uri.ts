@@ -32,9 +32,12 @@ export const isCloudMetadataAddress = (address: string): boolean => {
   return false;
 };
 
+/** `URL#hostname` keeps the brackets of an IPv6 literal (`[::1]`). */
+export const stripIpv6Brackets = (hostname: string): string =>
+  hostname.replace(/^\[(.*)\]$/, '$1');
+
 const isBlockedHost = (hostname: string): boolean => {
-  // url.hostname keeps the brackets of an IPv6 literal
-  const host = hostname.replace(/^\[(.*)\]$/, '$1');
+  const host = stripIpv6Brackets(hostname);
   if (isIP(host) !== 0) return isCloudMetadataAddress(host);
   return BLOCKED_METADATA_HOSTNAMES.has(host.toLowerCase().replace(/\.$/, ''));
 };

@@ -5,7 +5,9 @@
  * Responsibilities:
  * - Guard behind isFeatureEnabled() check
  * - On extraction success: bulk-upsert all extracted pages to ES (NO permission fields)
- * - On extraction failure: upsert a metadata-only doc + record in ExtractionFailureLogService
+ * - On extraction failure: record in ExtractionFailureLogService; on upload also
+ *   upsert a metadata-only doc (a re-extraction keeps what is indexed instead)
+ * - On re-extraction success: replace every doc the attachment had
  * - Dual-write support: when reindexBatch is rebuilding, write to both live and tmp indexes
  * - onDetach: delete all ES docs for a given attachmentId
  * - reindex: synchronous re-extraction + indexing for a single attachment
@@ -220,26 +222,45 @@ export class AttachmentSearchIndexer
    * 1. Write to live index first.
    * 2. Attempt write to tmp index — failure is logged as WARN and does not throw.
    *
-   * When only live is targeted, a single bulk call is issued.
+   * `replace` first deletes every doc the attachment has in that index, so
+   * docs of an earlier extraction (another page count, a failure doc) go.
    */
   private async writeToIndexes(
-    attachmentId: string,
-    pageId: string,
-    docs: IAttachmentEsDoc[],
     targetIndexes: string[],
+    {
+      attachmentId,
+      pageId,
+      docs,
+      replace,
+    }: {
+      attachmentId: string;
+      pageId: string;
+      docs: IAttachmentEsDoc[];
+      replace: boolean;
+    },
   ): Promise<void> {
     const liveIndex = this.delegatorExt.aliasName;
     const tmpIndexes = targetIndexes.filter((idx) => idx !== liveIndex);
     const hasLive = targetIndexes.includes(liveIndex);
 
-    // Always write to live first (if present)
-    if (hasLive) {
+    const writeTo = async (index: string): Promise<void> => {
+      if (replace) {
+        await this.delegatorExt.removeAttachmentsFromIndex(
+          [attachmentId],
+          index,
+        );
+      }
       await this.delegatorExt.syncAttachmentIndexed(
         attachmentId,
         pageId,
         docs,
-        liveIndex,
+        index,
       );
+    };
+
+    // Always write to live first (if present)
+    if (hasLive) {
+      await writeTo(liveIndex);
     }
 
     // Write to each tmp index (non-blocking on failure).
@@ -247,16 +268,7 @@ export class AttachmentSearchIndexer
     // so we use Promise.allSettled to satisfy the no-await-in-loops rule while still
     // isolating per-index failures.
     if (tmpIndexes.length > 0) {
-      const tmpResults = await Promise.allSettled(
-        tmpIndexes.map((tmpIndex) =>
-          this.delegatorExt.syncAttachmentIndexed(
-            attachmentId,
-            pageId,
-            docs,
-            tmpIndex,
-          ),
-        ),
-      );
+      const tmpResults = await Promise.allSettled(tmpIndexes.map(writeTo));
       for (let i = 0; i < tmpResults.length; i++) {
         const result = tmpResults[i];
         if (result.status === 'rejected') {
@@ -276,10 +288,15 @@ export class AttachmentSearchIndexer
   /**
    * Runs extraction for the attachment and indexes results.
    * Returns the ExtractionOutcome for the caller to surface.
+   *
+   * `reextract`: the attachment may already be indexed. A success replaces
+   * its docs; a failure leaves them as they are (a failure doc would share
+   * the id of a single-doc format's text doc and blank it).
    */
   private async extractAndIndex(
     attachment: AttachmentWithComputed,
     pageId: string,
+    mode: 'upload' | 'reextract',
   ): Promise<ExtractionOutcome> {
     const attachmentId = attachment._id.toString();
 
@@ -289,7 +306,12 @@ export class AttachmentSearchIndexer
 
     if (outcome.kind === 'success') {
       const docs = buildSuccessDocs(attachment, pageId, outcome);
-      await this.writeToIndexes(attachmentId, pageId, docs, targetIndexes);
+      await this.writeToIndexes(targetIndexes, {
+        attachmentId,
+        pageId,
+        docs,
+        replace: mode === 'reextract',
+      });
 
       logger.info(
         { attachmentId, pageId, docCount: docs.length },
@@ -311,18 +333,20 @@ export class AttachmentSearchIndexer
       // the extraction outcome
       await this.failureLog.record(failureEntry);
 
-      try {
-        await this.writeToIndexes(
-          attachmentId,
-          pageId,
-          [buildFailureDoc(attachment, pageId)],
-          targetIndexes,
-        );
-      } catch (err) {
-        logger.warn(
-          { err, attachmentId, pageId },
-          'Failed to index the metadata-only doc for a failed extraction',
-        );
+      if (mode === 'upload') {
+        try {
+          await this.writeToIndexes(targetIndexes, {
+            attachmentId,
+            pageId,
+            docs: [buildFailureDoc(attachment, pageId)],
+            replace: false,
+          });
+        } catch (err) {
+          logger.warn(
+            { err, attachmentId, pageId },
+            'Failed to index the metadata-only doc for a failed extraction',
+          );
+        }
       }
 
       logger.info(
@@ -379,7 +403,7 @@ export class AttachmentSearchIndexer
         return;
       }
 
-      await this.extractAndIndex(attachment, pageId);
+      await this.extractAndIndex(attachment, pageId, 'upload');
     } catch (err) {
       logger.error(
         { err, attachmentId: attachment._id?.toString(), pageId },
@@ -474,7 +498,11 @@ export class AttachmentSearchIndexer
         return { ok: false, outcome: { kind: 'serviceUnreachable' } };
       }
 
-      const outcome = await this.extractAndIndex(attachment, pageId);
+      const outcome = await this.extractAndIndex(
+        attachment,
+        pageId,
+        'reextract',
+      );
 
       return { ok: true, outcome };
     } catch (err) {

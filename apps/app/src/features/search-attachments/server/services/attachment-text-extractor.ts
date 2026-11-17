@@ -14,8 +14,15 @@ import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 
+import {
+  type ConcurrencyLimit,
+  createConcurrencyLimit,
+} from './concurrency-limit';
 import { buildExtractRequestBody } from './extract-request-body';
-import { isCloudMetadataAddress } from './validate-extractor-uri';
+import {
+  isCloudMetadataAddress,
+  stripIpv6Brackets,
+} from './validate-extractor-uri';
 
 const logger = loggerFactory('growi:service:search-attachments:extractor');
 
@@ -180,6 +187,7 @@ async function callExtractor(
  * - Blocks requests to cloud metadata IPs via DNS resolution check (SSRF defense)
  * - Retries 503 service_busy exactly once with exponential backoff + jitter
  * - Never logs the Bearer token value
+ * - Holds at most `maxConcurrentExtractions` files in memory at a time
  */
 type DeliveryFileFinder = {
   findDeliveryFile(
@@ -187,11 +195,28 @@ type DeliveryFileFinder = {
   ): Promise<NodeJS.ReadableStream>;
 };
 
+/**
+ * The extractor's default MAX_CONCURRENCY: a GROWI process sending more at
+ * once would only get service_busy answers back, while each waiting request
+ * would already hold its whole file in memory.
+ */
+const DEFAULT_MAX_CONCURRENT_EXTRACTIONS = 3;
+
 export class AttachmentTextExtractorService {
   private readonly fileUploader: DeliveryFileFinder;
 
-  constructor(fileUploader: DeliveryFileFinder) {
+  // One instance per process (see initAttachmentFullTextSearch), so uploads,
+  // re-extractions and a rebuild all share this limit.
+  private readonly limit: ConcurrencyLimit;
+
+  constructor(
+    fileUploader: DeliveryFileFinder,
+    {
+      maxConcurrentExtractions = DEFAULT_MAX_CONCURRENT_EXTRACTIONS,
+    }: { maxConcurrentExtractions?: number } = {},
+  ) {
     this.fileUploader = fileUploader;
+    this.limit = createConcurrencyLimit(maxConcurrentExtractions);
   }
 
   async extractAttachment(attachmentId: string): Promise<ExtractionOutcome> {
@@ -223,7 +248,7 @@ export class AttachmentTextExtractorService {
       // --- Step 3: DNS rebinding check ---
       let hostname: string;
       try {
-        hostname = new URL(extractorUri).hostname;
+        hostname = stripIpv6Brackets(new URL(extractorUri).hostname);
       } catch {
         return { kind: 'serviceUnreachable' };
       }
@@ -262,24 +287,14 @@ export class AttachmentTextExtractorService {
         return { kind: 'tooLarge', fileSize: attachment.fileSize };
       }
 
-      // --- Step 6: Fetch file bytes ---
-      const stream = await this.fileUploader.findDeliveryFile(attachment);
-      // The chunks are not kept in a variable, so only the body's copy stays
-      // in memory while the request runs.
-      const body = buildExtractRequestBody(
-        await streamToChunks(stream),
-        attachment,
+      // The slot is held from reading the file to the last answer, retry included
+      return await this.limit(() =>
+        this.readAndExtract(attachment, {
+          extractorUri,
+          token: extractorToken,
+          timeoutMs,
+        }),
       );
-
-      // --- Step 7: Call extractor (with built-in retry for 503) ---
-      return await callExtractor({
-        attachment,
-        body,
-        extractorUri,
-        token: extractorToken,
-        timeoutMs,
-        isRetry: false,
-      });
     } catch (error) {
       // Catch-all: ensure the method never throws regardless of what goes wrong
       logger.error(
@@ -288,5 +303,38 @@ export class AttachmentTextExtractorService {
       );
       return { kind: 'serviceUnreachable' };
     }
+  }
+
+  /** Steps 6–7; never throws (callExtractor resolves every outcome). */
+  private async readAndExtract(
+    attachment: AttachmentWithComputed,
+    settings: Pick<
+      CallExtractorOptions,
+      'extractorUri' | 'token' | 'timeoutMs'
+    >,
+  ): Promise<ExtractionOutcome> {
+    // --- Step 6: Fetch file bytes ---
+    let body: PostExtractBody;
+    try {
+      const stream = await this.fileUploader.findDeliveryFile(attachment);
+      // The chunks are not kept in a variable, so only the body's copy
+      // stays in memory while the request runs.
+      body = buildExtractRequestBody(await streamToChunks(stream), attachment);
+    } catch (error) {
+      // One missing file must not read as an extractor outage, which aborts
+      // a whole rebuild.
+      logger.warn(
+        { attachmentId: attachment.id, error },
+        'Failed to read the stored file',
+      );
+      return {
+        kind: 'failed',
+        reasonCode: 'file_read_failed',
+        message: 'The stored file could not be read',
+      };
+    }
+
+    // --- Step 7: Call extractor (with built-in retry for 503) ---
+    return callExtractor({ attachment, body, ...settings, isRetry: false });
   }
 }

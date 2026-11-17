@@ -260,6 +260,59 @@ describe('AttachmentSearchResultAggregator', () => {
       expect(result.primarySlot).toBe('pages');
     });
 
+    it('asks the attachment index only about the pages page search shows content of', async () => {
+      pageSearchFn.mockResolvedValue(
+        makePageSearchResult(['page1', 'hiddenContent'], {
+          hiddenContent: {
+            grant: PageGrant.GRANT_OWNER,
+            grantedUsers: [new mongoose.Types.ObjectId()],
+          },
+        }),
+      );
+      client.searchAttachments.mockResolvedValue(makeAttachmentResponse([]));
+
+      await makeAggregator().searchPrimary(inputFor(guest), {
+        facet: 'all',
+        from: 0,
+        size: 20,
+      });
+
+      expect(client.searchAttachments).toHaveBeenCalledOnce();
+      expect(client.searchAttachments.mock.calls[0][0]).toMatchObject({
+        query: { bool: { filter: [{ terms: { pageId: [idOf('page1')] } }] } },
+      });
+    });
+
+    it('returns the hits of every visible page of a result larger than one attachment query takes', async () => {
+      const names = Array.from({ length: 45 }, (_, i) => `big${i}`);
+      pageSearchFn.mockResolvedValue(makePageSearchResult(names));
+      client.searchAttachments.mockImplementation((body) => {
+        const { pageId } = (
+          body as {
+            query: { bool: { filter: [{ terms: { pageId: string[] } }] } };
+          }
+        ).query.bool.filter[0].terms;
+        return Promise.resolve(
+          makeAttachmentResponse(
+            pageId.map((id) => ({
+              pageId: id,
+              attachmentId: `att-${nameOf(id)}`,
+            })),
+          ),
+        );
+      });
+
+      const result = await makeAggregator().searchPrimary(inputFor(viewer), {
+        facet: 'all',
+        from: 0,
+        size: 45,
+      });
+
+      expect(attachmentIdsOf(result.items)).toEqual(
+        Object.fromEntries(names.map((name) => [name, [`att-${name}`]])),
+      );
+    });
+
     it.each([
       { who: 'a member', groups: [oid('group1')], kept: true },
       { who: 'a non-member', groups: [oid('group2')], kept: false },
@@ -375,6 +428,8 @@ describe('AttachmentSearchResultAggregator', () => {
       expect(result.items.map((i) => nameOf(i.data._id))).toEqual(['page1']);
       expect(attachmentIdsOf(result.items)).toEqual({});
       expect(pageSearchFn).toHaveBeenCalledOnce();
+      // Past the deadline no attachment query is started for this response
+      expect(client.searchAttachments).not.toHaveBeenCalled();
     });
 
     it('degrades to the pages-only result of the one page search when the attachment search fails', async () => {
