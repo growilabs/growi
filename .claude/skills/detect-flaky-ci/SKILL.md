@@ -761,34 +761,56 @@ lists.
    observation comment (Step 4). Rule 5 has no `excerpt`; the sentence below
    and the run link are its evidence.
 
-Never record an occurrence from rules 3, 4 or 5 as `confirmed`: none of them
-is retry-proven. A list that is `read` with an empty `tests[]` (its count is 0)
+This section never records an occurrence from rules 3, 4 or 5 as
+`confirmed`: none of them is retry-proven, so each one enters Step 4 as an
+observation. Step 4's own escalation then applies to it exactly as to any
+other observation — reaching `--vitest-threshold`, or recurring after a
+closed issue's fix, still moves it to `flaky/confirmed` there. A list that is
+`read` with an empty `tests[]` (its count is 0)
 contributes nothing, and a run whose `flaky` and `failed` lists are both
 `read` and empty contributes nothing even in a failed job: Playwright named
 no test that failed or needed a retry, so there is no test to attribute the
 job's failure to.
 
-How the occurrences from one job log combine:
+How the occurrences from one workflow run's `run-playwright` jobs combine:
 
 - **A test recorded per test is not recorded at job level too.** An
   occurrence recorded under an `identityKey` never also goes to
   `playwright:{BROWSER}`; the job-level identity receives only what rules 2,
   4 and 5 send it.
-- **Some lists read, some unreadable** (within one run or across runs) → the
+- **Some lists read, some unreadable** (within one `runs[]` element, or
+  across elements and jobs) → the
   tests of every `read` list are recorded per test, and each `unreadable`
   list goes to `playwright:{BROWSER}`. An unreadable list does not demote the
   readable ones.
-- **One occurrence per identity per job log.** When one job log reaches the
-  same identity more than once — `playwright:{BROWSER}` from both lists of
-  one `runs[]` element or from two elements, or the same `identityKey`
-  listed by two elements (the `chromium` job's installer run and main run
-  both depend on the `setup` project, so a test of that project can be
-  listed by both) — take it
-  through Step 4 once: as confirmed if any of its sources is a `flaky` list,
-  otherwise as an observation, quoting every source run's `excerpt`.
+- **One occurrence per identity per workflow run.** `--vitest-threshold`
+  counts separate runs, so one run must never add two occurrences to the
+  same identity. Parse every `run-playwright` job of the run — Step 2's
+  failed ones and Step 2b's successful ones — before taking any of its
+  Playwright identities through Step 4. When the run reaches the same
+  identity more than once, take it through Step 4 once: as confirmed if any
+  of its sources is a `flaky` list, otherwise as an observation. The sources
+  can be:
+  - `playwright:{BROWSER}` from both lists of one `runs[]` element, from two
+    elements, or from two jobs of the same browser (the shard and MongoDB
+    version cells of the matrix);
+  - the same `identityKey` listed by two elements of one job (the `chromium`
+    job's installer run and main run both depend on the `setup` project, so
+    a test of that project can be listed by both);
+  - the same `identityKey` listed by two jobs (the MongoDB `6.0` and `8.0`
+    cells of one shard run the same tests, so a test that failed every
+    attempt in both is listed by both; a setup project's test, such as one
+    of `users`, can have the same key in several browsers' jobs).
+
+  In the one issue body or observation comment this produces, the `Run:`
+  line is that run, the `Job:` line names every source job, and the evidence
+  quotes every source's `excerpt`, each under the name of the job it came
+  from.
 
 **Whenever an occurrence goes to `playwright:{BROWSER}`, say why** in the
-issue body (a new issue) or in the observation comment (an existing issue):
+issue body (a new issue) or in the observation comment (an existing issue) —
+once for each source job, under that job's name, when the occurrence was
+merged from several jobs:
 
 - rules 2 and 4: "Playwright's end-of-run `{flaky | failed}` list in this
   job's log could not be read (`{reason}`), so the test could not be
@@ -1252,11 +1274,14 @@ and `$NEW_ISSUE_JSON` holds the rest (`.html_url` for the Step 5 report, `.id`
 for the sub-issue call). Keep that variable in scope: a separate tool call
 starts a fresh shell that has none of these values.
 
-`{TIER_LABEL}` is `flaky/confirmed` only for a Playwright occurrence from
-Step 3 rules 1 and 2 (a test that passed on an in-run retry). Every
-observation — a vitest observation, or a Playwright occurrence from Step 3
-rules 3-5 — is `flaky/suspected` when one of the three mining checks hit and
-`flaky/observing` otherwise.
+`{TIER_LABEL}` is the tier the issue is created with. It is
+`flaky/confirmed` only for a Playwright occurrence from Step 3 rules 1 and 2
+(a test that passed on an in-run retry). Every observation — a vitest
+observation, or a Playwright occurrence from Step 3 rules 3-5 — is created
+`flaky/suspected` when one of the three mining checks hit and
+`flaky/observing` otherwise; the escalation paths below (reaching
+`--vitest-threshold`, a recurrence after a closed issue's fix) then move it
+up as they do for any observation.
 
 ### Attach the new issue to the dashboard as a sub-issue
 
@@ -1547,6 +1572,12 @@ issue count can be told apart from a check that quietly stopped working:
   went through Step 4 like any other), so report them separately.
 - any identity whose PR-owned check could not be completed because the
   compare or PR fetch failed (fail-open, so it was tracked anyway)
+- **failed `run-playwright` jobs with nothing recorded** — every job that
+  concluded `failure` but from which Step 3 recorded nothing, because every
+  `runs[]` element of its log had both its `flaky` and `failed` lists `read`
+  and empty. List each by job name with its run link. No issue is created
+  for them, so this line is the only trace that the job's failure was not
+  attributed to any test.
 
 This is the only user-facing output — do not create files.
 

@@ -2,9 +2,10 @@
  * Reading facts out of one CI job log: vitest failure blocks, and each
  * Playwright run's end-of-run summary with its flaky and failed test lists.
  *
- * Everything here is a fact; which tier an identity gets, which failures fold
- * into one identity, and whether a denylist hit drops a failure or the whole
- * job all stay in the procedure.
+ * Everything here is a fact; whether a failure gets a per-test or a job-level
+ * identity, whether it counts as confirmed or as an observation, which
+ * failures fold into one identity, and whether a denylist hit drops a failure
+ * or the whole job all stay in the procedure.
  *
  * Every function normalizes its input with `ansi.strip` first (which is
  * idempotent), so a caller may hand over either a raw log or an already
@@ -201,6 +202,12 @@ export type PlaywrightRun = {
 const TITLE_SEPARATOR = ' › ';
 const PROJECT_SEGMENT = /^\[([^\]]+)\]$/;
 const POSITIONED_SPEC_PATH = /^(.+):\d+:\d+$/;
+/**
+ * The reporter ends each list line with one space and then `─` up to 100
+ * columns — no `─` at all once the line is that wide. The padding holds no
+ * other space, so this removes exactly it, even from a title ending in `─`.
+ */
+const LIST_LINE_PADDING = / ─*$/;
 
 /**
  * Splits one `[project] › path:line:col › group › … › test` line, or returns
@@ -212,7 +219,8 @@ export const parsePlaywrightTestLine = (
   line: string,
 ): PlaywrightListedTest | null => {
   const [projectSegment, positionedPath, ...titles] = line
-    .trim()
+    .trimStart()
+    .replace(LIST_LINE_PADDING, '')
     .split(TITLE_SEPARATOR);
   const project = projectSegment?.match(PROJECT_SEGMENT)?.[1];
   const specPath = positionedPath?.match(POSITIONED_SPEC_PATH)?.[1];
@@ -233,12 +241,14 @@ const RUN_COUNT_KEYWORDS = [
 type RunCountKeyword = (typeof RUN_COUNT_KEYWORDS)[number];
 
 /**
- * Anchored on the leading number, so vitest's totals
- * (` Test Files  1 failed | 309 passed (310)`) never match. `interrupted` and
- * `did not run` are read only so that they do not end a summary.
+ * The whole line must be a count, a keyword and at most a parenthesised
+ * duration, so vitest's totals (` Test Files  1 failed | 309 passed (310)`)
+ * and other tools' prose (`  2 failed migrations …`) never match.
+ * `interrupted` and `did not run` are read only so that they do not end a
+ * summary.
  */
 const RUN_COUNT_LINE = new RegExp(
-  `^\\s*(\\d+)\\s+(${RUN_COUNT_KEYWORDS.join('|')})\\b`,
+  `^\\s*(\\d+)\\s+(${RUN_COUNT_KEYWORDS.join('|')})(?:\\s+\\([^)]*\\))?\\s*$`,
 );
 const NOTICE_PREFIX = '##[notice]';
 /**

@@ -30,6 +30,9 @@ const PLAYWRIGHT_TWO_RUNS = readFixture(
 const PLAYWRIGHT_FAILED_ALL_ATTEMPTS = readFixture(
   '41984122671-playwright-failed-all-attempts-excerpt.txt',
 );
+const PLAYWRIGHT_SHORT_TITLE_PADDED = readFixture(
+  '40851998100-playwright-short-title-padded-excerpt.txt',
+);
 const PLAYWRIGHT_COUNT_MISMATCH = readFixture(
   'constructed-playwright-flaky-count-mismatch-excerpt.txt',
 );
@@ -124,6 +127,24 @@ describe('parse-job-log.run', () => {
         },
       ],
     });
+  });
+
+  it('gives a test whose list line is padded with `─` the identity key issue 11955 is titled with', () => {
+    const runs = playwrightRuns(run(PLAYWRIGHT_SHORT_TITLE_PADDED));
+
+    expect(runs).toHaveLength(1);
+    expect(runs[0]?.failed).toMatchObject({
+      kind: 'read',
+      tests: [
+        {
+          identityKey:
+            'playwright:users:playwright/users.setup.ts:provision filter test users',
+        },
+      ],
+    });
+    expect(runs[0]?.excerpt).toContain(
+      `provision filter test users ${'─'.repeat(25)}`,
+    );
   });
 
   it('keeps the normal run and the guest-mode run of one job apart, each with its own counts and excerpt', () => {

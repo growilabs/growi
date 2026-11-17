@@ -6,9 +6,10 @@
  * which failures match the infrastructure-noise denylist.
  *
  * Replaces the literal-pattern greps and the ANSI `sed` the procedure used to
- * spell out. Every judgment stays there: which identity tier a failure gets,
- * whether the denylist should be widened, and where collateral and cascaded
- * failures are folded.
+ * spell out. Every judgment stays there: whether a failure gets a per-test or
+ * a job-level identity, whether it is confirmed or an observation, whether
+ * the denylist should be widened, and where collateral and cascaded failures
+ * are folded.
  *
  * The log arrives on **stdin**, never as a path or an id, so the two fetch
  * routes converge here (Requirement 3.2): `gh api --allow-escape-sequences …`

@@ -21,7 +21,7 @@ const CI_APP_TEST = readFixture('ci-app-test-100952911197-excerpt.txt');
 const REPRO_11849 = readFixture('11849-repro-result-log-excerpt.txt');
 /** Real shared setup-hook timeout (issue #11752): file-level FAIL lines. */
 const SETUP_HOOK_11752 = readFixture('11752-setup-hook-timeout-excerpt.txt');
-/** Real Playwright shard with one annotation and `0 failed / 1 flaky`. */
+/** Real Playwright shard: `1 flaky` with no test line under it. */
 const PLAYWRIGHT_11903 = readFixture('11903-playwright-flaky-excerpt.txt');
 /** Real Playwright shard whose summary is echoed again under `##[notice]`. */
 const PLAYWRIGHT_11914 = readFixture('11914-playwright-flaky-excerpt.txt');
@@ -394,6 +394,29 @@ describe('job-log.extractPlaywrightRuns', () => {
     );
   });
 
+  it('does not read a count-and-word line that is not a whole Playwright count line as a run', () => {
+    const log = [
+      '2026-09-14T09:41:02.5Z   2 failed migrations were rolled back',
+      '2026-09-14T09:41:02.6Z   3 passed checks, 1 warning',
+    ].join('\n');
+
+    expect(extractPlaywrightRuns(log)).toEqual([]);
+  });
+
+  it('reads a `passed` count line whatever unit its duration is printed in', () => {
+    for (const duration of [
+      '(0ms)',
+      '(850ms)',
+      '(14.7s)',
+      '(5.3m)',
+      '(1.2h)',
+    ]) {
+      expect(
+        extractPlaywrightRuns(`  3 passed ${duration}`)[0]?.counts.passed,
+      ).toBe(3);
+    }
+  });
+
   it('assigns the tests listed under `interrupted` to neither the failed nor the flaky list', () => {
     const log = [
       '  1 interrupted',
@@ -450,6 +473,35 @@ describe('job-log.parsePlaywrightTestLine', () => {
       specPath: 'playwright/30-search/search.spec.ts',
       testTitle: 'Search > nested group > finds a page',
     });
+  });
+
+  it('strips the ` ─…` padding Playwright adds to a list line shorter than 100 columns', () => {
+    expect(
+      parsePlaywrightTestLine(
+        `    [users] › playwright/users.setup.ts:54:1 › provision filter test users ${'─'.repeat(25)}`,
+      ),
+    ).toEqual({
+      project: 'users',
+      specPath: 'playwright/users.setup.ts',
+      testTitle: 'provision filter test users',
+    });
+  });
+
+  it('leaves a title that has no padding untouched', () => {
+    expect(
+      parsePlaywrightTestLine(
+        '  [chromium] › playwright/a.spec.ts:1:1 › group › opens the popover',
+      )?.testTitle,
+    ).toBe('group > opens the popover');
+  });
+
+  it('keeps a `─` that ends the title itself, whether or not `─` padding follows its space', () => {
+    const line = '    [chromium] › playwright/a.spec.ts:1:1 › draws a ─';
+
+    expect(
+      parsePlaywrightTestLine(`${line} ${'─'.repeat(10)}`)?.testTitle,
+    ).toBe('draws a ─');
+    expect(parsePlaywrightTestLine(`${line} `)?.testTitle).toBe('draws a ─');
   });
 
   it('keeps a `:` inside the test title', () => {
