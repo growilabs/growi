@@ -596,6 +596,23 @@ describe('pagelinkbackfilljobs (integration)', () => {
       });
     });
 
+    it('finishFailed keeps a pending Stop, so the owner of the retry sees it at its first checkpoint', async () => {
+      await patchJobDocument({ stopRequested: true });
+
+      await prisma.pagelinkbackfilljobs.finishFailed(OWNER, 'boom');
+      const claimed = await prisma.pagelinkbackfilljobs.tryClaim('owner-b', {
+        leaseMs: LEASE_MS,
+      });
+      const reply = await prisma.pagelinkbackfilljobs.checkpoint(
+        'owner-b',
+        progress,
+        { leaseMs: LEASE_MS },
+      );
+
+      expect(claimed).toBe(true);
+      expect(reply).toEqual({ stopRequested: true });
+    });
+
     it.each([
       0,
       Number.NaN,
