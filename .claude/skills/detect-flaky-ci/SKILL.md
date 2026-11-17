@@ -37,9 +37,10 @@ this skill re-derives everything it needs by querying the tracker on each run.
   window contains more than this, process the newest `N` and **say so
   explicitly** in Step 5 — never truncate silently.
 - `--vitest-threshold=N` — number of separate-run observations of the same
-  vitest test failure required before escalating from `flaky/observing` to
-  `flaky/confirmed`. Default `2`. (Playwright-detected flakiness always
-  escalates on the first observation — see Step 3.)
+  identity (a vitest test failure, or a Playwright test that failed on every
+  attempt) required before escalating from `flaky/observing` to
+  `flaky/confirmed`. Default `2`. (A Playwright test that passed on an
+  in-run retry is confirmed on its first occurrence — see Step 3.)
 
 ## Why a Time Window, Not a Run Count
 
@@ -65,10 +66,11 @@ pass cost a metadata check rather than a re-read of that run's job logs.
 Detection now produces one of three outcomes per candidate, cheapest evidence
 first:
 
-1. **`flaky/observing`** — a single vitest observation with no corroborating
-   signal (see "Cheap Suspicion Mining" below). Passive: waits for a future
-   run to repeat it (`--vitest-threshold`).
-2. **`flaky/suspected`** — a vitest observation that also matches one or more
+1. **`flaky/observing`** — a single observation (a vitest failure, or a
+   Playwright test that failed on every attempt — see Step 3) with no
+   corroborating signal (see "Cheap Suspicion Mining" below). Passive: waits
+   for a future run to repeat it (`--vitest-threshold`).
+2. **`flaky/suspected`** — an observation that also matches one or more
    of the five cheap, mechanical signals in "Cheap Suspicion Mining" (diff/PR
    mismatch, sandwich pattern, matrix divergence, a shared setup-hook timeout
    with cross-file slowdown, or a targeted historical backfill hit): grep/diff
@@ -81,21 +83,24 @@ first:
    `flaky/suspected` issue that `investigate-flaky-test` measured with the
    flaky-repro workflow (3 runs, no code change) and saw at least one pass.
 
-`detect-flaky-ci` only ever assigns tiers 1 and 3 (3 for Playwright only).
+`detect-flaky-ci` assigns tier 3 on a first occurrence only to a Playwright
+test that passed on an in-run retry; every observation starts at tier 1 or 2.
 `investigate-flaky-test` is the only skill that promotes tier 2 → tier 3 for
 vitest, because that promotion requires an actual measurement, which is an
 investigation action, not a detection action.
 
-## Cheap Suspicion Mining (vitest only)
+## Cheap Suspicion Mining (observations only)
 
 Before falling back to passive `--vitest-threshold` accumulation, check each
-vitest failure identity against five mechanical signals — grep/diff/API-field
-comparisons, with no code reading and no qualitative log judgment. ⑤ needs
-one extra log fetch (a nearby passing run of the same job) to compare numbers
-against, but the comparison itself is still mechanical (duration deltas), not
-reasoning about *why*. The numbering is legacy (④ was added before ⑤) and
-does not reflect run order; what matters is which observation each check runs
-against, and how strong its evidence is:
+observation identity (a vitest failure, or a Playwright test that failed on
+every attempt — Step 3 says which checks apply to it) against five
+mechanical signals — grep/diff/API-field comparisons, with no code reading
+and no qualitative log judgment. ⑤ needs one extra log fetch (a nearby
+passing run of the same job) to compare numbers against, but the comparison
+itself is still mechanical (duration deltas), not reasoning about *why*. The
+numbering is legacy (④ was added before ⑤) and does not reflect run order;
+what matters is which observation each check runs against, and how strong
+its evidence is:
 
 | Check | Runs against | Strength of its evidence |
 |---|---|---|
@@ -285,13 +290,13 @@ existing passive `flaky/observing` / `--vitest-threshold` path unchanged.
 **④ Targeted historical backfill (existing `flaky/observing` issues only).**
 ①-③ only look at data already in hand for *today's* observation; this one
 runs the other direction. For each currently-OPEN `flaky/observing` issue
-(you already fetch this list for Step 4's reconciliation — reuse it, do not
-re-fetch), actively search further back than this scan's `--window-hours` for
-an *earlier* occurrence of that same identity that was never recorded. That
-closes the gap described in "Why a Time Window, Not a Run Count" for the
-handful of tests already flagged as interesting; it deliberately does not
-apply to fresh, never-before-seen failures, which would mean deep-searching
-on every failure.
+whose identity is a `vitest:` one (you already fetch this list for Step 4's
+reconciliation — reuse it, do not re-fetch), actively search further back
+than this scan's `--window-hours` for an *earlier* occurrence of that same
+identity that was never recorded. That closes the gap described in "Why a
+Time Window, Not a Run Count" for the handful of tests already flagged as
+interesting; it deliberately does not apply to fresh, never-before-seen
+failures, which would mean deep-searching on every failure.
 
 Bounded cost: it runs only per already-`flaky/observing` issue (a handful at
 most) and only fetches logs for **failed** runs of the one relevant workflow
@@ -396,9 +401,9 @@ accumulation path — these checks are not exhaustive.
 ## Why vitest and Playwright are handled differently
 
 - **Playwright** runs with `retries: 2` in CI (`apps/app/playwright.config.ts`),
-  so a test that fails then passes on retry within the *same* job run prints
-  an `N flaky` summary line and `Retry #N` blocks — direct, single-run proof
-  of non-determinism, no accumulation needed.
+  so a test that fails then passes on retry within the *same* job run is
+  listed under an `N flaky` heading at the end of the run — direct,
+  single-run proof of non-determinism, no accumulation needed.
 - **vitest** (`ci-app-test`, `ci-app-test-integration`) has no retry
   mechanism, so a single failure is indistinguishable from a real regression.
   The only cheap, reliable signal is the same test failing across multiple
@@ -581,10 +586,17 @@ node bin/flaky-ci/scripts/parse-job-log.ts < "$LOG_FILE"
 
 Output fields (see `bin/flaky-ci/README.md`'s contract table for the exact
 shape): `vitest.failBlocks[]` (`project`, `specPath`, `testTitle`,
-`sharedSetupHook`, `excerpt`), `playwright.annotations[]` (`file`, `title`),
-`playwright.summary` (`failed`/`flaky`/`passed`/`skipped`, or `null` when the
-log carried no count line at all — Step 3's tier-1 rule below depends on
-telling that `null` apart from a captured `0`), `denylistHits[]`
+`sharedSetupHook`, `excerpt`), `playwright.runs[]` (one element per
+Playwright run in the log, in printed order — a `run-playwright` job can run
+Playwright more than once, e.g. a normal run and a guest-mode run — each with
+`counts` (`failed`/`flaky`/`passed`/`skipped`, for that run only), `flaky`
+and `failed` (the tests Playwright listed under that run's `N flaky` /
+`N failed` heading: either `{ kind: "read", tests[] }`, each test carrying
+`project`, `specPath`, `testTitle` and `identityKey`, or
+`{ kind: "unreadable", reason }` with `reason` `count-mismatch` or
+`malformed-entry`), and `excerpt` (the lines read as that run's summary).
+An empty `runs` means the log carried no Playwright summary at all, so the
+counts are unknown, not zero), `denylistHits[]`
 (`blockIndex`, `specPath`, `testTitle`, `pattern`, `needle`, `scope`). Exit
 code `2` means stdin was empty or unreadable — treat that job's evidence as
 "could not be measured" per Requirement 3.4 (report it in Step 5, do not
@@ -628,18 +640,12 @@ mcp__github__get_job_logs(owner="growilabs", repo="growi", job_id={JOB_ID}, fail
 node bin/flaky-ci/scripts/parse-job-log.ts < "$LOG_FILE"
 ```
 
-If `playwright.annotations` is empty **and** `playwright.summary` is either
-`null` or has `flaky: 0`, the shard had no flakiness — move on. Otherwise
-proceed to Step 3's Playwright extraction using this same output (there is
-no separate excerpt to re-fetch — the whole log already went through the
-script once). Note for Step 3's count test: these jobs concluded `success`,
-and a test that is still failing after its last retry fails the job, so
-`N failed` is 0 by construction here and the shard's count sum is the
-`N flaky` number alone.
-
-For the issue body's Evidence section (Step 4's template), quote the lines
-around the matching annotation directly from `$LOG_FILE` — it is still on
-disk from the fetch above.
+If every element of `playwright.runs` has `counts.flaky` equal to 0, the
+shard had no flakiness — record nothing and move on. That includes an empty
+`runs`: a successful job whose log carried no Playwright summary is recorded
+nowhere. Otherwise proceed to Step 3's Playwright rules using this same
+output (there is nothing to re-fetch — the whole log already went through
+the script once, and the Evidence section quotes each run's `excerpt`).
 
 **Classify infrastructure noise first — do not track these as flaky.** Read
 `denylistHits[]` from `parse-job-log.ts`'s output (already fetched above; the
@@ -688,119 +694,114 @@ Job names carry a shard number and MongoDB version that are **not stable
 identity** — the same spec lands on a different shard number across runs, so
 including it would fragment one flaky spec into many never-deduped issues.
 The browser (`chromium`/`firefox`/`webkit`) IS meaningful, since the same spec
-can be flaky in one engine and not another. Extract it from the job name, e.g.
+can be flaky in one engine and not another. In a listed test's `identityKey`
+(below) the `{BROWSER}` segment is the first part of the Playwright project
+name (`firefox/guest-mode` → `firefox`); for a test of a setup project
+(`setup`, `auth`, `users`) that segment is the project name, not a browser.
+For the job-level identity `playwright:{BROWSER}`, extract the browser from
+the job name, e.g.
 `test-prod-node24 / run-playwright (firefox, 1/2, 8.0)` → browser = `firefox`
 (the `test-prod-node24 / ` part is the reusable workflow's calling job).
 
-The reliable, structured signal is `parse-job-log.ts`'s `playwright.summary`
-(`failed`/`flaky`/`passed`/`skipped`, or `null` when the log carried no count
-line at all) and `playwright.annotations[]` (`file`, `title` — repeats kept,
-in the order printed). **Attributing a specific `flaky` count to a specific
-spec name from the raw log is not reliable**: the reporter interleaves
-`pw:api` debug traces with retry/attachment lines in a way that does not
-cleanly pair a `Retry #N` block with its spec, so a precise adjacency
-heuristic will misattribute. Use a two-tier approach instead.
+Read the tests from `parse-job-log.ts`'s `playwright.runs[]` and from nowhere
+else. Each run's `flaky` and `failed` lists are Playwright's own end-of-run
+lists for that run, and every listed test already carries its `identityKey`,
+in the form `playwright:{BROWSER}:{SPEC_PATH}:{TEST_TITLE}` — the identity
+Step 4 searches on. **Use `identityKey` verbatim.** Do not rebuild it from
+`project` / `specPath` / `testTitle`, and never split it on punctuation (a
+test title can itself contain `:`): a key that differs from an existing
+issue's title by one character files a duplicate instead of appending to it.
 
-**A test that failed and then passed on retry is annotated too.** Playwright
-emits an `::error file=...,title=...` annotation for it just as it does for a
-test that ended failed, and the summary line then reads `0 failed` /
-`1 flaky` — the *most common* shape of a Playwright flake, so the flaky test
-is in the annotation list, not left over beside it.
+These rules apply to `run-playwright` jobs only — Step 2's failed ones and
+Step 2b's successful ones. Never derive a `playwright:` identity from a
+vitest job's log, whatever its `playwright.runs` holds.
 
-1. **Precise identity (tier 1)** — use it when **both** of these hold in that
-   shard's `parse-job-log.ts` output:
+Apply rules 1-4 to each element of `runs[]` separately, whatever the job's
+conclusion (a `flaky` list in a failed job is still retry-proven). Whether a
+test is confirmed or an observation is decided only by which list of **that
+same run element** names it — never by another `runs[]` element's counts or
+lists.
 
-   - `playwright.annotations` contains **exactly one distinct** entry (by
-     `file` + `title` together), and
-   - `playwright.summary` is not `null`, and its `flaky` plus `failed` equals
-     1. `playwright.summary` being `null` means the log carried no count line
-     at all — both counts are unknown, not zero, and this test does not
-     apply; fall back to the job-level identity below rather than reading the
-     gap as a zero. A *captured* summary already carries `0` for any count
-     line the shard didn't print (a successful shard prints no `failed`
-     line), so once `playwright.summary` is non-`null` there is no separate
-     "missing line" case left to reason about.
+1. **`flaky.kind` is `read`** → for each entry in `flaky.tests[]`, record one
+   **confirmed** occurrence under its `identityKey`. Playwright retried the
+   test within the run and it needed the retry to pass; that is the
+   empirical proof, however many tests the list names.
+2. **`flaky.kind` is `unreadable`** → record one **confirmed** occurrence
+   under the job-level identity `playwright:{BROWSER}` (browser from the job
+   name, above). The run's `counts.flaky` says a retry-proven flake happened;
+   which test it was is unknown.
+3. **`failed.kind` is `read`** → for each entry in `failed.tests[]`, treat it
+   as an **observation** under its `identityKey`, not a confirmation: the
+   test failed on every attempt, so nothing about it is retry-proven, and it
+   may be a real regression. Run it through "Cheap Suspicion Mining" the
+   way a vitest observation goes through it — ①, ② and ③ apply (⑤ does not:
+   it is about a Vitest project's `setupFiles` hook, which a `run-playwright`
+   job has no counterpart for) — a hit makes it a **suspected** occurrence
+   (tier 2), otherwise it is a plain observation (tier 1, the passive
+   `flaky/observing` path). The Vitest section's folding subsections (shared
+   setup-hook, collateral, cascade) apply to vitest FAIL blocks only: every
+   entry in a `failed` list keeps its own identity, even when two entries
+   share a spec file.
+4. **`failed.kind` is `unreadable`** → treat it as one **observation** under
+   `playwright:{BROWSER}`, a plain one (`flaky/observing`): the mining
+   checks are not run for a job-level identity, because ① has no spec path
+   to compare against the PR's changed files.
+5. **`runs` is empty** (the log carried no Playwright summary at all) → for a
+   job that concluded `success`, record nothing (Step 2b already moved on).
+   For a job that concluded `failure`, treat it as one plain **observation**
+   under `playwright:{BROWSER}`, as in rule 4.
+6. **Never read a test name from anywhere but `runs[]`** — not from
+   `Retry #N` blocks, not from `::error` / `##[error]` lines, not from the
+   order of retry output, not from attachment paths. The reporter interleaves
+   `pw:api` debug traces with retry and attachment lines, so pairing a retry
+   with a spec by adjacency misattributes it. When the lists cannot name the
+   test, rules 2, 4 and 5 send the occurrence to `playwright:{BROWSER}`; the
+   test is never guessed.
+7. **The evidence is that run's `excerpt`** — quote it in the issue body or
+   observation comment (Step 4). Rule 5 has no `excerpt`; the sentence below
+   and the run link are its evidence.
 
-   The two together are what make the attribution safe: the counts say the
-   shard produced exactly one non-clean test result, and the single
-   annotation is the only thing that names one.
+Never record an occurrence from rules 3, 4 or 5 as `confirmed`: none of them
+is retry-proven. A list that is `read` with an empty `tests[]` (its count is 0)
+contributes nothing, and a run whose `flaky` and `failed` lists are both
+`read` and empty contributes nothing even in a failed job: Playwright named
+no test that failed or needed a retry, so there is no test to attribute the
+job's failure to.
 
-   **Do not require a retry attachment path.** `apps/app/playwright.config.ts`
-   sets `screenshot: 'only-on-failure'`, so a test whose retry *passes*
-   writes failure artifacts for the first attempt only and the retry's own
-   output directory never appears in the log. Since a retry that passes is
-   the most common flake shape, an attachment-path test would be empty almost
-   every time and tier 2 would fire on exactly the cases tier 1 exists for.
+How the occurrences from one job log combine:
 
-   The identity is then `playwright:{BROWSER}:{SPEC_PATH}:{TEST_TITLE}`,
-   with both halves **normalized** — the annotation's raw values are not the
-   identity:
+- **A test recorded per test is not recorded at job level too.** An
+  occurrence recorded under an `identityKey` never also goes to
+  `playwright:{BROWSER}`; the job-level identity receives only what rules 2,
+  4 and 5 send it.
+- **Some lists read, some unreadable** (within one run or across runs) → the
+  tests of every `read` list are recorded per test, and each `unreadable`
+  list goes to `playwright:{BROWSER}`. An unreadable list does not demote the
+  readable ones.
+- **One occurrence per identity per job log.** When one job log reaches the
+  same identity more than once — `playwright:{BROWSER}` from both lists of
+  one `runs[]` element or from two elements, or the same `identityKey`
+  listed by two elements (the `chromium` job's installer run and main run
+  both depend on the `setup` project, so a test of that project can be
+  listed by both) — take it
+  through Step 4 once: as confirmed if any of its sources is a `flaky` list,
+  otherwise as an observation, quoting every source run's `excerpt`.
 
-   - `{SPEC_PATH}` — the annotation's `file` field with the leading
-     `apps/app/` removed.
-   - `{TEST_TITLE}` — the annotation's `title` field with the leading
-     `[{browser}] › ` removed, then the `{path}:{line}:{col} › ` location
-     segment that follows it removed, then **every remaining ` › ` replaced
-     by ` > `**.
+**Whenever an occurrence goes to `playwright:{BROWSER}`, say why** in the
+issue body (a new issue) or in the observation comment (an existing issue):
 
-   Worked example, the annotation that produced issue #11903
-   (`{file: "apps/app/playwright/20-basic-features/inline-comment.spec.ts",
-   title: "[chromium] › playwright/20-basic-features/inline-comment.spec.ts:4758:3 › Inline comment - visual refresh: mockup cross-check captures › Capture popover states 5 (normal) and 6 (edit mode) in DARK mode (Req 4.4)"}`):
+- rules 2 and 4: "Playwright's end-of-run `{flaky | failed}` list in this
+  job's log could not be read (`{reason}`), so the test could not be
+  identified — see the linked run for the full report."
+- rule 5: "This job's log carried no Playwright summary, so no test could be
+  identified — see the linked run for the full report."
 
-   normalizes to this identity key (what #11903's title carries today):
+This is intentional: a coarser but honest identity beats a fabricated precise
+one. A new or reopened `playwright:{BROWSER}` issue is therefore the sign
+that a job's tests could not be identified from its lists, and the sentence
+it records says why.
 
-   ```
-   playwright:chromium:playwright/20-basic-features/inline-comment.spec.ts:Inline comment - visual refresh: mockup cross-check captures > Capture popover states 5 (normal) and 6 (edit mode) in DARK mode (Req 4.4)
-   ```
-
-   Normalizing is not cosmetic: Step 4 searches for an existing issue by
-   this exact title, so an un-normalized key (with `apps/app/`, with the
-   `[chromium] › file:line:col › ` prefix, or with ` › ` left in place) does
-   not match the issue the previous run created and files a duplicate
-   instead. Note that a title may itself contain `:` — #11903's does — so
-   never rebuild the key by splitting the normalized title on punctuation.
-
-   Always include `{BROWSER}`, per the "browser IS meaningful" rule above —
-   every tracking issue this skill has created for a specific spec already
-   carries it, and omitting it here would fork the identity key from the
-   title format Step 4 actually searches on, which is exactly the
-   "title/search mismatch → duplicate" failure that section warns about.
-2. **Fallback (tier 2, job-level)** — use `playwright:{BROWSER}` as the
-   identity in each of these three cases, which are exactly the cases tier 1
-   does not cover:
-
-   - **more than one distinct entry in `playwright.annotations`** — several
-     tests are named and which one the count refers to is genuinely unknown;
-   - **the counts do not add up to the annotation count** (`playwright.
-     summary.flaky` + `.failed` is not 1 against a single annotation) — the
-     log is describing more, or fewer, non-clean results than it names, so
-     the one annotation cannot be assumed to account for the shard's count;
-   - **the annotation's `title` is `null`** — there is then a file but no
-     test to name.
-
-   Say so explicitly in the issue body: "flaky test detected in this shard's
-   log (see excerpt below) but the specific spec could not be isolated from
-   the log alone — see the linked run for the full report." This is
-   intentional: a coarser but honest identity beats a fabricated precise one.
-
-Either tier counts as a **confirmed** occurrence (see Step 4) **when the
-shard's summary reports `N flaky` ≥ 1** — Playwright already retried in-run
-and the test still needed a retry to pass, regardless of whether this skill
-can name the exact spec. That is the Step 2b shape (`0 failed / 1 flaky`).
-
-The one shape tier 1 admits that this does **not** cover is `1 failed /
-0 flaky` on the Step 2 failed-job path: the counts still sum to 1 and the
-annotation still names the test, so the precise identity is right, but the
-test failed on **every** attempt — nothing about that is retry-proven. Treat
-such a result exactly like a vitest failure, per the Vitest section below:
-the identity is precise, and the result is an **observation**, not a
-confirmation. Run it through "Cheap Suspicion Mining" — ①, ② and ③ apply
-(⑤ does not: it is about a Vitest project's `setupFiles` hook, which a
-`run-playwright` job has no counterpart for) — a hit makes it a
-**suspected** occurrence (tier 2), otherwise it is a plain observation
-(tier 1, the passive `flaky/observing` path). **Either way, proceed to
-Step 4.** Never record a failed-every-attempt Playwright result as
-`confirmed`.
+Then proceed to Step 4 with each identity.
 
 ### Vitest jobs (`ci-app-test`, `ci-app-test-integration`)
 
@@ -1202,7 +1203,7 @@ cat > "$ISSUE_BODY_FILE" <<'EOF'
 ### Evidence
 
 ```
-{relevant log excerpt — the FAIL block or the ::error annotation + retry blocks}
+{relevant log excerpt — the FAIL block, or the Playwright run's `excerpt` (Step 3)}
 ```
 
 {if this spec file had more than one FAIL block in this job log, add the
@@ -1229,9 +1230,9 @@ List whichever subset actually matched; omit lines for checks that didn't hit.}
 ### Status
 
 {pick exactly one:
- - confirmed (Playwright): "Confirmed flaky from a single run (Playwright retry evidence)."
- - suspected (vitest, mining hit): "Suspected flaky ({every matched check, e.g. "① + ③", ordered strongest-first: ③ > ② > ①}) — handed directly to investigate-flaky-test for a confirmation measurement (3 independent runs on the flaky-repro workflow), no threshold wait needed."
- - observing (vitest, no mining hit): "Observation 1/{VITEST_THRESHOLD} — needs {VITEST_THRESHOLD - 1} more independent occurrence(s) before this is handed to investigate-flaky-test."}
+ - confirmed (Playwright, Step 3 rules 1-2): "Confirmed flaky from a single run (Playwright retry evidence)."
+ - suspected (observation, mining hit): "Suspected flaky ({every matched check, e.g. "① + ③", ordered strongest-first: ③ > ② > ①}) — handed directly to investigate-flaky-test for a confirmation measurement (3 independent runs on the flaky-repro workflow), no threshold wait needed."
+ - observing (observation, no mining hit): "Observation 1/{VITEST_THRESHOLD} — needs {VITEST_THRESHOLD - 1} more independent occurrence(s) before this is handed to investigate-flaky-test."}
 EOF
 
 NEW_ISSUE_JSON=$(gh api repos/growilabs/growi/issues -X POST \
@@ -1251,9 +1252,11 @@ and `$NEW_ISSUE_JSON` holds the rest (`.html_url` for the Step 5 report, `.id`
 for the sub-issue call). Keep that variable in scope: a separate tool call
 starts a fresh shell that has none of these values.
 
-`{TIER_LABEL}` is `flaky/confirmed` for Playwright, `flaky/suspected` for a
-vitest observation that hit one of the three mining checks, `flaky/observing`
-for a plain vitest observation with no mining hit.
+`{TIER_LABEL}` is `flaky/confirmed` only for a Playwright occurrence from
+Step 3 rules 1 and 2 (a test that passed on an in-run retry). Every
+observation — a vitest observation, or a Playwright occurrence from Step 3
+rules 3-5 — is `flaky/suspected` when one of the three mining checks hit and
+`flaky/observing` otherwise.
 
 ### Attach the new issue to the dashboard as a sub-issue
 
