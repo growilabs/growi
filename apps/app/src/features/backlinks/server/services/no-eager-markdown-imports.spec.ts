@@ -26,8 +26,8 @@ import {
 //
 // Two walks guard this from different angles:
 //
-// 1. From the backlinks server entry (`page-link-service.ts`, the module crowi
-//    instantiates). This guards the feature's *internal* graph regardless of how
+// 1. From the backlinks server entries (`page-link-service.ts` and
+//    `page-link-backfill-cron.ts`, the modules crowi instantiates). This guards the feature's *internal* graph regardless of how
 //    crowi reaches it — it keeps holding if that edge ever becomes a dynamic
 //    import(), which the boot walk below would then stop crossing.
 // 2. From the server's boot entrypoints (shared via `test-utils/boot-entrypoints`).
@@ -53,6 +53,7 @@ const MARKDOWN_PIPELINE_PACKAGE =
 
 const BACKLINKS_ENTRYPOINTS = [
   'features/backlinks/server/services/page-link-service.ts',
+  'features/backlinks/server/services/page-link-backfill-cron.ts',
 ];
 
 describe('lazy-load boundary for the markdown pipeline', () => {
