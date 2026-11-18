@@ -1080,7 +1080,14 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
   define an `updatedAt` range, so it cannot stand in for coverage.
 - **Counts shown to the admin.** While a run is active: processed pages
   of `runTotal`, the number of pages in the run's range, counted once at the first claim and stored
-  on the job document so it does not move under the progress bar. After a partial run: the number of
+  on the job document so it does not move under the progress bar. The walk applies the range filter
+  as it reaches each batch, so `processed` can end above `runTotal` (a page created or edited into the
+  range during the run is walked but was not counted) or below it (a counted page trashed or edited
+  out of the range is not walked). The display absorbs both rather than the walk: the percent is
+  `floor(processed / runTotal × 100)` capped at 99 (0 while `runTotal` is 0) until the status is
+  `complete`, and 100 only then; the count reads `min(processed, runTotal)` of `runTotal`; and
+  `skippedPages` is shown as its own count ("N pages skipped; indexed on their next save"), never
+  folded into the percent, so a finished run never reads as unfinished. After a partial run: the number of
   pages not included, which is the count of pages with `updatedAt < coveredSince`, and the total
   page count, so the line can say "about N older pages are not included". These two are **computed
   when the state is read, not stored**, because pages are created and edited all the time and a
@@ -1097,7 +1104,7 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
   | Job document | Shown | Controls |
   |---|---|---|
   | `coverage: none`, idle | "Backlinks have not been built for existing pages" (with the page count) | scope picker + Start |
-  | `requested` / `running` | processed of `runTotal` pages (count and percent), over the admin Socket.IO channel | Stop; Start disabled |
+  | `requested` / `running` | processed of `runTotal` pages (count and percent, capped as in "Counts shown to the admin"), over the admin Socket.IO channel | Stop; Start disabled |
   | `running` with `stopRequested` | "Stopping…" | none |
   | `failed` | the last error; the poll retries from the marker | none |
   | `stopped` | where it stopped (processed of `runTotal`) | Resume, or a new scope + Start |

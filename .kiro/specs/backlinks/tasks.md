@@ -618,7 +618,8 @@ Independent of B4/B5.
 
 - [ ] B3.7 Add the admin settings section and the panel's partial-index state
   - Add an SWR hook for the job state and a section in the admin settings with a scope picker (all
-    pages, newest N, edited after a date), progress (processed of `runTotal`, count and percent) over the admin Socket.IO channel, the
+    pages, newest N, edited after a date), progress (processed of `runTotal`, count and percent, capped at 99% until
+    `complete` and with skipped pages as their own count, per design.md's "Counts shown to the admin") over the admin Socket.IO channel, the
     not-included count in the partial-coverage line, and the states
     in design.md's table: not started, running, failed, stopping, stopped (Resume or a new scope), partial coverage (the
     control stays), all pages covered (a status line, no control). Choose where it sits in the admin
@@ -627,7 +628,8 @@ Independent of B4/B5.
     `all` or a run is active, saying that pages not edited since `coveredSince` are not included
   - Done when component tests render each state with the right text and controls (no start control
     when coverage is `all`, a disabled one while running), a started run's progress updates without a
-    reload, and the panel shows the partial state for a partial index and none for `all`
+    reload, a run whose `processed` passes `runTotal` reads 99% (count capped at `runTotal`) until it is
+    `complete` and 100% only then, and the panel shows the partial state for a partial index and none for `all`
   - _Requirements: 4.4, 4.5, 4.6, 4.7, 4.8, 4.9, 4.10_
   - _Boundary: BacklinksBackfillAdmin, BacklinksPanel_
   - _Depends: B3.6, B1.11_
