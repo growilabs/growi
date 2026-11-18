@@ -692,6 +692,25 @@ describe('AdminChatIntegration', () => {
         ]);
       });
 
+      it('does not send an unconfigured agent row with its direct-message box unchecked', async () => {
+        stubApi({ settings: settingsWith([]) });
+        stubSave();
+        const user = userEvent.setup();
+
+        renderScreen();
+
+        await screen.findByTestId('grw-chat-integration-permissions-form');
+        await user.selectOptions(scopeSelectFor('search'), 'all');
+        await user.click(
+          screen.getByRole('button', { name: /save channel permissions/i }),
+        );
+
+        await waitFor(() => expect(mocks.apiv3Post).toHaveBeenCalled());
+        expect(savedPayload().channelPermissions).toEqual([
+          { commandName: 'search', allowedChannels: 'all' },
+        ]);
+      });
+
       it('keeps a direct-message-only permission when the channel setting is not configured', async () => {
         stubApi({ settings: settingsWith([]) });
         stubSave();

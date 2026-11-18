@@ -45,10 +45,12 @@ export interface CommandTraits {
   readonly writes: boolean;
   readonly targeting: CommandTargeting;
   readonly directMessagePolicy: DirectMessagePolicy;
-  /** Can end up creating a page, which the admin screen says next to the row (Requirement 11.6). */
+  /**
+   * May create pages beyond what the command name suggests (the summary page
+   * of `agent`), so the admin screen shows a notice on that row (Requirement
+   * 11.8).
+   */
   readonly mayCreatePages: boolean;
-  /** Whether GROWI still offers the command; the admin screen lists only offered ones. */
-  readonly offered: boolean;
 }
 
 export const COMMAND_TRAITS: Readonly<Record<CommandName, CommandTraits>> = {
@@ -57,28 +59,24 @@ export const COMMAND_TRAITS: Readonly<Record<CommandName, CommandTraits>> = {
     targeting: 'broadcast',
     directMessagePolicy: 'follows-all-channels',
     mayCreatePages: false,
-    offered: true,
   },
   [COMMAND_NAMES.help]: {
     writes: false,
     targeting: 'broadcast',
     directMessagePolicy: 'follows-all-channels',
     mayCreatePages: false,
-    offered: true,
   },
   [COMMAND_NAMES.createPage]: {
     writes: true,
     targeting: 'single',
     directMessagePolicy: 'follows-all-channels',
     mayCreatePages: false,
-    offered: true,
   },
   [COMMAND_NAMES.keep]: {
     writes: true,
     targeting: 'single',
     directMessagePolicy: 'follows-all-channels',
     mayCreatePages: false,
-    offered: false,
   },
   // It can create a page, so it writes and stays denied until an admin
   // allows it (Requirement 11.6).
@@ -87,14 +85,12 @@ export const COMMAND_TRAITS: Readonly<Record<CommandName, CommandTraits>> = {
     targeting: 'single',
     directMessagePolicy: 'separate-flag',
     mayCreatePages: true,
-    offered: true,
   },
   [COMMAND_NAMES.linkPreview]: {
     writes: false,
     targeting: 'url-matched',
     directMessagePolicy: 'follows-all-channels',
     mayCreatePages: false,
-    offered: true,
   },
 };
 

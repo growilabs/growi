@@ -73,18 +73,11 @@ describe('command traits', () => {
     });
   });
 
-  it('marks only agent as a command that can create a page (Requirement 11.6)', () => {
+  it('marks only agent as a command that can create a page (Requirement 11.8)', () => {
     const creators = Object.values(COMMAND_NAMES).filter(
       (name) => COMMAND_TRAITS[name].mayCreatePages,
     );
     expect(creators).toEqual([COMMAND_NAMES.agent]);
-  });
-
-  it('marks keep, and only keep, as no longer offered by GROWI', () => {
-    const notOffered = Object.values(COMMAND_NAMES).filter(
-      (name) => !COMMAND_TRAITS[name].offered,
-    );
-    expect(notOffered).toEqual([COMMAND_NAMES.keep]);
   });
 
   it('uses only the three ways a target can be decided', () => {

@@ -142,10 +142,15 @@ interface CommandFormState {
   readonly allowedInDirectMessage: boolean;
 }
 
-// One row per command GROWI offers; a command it no longer offers has no row.
-const OFFERED_COMMAND_NAMES: ReadonlyArray<CommandName> = Object.values(
-  COMMAND_NAMES,
-).filter((name) => COMMAND_TRAITS[name].offered);
+// GROWI no longer offers `keep`, so it gets no row. Naming it in the guard's
+// type makes deleting `COMMAND_NAMES.keep` a compile error here.
+const isOffered = (
+  name: CommandName,
+): name is Exclude<CommandName, typeof COMMAND_NAMES.keep> =>
+  name !== COMMAND_NAMES.keep;
+
+const OFFERED_COMMAND_NAMES: ReadonlyArray<CommandName> =
+  Object.values(COMMAND_NAMES).filter(isOffered);
 
 const hasSeparateDmFlag = (commandName: CommandName): boolean =>
   COMMAND_TRAITS[commandName].directMessagePolicy === 'separate-flag';

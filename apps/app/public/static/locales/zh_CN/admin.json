@@ -1434,7 +1434,7 @@
       "detail": "proxy 不再接受此 GROWI。聊天一侧可能已解除配对（例如执行了 `unregister`），因此通知和命令无法使用。时钟偏差或密钥不一致也可能导致相同状态。要在 GROWI 一侧清理此关系，请点击下方的“Disconnect”，也可以重新尝试配对。"
     },
     "permissions": {
-      "creates_pages_notice": "此命令可能会在 GROWI 中创建页面。请仅在允许创建页面的频道中启用。",
+      "creates_pages_notice": "此命令可能会在 GROWI 中创建页面。请仅在允许创建页面的位置（频道或私信）中启用。",
       "allow_in_direct_message": "允许在私信中使用（包括 Slack 的 AI 应用界面）"
     }
   }
