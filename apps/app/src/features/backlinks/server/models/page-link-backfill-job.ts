@@ -27,10 +27,9 @@ export interface BackfillRunStart {
   readonly runTotal: number;
 }
 
-export interface BackfillCoverageRecord {
-  readonly coverage: 'partial' | 'all';
-  readonly coveredSince: Date | null;
-}
+export type BackfillCoverageRecord =
+  | { readonly coverage: 'partial'; readonly coveredSince: Date }
+  | { readonly coverage: 'all' };
 
 /** The checkpoint's view of the admin-owned fields, from the document it just wrote. */
 export interface BackfillCheckpointReply {
@@ -266,14 +265,16 @@ export const createPageLinkBackfillJobModel = (
     async finishComplete(
       owner: string,
       progress: BackfillProgress,
-      { coverage, coveredSince }: BackfillCoverageRecord,
+      record: BackfillCoverageRecord,
     ): Promise<boolean> {
       const value = await fencedWrite(owner, 'finishComplete', {
         ...progressFields(progress),
         ...settledEndingFields,
         status: 'complete',
-        coverage,
-        coveredSince: toDate(coveredSince),
+        coverage: record.coverage,
+        coveredSince: toDate(
+          record.coverage === 'partial' ? record.coveredSince : null,
+        ),
         completedAt: '$$NOW',
         lastError: null,
       });
