@@ -534,7 +534,7 @@ Independent of B4/B5.
   - _Boundary: PageLinkBackfillCron, backfill-range_
   - _Depends: B3.1, B1.3, B1.2_
 
-- [ ] B3.3 Register the backfill job and start it from a request
+- [x] B3.3 Register the backfill job and start it from a request
   - Register the backfill cron poll in server setup; an idle tick claims a pending start request, or
     a run whose lease has expired, and starts the paced loop (B3.2). Do not schedule the poll at boot
     when coverage is already `all`. The tick reads the job document directly from the database, not
