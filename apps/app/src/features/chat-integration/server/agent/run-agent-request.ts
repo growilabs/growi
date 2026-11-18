@@ -263,7 +263,17 @@ const recordAnswer = async (
     );
     return;
   }
-  logger.info({ ...idsOf(row), answer: answer.kind }, 'Agent request answered');
+  if (recorded.outcome === 'already-stored') {
+    logger.info(
+      { ...idsOf(row), outcome: recorded.outcome, droppedAnswer: answer.kind },
+      'Agent request finished; another answer was stored first, so this run’s answer was dropped',
+    );
+    return;
+  }
+  logger.info(
+    { ...idsOf(row), outcome: recorded.outcome, answer: answer.kind },
+    'Agent request answered',
+  );
 };
 
 /** Never rejects: the accept path starts it after responding and does not wait. */

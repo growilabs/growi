@@ -126,6 +126,16 @@ const recordingLogger = () => {
   return { logger, records };
 };
 
+/** Everything logged, with an Error's message and stack spelled out. */
+const loggedText = (records: unknown[][]): string =>
+  JSON.stringify(records, (_key, value: unknown) =>
+    value instanceof Error
+      ? { name: value.name, message: value.message, stack: value.stack }
+      : value,
+  );
+
+const SECRET_ERROR = 'secret-error-message';
+
 const sweepWith = (overrides: Partial<StaleAgentRequestSweepDeps> = {}) =>
   createStaleAgentRequestSweep({
     requests: ChatAgentRequest,
@@ -333,14 +343,40 @@ describe('sweepStaleAgentRequests', () => {
       const { logger, records } = recordingLogger();
       const requests = mock<StaleAgentRequestSweepDeps['requests']>({
         find: vi.fn(() => {
-          throw new Error('connection 7 to mongo:27017 closed');
+          throw new Error(`${SECRET_ERROR}: {"text":"what did we decide?"}`);
         }),
       });
 
       await expect(
         sweepWith({ requests, logger })(NOW),
       ).resolves.toBeUndefined();
-      expect(records).not.toHaveLength(0);
+      const text = loggedText(records);
+      expect(text).toContain('"Error"');
+      expect(text).not.toContain(SECRET_ERROR);
+    });
+
+    it('answers the other rows in the same call when finishing one row fails, logging only its id and the error name', async () => {
+      const failing = await requestRow({ startedMinutesAgo: 10 });
+      const other = await requestRow({ startedMinutesAgo: 9 });
+      const { logger, records } = recordingLogger();
+      const finishing = vi
+        .spyOn(ChatAgentRequest, 'updateOne')
+        .mockImplementationOnce(() => {
+          throw new Error(`${SECRET_ERROR}: E11000 dup key ${failing.text}`);
+        });
+      try {
+        await expect(sweepWith({ logger })(NOW)).resolves.toBeUndefined();
+      } finally {
+        finishing.mockRestore();
+      }
+
+      expect(await stateOf(failing)).toBe('running');
+      expect(await singleAnswerOf(other)).toEqual(TIMEOUT_ANSWER);
+      expect(await stateOf(other)).toBe('done');
+      const text = loggedText(records);
+      expect(text).toContain(failing.requestId);
+      expect(text).toContain('"Error"');
+      expect(text).not.toContain(SECRET_ERROR);
     });
   });
 
@@ -396,15 +432,11 @@ describe('sweepStaleAgentRequests', () => {
 
       await sweepWith({ outbox, logger })(NOW);
 
-      const text = JSON.stringify(records, (_key, value: unknown) =>
-        value instanceof Error
-          ? { name: value.name, message: value.message, stack: value.stack }
-          : value,
-      );
+      const text = loggedText(records);
       expect(text).toContain(row.requestId);
       expect(text).toContain('"Error"');
       expect(text).not.toContain('secret-request-text');
-      expect(text).not.toContain('secret-error-message');
+      expect(text).not.toContain(SECRET_ERROR);
     });
   });
 

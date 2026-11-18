@@ -697,6 +697,31 @@ describe('runAgentRequest', () => {
 
       expect(await storedAnswer(row)).toEqual(earlier);
       expect(await stateOf(row)).toBe('done');
+      const fieldsLogged = logged.map(([fields]) => fields);
+      expect(fieldsLogged).toContainEqual(
+        expect.objectContaining({
+          requestId: row.requestId,
+          outcome: 'already-stored',
+          droppedAnswer: 'text',
+        }),
+      );
+      expect(fieldsLogged).not.toContainEqual(
+        expect.objectContaining({ requestId: row.requestId, answer: 'text' }),
+      );
+    });
+
+    it('logs a stored answer as stored', async () => {
+      const { row } = await acceptedRequest();
+
+      await createAgentRequestRunner(harness().deps)(row);
+
+      expect(logged.map(([fields]) => fields)).toContainEqual(
+        expect.objectContaining({
+          requestId: row.requestId,
+          outcome: 'stored',
+          answer: 'text',
+        }),
+      );
     });
 
     it('leaves the row running when the answer could not be stored', async () => {
