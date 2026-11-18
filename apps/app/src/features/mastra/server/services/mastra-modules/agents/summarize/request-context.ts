@@ -25,4 +25,6 @@ export type PageReadBudget = {
  */
 export type SummarizeRequestContextShape = MastraRequestContextShape & {
   pageReadBudget: PageReadBudget;
+  // The page the route resolved; every read is pinned to it.
+  targetPageId: string;
 };

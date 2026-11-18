@@ -67,7 +67,8 @@ type LimitedGetPageContentToolOutput = z.infer<typeof outputSchema>;
  * the summarizeAgent. The budget counts characters sent to the LLM
  * (design.md LimitedGetPageContentTool):
  *
- * 1. `pageReadBudget` missing from requestContext -> `context_error` (no throw)
+ * 1. `pageReadBudget` or `targetPageId` missing from requestContext ->
+ *    `context_error` (no throw)
  * 2. budget exhausted -> `limit_exceeded` WITHOUT delegating
  * 3. otherwise delegate, then charge the outline and body actually returned,
  *    cutting the body at the remaining room
@@ -88,14 +89,15 @@ export const limitedGetPageContentTool = createTool({
   ): Promise<LimitedGetPageContentToolOutput> => {
     const ctx = context.requestContext as TypedRequestContext;
     const pageReadBudget = ctx.get('pageReadBudget');
+    const targetPageId = ctx.get('targetPageId');
 
-    if (pageReadBudget == null) {
+    if (pageReadBudget == null || targetPageId == null) {
       logger.warn(
-        'limited-get-page-content-tool: pageReadBudget missing in requestContext',
+        'limited-get-page-content-tool: pageReadBudget or targetPageId missing in requestContext',
       );
       return {
         result: 'context_error' as const,
-        reason: 'pageReadBudget missing in requestContext',
+        reason: 'pageReadBudget or targetPageId missing in requestContext',
       };
     }
 
@@ -108,7 +110,8 @@ export const limitedGetPageContentTool = createTool({
 
     // biome-ignore lint/style/noNonNullAssertion: createTool always wires execute
     const result = await getPageContentTool.execute!(
-      { ...inputData, limit: READ_LIMIT_LINES },
+      // pageId wins over pagePath in the delegate, so this pins the read.
+      { ...inputData, pageId: targetPageId, limit: READ_LIMIT_LINES },
       context,
     );
     const typedResult = result as LimitedGetPageContentToolOutput;

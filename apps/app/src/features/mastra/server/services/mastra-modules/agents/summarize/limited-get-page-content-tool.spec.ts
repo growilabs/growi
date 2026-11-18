@@ -35,8 +35,12 @@ vi.mock('~/server/models/obsolete-page', () => ({
   populateDataToShowRevision: vi.fn(),
 }));
 
-const buildRequestContext = (): RequestContext<SummarizeRequestContextShape> =>
-  new RequestContext<SummarizeRequestContextShape>();
+const buildRequestContext =
+  (): RequestContext<SummarizeRequestContextShape> => {
+    const requestContext = new RequestContext<SummarizeRequestContextShape>();
+    requestContext.set('targetPageId', 'p1');
+    return requestContext;
+  };
 
 const buildBudget = (limit: number, used = 0): PageReadBudget => ({
   limit,
@@ -129,6 +133,31 @@ describe('limitedGetPageContentTool', () => {
 
       expect(result.result).toBe('context_error');
       expect(delegateSpy).not.toHaveBeenCalled();
+    });
+
+    it('returns context_error without delegating when targetPageId is missing', async () => {
+      const requestContext = new RequestContext<SummarizeRequestContextShape>();
+      requestContext.set('pageReadBudget', buildBudget(60_000));
+
+      const result = await invokeExecute({ pageId: 'p1' }, requestContext);
+
+      expect(result.result).toBe('context_error');
+      expect(delegateSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('reads only the target page', () => {
+    it.each([
+      { pageId: 'other-page' },
+      { pagePath: '/other-page' },
+      { pageId: 'other-page', pagePath: '/other-page' },
+    ])('reads the target page when the model asks for %o', async (input) => {
+      const requestContext = buildRequestContext();
+      requestContext.set('pageReadBudget', buildBudget(60_000));
+
+      await invokeExecute(input, requestContext);
+
+      expect(delegateSpy.mock.calls[0][0]).toMatchObject({ pageId: 'p1' });
     });
   });
 

@@ -432,9 +432,10 @@ export const summarizeAgent: Agent; // registered in mastra-modules/index.ts as 
 | Requirements | 2.2, 2.3 |
 
 **Responsibilities & Constraints**
-- `RequestContext` の `pageReadBudget: { used: number; limit: number }` を読む。存在しない場合は本文を取得せず `context_error` を返す（`limitedSearchTool` と同じ規約）。
+- `RequestContext` の `pageReadBudget: { used: number; limit: number }` と `targetPageId`（ルートが解決した要約対象ページのID）を読む。どちらかが存在しない場合は本文を取得せず `context_error` を返す（`limitedSearchTool` と同じ規約）。
+- 読み取り先は常に `targetPageId` のページに固定する。LLMが指定した `pageId` / `pagePath` は使わない（ページ本文の指示によって別ページを読ませ、その内容を対象ページの要約として返すことを防ぐため）。
 - `used >= limit` の場合は `getPageContentTool` に委譲せず `limit_exceeded` を返す。
-- それ以外は `getPageContentTool` へ入力をそのまま委譲し、返された結果をバジェットに収めてから `used` に足して返す（`page-read-budget.ts` の `fitPageToBudget`）。
+- それ以外は `getPageContentTool` へ、`pageId` を `targetPageId` に差し替えた入力で委譲し、返された結果をバジェットに収めてから `used` に足して返す（`page-read-budget.ts` の `fitPageToBudget`）。
   - 見出しの一覧（`outline`）があれば、JSONにした文字数を先に数える。残りの文字数に収まらない場合は、収まるところまで末尾の見出しを落とす。
   - 本文（`content`）は、見出しの一覧を数えた後の残りの文字数で切る。切った場合は `hasMore: true` にする。サロゲートペアの途中では切らない（不正なUnicodeをLLMに渡さないため）。
   - 失敗応答（`not_found_or_forbidden` 等）は数えない。
@@ -451,13 +452,13 @@ export const summarizeAgent: Agent; // registered in mastra-modules/index.ts as 
 // mastra-modules/agents/summarize/limited-get-page-content-tool.ts
 export const limitedGetPageContentTool: Tool; // used only by summarizeAgent
 ```
-- Preconditions: `RequestContext` に `pageReadBudget` が設定済みであること（`SummarizeMessageRoute` が要約開始時に、そのリクエスト専用の新規オブジェクト `{ used: 0, limit: 60000 }` を注入する。リクエスト間で共有されるインスタンスではない）。
+- Preconditions: `RequestContext` に `pageReadBudget` と `targetPageId` が設定済みであること（`SummarizeMessageRoute` が要約開始時に、そのリクエスト専用の新規オブジェクト `{ used: 0, limit: 60000 }` と、ルート層ゲートで解決したページのIDを注入する。リクエスト間で共有されるインスタンスではない）。
 - Postconditions: `used` は実際に返した見出しの一覧と本文の文字数だけ単調増加し、`limit` を超えない。失敗応答のときは増加しない。`limit_exceeded` を返したときは `used`/`limit` を変更しない。
 - Invariants: `getPageContentTool` の権限チェック・入出力契約には一切手を加えない。
 
 **Implementation Notes**
 - Integration: `suggestPathAgent` の `limited-search-tool.ts` と同じファイル構成・命名パターンに揃える。
-- Validation: バジェット未設定時の `context_error`、`used >= limit` 時の `limit_exceeded`（委譲なし）、通常時の委譲＋文字数の加算、見出しの一覧の加算、最後の1回で残りの分だけを返すこと、残りに収まらない見出しを末尾から落とすこと、サロゲートペアの途中で切らないことをユニットテストで検証する。
+- Validation: バジェットまたは `targetPageId` 未設定時の `context_error`、LLMが別ページを指定しても `targetPageId` のページを読むこと、`used >= limit` 時の `limit_exceeded`（委譲なし）、通常時の委譲＋文字数の加算、見出しの一覧の加算、最後の1回で残りの分だけを返すこと、残りに収まらない見出しを末尾から落とすこと、サロゲートペアの途中で切らないことをユニットテストで検証する。
 - Risks: なし（既存ツールをラップするのみ）。
 
 #### GetPageContentTool（既存・変更）

@@ -123,6 +123,7 @@ const startSummarizeStream = (
   requestContext.set('searchService', crowi.searchService);
   requestContext.set('modelKey', effectiveModelKey);
   requestContext.set('pageReadBudget', pageReadBudget);
+  requestContext.set('targetPageId', page._id.toString());
 
   // Stops the LLM run when the client disconnects mid-stream.
   const abortController = new AbortController();
