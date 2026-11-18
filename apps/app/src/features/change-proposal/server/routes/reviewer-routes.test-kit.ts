@@ -22,7 +22,10 @@ import type {
   ReviewerInput,
   ReviewerRef,
 } from '../../interfaces';
-import { createChangeProposalService } from '../services/change-proposal-service';
+import {
+  type ChangeProposalService,
+  createChangeProposalService,
+} from '../services/change-proposal-service';
 import { createApplierTestKit } from '../services/proposal-applier.test-kit';
 import { createChangeProposalRouter } from '.';
 
@@ -47,6 +50,7 @@ export const createReviewerRoutesTestKit = (args: {
   const { prefix, ip, usernameBase } = args;
   let crowi: Crowi;
   let app: express.Application;
+  let service: ChangeProposalService;
   let currentUser: IUserHasId | undefined;
   const kit = createApplierTestKit({
     getCrowi: () => crowi,
@@ -91,6 +95,24 @@ export const createReviewerRoutesTestKit = (args: {
       .patch(endpointOf(id, 'reviewers'))
       .set('X-Forwarded-For', ip)
       .send(body);
+
+  const getProposal = (id: string) => request(app).get(`${MOUNT_PATH}/${id}`);
+
+  const postAction = (
+    id: string,
+    action: 'approve' | 'skip' | 'discard',
+    body: object = {},
+  ) =>
+    request(app)
+      .post(endpointOf(id, action))
+      .set('X-Forwarded-For', ip)
+      .send(body);
+
+  const putPerPageNotifications = (id: string, enabled: boolean) =>
+    request(app)
+      .put(endpointOf(id, 'per-page-notifications'))
+      .set('X-Forwarded-For', ip)
+      .send({ enabled });
 
   const getQueue = (query: Record<string, string> = {}) =>
     request(app).get(`${MOUNT_PATH}/review-queue`).query(query);
@@ -229,14 +251,10 @@ export const createReviewerRoutesTestKit = (args: {
       }
       next();
     });
-    app.use(
-      MOUNT_PATH,
-      createChangeProposalRouter(crowi, {
-        service: createChangeProposalService(crowi, {
-          applier: kit.newApplier(),
-        }),
-      }),
-    );
+    service = createChangeProposalService(crowi, {
+      applier: kit.newApplier(),
+    });
+    app.use(MOUNT_PATH, createChangeProposalRouter(crowi, { service }));
   }, 120_000);
 
   beforeEach(async () => {
@@ -260,12 +278,17 @@ export const createReviewerRoutesTestKit = (args: {
   return {
     kit,
     users,
+    // The service behind the routes; read it inside tests, not at collection time.
+    getService: () => service,
     fixtures,
     asUser,
     idOf,
     endpointOf,
     postReview,
     patchReviewers,
+    getProposal,
+    postAction,
+    putPerPageNotifications,
     getQueue,
     bearer,
     onlyActivityAt,
