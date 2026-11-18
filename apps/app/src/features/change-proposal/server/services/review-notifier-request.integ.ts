@@ -202,17 +202,18 @@ describe('ReviewNotifier.notifyReviewRequest', () => {
         candidates: reviewers,
         actorId: idOf(users.adder),
         activityId,
+        action: SupportedAction.ACTION_CHANGE_PROPOSAL_REVIEWER_ADD,
       });
     });
 
-    it('notifies only the individual users who became reviewers, not the requester, the adder, group members or a suspended user (Reviewers Req 4.11, 6.1, 6.2)', async () => {
+    it('notifies only the individual users who became reviewers, not the requester, the adder, group members or a suspended user, under the action of the activity that added them (Reviewers Req 4.11, 6.1, 6.2)', async () => {
       const notifications = await notificationsFor(proposal._id);
 
       expect(recipientNames(notifications)).toEqual(['member', 'outsider']);
       for (const n of notifications) {
         expect(n).toMatchObject({
           targetModel: SupportedTargetModel.MODEL_CHANGE_PROPOSAL,
-          action: SupportedAction.ACTION_CHANGE_PROPOSAL_REVIEW_REQUEST,
+          action: SupportedAction.ACTION_CHANGE_PROPOSAL_REVIEWER_ADD,
           status: 'UNOPENED',
         });
         expect(n.target.toString()).toBe(proposal._id);
@@ -277,6 +278,7 @@ describe('ReviewNotifier.notifyReviewRequest', () => {
       candidates: reviewers,
       actorId: idOf(users.requester),
       activityId: new mongoose.Types.ObjectId().toString(),
+      action: SupportedAction.ACTION_CHANGE_PROPOSAL_CREATE,
     });
 
     expect(await notificationsFor(proposal._id)).toHaveLength(0);
@@ -293,6 +295,7 @@ describe('ReviewNotifier.notifyReviewRequest', () => {
       candidates: [userReviewer('outsider')],
       actorId: idOf(users.requester),
       activityId: new mongoose.Types.ObjectId().toString(),
+      action: SupportedAction.ACTION_CHANGE_PROPOSAL_CREATE,
     });
 
     expect(await notificationsFor(proposal._id)).toHaveLength(0);
@@ -310,6 +313,7 @@ describe('ReviewNotifier.notifyReviewRequest', () => {
       candidates: reviewers,
       actorId: idOf(users.requester),
       activityId: new mongoose.Types.ObjectId().toString(),
+      action: SupportedAction.ACTION_CHANGE_PROPOSAL_CREATE,
     });
 
     expect(emitSocketIo).toHaveBeenCalledTimes(1);
@@ -329,6 +333,7 @@ describe('ReviewNotifier.notifyReviewRequest', () => {
         candidates: reviewers,
         actorId: idOf(users.requester),
         activityId: new mongoose.Types.ObjectId().toString(),
+        action: SupportedAction.ACTION_CHANGE_PROPOSAL_CREATE,
       }),
     ).resolves.toBeUndefined();
   });

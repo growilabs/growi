@@ -1196,8 +1196,6 @@
     "CHANGE_PROPOSAL_ABSTAIN": "Abstain from reviewing Change Proposal",
     "CHANGE_PROPOSAL_REVIEWER_ADD": "Add Change Proposal reviewer",
     "CHANGE_PROPOSAL_REVIEWER_REMOVE": "Remove Change Proposal reviewer",
-    "CHANGE_PROPOSAL_REVIEW_REQUEST": "Change Proposal review request",
-    "CHANGE_PROPOSAL_REVIEW_RESULT": "Change Proposal review result",
     "ADMIN_CHANGE_PROPOSAL_SETTINGS_UPDATE": "Update Change Proposal settings",
     "ADMIN_SITE_URL_UPDATE": "Update Site URL Settings",
     "ADMIN_MAIL_SMTP_UPDATE": "Update E-mail(SMTP) Settings",

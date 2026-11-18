@@ -164,6 +164,7 @@ export const createReviewerActions = (
         proposal: after,
         reviewer: actor.user,
         activityId,
+        action: SupportedAction.ACTION_CHANGE_PROPOSAL_APPROVE,
         decision: {
           kind: 'operations',
           result: 'approved',

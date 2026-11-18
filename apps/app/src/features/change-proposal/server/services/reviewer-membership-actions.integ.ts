@@ -27,6 +27,7 @@ import {
   createChangeProposalService,
 } from './change-proposal-service';
 import { createApplierTestKit } from './proposal-applier.test-kit';
+import { findReviewNotifications } from './review-notifications.test-kit';
 import type { ReviewActor } from './reviewer-actions';
 import { loadViewerIdentity } from './reviewer-identity';
 
@@ -114,14 +115,7 @@ describe('ChangeProposalService: adding and removing reviewers', () => {
 
   // Who received a review request for the proposal, by user id.
   const requestedUserIds = async (proposalId: string) =>
-    (
-      await InAppNotification.find({
-        target: proposalId,
-        action: SupportedAction.ACTION_CHANGE_PROPOSAL_REVIEW_REQUEST,
-      })
-        .lean()
-        .exec()
-    )
+    (await findReviewNotifications('review-request', { target: proposalId }))
       .map((n) => n.user.toString())
       .sort();
 
@@ -294,7 +288,7 @@ describe('ChangeProposalService: adding and removing reviewers', () => {
       expect(await requestedUserIds(proposal._id)).toEqual([idOf(extra.added)]);
     });
 
-    it('records one reviewer-add activity, as the one who added, with the channel (Reviewers Req 6.10)', async () => {
+    it('records one reviewer-add activity, as the one who added, with the channel, and sends the review request under its action (Reviewers Req 6.10)', async () => {
       const proposal = await pendingProposal();
 
       await service.addReviewers(
@@ -317,6 +311,12 @@ describe('ChangeProposalService: adding and removing reviewers', () => {
           'api',
         ],
       ]);
+      const [request] = await findReviewNotifications('review-request', {
+        target: proposal._id,
+      });
+      expect(request.action).toBe(
+        SupportedAction.ACTION_CHANGE_PROPOSAL_REVIEWER_ADD,
+      );
     });
 
     it('changes nothing and sends and logs nothing when everyone it names already is a reviewer (Reviewers Req 4.6)', async () => {

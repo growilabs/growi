@@ -1,7 +1,10 @@
 import type { IUserHasId } from '@growi/core';
 import mongoose from 'mongoose';
 
-import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
+import {
+  type SupportedAction,
+  SupportedTargetModel,
+} from '~/interfaces/activity';
 import { InAppNotificationStatuses } from '~/interfaces/in-app-notification';
 import type Crowi from '~/server/crowi';
 import { InAppNotification } from '~/server/models/in-app-notification';
@@ -45,6 +48,11 @@ export type NotifyReviewRequestArgs = {
   // Who added them; the requester when the proposal is created.
   readonly actorId: string;
   readonly activityId: string;
+  // The triggering activity's action. The snapshot kind, not this, tells the
+  // notification apart (research.md: notification action Decision).
+  readonly action:
+    | typeof SupportedAction.ACTION_CHANGE_PROPOSAL_CREATE
+    | typeof SupportedAction.ACTION_CHANGE_PROPOSAL_REVIEWER_ADD;
 };
 
 export type NotifyReviewResultArgs = {
@@ -52,6 +60,11 @@ export type NotifyReviewResultArgs = {
   readonly proposal: ChangeProposalDocument;
   readonly reviewer: IUserHasId;
   readonly activityId: string;
+  // A whole rejection is recorded as REJECT.
+  readonly action:
+    | typeof SupportedAction.ACTION_CHANGE_PROPOSAL_APPROVE
+    | typeof SupportedAction.ACTION_CHANGE_PROPOSAL_REJECT
+    | typeof SupportedAction.ACTION_CHANGE_PROPOSAL_ABSTAIN;
   readonly decision: ReviewDecisionNotice;
 };
 
@@ -185,12 +198,14 @@ const buildReviewResultSnapshot = async ({
       };
 };
 
-const notificationFields = (
-  proposal: ChangeProposalDocument,
-  activityId: string,
-) => ({
+const notificationFields = ({
+  proposal,
+  activityId,
+  action,
+}: NotifyReviewRequestArgs | NotifyReviewResultArgs) => ({
   targetModel: SupportedTargetModel.MODEL_CHANGE_PROPOSAL,
   target: proposal._id,
+  action,
   status: InAppNotificationStatuses.STATUS_UNOPENED,
   // Lets the notification list name who decided or added.
   activities: [activityId],
@@ -206,9 +221,8 @@ export const createReviewNotifier = (crowi: Crowi): ReviewNotifier => ({
       const createdAt = new Date();
       await InAppNotification.insertMany(
         inputs.map(({ user, snapshot }) => ({
-          ...notificationFields(args.proposal, args.activityId),
+          ...notificationFields(args),
           user,
-          action: SupportedAction.ACTION_CHANGE_PROPOSAL_REVIEW_REQUEST,
           createdAt,
           snapshot: JSON.stringify(snapshot),
         })),
@@ -236,9 +250,8 @@ export const createReviewNotifier = (crowi: Crowi): ReviewNotifier => ({
         return;
       }
       await InAppNotification.create({
-        ...notificationFields(args.proposal, args.activityId),
+        ...notificationFields(args),
         user: args.proposal.requester,
-        action: SupportedAction.ACTION_CHANGE_PROPOSAL_REVIEW_RESULT,
         createdAt: new Date(),
         snapshot: JSON.stringify(snapshot),
       });

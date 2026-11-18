@@ -104,6 +104,7 @@ export const createReviewerMembershipActions = (
         candidates: added,
         actorId: identity.userId,
         activityId,
+        action: SupportedAction.ACTION_CHANGE_PROPOSAL_REVIEWER_ADD,
       });
     }
   };

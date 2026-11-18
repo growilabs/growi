@@ -266,6 +266,7 @@ export const createChangeProposalService = (
       candidates,
       actorId: proposal.requester,
       activityId,
+      action: SupportedAction.ACTION_CHANGE_PROPOSAL_CREATE,
     });
   };
 

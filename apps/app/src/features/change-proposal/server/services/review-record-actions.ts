@@ -156,6 +156,7 @@ export const createReviewRecordActions = (
         proposal: after,
         reviewer: actor.user,
         activityId,
+        action: ACTIVITY_OF[entry.kind],
         decision: toNotice(entry),
       });
     }

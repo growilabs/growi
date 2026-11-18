@@ -199,7 +199,7 @@ describe('ChangeProposalService.createProposal: the review request notification'
     expect(await notificationsOf(proposalId)).toEqual([]);
   });
 
-  it('notifies each individual reviewer once with the create activity id, and not the requester (Reviewers Req 6.1)', async () => {
+  it('notifies each individual reviewer once with the id and the action of the create activity, and not the requester (Reviewers Req 6.1)', async () => {
     const emit = vi.spyOn(crowi.events.activity, 'emit');
 
     const proposalId = createdId(
@@ -221,7 +221,7 @@ describe('ChangeProposalService.createProposal: the review request notification'
     expect(activityIds).toHaveLength(1);
     for (const n of notifications) {
       expect(n).toMatchObject({
-        action: SupportedAction.ACTION_CHANGE_PROPOSAL_REVIEW_REQUEST,
+        action: SupportedAction.ACTION_CHANGE_PROPOSAL_CREATE,
       });
       expect(n.activities.map(String)).toEqual(activityIds);
     }

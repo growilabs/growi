@@ -590,8 +590,6 @@ describe('Change Proposal activity declarations', () => {
       'CHANGE_PROPOSAL_REVERT',
       'CHANGE_PROPOSAL_REVIEWER_ADD',
       'CHANGE_PROPOSAL_REVIEWER_REMOVE',
-      'CHANGE_PROPOSAL_REVIEW_REQUEST',
-      'CHANGE_PROPOSAL_REVIEW_RESULT',
     ]);
   });
 
@@ -607,10 +605,6 @@ describe('Change Proposal review activity declarations', () => {
     'CHANGE_PROPOSAL_ABSTAIN',
     'CHANGE_PROPOSAL_REVIEWER_ADD',
     'CHANGE_PROPOSAL_REVIEWER_REMOVE',
-  ];
-  const notificationActions = [
-    'CHANGE_PROPOSAL_REVIEW_REQUEST',
-    'CHANGE_PROPOSAL_REVIEW_RESULT',
   ];
 
   it('Reviewers Req 6.8/6.10 — declares the five review actions with their literal values', () => {
@@ -637,20 +631,6 @@ describe('Change Proposal review activity declarations', () => {
       expect(AllMediumGroupActions).toContain(action);
       expect(AllLargeGroupActions).toContain(action);
       expect(AllSmallGroupActions).not.toContain(action);
-    }
-  });
-
-  it('declares the two notification actions so in-app notifications accept them, without recording them as activities', () => {
-    expect(SupportedAction.ACTION_CHANGE_PROPOSAL_REVIEW_REQUEST).toBe(
-      'CHANGE_PROPOSAL_REVIEW_REQUEST',
-    );
-    expect(SupportedAction.ACTION_CHANGE_PROPOSAL_REVIEW_RESULT).toBe(
-      'CHANGE_PROPOSAL_REVIEW_RESULT',
-    );
-    for (const action of notificationActions) {
-      expect(AllSupportedActions).toContain(action);
-      expect(AllEssentialActions).not.toContain(action);
-      expect(AllMediumGroupActions).not.toContain(action);
     }
   });
 });
@@ -682,13 +662,11 @@ describe('isChangeProposalReviewActivity', () => {
     }
   });
 
-  it('rejects the other change proposal actions and the notification actions', () => {
+  it('rejects the other change proposal actions', () => {
     for (const action of [
       SupportedAction.ACTION_CHANGE_PROPOSAL_CREATE,
       SupportedAction.ACTION_CHANGE_PROPOSAL_APPLY,
       SupportedAction.ACTION_CHANGE_PROPOSAL_REVERT,
-      SupportedAction.ACTION_CHANGE_PROPOSAL_REVIEW_REQUEST,
-      SupportedAction.ACTION_CHANGE_PROPOSAL_REVIEW_RESULT,
     ]) {
       expect(isChangeProposalReviewActivity({ action })).toBe(false);
     }

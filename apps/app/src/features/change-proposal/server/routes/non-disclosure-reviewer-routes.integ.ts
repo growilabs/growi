@@ -426,7 +426,7 @@ describe('reviewer routes never disclose operations a viewer cannot see', () => 
       );
       expect(notifications).toEqual([
         {
-          action: SupportedAction.ACTION_CHANGE_PROPOSAL_REVIEW_RESULT,
+          action: SupportedAction.ACTION_CHANGE_PROPOSAL_REJECT,
           snapshot: expect.objectContaining({
             items: [
               {
@@ -438,7 +438,7 @@ describe('reviewer routes never disclose operations a viewer cannot see', () => 
           }),
         },
         {
-          action: SupportedAction.ACTION_CHANGE_PROPOSAL_REVIEW_RESULT,
+          action: SupportedAction.ACTION_CHANGE_PROPOSAL_REJECT,
           snapshot: expect.objectContaining({
             items: [],
             wholeRejection: { comment: OWN_WHOLE_COMMENT },

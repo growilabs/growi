@@ -15,6 +15,7 @@ import type {
   ReviewResultNotificationSnapshot,
 } from '../../interfaces';
 import type { CreateProposalRequest } from '../services/change-proposal-service-types';
+import { findReviewNotifications } from '../services/review-notifications.test-kit';
 import { createReviewerRoutesTestKit } from './reviewer-routes.test-kit';
 
 const TEST_IP = '10.0.0.196';
@@ -67,15 +68,11 @@ describe('the reviewer flow through the routes', () => {
     });
   };
 
-  const notificationsTo = async (
+  const notificationsTo = (
     user: IUserHasId,
     proposalId: string,
-    action: string,
-  ) =>
-    InAppNotification.find({ user: user._id, target: proposalId, action })
-      .sort({ _id: 1 })
-      .lean()
-      .exec();
+    kind: Parameters<typeof findReviewNotifications>[0],
+  ) => findReviewNotifications(kind, { target: proposalId, user: idOf(user) });
 
   const queuedIdsOf = async (user: IUserHasId): Promise<string[]> => {
     asUser(user);
@@ -141,18 +138,10 @@ describe('the reviewer flow through the routes', () => {
       (await kit.reload(proposalId)).operations.map((op) => op.status),
     ).toEqual(['pending', 'pending']);
     expect(
-      await notificationsTo(
-        users.subscriber,
-        proposalId,
-        SupportedAction.ACTION_CHANGE_PROPOSAL_REVIEW_REQUEST,
-      ),
+      await notificationsTo(users.subscriber, proposalId, 'review-request'),
     ).toHaveLength(1);
     expect(
-      await notificationsTo(
-        users.other,
-        proposalId,
-        SupportedAction.ACTION_CHANGE_PROPOSAL_REVIEW_REQUEST,
-      ),
+      await notificationsTo(users.other, proposalId, 'review-request'),
     ).toEqual([]);
 
     asUser(users.subscriber);
@@ -228,7 +217,7 @@ describe('the reviewer flow through the routes', () => {
     const results = await notificationsTo(
       users.requester,
       proposalId,
-      SupportedAction.ACTION_CHANGE_PROPOSAL_REVIEW_RESULT,
+      'review-result',
     );
     expect(
       results.map(
@@ -285,7 +274,7 @@ describe('the reviewer flow through the routes', () => {
       await notificationsTo(
         users.subscriber,
         rework.proposalId,
-        SupportedAction.ACTION_CHANGE_PROPOSAL_REVIEW_REQUEST,
+        'review-request',
       ),
     ).toHaveLength(1);
     expect(await queuedIdsOf(users.subscriber)).toContain(rework.proposalId);

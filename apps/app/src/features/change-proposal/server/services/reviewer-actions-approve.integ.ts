@@ -6,7 +6,6 @@ import { getInstance } from '^/test/setup/crowi';
 
 import { SupportedAction } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
-import { InAppNotification } from '~/server/models/in-app-notification';
 import type { PageDocument } from '~/server/models/page';
 import UserGroup from '~/server/models/user-group';
 import UserGroupRelation from '~/server/models/user-group-relation';
@@ -23,6 +22,7 @@ import {
   createChangeProposalService,
 } from './change-proposal-service';
 import { createApplierTestKit } from './proposal-applier.test-kit';
+import { findReviewNotifications } from './review-notifications.test-kit';
 import type { ReviewActor } from './reviewer-actions';
 
 const PREFIX = '/cp-reviewer-approve-integ';
@@ -134,12 +134,7 @@ describe('ChangeProposalService.approve by a reviewer', () => {
   };
 
   const resultNotifications = (proposalId: string) =>
-    InAppNotification.find({
-      target: proposalId,
-      action: SupportedAction.ACTION_CHANGE_PROPOSAL_REVIEW_RESULT,
-    })
-      .lean()
-      .exec();
+    findReviewNotifications('review-result', { target: proposalId });
 
   beforeAll(async () => {
     crowi = await getInstance();

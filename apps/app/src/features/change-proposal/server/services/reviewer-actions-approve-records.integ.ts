@@ -4,7 +4,6 @@ import { getInstance } from '^/test/setup/crowi';
 
 import { SupportedAction } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
-import { InAppNotification } from '~/server/models/in-app-notification';
 import { beginActivity } from '~/server/service/activity/index';
 import { prisma } from '~/utils/prisma';
 
@@ -18,6 +17,7 @@ import {
   createChangeProposalService,
 } from './change-proposal-service';
 import { createApplierTestKit } from './proposal-applier.test-kit';
+import { findReviewNotifications } from './review-notifications.test-kit';
 import type { ReviewActor } from './reviewer-actions';
 import { loadViewerIdentity } from './reviewer-identity';
 
@@ -114,12 +114,7 @@ describe('ChangeProposalService.approve: the records an approval leaves', () => 
   let emitSpy: { mockRestore(): void } | undefined;
 
   const resultNotifications = (proposalId: string) =>
-    InAppNotification.find({
-      target: proposalId,
-      action: SupportedAction.ACTION_CHANGE_PROPOSAL_REVIEW_RESULT,
-    })
-      .lean()
-      .exec();
+    findReviewNotifications('review-result', { target: proposalId });
 
   beforeAll(async () => {
     crowi = await getInstance();

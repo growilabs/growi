@@ -139,7 +139,7 @@ describe('ReviewNotifier.notifyReviewResult', () => {
     await mongoose.model('User').deleteMany({ _id: { $in: userIds } });
   });
 
-  it('sends the requester one notification per request, with the activity of that request (Reviewers Req 6.5)', async () => {
+  it('sends the requester one notification per request, with the activity of that request and its action (Reviewers Req 6.5)', async () => {
     const proposal = await storeProposal();
     const { publicEdit, create } = keysOf(proposal);
     const activityId = new mongoose.Types.ObjectId().toString();
@@ -148,6 +148,7 @@ describe('ReviewNotifier.notifyReviewResult', () => {
       proposal,
       reviewer: users.reviewer,
       activityId,
+      action: SupportedAction.ACTION_CHANGE_PROPOSAL_APPROVE,
       decision: {
         kind: 'operations',
         result: 'approved',
@@ -159,7 +160,7 @@ describe('ReviewNotifier.notifyReviewResult', () => {
     expect(notifications).toHaveLength(1);
     expect(notifications[0]).toMatchObject({
       targetModel: SupportedTargetModel.MODEL_CHANGE_PROPOSAL,
-      action: SupportedAction.ACTION_CHANGE_PROPOSAL_REVIEW_RESULT,
+      action: SupportedAction.ACTION_CHANGE_PROPOSAL_APPROVE,
       status: 'UNOPENED',
     });
     expect(notifications[0].user.toString()).toBe(idOf(users.requester));
@@ -184,6 +185,7 @@ describe('ReviewNotifier.notifyReviewResult', () => {
       proposal,
       reviewer: users.reviewer,
       activityId: new mongoose.Types.ObjectId().toString(),
+      action: SupportedAction.ACTION_CHANGE_PROPOSAL_REJECT,
       decision: {
         kind: 'operations',
         result: 'rejected',
@@ -208,6 +210,7 @@ describe('ReviewNotifier.notifyReviewResult', () => {
       proposal,
       reviewer: users.reviewer,
       activityId: new mongoose.Types.ObjectId().toString(),
+      action: SupportedAction.ACTION_CHANGE_PROPOSAL_ABSTAIN,
       decision: {
         kind: 'operations',
         result: 'abstained',
@@ -226,6 +229,7 @@ describe('ReviewNotifier.notifyReviewResult', () => {
       proposal,
       reviewer: users.reviewer,
       activityId: new mongoose.Types.ObjectId().toString(),
+      action: SupportedAction.ACTION_CHANGE_PROPOSAL_ABSTAIN,
       decision: {
         kind: 'operations',
         result: 'abstained',
@@ -256,6 +260,7 @@ describe('ReviewNotifier.notifyReviewResult', () => {
       proposal,
       reviewer: users.reviewer,
       activityId: new mongoose.Types.ObjectId().toString(),
+      action: SupportedAction.ACTION_CHANGE_PROPOSAL_APPROVE,
       decision: {
         kind: 'operations',
         result: 'approved',
@@ -273,11 +278,15 @@ describe('ReviewNotifier.notifyReviewResult', () => {
       proposal,
       reviewer: users.reviewer,
       activityId: new mongoose.Types.ObjectId().toString(),
+      action: SupportedAction.ACTION_CHANGE_PROPOSAL_REJECT,
       decision: { kind: 'whole-rejection', comment: 'not this way' },
     });
 
     const snapshot = await onlySnapshot(proposal._id);
     expect(snapshot.items).toEqual([]);
+    expect((await notificationsFor(proposal._id))[0].action).toBe(
+      SupportedAction.ACTION_CHANGE_PROPOSAL_REJECT,
+    );
     expect(snapshot.wholeRejection).toEqual({ comment: 'not this way' });
   });
 
@@ -288,6 +297,7 @@ describe('ReviewNotifier.notifyReviewResult', () => {
       proposal,
       reviewer: users.requester,
       activityId: new mongoose.Types.ObjectId().toString(),
+      action: SupportedAction.ACTION_CHANGE_PROPOSAL_APPROVE,
       decision: {
         kind: 'operations',
         result: 'approved',
@@ -309,6 +319,7 @@ describe('ReviewNotifier.notifyReviewResult', () => {
         proposal,
         reviewer: users.reviewer,
         activityId: new mongoose.Types.ObjectId().toString(),
+        action: SupportedAction.ACTION_CHANGE_PROPOSAL_REJECT,
         decision: { kind: 'whole-rejection' },
       }),
     ).resolves.toBeUndefined();

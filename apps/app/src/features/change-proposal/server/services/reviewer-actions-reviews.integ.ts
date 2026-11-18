@@ -8,7 +8,6 @@ import { getInstance } from '^/test/setup/crowi';
 import { Prisma } from '~/generated/prisma/client';
 import { SupportedAction } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
-import { InAppNotification } from '~/server/models/in-app-notification';
 import { UserStatus } from '~/server/models/user/conts';
 import { prisma } from '~/utils/prisma';
 
@@ -27,6 +26,7 @@ import {
 } from './change-proposal-service';
 import type { ServiceResult } from './change-proposal-service-types';
 import { createApplierTestKit } from './proposal-applier.test-kit';
+import { findReviewNotifications } from './review-notifications.test-kit';
 import type { ReviewActor } from './reviewer-actions';
 import { loadViewerIdentity } from './reviewer-identity';
 
@@ -106,12 +106,7 @@ describe('ChangeProposalService: rejecting and abstaining', () => {
     ]);
 
   const resultNotifications = (proposalId: string) =>
-    InAppNotification.find({
-      target: proposalId,
-      action: SupportedAction.ACTION_CHANGE_PROPOSAL_REVIEW_RESULT,
-    })
-      .lean()
-      .exec();
+    findReviewNotifications('review-result', { target: proposalId });
 
   const snapshotsOf = async (
     proposalId: string,
@@ -558,7 +553,7 @@ describe('ChangeProposalService: rejecting and abstaining', () => {
       ]);
     });
 
-    it('records the rejection as a reject activity and the abstention as an abstain activity, with the channel (Reviewers Req 6.8)', async () => {
+    it('records the rejection as a reject activity and the abstention as an abstain activity, with the channel, and notifies each under the action of its activity (Reviewers Req 6.8)', async () => {
       const proposal = await pendingProposal([
         kit.editInput(await kit.createPage('activity-a')),
         kit.editInput(await kit.createPage('activity-b')),
@@ -604,6 +599,13 @@ describe('ChangeProposalService: rejecting and abstaining', () => {
         ]),
       );
       expect(rows).toHaveLength(3);
+      expect(
+        (await resultNotifications(proposal._id)).map((n) => n.action),
+      ).toEqual([
+        SupportedAction.ACTION_CHANGE_PROPOSAL_REJECT,
+        SupportedAction.ACTION_CHANGE_PROPOSAL_ABSTAIN,
+        SupportedAction.ACTION_CHANGE_PROPOSAL_REJECT,
+      ]);
     });
 
     it('records, notifies and logs nothing when nothing it named is still pending (Reviewers Req 2.11, 6.5, 6.8)', async () => {
