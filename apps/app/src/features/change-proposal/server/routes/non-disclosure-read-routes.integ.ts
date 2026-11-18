@@ -245,9 +245,8 @@ describe('change proposals never disclose pages a viewer cannot see (read routes
       // biome-ignore lint/performance/noAwaitInLoops: the two approvals must run in order
       const approved = await service.approve(
         stored._id,
-        users.requester,
+        { user: users.requester, channel: 'ui', trigger: BACKGROUND },
         keys,
-        BACKGROUND,
       );
       if (!approved.ok) throw new Error(JSON.stringify(approved.error));
       await kit.waitForPageOperationsToFinish();
@@ -402,7 +401,9 @@ describe('change proposals never disclose pages a viewer cannot see (read routes
         'operations',
         'requester',
         'status',
+        'viewerRole',
       ]);
+      expect(proposal.viewerRole).toBe('other');
       expect(proposal.status).toBe('applied');
       expect(proposal.lastAppliedAt).toBe(T1.toISOString());
       expect(proposal.operations).toHaveLength(1);

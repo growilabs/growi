@@ -23,6 +23,9 @@ const EXPECTED_OPERATIONS: [string, string][] = [
   ['/change-proposals/{id}/revert', 'post'],
   ['/change-proposals/{id}/revert-request', 'post'],
   ['/change-proposals/{id}/per-page-notifications', 'put'],
+  ['/change-proposals/{id}/reviews', 'post'],
+  ['/change-proposals/{id}/reviewers', 'patch'],
+  ['/change-proposals/review-queue', 'get'],
 ];
 
 const documentedPaths = (glob: string): Record<string, PathItem> => {
@@ -51,7 +54,7 @@ describe('change-proposal OpenAPI documentation', () => {
     }
   });
 
-  it('documents all ten routes under the ChangeProposals tag', () => {
+  it('documents all thirteen routes under the ChangeProposals tag', () => {
     const paths = documentedPaths(ROUTES_GLOB);
 
     const documented = Object.entries(paths).flatMap(([route, item]) =>

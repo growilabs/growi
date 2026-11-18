@@ -1,4 +1,4 @@
-import { type IPage, PageGrant } from '@growi/core';
+import { getIdStringForRef, type IPage, PageGrant } from '@growi/core';
 import type { Namespace } from '@growi/core/dist/interfaces/vault';
 
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
@@ -13,13 +13,19 @@ import UserGroupRelation from '~/server/models/user-group-relation';
  *  2. computePageNamespaces – determines which namespace(s) a single page belongs
  *     to based on its grant settings.
  */
+/** The page fields that decide which namespace(s) a page belongs to. */
+export type PageGrantState = Pick<
+  IPage,
+  'grant' | 'grantedGroups' | 'grantedUsers'
+>;
+
 export interface VaultNamespaceMapper {
   computeAccessibleNamespaces(
     userId: string | null,
     scopes?: ReadonlyArray<string>,
   ): Promise<ReadonlyArray<Namespace>>;
 
-  computePageNamespaces(page: IPage): {
+  computePageNamespaces(page: PageGrantState): {
     current: ReadonlyArray<Namespace>;
     previous?: ReadonlyArray<Namespace>;
   };
@@ -57,7 +63,9 @@ const resolveGroupIds = async (userId: string): Promise<string[]> => {
  * responsibility (via isExcludedFromVault() in op handlers), not the
  * apps/app layer's (req 6.3).
  */
-const derivePageNamespaces = (page: IPage): ReadonlyArray<Namespace> => {
+const derivePageNamespaces = (
+  page: PageGrantState,
+): ReadonlyArray<Namespace> => {
   switch (page.grant) {
     case PageGrant.GRANT_PUBLIC:
       return ['public'];
@@ -68,16 +76,16 @@ const derivePageNamespaces = (page: IPage): ReadonlyArray<Namespace> => {
     case PageGrant.GRANT_USER_GROUP: {
       // Each granted group maps to a distinct namespace (req 3.4)
       const groups = page.grantedGroups ?? [];
-      return groups.map((g) => `group-${g.item.toString()}`);
+      return groups.map((g) => `group-${getIdStringForRef(g.item)}`);
     }
 
     case PageGrant.GRANT_OWNER: {
-      // Creator ID identifies the private namespace (req 3.5)
-      const creatorId = page.creator?.toString();
-      if (creatorId == null) {
-        return [];
-      }
-      return [`user-${creatorId}-only-me`];
+      // Read access to an only-me page is decided by grantedUsers, not by the
+      // creator. No granted user means no namespace.
+      const grantedUsers = page.grantedUsers ?? [];
+      return grantedUsers
+        .filter((user) => user != null)
+        .map((user) => `user-${getIdStringForRef(user)}-only-me`);
     }
 
     default:
@@ -140,7 +148,7 @@ export const createVaultNamespaceMapper = (): VaultNamespaceMapper => {
      * with both the old and new page objects and treating the old result as
      * `previous`).
      */
-    computePageNamespaces(page: IPage): {
+    computePageNamespaces(page: PageGrantState): {
       current: ReadonlyArray<Namespace>;
       previous?: ReadonlyArray<Namespace>;
     } {

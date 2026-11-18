@@ -1,4 +1,8 @@
-import type { OperationStatus, OperationType } from '../../interfaces';
+import {
+  APPLIED_AT_LEAST_ONCE_STATUSES,
+  type OperationStatus,
+  type OperationType,
+} from '../../interfaces';
 
 // The parts of an operation visibility depends on; OperationRecord and the
 // operations of a linked-proposal record both satisfy it.
@@ -23,11 +27,9 @@ export type VisibilityContext = {
 };
 
 // Statuses that say nothing about work in flight or never done, safe for non-requesters.
-const STATUSES_VISIBLE_TO_OTHERS: ReadonlySet<OperationStatus> = new Set([
-  'applied',
-  'reverted',
-  'revert-refused',
-]);
+const STATUSES_VISIBLE_TO_OTHERS: ReadonlySet<OperationStatus> = new Set(
+  APPLIED_AT_LEAST_ONCE_STATUSES,
+);
 
 // A create has no page until it is applied, so its target is the result page.
 export const targetPageIdOf = (

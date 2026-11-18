@@ -74,6 +74,7 @@ import loggerFactory from '~/utils/logger';
 import { prepareDeleteConfigValuesForCalc } from '~/utils/page-delete-config';
 import { prisma } from '~/utils/prisma';
 
+import { capturePreviousGrantState } from '../../events/page';
 import type { ObjectIdLike } from '../../interfaces/mongoose-utils';
 import { PathAlreadyExistsError } from '../../models/errors';
 import type { PageOperationDocument } from '../../models/page-operation';
@@ -92,6 +93,10 @@ import { BULK_REINDEX_SIZE, LIMIT_FOR_MULTIPLE_PAGE_OP } from './consts';
 import { deleteCompletelyOperation as deleteCompletelyOperationImpl } from './delete-completely-operation';
 import { onSeen } from './events/seen';
 import { isGrantImmutablePath } from './grant-immutable-path';
+import {
+  PageOperationRefusalReason,
+  PageOperationRefusedError,
+} from './page-operation-refusal';
 import type {
   DeletionOptions,
   DeletionVerdict,
@@ -669,7 +674,10 @@ class PageService implements IPageService {
       newPagePath,
     );
     if (!canOperate) {
-      throw Error(`Cannot operate rename to path "${newPagePath}" right now.`);
+      throw new PageOperationRefusedError(
+        PageOperationRefusalReason.OPERATION_IN_PROGRESS,
+        `Cannot operate rename to path "${newPagePath}" right now.`,
+      );
     }
 
     /*
@@ -770,7 +778,8 @@ class PageService implements IPageService {
         throw err;
       }
       if (!isGrantNormalized) {
-        throw Error(
+        throw new PageOperationRefusedError(
+          PageOperationRefusalReason.GRANT_NOT_ASSIGNABLE,
           `This page cannot be renamed to "${newPagePathSanitized}" since the selected grant or grantedGroup is not assignable to this page.`,
         );
       }
@@ -1584,7 +1593,8 @@ class PageService implements IPageService {
       newPagePathSanitized,
     );
     if (!canOperate) {
-      throw Error(
+      throw new PageOperationRefusedError(
+        PageOperationRefusalReason.OPERATION_IN_PROGRESS,
         `Cannot operate duplicate to path "${newPagePathSanitized}" right now.`,
       );
     }
@@ -1632,7 +1642,8 @@ class PageService implements IPageService {
         throw err;
       }
       if (!isGrantNormalized) {
-        throw Error(
+        throw new PageOperationRefusedError(
+          PageOperationRefusalReason.GRANT_NOT_ASSIGNABLE,
           `This page cannot be duplicated to "${newPagePathSanitized}" since the selected grant or grantedGroup is not assignable to this page.`,
         );
       }
@@ -3337,18 +3348,28 @@ class PageService implements IPageService {
     const childPagesWritable = new Writable({
       objectMode: true,
       write: async (batch, encoding, callback) => {
-        await this.updateChildPagesGrant(
-          batch,
-          grant,
-          user,
-          userRelatedGroups,
-          userRelatedParentGrantedGroups,
-        );
-        callback();
+        try {
+          await this.updateChildPagesGrant(
+            batch,
+            grant,
+            user,
+            userRelatedGroups,
+            userRelatedParentGrantedGroups,
+          );
+          callback();
+        } catch (err) {
+          callback(err);
+        }
       },
     });
 
-    await pipeline(childPagesReadableStream, batchStream, childPagesWritable);
+    try {
+      await pipeline(childPagesReadableStream, batchStream, childPagesWritable);
+    } finally {
+      // The bulk write above bypasses the per-page events. Also on failure:
+      // the batches written before it are already stored.
+      this.pageEvent.emit('syncDescendantsUpdate', parentPage, user);
+    }
   }
 
   async updateChildPagesGrant(
@@ -5009,7 +5030,8 @@ class PageService implements IPageService {
         throw err;
       }
       if (!isGrantNormalized) {
-        throw Error(
+        throw new PageOperationRefusedError(
+          PageOperationRefusalReason.GRANT_NOT_ASSIGNABLE,
           'The selected grant or grantedGroup is not assignable to this page.',
         );
       }
@@ -5377,6 +5399,7 @@ class PageService implements IPageService {
       dummyUser,
     );
     savedPage = await pushRevision(savedPage, newRevision, dummyUser);
+    await savedPage.populate('revision');
 
     if (savedPage._id == null) {
       throw new Error('Something went wrong: _id is null');
@@ -5679,14 +5702,16 @@ class PageService implements IPageService {
       newPageData.descendantCount = 0;
     }
 
+    const updateEventExtras = capturePreviousGrantState(newPageData);
     newPageData.applyScope(user, grant, grantUserGroupIds);
-
-    // update existing page
-    let savedPage = await newPageData.save();
 
     // Update body
     const isBodyPresent = body != null;
     const shouldUpdateBody = isBodyPresent;
+
+    // With a body, pushRevision saves the pending field changes together with the revision.
+    let savedPage = newPageData;
+    let populateError: unknown;
     if (shouldUpdateBody) {
       const origin = options.origin;
       const newRevision = prisma.revisions.prepareRevision(
@@ -5700,10 +5725,21 @@ class PageService implements IPageService {
       savedPage = await pushRevision(savedPage, newRevision, user, {
         expectedRevisionId: options.expectedRevisionId,
       });
-      await savedPage.populateDataToShowRevision();
+      // The update is already stored, so 'update' is still emitted below if
+      // populating fails; otherwise search and Vault would keep the old grant.
+      try {
+        await savedPage.populateDataToShowRevision();
+      } catch (err) {
+        populateError = err;
+      }
+    } else {
+      savedPage = await savedPage.save();
     }
 
-    this.pageEvent.emit('update', savedPage, user);
+    this.pageEvent.emit('update', savedPage, user, updateEventExtras);
+    if (populateError != null) {
+      throw populateError;
+    }
 
     // Update ex children's parent
     if (!wasOnTree && shouldBeOnTree) {
@@ -5786,14 +5822,16 @@ class PageService implements IPageService {
       grant,
       grantUserGroupIds,
     );
+    const updateEventExtras = capturePreviousGrantState(pageData);
     pageData.applyScope(user, grant, grantUserGroupIds);
-
-    // update existing page
-    let savedPage = await pageData.save();
 
     // Update revision
     const isBodyPresent = body != null;
     const shouldUpdateBody = isBodyPresent;
+
+    // With a body, pushRevision saves the pending field changes together with the revision.
+    let savedPage = pageData;
+    let populateError: unknown;
     if (shouldUpdateBody) {
       const newRevision = prisma.revisions.prepareRevision(
         pageData,
@@ -5806,15 +5844,25 @@ class PageService implements IPageService {
       savedPage = await pushRevision(savedPage, newRevision, user, {
         expectedRevisionId: options.expectedRevisionId,
       });
-      await savedPage.populateDataToShowRevision();
+      // Same as updatePage: 'update' is still emitted below if populating fails.
+      try {
+        await savedPage.populateDataToShowRevision();
+      } catch (err) {
+        populateError = err;
+      }
+    } else {
+      savedPage = await savedPage.save();
+    }
+
+    this.pageEvent.emit('update', savedPage, user, updateEventExtras);
+    if (populateError != null) {
+      throw populateError;
     }
 
     // update scopes for descendants
     if (options.overwriteScopesOfDescendants) {
       this.applyScopesToDescendantsWithStream(savedPage, user, true);
     }
-
-    this.pageEvent.emit('update', savedPage, user);
 
     return savedPage;
   }

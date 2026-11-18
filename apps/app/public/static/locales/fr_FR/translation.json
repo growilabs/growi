@@ -41,6 +41,7 @@
   "Update": "Enregistrer",
   "Update Page": "Mettre à jour la page",
   "Error": "Erreur",
+  "Retry": "Réessayer",
   "Warning": "Avertissement",
   "Sign in": "Connexion",
   "Sign in with External auth": "Se connecter avec {{signin}}",
@@ -434,7 +435,9 @@
     "user_not_admin": "Seul un administrateur peut supprimer la page",
     "single_deletion_empty_pages": "Une page vide ne peut pas être supprimée",
     "complete_deletion_not_allowed_for_user": "Vous n'êtes pas autorisé à supprimer cette page",
-    "deletion_not_allowed_for_user": "Vous n'êtes pas autorisé à supprimer cette page"
+    "deletion_not_allowed_for_user": "Vous n'êtes pas autorisé à supprimer cette page",
+    "grant_not_assignable": "La page ne peut pas être placée à ce chemin avec sa permission actuelle, car la page parente est ouverte à moins d'utilisateurs.",
+    "operation_in_progress": "Une autre opération sur cette page ou une page voisine est encore en cours. Veuillez réessayer plus tard."
   },
   "page_history": {
     "revision_list": "Historique des modifications",
@@ -694,11 +697,14 @@
     "delete_all_selected_page": "Tout supprimer",
     "select_all": "Tout sélectionner",
     "delete_selected_pages": "Supprimer les pages sélectionnées",
+    "selected_count": "{{selectedCount}} sélectionnée(s)",
+    "selected_count_of_loaded": "{{selectedCount}} sélectionnée(s) ({{loadedCount}} chargée(s))",
     "currently_not_implemented": "Non implémenté",
     "search_again": "Rechercher",
     "number_of_list_to_display": "Afficher",
     "page_number_unit": "pages",
     "hit_number_unit": "trouvé",
+    "failed_to_load_more": "Échec du chargement de résultats supplémentaires",
     "filter": "Filtres",
     "search_option": "Options de recherche",
     "filter_remove": "Supprimer",
@@ -1236,6 +1242,15 @@
     },
     "achievement": {
       "settled_with_percent": "Terminé ({{percent}} % réalisé)"
+    },
+    "review_term": {
+      "reviewer": "Approbateur",
+      "approve": "Approuver",
+      "reject": "Rejeter",
+      "abstain": "S'abstenir",
+      "comment": "Commentaire",
+      "purpose": "Objectif du changement",
+      "decision": "Décision"
     }
   },
   "change_proposal_viewer": {
@@ -1321,5 +1336,10 @@
         "error": "Échec de l'envoi de la demande"
       }
     }
+  },
+  "plantuml": {
+    "url-too-long": "Le diagramme est trop volumineux et dépasse probablement la longueur d'URL maximale du serveur PlantUML. Divisez ou simplifiez le diagramme.",
+    "post-unavailable": "Le serveur PlantUML ne prend peut-être pas en charge POST, ou le navigateur ne parvient pas à le joindre. L'administrateur peut revenir à GET en définissant PLANTUML_HTTP_METHOD=get.",
+    "render-failed": "Le diagramme n'a pas pu être affiché. Le serveur PlantUML est injoignable ou a renvoyé une erreur."
   }
 }

@@ -81,6 +81,7 @@ const createProposal = (
   lastAppliedAt: '2026-03-05T08:09:10.000Z',
   status: 'applied',
   isRequester: false,
+  viewerRole: 'other',
   operations: [createOperation('op-a'), createOperation('op-b')],
   ...overrides,
 });
@@ -111,6 +112,7 @@ describe('ChangeProposalDetail', () => {
       mockFound(
         createProposal({
           isRequester: true,
+          viewerRole: 'requester',
           operations: [
             { key: 'f', type: 'edit', status: 'failed', path: '/failed-path' },
           ],

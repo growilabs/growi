@@ -13,6 +13,9 @@ import { listAppliedRouteHandlersFactory } from './list-applied';
 import { listMineRouteHandlersFactory } from './list-mine';
 import { revertRouteHandlersFactory } from './revert';
 import { revertRequestRouteHandlersFactory } from './revert-request';
+import { reviewQueueRouteHandlersFactory } from './review-queue';
+import { reviewersRouteHandlersFactory } from './reviewers';
+import { reviewsRouteHandlersFactory } from './reviews';
 import { revisionMarksRouteHandlersFactory } from './revision-marks';
 import { setPerPageNotificationsRouteHandlersFactory } from './set-per-page-notifications';
 import { skipRouteHandlersFactory } from './skip';
@@ -41,11 +44,20 @@ export const createChangeProposalRouter = (
   // Fixed paths before /:id, which would otherwise take them as ids.
   router.get('/mine', listMineRouteHandlersFactory(crowi, getService));
   router.get('/applied', listAppliedRouteHandlersFactory(crowi, getService));
+  router.get(
+    '/review-queue',
+    reviewQueueRouteHandlersFactory(crowi, getService),
+  );
   router.post(
     '/revision-marks',
     revisionMarksRouteHandlersFactory(crowi, getService),
   );
   router.post('/:id/approve', approveRouteHandlersFactory(crowi, getService));
+  router.post('/:id/reviews', reviewsRouteHandlersFactory(crowi, getService));
+  router.patch(
+    '/:id/reviewers',
+    reviewersRouteHandlersFactory(crowi, getService),
+  );
   router.post('/:id/skip', skipRouteHandlersFactory(crowi, getService));
   router.post('/:id/discard', discardRouteHandlersFactory(crowi, getService));
   router.post('/:id/revert', revertRouteHandlersFactory(crowi, getService));

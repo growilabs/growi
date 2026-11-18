@@ -81,6 +81,7 @@ const buildProposal = (
   lastAppliedAt: 'LASTAPPLIEDAT',
   status: 'applied',
   isRequester: false,
+  viewerRole: 'other',
   operations: [],
   ...overrides,
 });
@@ -197,6 +198,7 @@ describe('ChangeProposalDetail shows gone pages only as core returned them', () 
   it('shows the requester the recorded paths and the page-gone text, and nothing else, for operations whose pages are gone', () => {
     const proposal = buildProposal({
       isRequester: true,
+      viewerRole: 'requester',
       status: 'partially-reverted',
       operations: [
         {

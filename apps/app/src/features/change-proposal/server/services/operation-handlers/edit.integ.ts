@@ -290,6 +290,7 @@ describe('edit operation handler', () => {
         'update',
         expect.objectContaining({ _id: page._id }),
         expect.anything(),
+        expect.objectContaining({ previousGrant: PageGrant.GRANT_PUBLIC }),
       );
     });
 

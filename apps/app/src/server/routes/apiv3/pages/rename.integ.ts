@@ -49,6 +49,7 @@ import request from 'supertest';
 import { getInstance } from '^/test/setup/crowi';
 
 import type { IOptionsForCreate } from '~/interfaces/page';
+import { PageActionStage, PageActionType } from '~/interfaces/page-operation';
 import type Crowi from '~/server/crowi';
 import type { PageDocument } from '~/server/models/page';
 import PageOperation from '~/server/models/page-operation';
@@ -381,5 +382,59 @@ describe('PUT /rename', () => {
 
     const renamedPage = await crowi.models.Page.findById(page._id);
     expect(renamedPage?.path).toBe(renamedPath);
+  });
+
+  it('returns 409 and leaves the page untouched when its grant is not assignable at the new path', async () => {
+    const page = await createPage(sourcePath, 'source body', requester);
+    const narrowerParentPath = `${FIXTURE_ROOT}/narrower-parent`;
+    await createPage(narrowerParentPath, 'parent body', requester, {
+      grant: PageGrant.GRANT_OWNER,
+    });
+
+    const response = await request(app)
+      .put('/rename')
+      .set('X-Forwarded-For', TEST_IP)
+      .send({
+        pageId: page._id.toString(),
+        newPagePath: `${narrowerParentPath}/moved`,
+        revisionId: latestRevisionIdOf(page),
+      });
+
+    expect(response.status).toBe(409);
+    expect(response.body.errors).toEqual([
+      expect.objectContaining({ code: 'grant_not_assignable' }),
+    ]);
+
+    const untouchedPage = await crowi.models.Page.findById(page._id);
+    expect(untouchedPage?.path).toBe(sourcePath);
+  });
+
+  it('returns 409 and leaves the page untouched while another operation holds its path', async () => {
+    const page = await createPage(sourcePath, 'source body', requester);
+    await PageOperation.create({
+      actionType: PageActionType.Rename,
+      actionStage: PageActionStage.Sub,
+      fromPath: sourcePath,
+      toPath: `${FIXTURE_ROOT}/held-by-another-operation`,
+      page: { _id: page._id, path: sourcePath },
+      user: { _id: requester._id },
+    });
+
+    const response = await request(app)
+      .put('/rename')
+      .set('X-Forwarded-For', TEST_IP)
+      .send({
+        pageId: page._id.toString(),
+        newPagePath: renamedPath,
+        revisionId: latestRevisionIdOf(page),
+      });
+
+    expect(response.status).toBe(409);
+    expect(response.body.errors).toEqual([
+      expect.objectContaining({ code: 'operation_in_progress' }),
+    ]);
+
+    const untouchedPage = await crowi.models.Page.findById(page._id);
+    expect(untouchedPage?.path).toBe(sourcePath);
   });
 });

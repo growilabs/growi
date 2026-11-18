@@ -35,6 +35,9 @@ const emptyOperation: ChangeproposalsOperations = {
   revertTarget: null,
   revertedByProposalId: null,
   revertedAt: null,
+  approvedBy: null,
+  approvedChannel: null,
+  decisionToken: null,
 };
 
 const operationRow = (
@@ -56,6 +59,9 @@ const proposalRow = (fields: Partial<changeproposals>): changeproposals => ({
   applyLease: null,
   expiresAt: null,
   perPageNotifications: true,
+  purpose: null,
+  reviewers: [],
+  reviews: [],
   createdAt: CREATED_AT,
   updatedAt: CREATED_AT,
   ...fields,
@@ -73,8 +79,163 @@ describe('toChangeProposalDocument', () => {
       operations: [],
       appliedPageIds: [],
       perPageNotifications: true,
+      reviewers: [],
+      reviews: [],
       createdAt: CREATED_AT,
       updatedAt: CREATED_AT,
+    });
+  });
+
+  describe('reviewer fields (Req 15.1, 15.8)', () => {
+    const REVIEWER_ID = '65f000000000000000000005';
+    const ADDER_ID = '65f000000000000000000006';
+    const ADDED_AT = new Date('2026-10-02T00:00:00Z');
+    const REMOVED_AT = new Date('2026-10-03T00:00:00Z');
+    const reviewRow = {
+      kind: 'reject',
+      operationKey: null,
+      by: REVIEWER_ID,
+      at: ADDED_AT,
+      comment: null,
+      channel: 'ui',
+    };
+
+    it('maps purpose, reviewers and reviews and drops absent optional keys', () => {
+      const doc = toChangeProposalDocument(
+        proposalRow({
+          purpose: 'why this change',
+          reviewers: [
+            {
+              kind: 'user',
+              id: REVIEWER_ID,
+              addedBy: ADDER_ID,
+              addedAt: ADDED_AT,
+              removedBy: null,
+              removedAt: null,
+            },
+            {
+              kind: 'user-group',
+              id: REVIEWER_ID,
+              addedBy: ADDER_ID,
+              addedAt: ADDED_AT,
+              removedBy: ADDER_ID,
+              removedAt: REMOVED_AT,
+            },
+          ],
+          reviews: [
+            reviewRow,
+            {
+              ...reviewRow,
+              kind: 'abstain',
+              operationKey: 'k-0',
+              comment: 'not mine',
+              channel: 'ai-tool',
+            },
+          ],
+        }),
+      );
+
+      expect(doc.purpose).toBe('why this change');
+      expect(doc.reviewers).toStrictEqual([
+        {
+          kind: 'user',
+          id: REVIEWER_ID,
+          addedBy: ADDER_ID,
+          addedAt: ADDED_AT,
+        },
+        {
+          kind: 'user-group',
+          id: REVIEWER_ID,
+          addedBy: ADDER_ID,
+          addedAt: ADDED_AT,
+          removedBy: ADDER_ID,
+          removedAt: REMOVED_AT,
+        },
+      ]);
+      expect(doc.reviews).toStrictEqual([
+        { kind: 'reject', by: REVIEWER_ID, at: ADDED_AT, channel: 'ui' },
+        {
+          kind: 'abstain',
+          operationKey: 'k-0',
+          by: REVIEWER_ID,
+          at: ADDED_AT,
+          comment: 'not mine',
+          channel: 'ai-tool',
+        },
+      ]);
+    });
+
+    it('maps the approval fields of an operation and omits them when absent', () => {
+      const approvedAt = new Date('2026-10-04T00:00:00Z');
+      const doc = toChangeProposalDocument(
+        proposalRow({
+          operations: [
+            operationRow({
+              type: 'create',
+              path: '/a',
+              body: 'b',
+              approvedAt,
+              approvedBy: REVIEWER_ID,
+              approvedChannel: 'api',
+              decisionToken: 'token-1',
+            }),
+            operationRow({
+              type: 'create',
+              path: '/b',
+              body: 'b',
+              index: 1,
+              key: 'k-1',
+            }),
+          ],
+        }),
+      );
+
+      expect(doc.operations[0]).toMatchObject({
+        approvedAt,
+        approvedBy: REVIEWER_ID,
+        approvedChannel: 'api',
+        decisionToken: 'token-1',
+      });
+      expect(doc.operations[1]).not.toHaveProperty('approvedBy');
+      expect(doc.operations[1]).not.toHaveProperty('approvedChannel');
+      expect(doc.operations[1]).not.toHaveProperty('decisionToken');
+    });
+
+    it('throws for an unknown review channel or review kind', () => {
+      expect(() =>
+        toChangeProposalDocument(
+          proposalRow({
+            reviews: [{ ...reviewRow, channel: 'smoke-signal' }],
+          }),
+        ),
+      ).toThrow();
+      expect(() =>
+        toChangeProposalDocument(
+          proposalRow({ reviews: [{ ...reviewRow, kind: 'approve' }] }),
+        ),
+      ).toThrow();
+    });
+
+    it('carries the new fields through the summary conversion as well', () => {
+      const { body: _body, ...createWithoutBody } = operationRow({
+        type: 'create',
+        path: '/a',
+        approvedBy: REVIEWER_ID,
+        approvedChannel: 'ui',
+        decisionToken: 'token-1',
+      });
+      const summary = toChangeProposalSummary({
+        ...proposalRow({ purpose: 'p' }),
+        operations: [createWithoutBody],
+      });
+
+      expect(summary.purpose).toBe('p');
+      expect(summary.reviewers).toStrictEqual([]);
+      expect(summary.operations[0]).toMatchObject({
+        approvedBy: REVIEWER_ID,
+        approvedChannel: 'ui',
+        decisionToken: 'token-1',
+      });
     });
   });
 

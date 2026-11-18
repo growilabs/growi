@@ -1,3 +1,5 @@
+import type { ReviewChannel, ReviewerRef, ReviewRecord } from './reviewer';
+
 // Total size cap for the bodies in one proposal; keeps a document well under MongoDB's 16 MB limit.
 export const MAX_TOTAL_BODY_BYTES = 8 * 1024 * 1024;
 
@@ -135,6 +137,10 @@ export type OperationRecord = OperationPayload & {
   readonly status: OperationStatus;
   readonly reason?: OperationReason;
   readonly approvedAt?: Date;
+  // Set together with approvedAt only by an approval request; auto-apply and revert leave them unset.
+  readonly approvedBy?: string;
+  readonly approvedChannel?: ReviewChannel;
+  readonly decisionToken?: string;
   readonly appliedAt?: Date;
   readonly resultPageId?: string;
   readonly resultRevisionId?: string;
@@ -162,6 +168,9 @@ export type ChangeProposalDocument = {
   } | null;
   readonly expiresAt?: Date;
   readonly perPageNotifications: boolean;
+  readonly purpose?: string;
+  readonly reviewers: readonly ReviewerRef[];
+  readonly reviews: readonly ReviewRecord[];
   readonly createdAt: Date;
   readonly updatedAt: Date;
 };

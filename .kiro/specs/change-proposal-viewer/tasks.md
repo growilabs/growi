@@ -4,9 +4,9 @@
 >
 > **core との関係と版**:
 > - `change-proposal-core` は実装を終えて master に入っている（core の型・設定・action・画面の共通の部品・取得と取り消しの API・まとめた通知のすべて）。本計画のタスクは、core のタスクを待たずに始められる。
-> - 本計画は、core の変更（ページがもう無い操作を取り消しの相手にも表示のために返す見え方の決まり、完全な削除の操作のパス、編集の操作に反映した時点のパスを記録すること、ページがもう無い操作のパスを記録から返すこと。core の要件 6.7・9.11・9.12・9.13）を、グループ 8 のタスクとして同じ PR で実装する。決まりは core の spec が持つ。詳細ページと一覧のタスク（5.2・5.3・5.4・5.8）と、それを確かめる 7.2 は、グループ 8 のあとで行う。
+> - 本計画は、core の変更（ページがもう無い操作を取り消しの相手にも表示のために返す見え方の決まり、完全な削除の操作のパス、編集の操作に反映した時点のパスを記録すること、ページがもう無い操作のパスを記録から返すこと。core の要件 6.7・9.15・9.16・9.17）を、グループ 8 のタスクとして同じ PR で実装する。決まりは core の spec が持つ。詳細ページと一覧のタスク（5.2・5.3・5.4・5.8）と、それを確かめる 7.2 は、グループ 8 のあとで行う。
 > - core のまとめた通知はすでに master にある。本計画の通知の表示（5.9・6.4）が入るまでの版では、書き込み機能を有効にした wiki で、未読の印だけが出て開いても何も表示されない通知が生まれる。本計画の通知の表示は、この PR でまとめて入れる。
-> - design.md の「Upstream issues for change-proposal-core」の U1〜U6 は、どれも core の design で決まっている。本人以外に返す操作の条件（U5）、取り消しの結果の型 `RevertResult`（U3）、本人以外への `lastAppliedAt`（U2）は core の決めたものをそのまま使い、viewer のタスクで作り直さない。U5 の条件のうち、ページがもう無い操作の扱いだけは、core の spec の決まり（core の要件 9.11）に合わせて、グループ 8 で core のコードを直す。
+> - design.md の「Upstream issues for change-proposal-core」の U1〜U6 は、どれも core の design で決まっている。本人以外に返す操作の条件（U5）、取り消しの結果の型 `RevertResult`（U3）、本人以外への `lastAppliedAt`（U2）は core の決めたものをそのまま使い、viewer のタスクで作り直さない。U5 の条件のうち、ページがもう無い操作の扱いだけは、core の spec の決まり（core の要件 9.15）に合わせて、グループ 8 で core のコードを直す。
 > - `change-proposal-ai-agent` の、本人向けの部品（`AiRecordSection`）を `requester-only-sections.ts` の `'ai-chat'` の行に登録するタスクは、本計画の 5.6（表を作る）のあとで行う。詳細ページで表示されることの確認は 5.7 のあとになる。
 > - `change-proposal-ai-agent` の、後続・見直しを頼むボタンの部品を `requester-action-slots.ts` の `'ai-chat'` の行に登録するタスク（ai-agent の 6.7）は、本計画の 5.11 のあとで行う。
 > - 5.11・5.12 が使う core の段階・つながり・達成度（型、言葉の表と純関数、取得の応答）は、master の core にある。
@@ -257,7 +257,7 @@
   - Recent Changes・ページ履歴・作者の表示・通知の既存のテストが変更なしで通っていることを確かめている
   - _Requirements: 6.4, 10.4_
 
-- [x] 8. core の変更: ページがもう無い操作の見え方とパス（core の要件 6.7・9.11・9.12・9.13。決まりは core の design と、research.md の決定「ページがもう無い操作は、取り消しの相手にも見せる」「編集の操作のパスは、反映したときに操作の記録に残す」にある）
+- [x] 8. core の変更: ページがもう無い操作の見え方とパス（core の要件 6.7・9.15・9.16・9.17。決まりは core の design と、research.md の決定「ページがもう無い操作は、取り消しの相手にも見せる」「編集の操作のパスは、反映したときに操作の記録に残す」にある）
 - [x] 8.1 (P) 見え方の純関数に、取り消しの相手の扱いを足す
   - `server/domain/select-visible-operations.ts` の `VisibilityOperationFacts` に `revertedByProposalId` を、`VisibilityContext` に `isOriginalRequester`（見ている取り消しの Change Proposal の元を、見る人が依頼した）と `revertProposalIdsByViewer`（見る人が依頼した取り消しの Change Proposal の ID の集合）を足す
   - 対象のページが `deletedPageIds` に入る操作は、依頼した人に返し、取り消しの相手（`isOriginalRequester` が真、または操作の `revertedByProposalId` が `revertProposalIdsByViewer` に入る）には、状態が反映済み・取り消し済み・取り消しを断られたのときだけ返す。まだページが無い新規作成（ページの ID が無い）は、今のまま依頼した人にだけ返す

@@ -29,8 +29,8 @@
     totals — ` Test Files  1 failed | 309 passed (310)` and
     ` Tests  5 failed | 4151 passed (4156)`. Those two lines are the reason
     the ranges end where they do: they contain the words `1 failed` and
-    `5 failed`, and reading either as a Playwright shard summary would fire
-    the tier-1 count test on a vitest job. `extractSummary` must return
-    `null` for this file.
+    `5 failed`, and reading either as a Playwright shard summary would make
+    a vitest job report a Playwright run. `extractPlaywrightRuns` must
+    return no run for this file.
 
 - **Captured**: 2026-09-16.

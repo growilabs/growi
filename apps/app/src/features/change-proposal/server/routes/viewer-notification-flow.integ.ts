@@ -93,12 +93,11 @@ describe('change proposal notifications through the notification list API', () =
     if (!created.ok) throw new Error(JSON.stringify(created.error));
     const { proposalId } = created.value;
 
-    const applied = await service.approve(
-      proposalId,
-      users.requester,
-      'all',
-      BACKGROUND,
-    );
+    const applied = await service.approve(proposalId, {
+      user: users.requester,
+      channel: 'ui',
+      trigger: BACKGROUND,
+    });
     await kit.waitForPageOperationsToFinish();
     if (!applied.ok) throw new Error(JSON.stringify(applied.error));
     const stored = await kit.reload(proposalId);

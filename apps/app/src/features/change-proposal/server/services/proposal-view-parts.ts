@@ -8,10 +8,12 @@ import type {
   ChangeProposalView,
   OperationRecord,
   RequesterProposalState,
+  ViewerRole,
 } from '../../interfaces';
 import {
   computeAchievement,
   deriveProposalStatus,
+  deriveVisibleStage,
   targetPageIdOf,
   type VisibilityContext,
   type VisibilityOperationFacts,
@@ -121,7 +123,7 @@ const requesterStateOf = (
   };
 };
 
-/** Reads every requester in one query; a deleted user reads as empty names. */
+/** Reads the given users in one query; a deleted user reads as empty names. */
 export const readRequesters = async (
   requesterIds: readonly string[],
 ): Promise<(requesterId: string) => RequesterView> => {
@@ -147,16 +149,20 @@ export const readRequesters = async (
  * The fields a viewer sees of a proposal itself. Status, achievement and (for
  * non-requesters) lastAppliedAt come from the visible operations only, so
  * nothing counts or dates an operation the viewer may not see (requirements 9.4, 9.10).
+ * For non-requesters even the stage is the one the visible operations imply
+ * (Req 19.6).
  */
 export const toProposalHeaderView = (args: {
   readonly id: string;
   readonly proposal: HeaderFacts;
   readonly visible: readonly VisibleOperationFacts[];
-  readonly isRequester: boolean;
+  readonly role: ViewerRole;
   readonly requester: RequesterView;
   readonly isPerPageNotificationsEnabled: boolean;
 }): ProposalHeaderView => {
-  const { id, proposal, visible, isRequester } = args;
+  const { id, proposal, visible, role } = args;
+  const isRequester = role === 'requester';
+  const stage = isRequester ? proposal.lifecycle : deriveVisibleStage(visible);
   const lastAppliedAt = isRequester
     ? proposal.lastAppliedAt
     : newestAppliedAt(visible);
@@ -169,8 +175,9 @@ export const toProposalHeaderView = (args: {
     ...(lastAppliedAt == null
       ? {}
       : { lastAppliedAt: lastAppliedAt.toISOString() }),
-    status: deriveProposalStatus(proposal.lifecycle, visible),
+    status: deriveProposalStatus(stage, visible),
     isRequester,
+    viewerRole: role,
     ...(proposal.revertOf == null ? {} : { revertOf: proposal.revertOf }),
     ...(isRequester
       ? {

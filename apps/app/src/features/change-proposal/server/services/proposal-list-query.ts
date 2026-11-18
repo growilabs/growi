@@ -5,11 +5,13 @@ import { prisma } from '~/utils/prisma';
 import {
   APPLIED_AT_LEAST_ONCE_STATUSES,
   type ChangeProposalSummaryView,
+  type ViewerRole,
 } from '../../interfaces';
 import {
   recordedPathOf,
   selectVisibleOperations,
   targetPageIdOf,
+  type ViewerIdentity,
 } from '../domain';
 import type { AppliedListCursor } from '../models/change-proposal-types';
 import type {
@@ -18,7 +20,6 @@ import type {
 } from '../models/to-change-proposal-document';
 import { loadViewablePages, type ViewablePages } from './current-page-facts';
 import {
-  contextFor,
   loadRevertCounterparts,
   type ProposalHeaderView,
   pageIdsOf,
@@ -29,6 +30,7 @@ import type {
   RevertCounterpartFacts,
   RevertCounterpartSource,
 } from './revert-counterparts';
+import { loadViewerIdentity } from './reviewer-identity';
 import { readChangeProposalSettings } from './settings';
 
 export type ProposalListQuery = {
@@ -61,7 +63,7 @@ export type AppliedListScan = {
 
 const APPLIED_LIST_SCAN_BATCH = 50;
 const APPLIED_LIST_SCAN_LIMIT = 500;
-const DEFAULT_APPLIED_LIST_SCAN: AppliedListScan = {
+export const DEFAULT_APPLIED_LIST_SCAN: AppliedListScan = {
   batchSize: APPLIED_LIST_SCAN_BATCH,
   limit: APPLIED_LIST_SCAN_LIMIT,
 };
@@ -82,11 +84,12 @@ const decodeCursor = (value: string): AppliedListCursor | null => {
     : { lastAppliedAt: new Date(Number(match[1])), id: match[2] };
 };
 
-const isPositiveInteger = (value: number): boolean =>
+export const isPositiveInteger = (value: number): boolean =>
   Number.isInteger(value) && value > 0;
 
 type VisibleSummary = {
   readonly summary: ChangeProposalSummary;
+  readonly role: ViewerRole;
   readonly visible: readonly OperationSummaryRecord[];
   readonly pages: ChangeProposalSummaryView['pages'];
 };
@@ -114,7 +117,7 @@ const pageOf = (
   return path == null ? { id: pageId } : { id: pageId, path };
 };
 
-const visiblePagesOf = (
+export const visiblePagesOf = (
   visible: readonly OperationSummaryRecord[],
   viewable: ViewablePages,
   createdPaths: ReadonlyMap<string, string>,
@@ -141,10 +144,12 @@ type SummaryVisibility = {
 const loadSummaryVisibility = async (
   rows: readonly ChangeProposalSummary[],
   viewer: IUserHasId,
+  identity?: ViewerIdentity,
 ): Promise<SummaryVisibility> => {
   const viewable = await loadViewablePages(
     rows.flatMap((row) => pageIdsOf(row.operations)),
     viewer,
+    identity,
   );
   const counterpartsOf = await loadRevertCounterparts(
     rows,
@@ -154,18 +159,23 @@ const loadSummaryVisibility = async (
   return { viewable, counterpartsOf };
 };
 
+// These lists apply the other-viewer rule to reviewers too, and say so in the
+// role (Req 19.10).
 const toVisibleSummary = (
   summary: ChangeProposalSummary,
-  viewerId: string,
+  role: ViewerRole,
   { viewable, counterpartsOf }: SummaryVisibility,
 ): VisibleSummary => {
   const counterpart = counterpartsOf(summary);
-  const visible = selectVisibleOperations(
-    summary.operations,
-    contextFor(summary.requester, viewerId, viewable, counterpart),
-  );
+  const visible = selectVisibleOperations(summary.operations, {
+    ...viewable,
+    isRequester: role === 'requester',
+    isOriginalRequester: counterpart.isOriginalRequester,
+    revertProposalIdsByViewer: counterpart.revertProposalIdsByViewer,
+  });
   return {
     summary,
+    role,
     visible,
     pages: visiblePagesOf(visible, viewable, counterpart.createdPaths),
   };
@@ -174,19 +184,18 @@ const toVisibleSummary = (
 // Requester names and the admin setting are read once for the whole list.
 const toSummaryViews = async (
   entries: readonly VisibleSummary[],
-  viewerId: string,
 ): Promise<ChangeProposalSummaryView[]> => {
   const requesterOf = await readRequesters(
     entries.map((entry) => entry.summary.requester),
   );
   const isPerPageNotificationsEnabled =
     readChangeProposalSettings().perPageNotificationsEnabled;
-  return entries.map(({ summary, visible, pages }) => {
+  return entries.map(({ summary, role, visible, pages }) => {
     const header: ProposalHeaderView = toProposalHeaderView({
       id: summary.id,
       proposal: summary,
       visible,
-      isRequester: summary.requester === viewerId,
+      role,
       requester: requesterOf(summary.requester),
       isPerPageNotificationsEnabled,
     });
@@ -221,6 +230,8 @@ const scanAppliedVisible = async (
   readonly next: AppliedListCursor | null;
 }> => {
   const viewerId = viewer._id.toString();
+  // Read once for the whole scan, however many batches it takes.
+  const identity = await loadViewerIdentity(viewerId);
   const matched: VisibleSummary[] = [];
   let position = start;
   let scanned = 0;
@@ -231,11 +242,15 @@ const scanAppliedVisible = async (
       position,
       take,
     );
-    const visibility = await loadSummaryVisibility(rows, viewer);
+    const visibility = await loadSummaryVisibility(rows, viewer, identity);
     for (const row of rows) {
       scanned += 1;
       position = positionOf(row);
-      const entry = toVisibleSummary(row, viewerId, visibility);
+      const entry = toVisibleSummary(
+        row,
+        row.requester === viewerId ? 'requester' : 'other',
+        visibility,
+      );
       if (hasAppliedOperation(entry)) {
         matched.push(entry);
         if (matched.length === limit) {
@@ -265,9 +280,9 @@ export const createProposalListQuery = (
     });
     const pageRows = rows.slice(0, limit);
     const visibility = await loadSummaryVisibility(pageRows, viewer);
+    // Every row is the viewer's own proposal.
     const items = await toSummaryViews(
-      pageRows.map((row) => toVisibleSummary(row, viewerId, visibility)),
-      viewerId,
+      pageRows.map((row) => toVisibleSummary(row, 'requester', visibility)),
     );
     return { items, hasNext: rows.length > limit };
   },
@@ -284,7 +299,7 @@ export const createProposalListQuery = (
       scan,
     );
     return {
-      items: await toSummaryViews(matched, viewer._id.toString()),
+      items: await toSummaryViews(matched),
       nextCursor: next == null ? null : encodeCursor(next),
     };
   },

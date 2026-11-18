@@ -3,16 +3,18 @@ import { Schema } from 'mongoose';
 
 import { Prisma } from '~/generated/prisma/client';
 import { getOrCreateModel } from '~/server/util/mongoose-utils';
-import loggerFactory from '~/utils/logger';
 import type { prisma } from '~/utils/prisma';
 
 import type {
   ChangeProposalDocument,
   OperationStatus,
   ProposalMark,
+  ReviewerInput,
   SkipReason,
 } from '../../interfaces';
+import type { ViewerIdentity } from '../domain';
 import {
+  approverWhere,
   closableWhere,
   hasPendingOperation,
   idNotIn,
@@ -23,16 +25,29 @@ import {
   SETTLED,
   settleableWhere,
   summarySelect,
+  toApprovalData,
   toLinkedProposalRecord,
   toOperationCreateInput,
   toOriginalOperationData,
   toOutcomeData,
   toRequesterWriteMiss,
   toRevertCounterpartRecord,
+  toReviewerWriteMiss,
+  UNSET_APPROVAL,
+  unapprovedOperation,
   withoutUndefined,
 } from './change-proposal-query-parts';
+import { listReviewQueueAfter } from './change-proposal-review-queue';
+import {
+  addReviewers,
+  addReviews,
+  clearReviewsOnApproval,
+  removeReviewers,
+} from './change-proposal-reviewer-writes';
 import type {
+  AddReviewersResult,
   AppliedListCursor,
+  AttributedApproval,
   ClosingLifecycle,
   CreateProposalInput,
   LinkedProposalRecord,
@@ -40,14 +55,14 @@ import type {
   RecordedOutcome,
   RequesterWriteResult,
   RevertCounterpartRecord,
+  ReviewEntry,
 } from './change-proposal-types';
+import { runConditionalWrite } from './conditional-write';
 import {
   type ChangeProposalSummary,
   toChangeProposalDocument,
   toChangeProposalSummary,
 } from './to-change-proposal-document';
-
-const logger = loggerFactory('growi:features:change-proposal:models');
 
 export const APPLY_LEASE_MS = 5 * 60 * 1000;
 export const LINKED_PROPOSALS_LIMIT = 50;
@@ -55,27 +70,6 @@ export const LINKED_PROPOSALS_LIMIT = 50;
 // Prisma does every read and write. The mongoose model exists only so that
 // notifications and activities can populate it as their targetModel.
 getOrCreateModel('ChangeProposal', new Schema({}));
-
-// P2034 is the query engine giving up after repeated write conflicts; the caller did not write.
-const runConditionalWrite = async (
-  write: () => Promise<{ count: number }>,
-): Promise<boolean> => {
-  try {
-    const { count } = await write();
-    return count > 0;
-  } catch (err) {
-    if (
-      err instanceof Prisma.PrismaClientKnownRequestError &&
-      err.code === 'P2034'
-    ) {
-      logger.warn(
-        `Conditional write gave up after write conflicts: ${err.message}`,
-      );
-      return false;
-    }
-    throw err;
-  }
-};
 
 type RequesterReader = (
   id: string,
@@ -137,6 +131,9 @@ export const extension = Prisma.defineExtension((client) => {
               appliedPageIds: [],
               expiresAt: input.expiresAt,
               perPageNotifications: input.perPageNotifications,
+              purpose: input.purpose,
+              reviewers: (input.reviewers ?? []).map((r) => ({ ...r })),
+              reviews: [],
             }),
           });
           return toChangeProposalDocument(created);
@@ -249,41 +246,141 @@ export const extension = Prisma.defineExtension((client) => {
           );
         },
 
+        /**
+         * Approves the chosen pending, not-yet-approved operations. A requester id alone
+         * (auto-apply) records no approver. `ok` means only that the proposal matched, not
+         * that an operation was written: the caller re-reads the operations carrying its
+         * decisionToken to learn which ones this request approved.
+         */
         async markApproved(
           id: string,
-          requesterId: string,
+          approver: string | AttributedApproval,
           keys: readonly string[],
           now: Date,
         ): Promise<RequesterWriteResult> {
           const context =
             Prisma.getExtensionContext<typeof prisma.changeproposals>(this);
+          const approverId =
+            typeof approver === 'string' ? approver : approver.approver.userId;
           const written =
             isValidObjectId(id) &&
-            isValidObjectId(requesterId) &&
+            isValidObjectId(approverId) &&
             (await runConditionalWrite(() =>
               context.updateMany({
-                where: { id, requester: requesterId, lifecycle: 'open' },
+                where: { id, lifecycle: 'open', ...approverWhere(approver) },
                 data: {
                   operations: {
                     updateMany: {
-                      where: { key: { in: [...keys] }, status: PENDING },
-                      data: { approvedAt: now },
+                      where: {
+                        key: { in: [...keys] },
+                        status: PENDING,
+                        ...unapprovedOperation,
+                      },
+                      data: toApprovalData(now, approver),
                     },
                   },
                 },
               }),
             ));
-          return written
-            ? { ok: true }
-            : explainRequesterWriteMiss(
-                (pid) =>
-                  context.findUnique({
-                    where: { id: pid },
-                    select: { requester: true },
-                  }),
-                id,
-                requesterId,
-              );
+          if (written) {
+            return { ok: true };
+          }
+          if (typeof approver === 'string') {
+            return explainRequesterWriteMiss(
+              (pid) =>
+                context.findUnique({
+                  where: { id: pid },
+                  select: { requester: true },
+                }),
+              id,
+              approver,
+            );
+          }
+          return toReviewerWriteMiss(
+            isValidObjectId(id) && isValidObjectId(approverId)
+              ? await context.findUnique({
+                  where: { id },
+                  select: { requester: true, reviewers: true },
+                })
+              : null,
+            approver.approver,
+          );
+        },
+
+        /**
+         * Adds each reviewer with its own conditional push, so concurrent adds never drop
+         * one another and a reviewer is never active twice. `added` lists only the
+         * reviewers this call made active.
+         */
+        addReviewers(
+          id: string,
+          actor: ViewerIdentity,
+          inputs: readonly ReviewerInput[],
+          now: Date,
+        ): Promise<AddReviewersResult> {
+          return addReviewers(
+            Prisma.getExtensionContext<typeof prisma.changeproposals>(this),
+            id,
+            actor,
+            inputs,
+            now,
+          );
+        },
+
+        /** Marks the matching active reviewers as removed; the entries stay as a record. */
+        removeReviewers(
+          id: string,
+          actor: ViewerIdentity,
+          inputs: readonly ReviewerInput[],
+          now: Date,
+        ): Promise<RequesterWriteResult> {
+          return removeReviewers(
+            Prisma.getExtensionContext<typeof prisma.changeproposals>(this),
+            id,
+            actor,
+            inputs,
+            now,
+          );
+        },
+
+        /**
+         * Records a reviewer's reject or abstain, replacing the same reviewer's earlier
+         * record of the same operations (or of the whole proposal). Operations are left as
+         * they are: a rejection never stops an approval.
+         */
+        addReviews(
+          id: string,
+          reviewer: ViewerIdentity,
+          entry: ReviewEntry,
+          now: Date,
+        ): Promise<RequesterWriteResult> {
+          return addReviews(
+            Prisma.getExtensionContext<typeof prisma.changeproposals>(this),
+            id,
+            reviewer,
+            entry,
+            now,
+          );
+        },
+
+        /**
+         * Drops the approver's reject and abstain records of the approved operations, and with
+         * `wholeProposal` their whole rejection too. Not limited to open proposals: the apply
+         * that follows an approval may already have settled the proposal.
+         */
+        clearReviewsOnApproval(
+          id: string,
+          approverId: string,
+          operationKeys: readonly string[],
+          options: { readonly wholeProposal: boolean },
+        ): Promise<boolean> {
+          return clearReviewsOnApproval(
+            Prisma.getExtensionContext<typeof prisma.changeproposals>(this),
+            id,
+            approverId,
+            operationKeys,
+            options.wholeProposal,
+          );
         },
 
         /**
@@ -323,7 +420,7 @@ export const extension = Prisma.defineExtension((client) => {
                       data: {
                         status: 'skipped',
                         reason,
-                        approvedAt: { unset: true },
+                        ...UNSET_APPROVAL,
                       },
                     },
                   },
@@ -441,7 +538,7 @@ export const extension = Prisma.defineExtension((client) => {
                     data: {
                       status: 'skipped',
                       reason: closing,
-                      approvedAt: { unset: true },
+                      ...UNSET_APPROVAL,
                     },
                   },
                 },
@@ -541,12 +638,15 @@ export const extension = Prisma.defineExtension((client) => {
               requester: true,
               entry: true,
               basedOn: true,
+              reviewers: true,
               operations: {
                 select: {
                   key: true,
                   type: true,
                   status: true,
                   pageId: true,
+                  path: true,
+                  toPath: true,
                   resultPageId: true,
                   revertedByProposalId: true,
                 },
@@ -634,6 +734,20 @@ export const extension = Prisma.defineExtension((client) => {
             select: summarySelect,
           });
           return rows.map(toChangeProposalSummary);
+        },
+
+        /** Open proposals with an active reviewer entry for the viewer or a group of theirs, by `_id` after `afterId`. */
+        listReviewQueueAfter(
+          viewer: ViewerIdentity,
+          afterId: string | null,
+          take: number,
+        ): Promise<ChangeProposalSummary[]> {
+          return listReviewQueueAfter(
+            Prisma.getExtensionContext<typeof prisma.changeproposals>(this),
+            viewer,
+            afterId,
+            take,
+          );
         },
 
         /** Reads the proposals the marks point at, keeping only the marked operations. */

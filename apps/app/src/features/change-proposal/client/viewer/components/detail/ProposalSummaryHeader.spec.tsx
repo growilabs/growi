@@ -31,6 +31,7 @@ const createProposal = (
   createdAt: '2026-03-04T05:06:07.000Z',
   status: 'pending',
   isRequester: false,
+  viewerRole: 'other',
   operations: [],
   ...overrides,
 });
@@ -41,6 +42,7 @@ describe('ProposalSummaryHeader', () => {
       <ProposalSummaryHeader
         proposal={createProposal({
           isRequester: true,
+          viewerRole: 'requester',
           requesterState: {
             lifecycle: 'settled',
             achievement: { applied: 1, attempted: 2 },

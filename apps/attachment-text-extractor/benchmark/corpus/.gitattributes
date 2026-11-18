@@ -1,0 +1,2 @@
+# Corpus files are exact bytes (legacy charsets, BOMs, CRLF); never convert them.
+* binary

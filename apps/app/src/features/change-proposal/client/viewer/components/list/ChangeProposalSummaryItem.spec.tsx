@@ -24,6 +24,7 @@ const createSummary = (
   createdAt: 'CREATED',
   status: 'applied',
   isRequester: false,
+  viewerRole: 'other',
   pages: [],
   ...overrides,
 });
@@ -34,6 +35,7 @@ describe('ChangeProposalSummaryItem', () => {
       <ChangeProposalSummaryItem
         proposal={createSummary({
           isRequester: true,
+          viewerRole: 'requester',
           requesterState: {
             lifecycle: 'expired',
             perPageNotifications: { value: true, isEnabledBySettings: true },

@@ -38,6 +38,7 @@ const createSummary = (
   createdAt: 'CREATED',
   status: 'applied',
   isRequester: false,
+  viewerRole: 'other',
   pages: [],
   ...overrides,
 });

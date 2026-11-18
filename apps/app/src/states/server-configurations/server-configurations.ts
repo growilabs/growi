@@ -190,6 +190,7 @@ export const rendererConfigAtom = atom<RendererConfig>({
   isIndentSizeForced: false,
   drawioUri: '',
   plantumlUri: '',
+  plantumlHttpMethod: 'get',
   highlightJsStyleBorder: false,
   isEnabledXssPrevention: true,
   sanitizeType: 'Recommended',

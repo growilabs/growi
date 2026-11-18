@@ -8,7 +8,6 @@ export type {
 } from './services/change-proposal-service';
 export { createChangeProposalService } from './services/change-proposal-service';
 export type {
-  ApprovalTargets,
   CreateProposalRequest,
   CreateProposalResult,
   RevertTargets,

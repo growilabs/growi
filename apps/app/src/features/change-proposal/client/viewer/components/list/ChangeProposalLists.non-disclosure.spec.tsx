@@ -59,6 +59,7 @@ const buildSummary = (
   lastAppliedAt: 'LASTAPPLIEDAT',
   status: 'applied',
   isRequester: false,
+  viewerRole: 'other',
   pages,
 });
 

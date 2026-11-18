@@ -119,9 +119,8 @@ describe('ChangeProposalService maintenance: expiry, withdrawal, resume and sett
       );
       await service.approve(
         proposal._id,
-        users.requester,
+        { user: users.requester, channel: 'ui', trigger: BACKGROUND },
         [proposal.operations[0].key],
-        BACKGROUND,
       );
 
       expect(
@@ -251,7 +250,11 @@ describe('ChangeProposalService maintenance: expiry, withdrawal, resume and sett
           });
 
           const [approved, expired] = await Promise.all([
-            service.approve(proposal._id, users.requester, 'all', BACKGROUND),
+            service.approve(proposal._id, {
+              user: users.requester,
+              channel: 'ui',
+              trigger: BACKGROUND,
+            }),
             service.expireDueProposals(now),
           ]);
 
