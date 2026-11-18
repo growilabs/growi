@@ -60,6 +60,11 @@ const reviewersValidator: ValidationChain[] = [
   ...reviewerListValidator('remove'),
 ];
 
+// The validators check kind and id but let other properties through; keep only what ReviewerInput declares.
+const toReviewerInputs = (
+  reviewers: readonly ReviewerInput[],
+): ReviewerInput[] => reviewers.map(({ kind, id }) => ({ kind, id }));
+
 /**
  * @swagger
  *
@@ -142,11 +147,15 @@ export const reviewersRouteHandlersFactory = (
       // The service settles the activity before it returns — see rules/activity-recording.md.
       const result =
         change.add !== undefined
-          ? await getService().addReviewers(req.params.id, actor, change.add)
+          ? await getService().addReviewers(
+              req.params.id,
+              actor,
+              toReviewerInputs(change.add),
+            )
           : await getService().removeReviewers(
               req.params.id,
               actor,
-              change.remove,
+              toReviewerInputs(change.remove),
             );
       if (!result.ok) {
         return respondWithServiceError(res, result.error);
