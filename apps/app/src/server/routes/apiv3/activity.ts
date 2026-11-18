@@ -170,6 +170,14 @@ const validator = {
  *                           Present on attachment activities (ATTACHMENT_ADD /
  *                           ATTACHMENT_REMOVE / ATTACHMENT_DOWNLOAD).
  *                         example: 12345
+ *                       reviewChannel:
+ *                         type: string
+ *                         enum: [ui, api, ai-tool]
+ *                         description: >-
+ *                           Channel a change proposal review activity came
+ *                           through. Present on change proposal approve,
+ *                           reject, abstain and reviewer change activities.
+ *                         example: "ui"
  *                   createdAt:
  *                     type: string
  *                     format: date-time

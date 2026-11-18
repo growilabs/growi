@@ -36,6 +36,50 @@ const validator = [
   limitValidator(),
 ];
 
+/**
+ * @swagger
+ *
+ *    /change-proposals/review-queue:
+ *      get:
+ *        tags: [ChangeProposals]
+ *        summary: List open change proposals waiting for review by the caller
+ *        description: >
+ *          Lists proposals the caller is a reviewer of that still have pending operations
+ *          on pages the caller may view. No total count is returned; continue with
+ *          nextCursor. Requires the `read:features:page` scope.
+ *        parameters:
+ *          - name: cursor
+ *            in: query
+ *            description: Opaque cursor, a 24-character lowercase hexadecimal string
+ *            schema:
+ *              type: string
+ *          - name: limit
+ *            in: query
+ *            schema:
+ *              type: integer
+ *              minimum: 1
+ *              maximum: 50
+ *              default: 20
+ *        responses:
+ *          200:
+ *            description: Summaries and the cursor to continue from
+ *            content:
+ *              application/json:
+ *                schema:
+ *                  type: object
+ *                  properties:
+ *                    items:
+ *                      type: array
+ *                      items:
+ *                        type: object
+ *                    nextCursor:
+ *                      type: string
+ *                      nullable: true
+ *          400:
+ *            description: Invalid cursor or limit (code validation_failed)
+ *          403:
+ *            description: Not authenticated or insufficient scope
+ */
 export const reviewQueueRouteHandlersFactory = (
   crowi: Crowi,
   getService: GetChangeProposalService,

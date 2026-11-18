@@ -196,7 +196,7 @@
   - _Requirements: 2.7, 3.10, 4.1, 5.5, 7.5_
   - _Depends: 4.4, 6.2, 6.3, 6.4_
   - _Boundary: routes_
-- [ ] 7.2 OpenAPI の仕様を更新する
+- [x] 7.2 OpenAPI の仕様を更新する
   - 新しい route と、承認の応答の変更（`in-progress` の結果の項目）の `@swagger` を足し、仕様の操作の一覧とテスト名を更新する
   - `lint:openapi:apiv3` が通る状態になっている
   - _Requirements: 2.1, 3.1, 4.1, 5.5_

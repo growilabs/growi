@@ -39,7 +39,9 @@ type Req = AuthenticatedRequest<
  *          Approves the chosen pending operations (each chosen key also approves the other
  *          pending operations on the same page), or every pending operation when
  *          operationKeys is omitted, and applies them before responding. "in-progress"
- *          means another run holds the apply; it applies the approved operations.
+ *          means another run holds the apply; it applies the approved operations, and its
+ *          optional results hold the caller's operations as freshly read so a client can
+ *          show progress.
  *          The requester and the reviewers may approve, each only the operations on pages
  *          they may view; anyone else, and a reviewer who may view none of its pages, gets
  *          the same 404 as a missing id.
@@ -88,7 +90,7 @@ type Req = AuthenticatedRequest<
  *                              reason:
  *                                type: string
  *          400:
- *            description: Invalid request body, or a read-only user
+ *            description: Invalid request body (code validation_failed), or a read-only user
  *          403:
  *            description: Not authenticated or insufficient scope
  *          404:

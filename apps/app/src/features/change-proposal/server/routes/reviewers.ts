@@ -29,6 +29,67 @@ type Req = AuthenticatedRequest<
   AccessTokenParserReq['query']
 >;
 
+/**
+ * @swagger
+ *
+ *    /change-proposals/{id}/reviewers:
+ *      patch:
+ *        tags: [ChangeProposals]
+ *        summary: Add or remove reviewers of a change proposal
+ *        description: >
+ *          One request either adds or removes reviewers, so the body holds exactly one of
+ *          add and remove. A user who is not active, or a group that does not exist, is
+ *          answered with code reviewer_not_found. A body of the wrong shape gets code
+ *          invalid_request. Requires the `write:features:page` scope.
+ *        parameters:
+ *          - name: id
+ *            in: path
+ *            required: true
+ *            schema:
+ *              type: string
+ *        requestBody:
+ *          required: true
+ *          content:
+ *            application/json:
+ *              schema:
+ *                type: object
+ *                properties:
+ *                  add:
+ *                    type: array
+ *                    items:
+ *                      type: object
+ *                      required: [kind, id]
+ *                      properties:
+ *                        kind:
+ *                          type: string
+ *                          enum: [user, user-group, external-user-group]
+ *                        id:
+ *                          type: string
+ *                          description: User ID or group ID
+ *                  remove:
+ *                    type: array
+ *                    items:
+ *                      type: object
+ *                      required: [kind, id]
+ *                      properties:
+ *                        kind:
+ *                          type: string
+ *                          enum: [user, user-group, external-user-group]
+ *                        id:
+ *                          type: string
+ *                          description: User ID or group ID
+ *        responses:
+ *          204:
+ *            description: The reviewers were changed
+ *          400:
+ *            description: Malformed body (code invalid_request), an unknown or inactive reviewer (code reviewer_not_found), too many reviewers (code too_many_reviewers), or reviewers are disabled on this wiki (code reviewers_disabled)
+ *          403:
+ *            description: Not authenticated, insufficient scope, or a user who may not change proposals (code user_not_allowed)
+ *          404:
+ *            description: The proposal does not exist, or the caller may not see it (code notfound)
+ *          409:
+ *            description: The proposal is no longer open (code not_open)
+ */
 export const reviewersRouteHandlersFactory = (
   crowi: Crowi,
   getService: GetChangeProposalService,

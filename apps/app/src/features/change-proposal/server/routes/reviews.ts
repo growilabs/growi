@@ -67,6 +67,81 @@ const dispatchReview = (
   return null;
 };
 
+/**
+ * @swagger
+ *
+ *    /change-proposals/{id}/reviews:
+ *      post:
+ *        tags: [ChangeProposals]
+ *        summary: Reject or abstain from pending operations of a change proposal, as a reviewer
+ *        description: >
+ *          Records a rejection or an abstention. A rejection without operationKeys rejects
+ *          the whole proposal (results is then empty); an abstention always needs
+ *          operationKeys. Only pending operations on pages the caller may view are affected.
+ *          The requester cannot review their own proposal. A body of the wrong shape gets
+ *          code invalid_request (the approve route answers validation_failed instead).
+ *          Requires the `write:features:page` scope.
+ *        parameters:
+ *          - name: id
+ *            in: path
+ *            required: true
+ *            schema:
+ *              type: string
+ *        requestBody:
+ *          required: true
+ *          content:
+ *            application/json:
+ *              schema:
+ *                type: object
+ *                required: [kind]
+ *                properties:
+ *                  kind:
+ *                    type: string
+ *                    enum: [reject, abstain]
+ *                  operationKeys:
+ *                    type: array
+ *                    minItems: 1
+ *                    maxItems: 1000
+ *                    items:
+ *                      type: string
+ *                  comment:
+ *                    type: string
+ *                    maxLength: 500
+ *        responses:
+ *          200:
+ *            description: The review was recorded
+ *            content:
+ *              application/json:
+ *                schema:
+ *                  type: object
+ *                  properties:
+ *                    result:
+ *                      type: object
+ *                      properties:
+ *                        type:
+ *                          type: string
+ *                          enum: [done]
+ *                        results:
+ *                          type: array
+ *                          items:
+ *                            type: object
+ *                            properties:
+ *                              key:
+ *                                type: string
+ *                              status:
+ *                                type: string
+ *                              reason:
+ *                                type: string
+ *                                nullable: true
+ *          400:
+ *            description: Malformed body (code invalid_request), a comment over 500 characters (code comment_too_long), or the caller is the requester (code requester_cannot_review)
+ *          403:
+ *            description: Not authenticated, insufficient scope, or a user who may not change proposals (code user_not_allowed)
+ *          404:
+ *            description: The proposal does not exist, or the caller is neither its requester nor a reviewer who may view one of its pages (code notfound)
+ *          409:
+ *            description: The proposal is no longer open (code not_open)
+ */
 export const reviewsRouteHandlersFactory = (
   crowi: Crowi,
   getService: GetChangeProposalService,
