@@ -64,7 +64,7 @@ requirements.md の受け入れ条件は、この基準で削らない。受け�
 - 人の保存と反映が共通に使う、ページごとの通知の処理（`server/service/page-save/page-notifications.ts`。グローバル通知の送信と、編集の `PAGE_UPDATE` の activity の記録）
 - 管理者の設定キー、設定の API、設定画面
 - Change Proposal の取得・一覧・承認・飛ばす・破棄・取り消し・リビジョンの印の取得の REST API と、その応答の形
-- 兄弟の spec の画面で共通に使う client の部品（`features/change-proposal/client/shared/`）: 操作の種類・操作の状態・全体の状態・理由・戻せない理由・段階・つながりの関係の表示名の表と達成度の文言、`translation` の名前空間の `change_proposal.*` の翻訳キー（5 言語）、`i18next.config.ts` の `preservePatterns`、達成度の割合と残りの操作を決める純関数、diff2html の設定と CSS、詳細ページの URL を作る `buildProposalHref`。ページ履歴の差分（`RevisionDiff`）もこれを使う
+- 兄弟の spec の画面で共通に使う client の部品（`features/change-proposal/client/shared/`）: 操作の種類・操作の状態・全体の状態・理由・戻せない理由・段階・つながりの関係・承認者の機能の言葉（承認者・承認・却下・放棄・コメント・変更の目的・判断）の表示名の表と達成度の文言、`translation` の名前空間の `change_proposal.*` の翻訳キー（5 言語）、`i18next.config.ts` の `preservePatterns`、達成度の割合と残りの操作を決める純関数、diff2html の設定と CSS、詳細ページの URL を作る `buildProposalHref`。ページ履歴の差分（`RevisionDiff`）もこれを使う
 - 承認者の保存（`reviewers`）と、承認者である人・見る人の役割・承認の対象・見える段階の判定
 - 承認・却下・放棄・承認者の追加と削除のサーバー側の処理と API、承認者としての承認待ちの一覧（`GET /review-queue`）。承認の記録（操作の項目）と、却下と放棄の記録（`reviews`）。却下と放棄は、操作の状態・承認・段階・達成度を変えない
 - 承認者への通知（`review-request`）と、依頼した人への判断の結果の通知（`review-result`）の snapshot の契約と作成。判断と承認者の追加・削除の activity の 5 つの action と、activity の snapshot の項目 `reviewChannel`
@@ -929,6 +929,7 @@ const PROPOSAL_LIFECYCLE_LABEL_KEYS: { readonly [K in ProposalLifecycle]: string
 type ProposalLinkKind = BasedOnRelation | 'based-on';                                    // 'based-on': the link from a derived proposal to its base
 const PROPOSAL_LINK_LABEL_KEYS: { readonly [K in ProposalLinkKind]: string };           // change_proposal.link.*
 const ACHIEVEMENT_LABEL_KEY = 'change_proposal.achievement.settled_with_percent';       // {{percent}}
+const REVIEW_TERM_LABEL_KEYS: { readonly [K in 'reviewer' | 'approve' | 'reject' | 'abstain' | 'comment' | 'purpose' | 'decision']: string }; // change_proposal.review_term.*
 
 // proposal-progress.ts
 function toAchievementPercent(achievement: ProposalAchievement): number | null; // Math.floor(applied / attempted * 100); null when attempted is 0

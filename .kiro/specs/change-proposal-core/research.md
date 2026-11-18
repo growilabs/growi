@@ -190,7 +190,7 @@ umbrella の判断（決定 1〜6）とコード上の事実は [../change-propo
 - **Context**: 要件 11。viewer の画面と ai-agent のチャット画面は、どちらも操作の種類・状態・理由を言葉にし、本文の差分を表示する。
 - **Selected Approach**: 値から翻訳キーを引く表、`translation` の名前空間の `change_proposal.*` のキー（5 言語）、diff2html の設定と CSS を、core の `client/shared/` に置く。ページ履歴の差分（`RevisionDiff`）も同じ部品を使う。画面ごとの文言は、それぞれの spec が `change_proposal_viewer.*` と `change_proposal_chat.*` に置く。まとめた通知の文言は viewer の `commons` に置く。
 - **Rationale**: 値の型を持つのは core なので、値が増えたときに表と翻訳を同じ spec の中で直せる。2 つの画面が別々に表を持つと、同じ値の言葉が食い違う。表を `satisfies Record<…>` で宣言すると、値を足して表に足し忘れたときに型の検査で止まる。
-- **Trade-offs**: キーの全体を表から引くので、翻訳キーの検査（i18next-cli）にはキーが使われていないように見える。`i18next.config.ts` の `preservePatterns` に 表の接頭辞（8 つ）のワイルドカードを足して、使われていないと報告されないようにする。`change_proposal.` で始まる静的な呼び出しを作らないので、ワイルドカードで隠れるキーは無い。
+- **Trade-offs**: キーの全体を表から引くので、翻訳キーの検査（i18next-cli）にはキーが使われていないように見える。`i18next.config.ts` の `preservePatterns` に 表の接頭辞（9 つ）のワイルドカードを足して、使われていないと報告されないようにする。`change_proposal.` で始まる静的な呼び出しを作らないので、ワイルドカードで隠れるキーは無い。
 
 ### Decision: 新しいコレクションは Prisma で読み書きし、索引は migration で作る
 - **Context**: GROWI は Mongoose のモデルを Prisma の拡張（`Prisma.defineExtension`）へ順に移している（`.claude/rules/model.md`）。新しいコレクション `changeproposals` を Mongoose で読み書きすると、あとで移す対象を 1 つ増やすことになる。一方で、このコレクションには疎な索引（値を持つ文書だけが入る索引）が要り、Change Proposal の状態の変化は「今の状態がこうなら書く」という条件付きの更新に頼る。
