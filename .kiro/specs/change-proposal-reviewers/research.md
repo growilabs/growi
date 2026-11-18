@@ -113,6 +113,14 @@
 - **Rationale**: 型で閉じられる穴は、型と入口の検証で閉じる。サービスの奥に実行時の検査と、型に反する値をわざと作って渡すテストを置くと、同じ規則が 2 か所に分かれ、どちらが正かが分からなくなる。route の検証にすれば、承認の route と同じ応答（`validation_failed`）になり、エラーコードもそろう。
 - **Trade-offs**: route を通らない入口（将来の AI の道具など）は、自分の入口で形を検査してから呼ぶ必要がある。検査を忘れると、型に合わない値がそのままサービスに届く。キーが空の配列は、型（`readonly string[]`）では断れないので、サービスに渡ると、何も記録せずに成功を返す（全体の却下にはならない）。
 
+### Decision: 通知の action は、きっかけになった activity の action を使う
+- **Context**: 承認者への通知（`review-request`）と判断の結果の通知（`review-result`）にも、`InAppNotification` の `action` が要る。通知のためだけの action（`CHANGE_PROPOSAL_REVIEW_REQUEST`、`CHANGE_PROPOSAL_REVIEW_RESULT` など）を作ると、activity として記録されないのに、名前が `CHANGE_PROPOSAL_` で始まるので、監査ログの絞り込みの一覧に出て、選んでも何も見つからない。
+- **Alternatives Considered**: (1) 通知のためだけの action を作り、監査ログの絞り込みの一覧から外す。(2) 通知のためだけの action を作らず、通知のきっかけになった activity の action を使う。
+- **Selected Approach**: (2)（オーナー決定）。承認者への通知は、作成（`CHANGE_PROPOSAL_CREATE`）か承認者の追加（`CHANGE_PROPOSAL_REVIEWER_ADD`）の action を使う。判断の結果の通知は、承認（`CHANGE_PROPOSAL_APPROVE`）、却下（`CHANGE_PROPOSAL_REJECT`。全体の却下もこれ）、放棄（`CHANGE_PROPOSAL_ABSTAIN`）の action を使う。activity を記録した側が、その action を通知の処理に渡す。通知の種類は snapshot の `kind` で見分ける。
+- **Rationale**: core の反映の通知（`proposal-notifier.ts`）が、すでにこの形になっている（action は反映か取り消しの activity のもの、種類は snapshot の `kind`）。通知に付ける activity と action がそろう。(1) は、一覧から外すための特別な扱いが要り、activity にならない action と、その 5 言語の表示名が残る。同じ action を使っても、ほかの通知と混ざらない。これらの activity は target の文書を渡さずに記録するので、既存のアプリ内通知の経路（`upsertByActivity`）は動かず、同じ action の通知が別に作られることはない。通知の一覧の画面は、`targetModel` で読み手を決めるので、今の画面が action を見て Change Proposal の通知に別の文言を出すこともない。
+- **Trade-offs**: action だけでは通知の種類が決まらない（たとえば `CHANGE_PROPOSAL_CREATE` の通知が承認者への通知だと分かるのは、snapshot の `kind` を読んだとき）。通知を読む処理は、snapshot の `kind` で形を選ぶ必要がある。
+- **Follow-up**: viewer の design は、通知の snapshot を読む処理（`parseChangeProposalNotification`）を action で振り分ける形で書かれている。承認の通知を表示に足すときは、action ではなく snapshot の `kind` で形を選ぶ。ai-agent の spec は、通知の action を読まない。
+
 ## Risks & Mitigations
 - **配列の索引の効き方が未実測** → 計測のタスクを置く。1 回に調べる件数の上限で最悪の負荷を抑える。
 - **viewer・ai-agent が「承認待ちは依頼した人にだけ」を前提にしている** → Revalidation Triggers に書き、viewer・ai-agent の spec に追従を足す。
