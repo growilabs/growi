@@ -83,6 +83,8 @@ inAppNotificationSchema.index({
 
 getOrCreateModel('InAppNotification', inAppNotificationSchema);
 
+const UPSERT_BATCH_SIZE = 1000;
+
 export interface UpsertByActivityParams {
   userIds: string[];
   activityId: string;
@@ -349,39 +351,48 @@ export const extension = Prisma.defineExtension((client) => {
             return;
           }
 
-          const result = await client.$runCommandRaw({
-            update: 'inappnotifications',
-            ordered: false,
-            updates: uniqueUserIds.map((userId) => ({
-              q: {
-                user: toRawObjectId(userId),
-                target: target != null ? toRawObjectId(target) : null,
-                action,
-                createdAt: { $gt: toRawDate(lastWeek) },
-                snapshot,
-              },
-              u: {
-                $set: {
-                  user: toRawObjectId(userId),
-                  targetModel,
-                  target: target != null ? toRawObjectId(target) : null,
-                  action,
-                  status: STATUS_UNOPENED,
-                  createdAt: toRawDate(createdAt),
-                  snapshot,
-                },
-                $addToSet: { activities: toRawObjectId(activityId) },
-                $setOnInsert: { __v: 0 },
-              },
-              upsert: true,
-            })),
-          });
+          // One update command is capped at 100,000 statements / ~16MB, so a
+          // very large recipient list is sent in chunks
+          for (let i = 0; i < uniqueUserIds.length; i += UPSERT_BATCH_SIZE) {
+            const result = await client.$runCommandRaw({
+              update: 'inappnotifications',
+              ordered: false,
+              updates: uniqueUserIds
+                .slice(i, i + UPSERT_BATCH_SIZE)
+                .map((userId) => ({
+                  q: {
+                    user: toRawObjectId(userId),
+                    target: target != null ? toRawObjectId(target) : null,
+                    action,
+                    createdAt: { $gt: toRawDate(lastWeek) },
+                    snapshot,
+                  },
+                  u: {
+                    $set: {
+                      user: toRawObjectId(userId),
+                      targetModel,
+                      target: target != null ? toRawObjectId(target) : null,
+                      action,
+                      status: STATUS_UNOPENED,
+                      createdAt: toRawDate(createdAt),
+                      snapshot,
+                    },
+                    $addToSet: { activities: toRawObjectId(activityId) },
+                    $setOnInsert: { __v: 0 },
+                  },
+                  upsert: true,
+                })),
+            });
 
-          // $runCommandRaw reports per-document failures with ok: 1 instead of throwing
-          if (result.writeErrors != null || result.writeConcernError != null) {
-            throw new Error(
-              `Failed to upsert inappnotifications: ${JSON.stringify(result)}`,
-            );
+            // $runCommandRaw reports per-document failures with ok: 1 instead of throwing
+            if (
+              result.writeErrors != null ||
+              result.writeConcernError != null
+            ) {
+              throw new Error(
+                `Failed to upsert inappnotifications: ${JSON.stringify(result)}`,
+              );
+            }
           }
         },
       },

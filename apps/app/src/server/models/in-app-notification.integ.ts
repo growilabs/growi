@@ -85,6 +85,36 @@ describe('inappnotifications.upsertByActivity', () => {
     );
   });
 
+  it('creates one notification per recipient when recipients span several batches', async () => {
+    const batchTarget = new ObjectId().toString();
+    const userIds = Array.from({ length: 2500 }, () =>
+      new ObjectId().toString(),
+    );
+
+    try {
+      await prisma.inappnotifications.upsertByActivity({
+        userIds,
+        activityId: new ObjectId().toString(),
+        targetModel: 'Page',
+        target: batchTarget,
+        action: 'PAGE_CREATE',
+        snapshot: null,
+        createdAt: now,
+        lastWeek: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000),
+      });
+
+      expect(
+        await prisma.inappnotifications.count({
+          where: { target: batchTarget },
+        }),
+      ).toBe(2500);
+    } finally {
+      await prisma.inappnotifications.deleteMany({
+        where: { target: batchTarget },
+      });
+    }
+  });
+
   it('creates a new document when the previous one is older than the window', async () => {
     await upsert(
       new ObjectId().toString(),
