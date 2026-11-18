@@ -8,4 +8,7 @@ export interface IUserUISettings {
   // modelKey (`${provider}/${modelId}`) so the selection uniquely identifies its owning
   // provider; used as the initial selection on next visit (Req 4.4).
   aiChatSelectedModelKey?: string;
+  // Width of the AI chat sidebar in px, set by the user via drag resize.
+  // Absent until the user resizes it once (client default applies).
+  aiChatSidebarWidth?: number;
 }

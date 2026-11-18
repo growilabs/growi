@@ -133,6 +133,42 @@ describe('PUT /user-ui-settings handler', () => {
       'openai/o3',
     );
   });
+
+  it('persists aiChatSidebarWidth into the $set', async () => {
+    const { req, res } = buildReqRes({ aiChatSidebarWidth: 640 });
+
+    // biome-ignore lint/suspicious/noExplicitAny: invoking the express handler with mocked req/res
+    await getHandler()(req as any, res as any, vi.fn());
+
+    const update = findOneAndUpdate.mock.calls[0][1];
+    // Guards the hard-coded updateData allow-list: a field missing there never
+    // reaches the $set even though the validator accepts it.
+    expect(update.$set).toEqual(
+      expect.objectContaining({ aiChatSidebarWidth: 640 }),
+    );
+  });
+
+  it('does NOT write aiChatSidebarWidth when it is omitted', async () => {
+    const { req, res } = buildReqRes({ currentProductNavWidth: 320 });
+
+    // biome-ignore lint/suspicious/noExplicitAny: invoking the express handler with mocked req/res
+    await getHandler()(req as any, res as any, vi.fn());
+
+    const update = findOneAndUpdate.mock.calls[0][1];
+    expect(update.$set).not.toHaveProperty('aiChatSidebarWidth');
+  });
+
+  it('persists aiChatSidebarWidth for logged-out users into the session', async () => {
+    const { req, res } = buildReqRes({ aiChatSidebarWidth: 640 });
+    // biome-ignore lint/suspicious/noExplicitAny: overriding the mocked req for the logged-out branch
+    const loggedOutReq = { body: req.body, session: {} } as any;
+
+    // biome-ignore lint/suspicious/noExplicitAny: invoking the express handler with mocked req/res
+    await getHandler()(loggedOutReq, res as any, vi.fn());
+
+    expect(findOneAndUpdate).not.toHaveBeenCalled();
+    expect(loggedOutReq.session.uiSettings.aiChatSidebarWidth).toBe(640);
+  });
 });
 
 // Drive the real express-validator engine over the exported PUT validator chain and
@@ -141,7 +177,11 @@ describe('PUT /user-ui-settings handler', () => {
 // chain accepts/rejects, not how the chain is built.
 const runPutValidators = async (
   settings: Record<string, unknown>,
-): Promise<{ hasErrors: boolean; failedFields: string[] }> => {
+): Promise<{
+  hasErrors: boolean;
+  failedFields: string[];
+  sanitized: Record<string, unknown>;
+}> => {
   const req = {
     body: { settings },
     cookies: {},
@@ -156,6 +196,7 @@ const runPutValidators = async (
   return {
     hasErrors: !result.isEmpty(),
     failedFields: result.array().map((e) => e.param),
+    sanitized: req.body.settings,
   };
 };
 
@@ -177,6 +218,40 @@ describe('validatorForPutUserUISettings', () => {
     });
 
     it('accepts an omitted aiChatSelectedModelKey (optional)', async () => {
+      const { hasErrors } = await runPutValidators({
+        currentSidebarContents: 'recent',
+      });
+      expect(hasErrors).toBe(false);
+    });
+  });
+  describe('aiChatSidebarWidth', () => {
+    it('accepts a positive integer', async () => {
+      const { hasErrors } = await runPutValidators({ aiChatSidebarWidth: 500 });
+      expect(hasErrors).toBe(false);
+    });
+
+    it('converts a numeric string to a number so it is stored as a number', async () => {
+      const { hasErrors, sanitized } = await runPutValidators({
+        aiChatSidebarWidth: '640',
+      });
+      expect(hasErrors).toBe(false);
+      expect(sanitized.aiChatSidebarWidth).toBe(640);
+    });
+
+    it.each([
+      ['a non-numeric string', 'abc'],
+      ['zero', 0],
+      ['a negative number', -1],
+      ['a non-integer', 12.5],
+    ])('rejects %s', async (_label, value) => {
+      const { hasErrors, failedFields } = await runPutValidators({
+        aiChatSidebarWidth: value,
+      });
+      expect(hasErrors).toBe(true);
+      expect(failedFields).toContain('settings.aiChatSidebarWidth');
+    });
+
+    it('accepts an omitted aiChatSidebarWidth (optional)', async () => {
       const { hasErrors } = await runPutValidators({
         currentSidebarContents: 'recent',
       });

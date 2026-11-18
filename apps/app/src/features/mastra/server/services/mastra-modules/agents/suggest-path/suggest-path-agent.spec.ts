@@ -1,5 +1,13 @@
 import type { MastraModelConfig } from '@mastra/core/llm';
+import { RequestContext } from '@mastra/core/request-context';
+import { MockLanguageModelV3 } from 'ai/test';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { mock } from 'vitest-mock-extended';
+
+import type { UsageMeter } from '~/features/ai-usage/server';
+
+import type { LanguageModelV3 } from '../../../usage-metering/from-language-model-usage';
+import type { SuggestPathRequestContextShape } from './request-context';
 
 // ---------------------------------------------------------------------------
 // Module mocks
@@ -61,6 +69,9 @@ vi.mock('@mastra/core/mastra', () => {
   return { Mastra: StubMastra };
 });
 
+// The real barrel also loads the public route and Prisma models.
+vi.mock('~/features/ai-usage/server', () => ({ recordAiUsage: vi.fn() }));
+
 // Suppress logger noise from transitively-imported modules.
 vi.mock('~/utils/logger', () => ({
   default: () => ({
@@ -77,12 +88,13 @@ vi.mock('~/utils/logger', () => ({
 // Because suggest-path-agent.ts resolves the model lazily inside its `model()`
 // function (not at import time), changing this return value between tests is
 // enough to vary behavior — no module reset / re-import is required.
+// The real resolver is async, so the mock turns a sync throw into a rejection.
 const resolverMock = vi.hoisted(() => ({
-  fn: vi.fn<() => MastraModelConfig>(),
+  fn: vi.fn<(modelKey?: string) => MastraModelConfig>(),
 }));
 
 vi.mock('../../../ai-sdk-modules/resolve-mastra-model', () => ({
-  resolveMastraModel: () => resolverMock.fn(),
+  resolveMastraModel: async (modelKey?: string) => resolverMock.fn(modelKey),
 }));
 
 // Replace memory with an inert stub: mastra-modules/index.ts (loaded by the
@@ -127,14 +139,18 @@ const getCapturedConfig = (): CapturedAgentConfig => {
   return config;
 };
 
-// Narrow `model` to a callable and evaluate it once. Throwing (instead of a
-// non-null assertion) keeps every call site cast-free.
-const resolveModel = (config: CapturedAgentConfig): unknown => {
+// Narrow `model` to a callable and evaluate it once, as Mastra does per
+// request. Throwing (instead of a non-null assertion) keeps every call site
+// cast-free.
+const resolveModel = (
+  config: CapturedAgentConfig,
+  requestContext = new RequestContext<SuggestPathRequestContextShape>(),
+): Promise<unknown> => {
   const { model } = config;
   if (typeof model !== 'function') {
     throw new Error('model is expected to be a DynamicArgument function');
   }
-  return model();
+  return Promise.resolve(model({ requestContext }));
 };
 
 beforeEach(() => {
@@ -208,16 +224,36 @@ describe('suggestPathAgent', () => {
       expect(resolverCalledDuringImport).toBe(false);
     });
 
-    it('forwards the model from resolveMastraModel() when resolution succeeds', () => {
+    it('forwards the model from resolveMastraModel() when resolution succeeds', async () => {
       resolverMock.fn.mockReturnValue(sentinelModel);
 
-      // The dynamic function hands back exactly the resolver's model — a single
-      // provider's single model (support/mastra's provider-agnostic AI layer),
-      // resolved at use time rather than constructed here.
-      expect(resolveModel(getCapturedConfig())).toBe(sentinelModel);
+      // The dynamic function hands back exactly the resolver's model, resolved
+      // at use time rather than constructed here.
+      await expect(resolveModel(getCapturedConfig())).resolves.toBe(
+        sentinelModel,
+      );
     });
 
-    it('re-resolves the model on every evaluation, so a config change takes effect without a restart', () => {
+    it('resolves the model key set in the request context', async () => {
+      resolverMock.fn.mockReturnValue(sentinelModel);
+      const requestContext =
+        new RequestContext<SuggestPathRequestContextShape>();
+      requestContext.set('modelKey', 'anthropic/claude-test');
+
+      await resolveModel(getCapturedConfig(), requestContext);
+
+      expect(resolverMock.fn).toHaveBeenCalledWith('anthropic/claude-test');
+    });
+
+    it('lets the resolver pick the default model when the request context has no model key', async () => {
+      resolverMock.fn.mockReturnValue(sentinelModel);
+
+      await resolveModel(getCapturedConfig());
+
+      expect(resolverMock.fn).toHaveBeenCalledWith(undefined);
+    });
+
+    it('re-resolves the model on every evaluation, so a config change takes effect without a restart', async () => {
       const config = getCapturedConfig();
 
       const firstModel = { id: 'model-first' } as unknown as MastraModelConfig;
@@ -226,13 +262,13 @@ describe('suggestPathAgent', () => {
       } as unknown as MastraModelConfig;
 
       resolverMock.fn.mockReturnValue(firstModel);
-      expect(resolveModel(config)).toBe(firstModel);
+      await expect(resolveModel(config)).resolves.toBe(firstModel);
 
       resolverMock.fn.mockReturnValue(secondModel);
-      expect(resolveModel(config)).toBe(secondModel);
+      await expect(resolveModel(config)).resolves.toBe(secondModel);
     });
 
-    it('propagates the resolver throw at use time without swallowing it', () => {
+    it('propagates the resolver throw at use time without swallowing it', async () => {
       // On misconfiguration resolveMastraModel() throws; the agent's lazy
       // model() must let it surface (handled by the engine's error handling),
       // not swallow or replace it.
@@ -243,13 +279,76 @@ describe('suggestPathAgent', () => {
         throw resolverError;
       });
 
-      let thrown: unknown;
-      try {
-        resolveModel(getCapturedConfig());
-      } catch (e) {
-        thrown = e;
+      await expect(resolveModel(getCapturedConfig())).rejects.toBe(
+        resolverError,
+      );
+    });
+  });
+
+  describe('usage metering (requirements 2.2, 2.6)', () => {
+    const isV3Model = (model: unknown): model is LanguageModelV3 =>
+      typeof model === 'object' &&
+      model != null &&
+      'specificationVersion' in model &&
+      model.specificationVersion === 'v3';
+
+    const createProviderModel = () =>
+      new MockLanguageModelV3({
+        doGenerate: {
+          content: [{ type: 'text', text: 'ok' }],
+          finishReason: { unified: 'stop', raw: 'stop' },
+          usage: {
+            inputTokens: {
+              total: 30,
+              noCache: 30,
+              cacheRead: undefined,
+              cacheWrite: undefined,
+            },
+            outputTokens: { total: 7, text: 7, reasoning: undefined },
+          },
+          warnings: [],
+        },
+      });
+
+    it('reports each call of the resolved model to the usage meter of the request', async () => {
+      resolverMock.fn.mockReturnValue(createProviderModel());
+      const usageMeter = mock<UsageMeter>();
+      const requestContext =
+        new RequestContext<SuggestPathRequestContextShape>();
+      requestContext.set('usageMeter', usageMeter);
+
+      const model = await resolveModel(getCapturedConfig(), requestContext);
+      if (!isV3Model(model)) {
+        throw new Error('Expected a v3 language model');
       }
-      expect(thrown).toBe(resolverError);
+      await model.doGenerate({
+        prompt: [{ role: 'user', content: [{ type: 'text', text: 'hi' }] }],
+      });
+
+      expect(usageMeter.add).toHaveBeenCalledTimes(1);
+      expect(usageMeter.add).toHaveBeenCalledWith({
+        inputTokens: 30,
+        outputTokens: 7,
+        reasoningTokens: null,
+        cacheReadTokens: null,
+        cacheWriteTokens: null,
+      });
+    });
+
+    it('leaves the resolved (cached) model unwrapped, so other requests are not reported to this meter', async () => {
+      const providerModel = createProviderModel();
+      resolverMock.fn.mockReturnValue(providerModel);
+      const usageMeter = mock<UsageMeter>();
+      const requestContext =
+        new RequestContext<SuggestPathRequestContextShape>();
+      requestContext.set('usageMeter', usageMeter);
+
+      await resolveModel(getCapturedConfig(), requestContext);
+      await providerModel.doGenerate({
+        prompt: [{ role: 'user', content: [{ type: 'text', text: 'hi' }] }],
+      });
+
+      expect(usageMeter.add).not.toHaveBeenCalled();
     });
   });
 

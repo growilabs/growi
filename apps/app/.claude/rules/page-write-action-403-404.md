@@ -135,7 +135,7 @@ Fixed (uniform 404):
 - `apps/app/src/server/routes/apiv3/pages/index.js` — `/pages/resume-rename`
   (previously always returned 403, even when the page was genuinely not
   found — the fix collapsed this to a uniform 404, not the inverse split).
-- `apps/app/src/server/routes/apiv3/share-links.js` — `DELETE
+- `apps/app/src/server/routes/apiv3/share-links/share-links.ts` — `DELETE
   /share-links/:id` (previously skipped the permission check entirely once
   an existence probe showed the related page was already gone, letting any
   non-admin delete the share link; now denies uniformly whenever the

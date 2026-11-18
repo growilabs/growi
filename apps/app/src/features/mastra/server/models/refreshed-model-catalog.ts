@@ -14,7 +14,7 @@ const logger = loggerFactory(
 const SINGLETON_ID = 'singleton';
 
 /**
- * The persisted result of an opt-in model-catalog refresh (Req 9): the
+ * The persisted result of a model-catalog refresh (Req 9): the
  * models.dev snapshot fetched at runtime, run through the SAME filter and
  * sanity checks as the bundled asset (buildModelCatalog), stored so it
  * survives restarts and is shared across app instances.

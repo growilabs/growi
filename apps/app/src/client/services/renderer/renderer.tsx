@@ -33,6 +33,7 @@ import * as addLineNumberAttribute from '~/services/renderer/rehype-plugins/add-
 import * as keywordHighlighter from '~/services/renderer/rehype-plugins/keyword-highlighter';
 import * as relocateToc from '~/services/renderer/rehype-plugins/relocate-toc';
 import * as attachment from '~/services/renderer/remark-plugins/attachment';
+import { closedMath } from '~/services/renderer/remark-plugins/closed-math';
 import * as codeBlock from '~/services/renderer/remark-plugins/codeblock';
 import * as mention from '~/services/renderer/remark-plugins/mention';
 import * as xsvToTable from '~/services/renderer/remark-plugins/xsv-to-table';
@@ -73,7 +74,11 @@ export const generateViewOptions = (
     math,
     [
       plantuml.remarkPlugin,
-      { plantumlUri: config.plantumlUri, isDarkMode: config.isDarkMode },
+      {
+        plantumlUri: config.plantumlUri,
+        plantumlHttpMethod: config.plantumlHttpMethod,
+        isDarkMode: config.isDarkMode,
+      },
     ],
     [drawio.remarkPlugin, { isDarkMode: config.isDarkMode }],
     mermaidRemarkPlugin,
@@ -242,7 +247,11 @@ export const generateSimpleViewOptions = (
     math,
     [
       plantuml.remarkPlugin,
-      { plantumlUri: config.plantumlUri, isDarkMode: config.isDarkMode },
+      {
+        plantumlUri: config.plantumlUri,
+        plantumlHttpMethod: config.plantumlHttpMethod,
+        isDarkMode: config.isDarkMode,
+      },
     ],
     [drawio.remarkPlugin, { isDarkMode: config.isDarkMode }],
     mermaidRemarkPlugin,
@@ -362,9 +371,14 @@ export const generatePreviewOptions = (
   // add remark plugins
   remarkPlugins.push(
     math,
+    closedMath,
     [
       plantuml.remarkPlugin,
-      { plantumlUri: config.plantumlUri, isDarkMode: config.isDarkMode },
+      {
+        plantumlUri: config.plantumlUri,
+        plantumlHttpMethod: config.plantumlHttpMethod,
+        isDarkMode: config.isDarkMode,
+      },
     ],
     [drawio.remarkPlugin, { isDarkMode: config.isDarkMode }],
     mermaidRemarkPlugin,

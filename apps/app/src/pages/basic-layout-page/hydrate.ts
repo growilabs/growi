@@ -1,5 +1,6 @@
 import { useHydrateAtoms } from 'jotai/utils';
 
+import { useHydrateChatSidebarAtoms } from '~/features/mastra/states';
 import {
   isSearchScopeChildrenAsDefaultAtom,
   isSearchServiceConfiguredAtom,
@@ -44,4 +45,5 @@ export const useHydrateBasicLayoutConfigurationAtoms = (
   useHydrateAtoms(tuples);
 
   useHydrateSidebarAtoms(sidebarConfig, userUISettings);
+  useHydrateChatSidebarAtoms(userUISettings);
 };

@@ -1,5 +1,5 @@
 import type { ModelProviderOptions } from '~/features/mastra/interfaces/allowed-model';
-import { getEffectiveDefaultModelKey } from '~/features/mastra/server/services/ai-sdk-modules/llm-providers/effective-model-key';
+import type { ModelKey } from '~/features/mastra/interfaces/model-key';
 import { getProviderOptionsForModel } from '~/features/mastra/server/services/ai-sdk-modules/resolve-provider-options';
 import { configManager } from '~/server/service/config-manager';
 
@@ -25,11 +25,10 @@ const mergeProviderOptions = (
 /**
  * Resolve the providerOptions for the suggestPathAgent generate call.
  *
- * Base: the catalog-declared providerOptions of the effective model — the
- * same per-model source the chat route uses (getProviderOptionsForModel).
- * The agent resolves its model with `resolveMastraModel()` (no explicit key),
- * so the effective key here is the allow-list default; both lookups go
- * through the same allow-list checkpoint and cannot diverge.
+ * Base: the catalog-declared providerOptions of the given model — the same
+ * per-model source the chat route uses (getProviderOptionsForModel). The
+ * engine passes the same key it puts in the request context for the agent's
+ * model, so the options always match the model that runs.
  *
  * Overlay: the suggest-path-specific providerOptions
  * (`ai:providerOptions:suggestPathAgent`), read per request so a config
@@ -47,9 +46,10 @@ const mergeProviderOptions = (
  * an unsupported combination surfaces as a provider error and is absorbed by
  * the orchestrator's memo fallback (design.md AgenticEngine, 3.5/3.6).
  */
-export const resolveAgentProviderOptions = (): ModelProviderOptions => {
-  const effectiveModelKey = getEffectiveDefaultModelKey();
-  const baseOptions = getProviderOptionsForModel(effectiveModelKey);
+export const resolveAgentProviderOptions = (
+  modelKey: ModelKey,
+): ModelProviderOptions => {
+  const baseOptions = getProviderOptionsForModel(modelKey);
 
   const overlay = configManager.getConfig(
     'ai:providerOptions:suggestPathAgent',

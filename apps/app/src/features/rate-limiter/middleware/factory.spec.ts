@@ -15,6 +15,7 @@ const MIXED_CASE_REGEXP_MAX_REQUESTS = vi.hoisted(() => {
 });
 
 vi.mock('./consume-points', () => ({ consumePoints }));
+vi.mock('~/utils/logger', () => ({ default: () => ({ error: vi.fn() }) }));
 
 import {
   DEFAULT_MAX_REQUESTS,
@@ -24,6 +25,7 @@ import {
 import { middlewareFactory } from './factory';
 
 type ConsumeCall = {
+  key: string | null;
   config: IApiRateLimitConfig | undefined;
   ipMultiplier: number | undefined;
 };
@@ -58,7 +60,8 @@ const consumeCallsFor = async (
 
   expect(next).toHaveBeenCalled();
   expect(consumePoints).toHaveBeenCalled();
-  return consumePoints.mock.calls.map(([, , config, ipMultiplier]) => ({
+  return consumePoints.mock.calls.map(([, key, config, ipMultiplier]) => ({
+    key,
     config,
     ipMultiplier,
   }));
@@ -158,5 +161,60 @@ describe('middlewareFactory', () => {
     for (const config of configs) {
       expect(config).toBeUndefined();
     }
+  });
+
+  it.each([
+    ['/_api/v3/installer', 'POST', 5],
+    ['/_api/v3/login', 'POST', 5],
+    ['/_api/v3/register', 'POST', 5],
+    ['/_api/v3/invited', 'POST', 20],
+    ['/_api/v3/user-activation/register', 'POST', 5],
+    ['/_api/v3/forgot-password', 'POST', 5],
+    ['/_api/v3/forgot-password', 'PUT', 5],
+    ['/_api/v3/user-activation/token', 'GET', 5],
+    ['/_api/v3//login', 'POST', 5],
+    ['/_API/v3//LOGIN//', 'POST', 5],
+    ['/_api/v3/invited//', 'POST', 20],
+    ['/_api/v3//forgot-password//', 'PUT', 5],
+  ])('applies the configured auth limit to %s %s', async (path, method, maxRequests) => {
+    const configs = await configsUsedFor(path, method);
+
+    expect(configs[0]?.maxRequests).toBe(maxRequests);
+  });
+
+  it.each([
+    '/_API/v3/LOGIN/',
+    '/_api/v3/%6Cogin',
+  ])('uses the login limit for equivalent route path %s', async (path) => {
+    const configs = await configsUsedFor(path, 'POST');
+
+    expect(configs[0]?.maxRequests).toBe(5);
+  });
+
+  it('uses one per-IP bucket for equivalent login paths', async () => {
+    const canonical = await consumeCallsFor('/_api/v3/login', 'POST');
+    const caseAndSlashVariant = await consumeCallsFor(
+      '/_API/v3/LOGIN/',
+      'POST',
+    );
+    const encodedVariant = await consumeCallsFor('/_api/v3/%6Cogin', 'POST');
+
+    expect(caseAndSlashVariant[0]?.key).toBe(canonical[0]?.key);
+    expect(encodedVariant[0]?.key).toBe(canonical[0]?.key);
+  });
+
+  it.each([
+    ['/_api/v3/login', '/_api/v3//login', 'POST'],
+    ['/_api/v3/login', '/_API/v3//LOGIN//', 'POST'],
+    ['/_api/v3/invited', '/_api/v3/invited//', 'POST'],
+    ['/_api/v3/forgot-password', '/_api/v3//forgot-password//', 'PUT'],
+  ])('uses the same per-IP bucket and limit for %s and %s', async (canonicalPath, variantPath, method) => {
+    const canonical = await consumeCallsFor(canonicalPath, method);
+    const variant = await consumeCallsFor(variantPath, method);
+
+    expect(variant[0]?.key).toBe(canonical[0]?.key);
+    expect(variant[0]?.config?.maxRequests).toBe(
+      canonical[0]?.config?.maxRequests,
+    );
   });
 });

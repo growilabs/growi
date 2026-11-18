@@ -1,11 +1,4 @@
-import type {
-  HasObjectId,
-  IAttachment,
-  IPage,
-  IRevision,
-  IUser,
-  Ref,
-} from '@growi/core';
+import type { HasObjectId, IAttachment, IPage, IUser, Ref } from '@growi/core';
 
 export const PageBulkExportFormat = {
   md: 'md',
@@ -14,6 +7,11 @@ export const PageBulkExportFormat = {
 
 export type PageBulkExportFormat =
   (typeof PageBulkExportFormat)[keyof typeof PageBulkExportFormat];
+
+export const isPageBulkExportFormat = (
+  value: unknown,
+): value is PageBulkExportFormat =>
+  Object.values<unknown>(PageBulkExportFormat).includes(value);
 
 // Error code shared between the API route and the client to detect a
 // duplicate bulk export job in progress. Keep this as the single source of truth.
@@ -53,10 +51,3 @@ export interface IPageBulkExportJob {
 export interface IPageBulkExportJobHasId
   extends IPageBulkExportJob,
     HasObjectId {}
-
-// snapshot of page info to upload
-export interface IPageBulkExportPageSnapshot {
-  pageBulkExportJob: Ref<IPageBulkExportJob>;
-  path: string; // page path when export was stared
-  revision: Ref<IRevision>; // page revision when export was stared
-}

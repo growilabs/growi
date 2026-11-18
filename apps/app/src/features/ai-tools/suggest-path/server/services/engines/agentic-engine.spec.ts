@@ -2,6 +2,7 @@ import type { IUserHasId } from '@growi/core/dist/interfaces';
 import type { RequestContext } from '@mastra/core/request-context';
 import { mock } from 'vitest-mock-extended';
 
+import type { UsageMeter } from '~/features/ai-usage/server';
 import type { ModelProviderOptions } from '~/features/mastra/interfaces/allowed-model';
 import type { SuggestPathRequestContextShape } from '~/features/mastra/server/services/mastra-modules/agents/suggest-path';
 import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils';
@@ -21,8 +22,14 @@ const mocks = vi.hoisted(() => {
     loggerDebugMock: vi.fn(),
     loggerWarnMock: vi.fn(),
     loggerErrorMock: vi.fn(),
+    createUsageMeterMock: vi.fn(),
   };
 });
+
+// The real barrel also loads the public route and Prisma models.
+vi.mock('~/features/ai-usage/server', () => ({
+  createUsageMeter: mocks.createUsageMeterMock,
+}));
 
 vi.mock('~/server/service/config-manager', () => ({
   configManager: { getConfig: mocks.getConfigMock },
@@ -178,6 +185,8 @@ const SAMPLE_TOTAL_USAGE = {
   cachedInputTokens: 0,
 };
 
+let usageMeter = mock<UsageMeter>();
+
 const callEngine = (): ReturnType<typeof agenticEngine> =>
   agenticEngine({
     user: mockUser,
@@ -214,6 +223,9 @@ beforeEach(() => {
   mocks.loggerDebugMock.mockClear();
   mocks.loggerWarnMock.mockClear();
   mocks.loggerErrorMock.mockClear();
+  usageMeter = mock<UsageMeter>();
+  mocks.createUsageMeterMock.mockReset();
+  mocks.createUsageMeterMock.mockReturnValue(usageMeter);
 });
 
 afterEach(() => {
@@ -259,6 +271,98 @@ describe('agenticEngine', () => {
       const ctx = getGenerateCall().options.requestContext;
       expect(ctx.get('user')).toBe(mockUser);
       expect(ctx.get('searchService')).toBe(mockSearchService);
+    });
+  });
+
+  describe('usage metering (Requirements 2.2, 2.6)', () => {
+    it('uses the effective default model key for the model, the meter and the providerOptions alike', async () => {
+      mocks.configValues.set(ALLOWED_MODELS_KEY, [
+        {
+          provider: 'openai',
+          modelId: 'test-model',
+          isDefault: true,
+          providerOptions: { openai: { reasoningEffort: 'low' } },
+        },
+      ]);
+      primeGenerate(outputWith([]));
+
+      await callEngine();
+
+      const { options } = getGenerateCall();
+      expect(options.requestContext.get('modelKey')).toBe('openai/test-model');
+      expect(mocks.createUsageMeterMock).toHaveBeenCalledTimes(1);
+      // The user id is covered with a real user in the usage-metering spec.
+      expect(mocks.createUsageMeterMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          feature: 'suggest-path',
+          modelKey: 'openai/test-model',
+        }),
+      );
+      expect(options.providerOptions).toEqual({
+        openai: { reasoningEffort: 'low' },
+      });
+    });
+
+    it('hands the meter to the agent through the request context', async () => {
+      primeGenerate(outputWith([]));
+
+      await callEngine();
+
+      expect(getGenerateCall().options.requestContext.get('usageMeter')).toBe(
+        usageMeter,
+      );
+    });
+
+    it('closes the meter once as completed when generate succeeds', async () => {
+      primeGenerate(outputWith([suggestionEntry('/a/', 1)]));
+
+      await callEngine();
+
+      expect(usageMeter.close).toHaveBeenCalledTimes(1);
+      expect(usageMeter.close).toHaveBeenCalledWith({ outcome: 'completed' });
+    });
+
+    it('closes the meter once as failed when generate rejects', async () => {
+      mocks.generateMock.mockRejectedValue(new Error('provider failed'));
+
+      await expect(callEngine()).rejects.toThrow('provider failed');
+
+      expect(usageMeter.close).toHaveBeenCalledTimes(1);
+      expect(usageMeter.close).toHaveBeenCalledWith({ outcome: 'failed' });
+    });
+
+    it('closes the meter once as failed when the timeout aborts generate', async () => {
+      vi.useFakeTimers();
+      armAbortAwareGenerate();
+
+      const rejection = expect(callEngine()).rejects.toThrow(
+        'agentic engine timed out after 60000ms',
+      );
+      await vi.advanceTimersByTimeAsync(60_000);
+      await rejection;
+
+      expect(usageMeter.close).toHaveBeenCalledTimes(1);
+      expect(usageMeter.close).toHaveBeenCalledWith({ outcome: 'failed' });
+    });
+
+    it('closes the meter as failed when generate settles without output after the timeout aborted it', async () => {
+      vi.useFakeTimers();
+      // Mastra resolves (rather than rejects) an aborted generate.
+      mocks.generateMock.mockImplementation(
+        (_messages: unknown, options: CapturedGenerateOptions) =>
+          new Promise((resolve) => {
+            options.abortSignal.addEventListener('abort', () => {
+              resolve({ object: undefined });
+            });
+          }),
+      );
+
+      const rejection = expect(callEngine()).rejects.toThrow();
+      await vi.advanceTimersByTimeAsync(60_000);
+      await rejection;
+
+      expect(usageMeter.close).toHaveBeenCalledTimes(1);
+      expect(usageMeter.close).toHaveBeenCalledWith({ outcome: 'failed' });
     });
   });
 

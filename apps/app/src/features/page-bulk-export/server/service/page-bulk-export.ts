@@ -1,26 +1,25 @@
 import { type IPage, SubscriptionStatusType } from '@growi/core';
-import type { HydratedDocument } from 'mongoose';
 import mongoose from 'mongoose';
 
+import type { pagebulkexportjobs } from '~/generated/prisma/client';
 import { SupportedTargetModel } from '~/interfaces/activity';
 import type { PageModel } from '~/server/models/page';
 import Subscription from '~/server/models/subscription';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import type { PageBulkExportFormat } from '../../interfaces/page-bulk-export';
 import {
   PageBulkExportJobInProgressStatus,
   PageBulkExportJobStatus,
 } from '../../interfaces/page-bulk-export';
-import type { PageBulkExportJobDocument } from '../models/page-bulk-export-job';
-import PageBulkExportJob from '../models/page-bulk-export-job';
 
 const logger = loggerFactory('growi:services:PageBulkExportService');
 
 export class DuplicateBulkExportJobError extends Error {
-  duplicateJob: HydratedDocument<PageBulkExportJobDocument>;
+  duplicateJob: pagebulkexportjobs;
 
-  constructor(duplicateJob: HydratedDocument<PageBulkExportJobDocument>) {
+  constructor(duplicateJob: pagebulkexportjobs) {
     super('Duplicate bulk export job is in progress');
     this.duplicateJob = duplicateJob;
   }
@@ -56,36 +55,37 @@ class PageBulkExportService implements IPageBulkExportService {
       throw new Error('Base page not found or not accessible');
     }
 
-    const duplicatePageBulkExportJobInProgress: HydratedDocument<PageBulkExportJobDocument> | null =
-      await PageBulkExportJob.findOne({
-        user: { $eq: currentUser },
-        page: basePage,
-        format: { $eq: format },
-        $or: Object.values(PageBulkExportJobInProgressStatus).map((status) => ({
-          status,
-        })),
+    const duplicatePageBulkExportJobInProgress =
+      await prisma.pagebulkexportjobs.findFirst({
+        where: {
+          userId: currentUser._id.toString(),
+          pageId: basePage._id.toString(),
+          format,
+          status: { in: Object.values(PageBulkExportJobInProgressStatus) },
+        },
       });
     if (duplicatePageBulkExportJobInProgress != null) {
       if (restartJob) {
-        this.resetBulkExportJob(duplicatePageBulkExportJobInProgress);
+        await this.resetBulkExportJob(duplicatePageBulkExportJobInProgress);
         return;
       }
       throw new DuplicateBulkExportJobError(
         duplicatePageBulkExportJobInProgress,
       );
     }
-    const pageBulkExportJob: HydratedDocument<PageBulkExportJobDocument> =
-      await PageBulkExportJob.create({
-        user: currentUser,
-        page: basePage,
+    const pageBulkExportJob = await prisma.pagebulkexportjobs.create({
+      data: {
+        userId: currentUser._id.toString(),
+        pageId: basePage._id.toString(),
         format,
         status: PageBulkExportJobStatus.initializing,
-      });
+      },
+    });
 
     await Subscription.upsertSubscription(
       currentUser,
       SupportedTargetModel.MODEL_PAGE_BULK_EXPORT_JOB,
-      pageBulkExportJob,
+      pageBulkExportJob.id,
       SubscriptionStatusType.SUBSCRIBE,
     );
   }
@@ -94,10 +94,12 @@ class PageBulkExportService implements IPageBulkExportService {
    * Reset page bulk export job in progress
    */
   async resetBulkExportJob(
-    pageBulkExportJob: HydratedDocument<PageBulkExportJobDocument>,
+    pageBulkExportJob: pagebulkexportjobs,
   ): Promise<void> {
-    pageBulkExportJob.restartFlag = true;
-    await pageBulkExportJob.save();
+    await prisma.pagebulkexportjobs.update({
+      where: { id: pageBulkExportJob.id },
+      data: { restartFlag: true },
+    });
   }
 }
 

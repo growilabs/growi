@@ -11,6 +11,10 @@ services:
       - ../../share:/workspace/share:delegated
       - page_bulk_export_tmp:/tmp/page-bulk-export
     tty: true
+    environment:
+      # Keep production-build runs in the devcontainer out of real-instance telemetry
+      - SERVICE_TYPE=dev
+      - OPENTELEMETRY_ENABLED=false
     networks:
     - default
     - opentelemetry-collector-dev-setup_default

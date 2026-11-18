@@ -78,6 +78,7 @@ module.exports = {
         'Attachment',
         'Bookmarks',
         'BookmarkFolders',
+        'ChangeProposals',
         'Page',
         'Pages',
         'PageListing',
@@ -99,6 +100,7 @@ module.exports = {
         'AdminHome',
         'AppSettings',
         'AiSettings',
+        'ChangeProposalSettings',
         'ExternalUserGroups',
         'SecuritySetting',
         'MarkDownSetting',
@@ -130,7 +132,7 @@ module.exports = {
     },
     {
       name: 'Public API',
-      tags: ['Healthcheck', 'Statistics', '', '', '', '', '', ''],
+      tags: ['Healthcheck', 'Statistics', 'AiUsage', '', '', '', '', '', ''],
     },
   ],
 };

@@ -1,0 +1,29 @@
+@use '@growi/core-styles/scss/bootstrap/init' as bs;
+
+.grw-chat-sidebar {
+  z-index: bs.$zindex-fixed + 2;
+
+  // When a Radix popover (e.g. the model-select dropdown) opens, react-remove-scroll
+  // locks the body (overflow: hidden) and removes the page scrollbar, which widens the
+  // viewport. A position-fixed, right-anchored panel would then jump right by the
+  // scrollbar width. react-remove-scroll publishes that width as
+  // `--removed-body-scroll-bar-size` on <body> while locked, so mirror it as a
+  // right margin to keep the sidebar visually fixed. It resolves to 0 when nothing
+  // is locked, so there is no effect outside the lock (or with overlay scrollbars).
+  margin-right: var(--removed-body-scroll-bar-size, 0px);
+
+  // Below sm the panel is always full width; from sm up the fixed root
+  // shrinks to the width of the resizable area inside it.
+  @include bs.media-breakpoint-down(sm) {
+    width: 100%;
+  }
+}
+
+// Full width below sm is decided by CSS, not by the JS breakpoint state: that
+// state starts as false and resolves only after mount, which would render the
+// first frame full width on a desktop. !important overrides the inline width.
+.grw-chat-sidebar-resizable-area {
+  @include bs.media-breakpoint-down(sm) {
+    width: 100% !important;
+  }
+}

@@ -3,7 +3,7 @@ import type { Locale } from 'date-fns/locale';
 import { useTranslation } from 'next-i18next';
 
 import type {
-  ActivityHasTargetPage,
+  IUserActivity,
   SupportedActivityActionType,
 } from '~/interfaces/activity';
 import { ActivityLogActions } from '~/interfaces/activity';
@@ -40,15 +40,7 @@ export const IconActivityTranslationMap: Record<
 };
 
 type ActivityListItemProps = {
-  activity: ActivityHasTargetPage;
-};
-
-type AllowPageDisplayPayload = {
-  grant: number | undefined;
-  status: string;
-  wip: boolean;
-  deletedAt?: Date;
-  path: string;
+  activity: IUserActivity;
 };
 
 const translateAction = (action: SupportedActivityActionType): string => {
@@ -59,34 +51,13 @@ const setIcon = (action: SupportedActivityActionType): string => {
   return IconActivityTranslationMap[action] || 'question_mark';
 };
 
-const calculateTimePassed = (date: Date, locale: Locale): string => {
+const calculateTimePassed = (date: string, locale: Locale): string => {
   const timePassed = formatDistanceToNow(date, {
     addSuffix: true,
     locale,
   });
 
   return timePassed;
-};
-
-const pageAllowedForDisplay = (
-  allowDisplayPayload: AllowPageDisplayPayload,
-): boolean => {
-  const { grant, status, wip, deletedAt } = allowDisplayPayload;
-  if (grant !== 1) return false;
-
-  if (status !== 'published') return false;
-
-  if (wip) return false;
-
-  if (deletedAt) return false;
-
-  return true;
-};
-
-const setPath = (path: string, allowed: boolean): string => {
-  if (allowed) return path;
-
-  return '';
 };
 
 export const ActivityListItem = ({
@@ -100,19 +71,9 @@ export const ActivityListItem = ({
 
   const { activity } = props;
 
-  const { path, grant, status, wip, deletedAt } = activity.target;
+  const { path } = activity.target;
 
-  const allowDisplayPayload: AllowPageDisplayPayload = {
-    grant,
-    status,
-    wip,
-    deletedAt,
-    path,
-  };
-
-  const isPageAllowed = pageAllowedForDisplay(allowDisplayPayload);
-
-  const action = activity.action as SupportedActivityActionType;
+  const { action } = activity;
   const keyToTranslate = translateAction(action);
   const fullKeyPath = `user_home_page.${keyToTranslate}`;
 
@@ -126,10 +87,10 @@ export const ActivityListItem = ({
         <div className="flex-grow-1 ms-2">
           <div className="activity-path-line mb-0">
             <a
-              href={setPath(path, isPageAllowed)}
+              href={path}
               className="activity-target-link fw-bold text-wrap d-block"
             >
-              <span>{setPath(path, isPageAllowed)}</span>
+              <span>{path}</span>
             </a>
           </div>
 

@@ -1,3 +1,8 @@
+import {
+  createUsageMeter,
+  type UsageMeterOutcome,
+} from '~/features/ai-usage/server';
+import { getEffectiveDefaultModelKey } from '~/features/mastra/server/services/ai-sdk-modules/llm-providers/effective-model-key';
 import { mastra } from '~/features/mastra/server/services/mastra-modules';
 import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
@@ -100,11 +105,6 @@ export const agenticEngine: SuggestPathEngine = async (
   const agent = mastra.getAgent('suggestPathAgent');
 
   const controller = new AbortController();
-  const timeoutTimer = setTimeout(() => {
-    controller.abort(
-      new Error(`agentic engine timed out after ${timeoutMs}ms`),
-    );
-  }, timeoutMs);
 
   // Observability state shared between the success and reject paths: the
   // trace emitter receives whatever is known at emission time, so a reject
@@ -125,20 +125,42 @@ export const agenticEngine: SuggestPathEngine = async (
     });
 
   try {
-    // Inline wrapper so the timer is ALWAYS cleared once generate settles
-    // (success or failure), while `result` stays in scope for the mapping
-    // and the trace emission below.
+    // Decided once: the same key selects the model (via the request context),
+    // its providerOptions, and the usage record.
+    const modelKey = getEffectiveDefaultModelKey();
+    requestContext.set('modelKey', modelKey);
+    const usageMeter = createUsageMeter({
+      userId: user._id.toString(),
+      feature: 'suggest-path',
+      modelKey,
+    });
+    requestContext.set('usageMeter', usageMeter);
+
+    const timeoutTimer = setTimeout(() => {
+      controller.abort(
+        new Error(`agentic engine timed out after ${timeoutMs}ms`),
+      );
+    }, timeoutMs);
+
+    // Inline wrapper so the timer is ALWAYS cleared and the meter closed once
+    // generate settles (success, failure or timeout), while `result` stays in
+    // scope for the mapping and the trace emission below.
     result = await (async () => {
+      let outcome: UsageMeterOutcome = 'failed';
       try {
-        return await agent.generate(buildUserPrompt(body), {
+        const generated = await agent.generate(buildUserPrompt(body), {
           structuredOutput: { schema: AGENTIC_OUTPUT_JSON_SCHEMA },
           maxSteps: computeMaxSteps(searchLimit, childListingLimit),
           abortSignal: controller.signal,
           requestContext,
-          providerOptions: resolveAgentProviderOptions(),
+          providerOptions: resolveAgentProviderOptions(modelKey),
         });
+        // Mastra resolves an aborted generate instead of rejecting it.
+        outcome = controller.signal.aborted ? 'failed' : 'completed';
+        return generated;
       } finally {
         clearTimeout(timeoutTimer);
+        usageMeter.close({ outcome });
       }
     })();
 

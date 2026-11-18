@@ -11,6 +11,11 @@ import {
 } from 'ai';
 import type { Request, RequestHandler } from 'express';
 
+import {
+  createUsageMeter,
+  type UsageMeter,
+  type UsageMeterOutcome,
+} from '~/features/ai-usage/server';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
@@ -83,6 +88,10 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
       requestContext.set('user', req.user);
       requestContext.set('searchService', crowi.searchService);
 
+      // Every exit after the meter is created closes it: `execute`'s finally once
+      // the stream is consumed, or the catch below when setup fails first.
+      let usageMeter: UsageMeter | undefined;
+
       try {
         // Resolve the effective modelKey ONCE per request — the single allow-list
         // rounding checkpoint: an out-of-allowlist / undefined modelKey is collapsed
@@ -94,6 +103,14 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
         // that is an idempotent defense-in-depth pass (no second warning).
         const effectiveModelKey = resolveEffectiveModelKey(modelKey);
         requestContext.set('modelKey', effectiveModelKey);
+
+        const meter = createUsageMeter({
+          userId: req.user._id.toString(),
+          feature: 'chat',
+          modelKey: effectiveModelKey,
+        });
+        usageMeter = meter;
+        requestContext.set('usageMeter', meter);
 
         const stream = await growiAgent.stream(messages, {
           requestContext,
@@ -136,51 +153,58 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
           originalMessages: messages,
           onError: onChatError,
           execute: async ({ writer }) => {
-            // Workaround for https://github.com/mastra-ai/mastra/issues/11884#issuecomment-3799153269
-            // toAISdkStream() returns a ReadableStream that lacks [Symbol.asyncIterator]
-            // in the TypeScript types, so iterate manually via a reader.
-            const reader = toAISdkStream(stream, {
-              from: 'agent',
-              version: 'v6',
-              sendReasoning: true,
-              // Primary sanitize point: the agent→UI chunk converter calls this
-              // with the original error to build the error chunk's text.
-              onError: onChatError,
-            }).getReader();
+            let outcome: UsageMeterOutcome = 'failed';
+            try {
+              // Workaround for https://github.com/mastra-ai/mastra/issues/11884#issuecomment-3799153269
+              // toAISdkStream() returns a ReadableStream that lacks [Symbol.asyncIterator]
+              // in the TypeScript types, so iterate manually via a reader.
+              const reader = toAISdkStream(stream, {
+                from: 'agent',
+                version: 'v6',
+                sendReasoning: true,
+                // Primary sanitize point: the agent→UI chunk converter calls this
+                // with the original error to build the error chunk's text.
+                onError: onChatError,
+              }).getReader();
 
-            while (true) {
-              // biome-ignore lint/performance/noAwaitInLoops: necessary to read stream sequentially
-              const { value, done } = await reader.read();
-              if (done) break;
-              writer.write(value);
+              while (true) {
+                // biome-ignore lint/performance/noAwaitInLoops: necessary to read stream sequentially
+                const { value, done } = await reader.read();
+                if (done) break;
+                writer.write(value);
+              }
+
+              const [usage, finishReason, steps] = await Promise.all([
+                stream.usage,
+                stream.finishReason,
+                stream.steps,
+              ]);
+
+              // Typed against the shared CustomUIMessageMetadata so the written
+              // shape stays in sync with what the client reads as
+              // `message.metadata` (see ../../interfaces/chat-message). The
+              // relayed mastra chunks carry `unknown` metadata, so the stream
+              // itself is left ungenerified; this annotation is the write-side
+              // contract.
+              const messageMetadata: CustomUIMessageMetadata = { finishReason };
+              writer.write({ type: 'message-metadata', messageMetadata });
+
+              logger.info(
+                {
+                  finishReason,
+                  stepCount: steps.length,
+                  inputTokens: usage.inputTokens,
+                  outputTokens: usage.outputTokens,
+                  totalTokens: usage.totalTokens,
+                  reasoningTokens: usage.reasoningTokens,
+                },
+                'Stream finished',
+              );
+
+              outcome = finishReason === 'error' ? 'failed' : 'completed';
+            } finally {
+              meter.close({ outcome });
             }
-
-            const [usage, finishReason, steps] = await Promise.all([
-              stream.usage,
-              stream.finishReason,
-              stream.steps,
-            ]);
-
-            // Typed against the shared CustomUIMessageMetadata so the written
-            // shape stays in sync with what the client reads as
-            // `message.metadata` (see ../../interfaces/chat-message). The
-            // relayed mastra chunks carry `unknown` metadata, so the stream
-            // itself is left ungenerified; this annotation is the write-side
-            // contract.
-            const messageMetadata: CustomUIMessageMetadata = { finishReason };
-            writer.write({ type: 'message-metadata', messageMetadata });
-
-            logger.info(
-              {
-                finishReason,
-                stepCount: steps.length,
-                inputTokens: usage.inputTokens,
-                outputTokens: usage.outputTokens,
-                totalTokens: usage.totalTokens,
-                reasoningTokens: usage.reasoningTokens,
-              },
-              'Stream finished',
-            );
           },
         });
 
@@ -196,6 +220,7 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
           },
         });
       } catch (error) {
+        usageMeter?.close({ outcome: 'failed' });
         logger.error(error);
         if (!res.headersSent) {
           return res.apiv3Err(new ErrorV3('Failed to post message'));

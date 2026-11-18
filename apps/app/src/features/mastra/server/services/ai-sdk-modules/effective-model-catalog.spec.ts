@@ -14,7 +14,11 @@ vi.mock('~/utils/prisma', () => ({
   prisma: { mastrarefreshedmodelcatalogs: { getSingleton } },
 }));
 
-import { getEffectiveSelectableModels } from './effective-model-catalog';
+import {
+  findCatalogEntry,
+  getEffectiveSelectableModels,
+  resolveEffectiveCatalog,
+} from './effective-model-catalog';
 import { BUNDLED_CATALOG_GENERATED_AT } from './model-catalog';
 
 beforeEach(() => {
@@ -182,5 +186,114 @@ describe('getEffectiveSelectableModels (Req 9.5)', () => {
 
       expect(fetchSpy).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('resolveEffectiveCatalog', () => {
+  const fetchedAt = new Date('2031-01-02T03:04:05.000Z');
+  const refreshedModels = {
+    openai: [
+      {
+        id: 'refreshed-model',
+        name: 'Refreshed Model',
+        pricing: { input: 1, output: 2 },
+      },
+    ],
+  };
+
+  it('returns the refreshed catalog with its fetchedAt when it is adopted', async () => {
+    getSingleton.mockResolvedValue({
+      models: refreshedModels,
+      fetchedAt,
+      supersededBundledGeneratedAt: new Date(
+        BUNDLED_CATALOG_GENERATED_AT.getTime(),
+      ),
+      source: 'https://models.dev/api.json (MIT)',
+    });
+
+    const result = await resolveEffectiveCatalog();
+
+    expect(result.source).toBe('refreshed');
+    expect(result.contentFetchedAt).toEqual(fetchedAt);
+    expect(result.models).toEqual(refreshedModels);
+  });
+
+  it('returns the bundled catalog with its generation time when the bundled one is newer', async () => {
+    getSingleton.mockResolvedValue({
+      models: refreshedModels,
+      fetchedAt,
+      supersededBundledGeneratedAt: new Date(0),
+      source: 'https://models.dev/api.json (MIT)',
+    });
+
+    const result = await resolveEffectiveCatalog();
+
+    expect(result.source).toBe('bundled');
+    expect(result.contentFetchedAt).toEqual(BUNDLED_CATALOG_GENERATED_AT);
+    expect(result.models.openai.length).toBeGreaterThan(0);
+    expect(result.models.openai.map((m) => m.id)).not.toContain(
+      'refreshed-model',
+    );
+  });
+
+  it('returns the bundled catalog when nothing is persisted', async () => {
+    getSingleton.mockResolvedValue(null);
+
+    const result = await resolveEffectiveCatalog();
+
+    expect(result.source).toBe('bundled');
+    expect(result.contentFetchedAt).toEqual(BUNDLED_CATALOG_GENERATED_AT);
+  });
+
+  it('returns the bundled catalog without throwing when the read fails', async () => {
+    getSingleton.mockRejectedValue(new Error('boom'));
+
+    const result = await resolveEffectiveCatalog();
+
+    expect(result.source).toBe('bundled');
+    expect(result.contentFetchedAt).toEqual(BUNDLED_CATALOG_GENERATED_AT);
+  });
+});
+
+describe('findCatalogEntry', () => {
+  beforeEach(() => {
+    getSingleton.mockResolvedValue({
+      models: {
+        openai: [
+          {
+            id: 'refreshed-model',
+            name: 'Refreshed Model',
+            pricing: { input: 1, output: 2 },
+          },
+        ],
+      },
+      fetchedAt: new Date(),
+      supersededBundledGeneratedAt: new Date(
+        BUNDLED_CATALOG_GENERATED_AT.getTime(),
+      ),
+      source: 'https://models.dev/api.json (MIT)',
+    });
+  });
+
+  it('returns the entry, including its pricing, for a known provider and model', async () => {
+    const catalog = await resolveEffectiveCatalog();
+
+    expect(findCatalogEntry(catalog, 'openai', 'refreshed-model')).toEqual({
+      id: 'refreshed-model',
+      name: 'Refreshed Model',
+      pricing: { input: 1, output: 2 },
+    });
+  });
+
+  it('returns undefined for an unknown model id', async () => {
+    const catalog = await resolveEffectiveCatalog();
+
+    expect(findCatalogEntry(catalog, 'openai', 'nope')).toBeUndefined();
+  });
+
+  it('returns undefined for the catalog-less provider azure-openai', async () => {
+    const catalog = await resolveEffectiveCatalog();
+
+    expect(findCatalogEntry(catalog, 'azure-openai', 'x')).toBeUndefined();
   });
 });
