@@ -436,9 +436,9 @@ export const reviewsReplacedBy = (
 ): Prisma.ChangeproposalsReviewsWhereInput => ({
   by,
   at: { lt: now },
-  ...(entry.operationKeys === 'whole-proposal'
+  ...(entry.target.scope === 'whole'
     ? wholeProposalReview
-    : reviewsOfOperations(entry.operationKeys)),
+    : reviewsOfOperations(entry.target.operationKeys)),
 });
 
 export const reviewsClearedByApproval = (
@@ -465,7 +465,8 @@ export const toReviewCreateInputs = (
     comment: entry.comment,
     channel: entry.channel,
   });
-  return entry.operationKeys === 'whole-proposal'
+  const { target } = entry;
+  return target.scope === 'whole'
     ? [record]
-    : entry.operationKeys.map((operationKey) => ({ ...record, operationKey }));
+    : target.operationKeys.map((operationKey) => ({ ...record, operationKey }));
 };

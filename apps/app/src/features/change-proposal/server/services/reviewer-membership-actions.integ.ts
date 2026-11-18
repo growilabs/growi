@@ -549,7 +549,7 @@ describe('ChangeProposalService: adding and removing reviewers', () => {
       await prisma.changeproposals.addReviews(
         proposal._id,
         await loadViewerIdentity(idOf(users.subscriber)),
-        { kind: 'reject', operationKeys: 'whole-proposal', channel: 'ui' },
+        { kind: 'reject', target: { scope: 'whole' }, channel: 'ui' },
         NOW,
       );
 

@@ -652,7 +652,11 @@ describe('ChangeProposalService: rejecting and abstaining', () => {
       await prisma.changeproposals.addReviews(
         proposal._id,
         await loadViewerIdentity(idOf(users.subscriber)),
-        { kind: 'reject', operationKeys: [key], channel: 'ui' },
+        {
+          kind: 'reject',
+          target: { scope: 'operations', operationKeys: [key] },
+          channel: 'ui',
+        },
         new Date(),
       );
       updateMany.spy.mockRejectedValueOnce(writeConflict());

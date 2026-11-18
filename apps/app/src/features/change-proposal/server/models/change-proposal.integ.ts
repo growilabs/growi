@@ -1377,7 +1377,11 @@ describe('ChangeProposal model (Prisma extension)', () => {
       await prisma.changeproposals.addReviews(
         created._id,
         identityOf(reviewer.id),
-        { kind: 'abstain', operationKeys: [abstained], channel: 'ui' },
+        {
+          kind: 'abstain',
+          target: { scope: 'operations', operationKeys: [abstained] },
+          channel: 'ui',
+        },
         new Date(),
       );
       await prisma.changeproposals.addReviews(
@@ -1385,7 +1389,7 @@ describe('ChangeProposal model (Prisma extension)', () => {
         identityOf(reviewer.id),
         {
           kind: 'reject',
-          operationKeys: 'whole-proposal',
+          target: { scope: 'whole' },
           channel: 'ui',
           comment: 'no',
         },
@@ -1573,7 +1577,7 @@ describe('ChangeProposal model (Prisma extension)', () => {
         identityOf(reviewer),
         {
           kind: 'reject',
-          operationKeys: [first, second],
+          target: { scope: 'operations', operationKeys: [first, second] },
           comment: '<b>not this</b>',
           channel: 'api',
         },
@@ -1600,7 +1604,7 @@ describe('ChangeProposal model (Prisma extension)', () => {
       const result = await prisma.changeproposals.addReviews(
         created._id,
         identityOf(reviewer),
-        { kind: 'reject', operationKeys: 'whole-proposal', channel: 'ui' },
+        { kind: 'reject', target: { scope: 'whole' }, channel: 'ui' },
         now,
       );
 
@@ -1617,7 +1621,11 @@ describe('ChangeProposal model (Prisma extension)', () => {
       await prisma.changeproposals.addReviews(
         created._id,
         identityOf(reviewer),
-        { kind: 'abstain', operationKeys: [first], channel: 'ai-tool' },
+        {
+          kind: 'abstain',
+          target: { scope: 'operations', operationKeys: [first] },
+          channel: 'ai-tool',
+        },
         now,
       );
 
@@ -1649,13 +1657,17 @@ describe('ChangeProposal model (Prisma extension)', () => {
       await prisma.changeproposals.addReviews(
         created._id,
         identityOf(reviewer),
-        { kind: 'reject', operationKeys: [first, second], channel: 'ui' },
+        {
+          kind: 'reject',
+          target: { scope: 'operations', operationKeys: [first, second] },
+          channel: 'ui',
+        },
         new Date(),
       );
       await prisma.changeproposals.addReviews(
         created._id,
         identityOf(reviewer),
-        { kind: 'reject', operationKeys: 'whole-proposal', channel: 'ui' },
+        { kind: 'reject', target: { scope: 'whole' }, channel: 'ui' },
         new Date(),
       );
 
@@ -1671,26 +1683,38 @@ describe('ChangeProposal model (Prisma extension)', () => {
       await prisma.changeproposals.addReviews(
         created._id,
         identityOf(reviewer),
-        { kind: 'reject', operationKeys: [first, second], channel: 'ui' },
+        {
+          kind: 'reject',
+          target: { scope: 'operations', operationKeys: [first, second] },
+          channel: 'ui',
+        },
         earlier,
       );
       await prisma.changeproposals.addReviews(
         created._id,
         identityOf(reviewer),
-        { kind: 'reject', operationKeys: 'whole-proposal', channel: 'ui' },
+        { kind: 'reject', target: { scope: 'whole' }, channel: 'ui' },
         earlier,
       );
       await prisma.changeproposals.addReviews(
         created._id,
         identityOf(other),
-        { kind: 'reject', operationKeys: [first], channel: 'ui' },
+        {
+          kind: 'reject',
+          target: { scope: 'operations', operationKeys: [first] },
+          channel: 'ui',
+        },
         earlier,
       );
 
       await prisma.changeproposals.addReviews(
         created._id,
         identityOf(reviewer),
-        { kind: 'abstain', operationKeys: [first], channel: 'api' },
+        {
+          kind: 'abstain',
+          target: { scope: 'operations', operationKeys: [first] },
+          channel: 'api',
+        },
         later,
       );
 
@@ -1730,7 +1754,11 @@ describe('ChangeProposal model (Prisma extension)', () => {
       await prisma.changeproposals.addReviews(
         created._id,
         identityOf(reviewer),
-        { kind: 'abstain', operationKeys: [first], channel: 'ui' },
+        {
+          kind: 'abstain',
+          target: { scope: 'operations', operationKeys: [first] },
+          channel: 'ui',
+        },
         new Date(Date.now() - 1000),
       );
       await prisma.changeproposals.addReviews(
@@ -1738,7 +1766,7 @@ describe('ChangeProposal model (Prisma extension)', () => {
         identityOf(reviewer),
         {
           kind: 'reject',
-          operationKeys: 'whole-proposal',
+          target: { scope: 'whole' },
           comment: 'first',
           channel: 'ui',
         },
@@ -1750,7 +1778,7 @@ describe('ChangeProposal model (Prisma extension)', () => {
         identityOf(reviewer),
         {
           kind: 'reject',
-          operationKeys: 'whole-proposal',
+          target: { scope: 'whole' },
           comment: 'second',
           channel: 'ui',
         },
@@ -1776,7 +1804,11 @@ describe('ChangeProposal model (Prisma extension)', () => {
       const result = await prisma.changeproposals.addReviews(
         created._id,
         identityOf(newObjectId()),
-        { kind: 'reject', operationKeys: [first], channel: 'ui' },
+        {
+          kind: 'reject',
+          target: { scope: 'operations', operationKeys: [first] },
+          channel: 'ui',
+        },
         new Date(),
       );
 
@@ -1795,7 +1827,11 @@ describe('ChangeProposal model (Prisma extension)', () => {
       const result = await prisma.changeproposals.addReviews(
         created._id,
         identityOf(reviewer),
-        { kind: 'reject', operationKeys: [first], channel: 'ui' },
+        {
+          kind: 'reject',
+          target: { scope: 'operations', operationKeys: [first] },
+          channel: 'ui',
+        },
         new Date(),
       );
 
@@ -1808,7 +1844,11 @@ describe('ChangeProposal model (Prisma extension)', () => {
         prisma.changeproposals.addReviews(
           id,
           identityOf(reviewer),
-          { kind: 'abstain', operationKeys: [key], channel: 'api' },
+          {
+            kind: 'abstain',
+            target: { scope: 'operations', operationKeys: [key] },
+            channel: 'api',
+          },
           new Date(),
         );
       const recordsOf = async (id: string, reviewer: string, key: string) =>
@@ -1820,7 +1860,11 @@ describe('ChangeProposal model (Prisma extension)', () => {
         await prisma.changeproposals.addReviews(
           fixture.created._id,
           identityOf(fixture.reviewer),
-          { kind: 'reject', operationKeys: [fixture.first], channel: 'ui' },
+          {
+            kind: 'reject',
+            target: { scope: 'operations', operationKeys: [fixture.first] },
+            channel: 'ui',
+          },
           new Date(Date.now() - 1000),
         );
         return fixture;
@@ -1922,13 +1966,17 @@ describe('ChangeProposal model (Prisma extension)', () => {
         await prisma.changeproposals.addReviews(
           id,
           identityOf(reviewer),
-          { kind: 'reject', operationKeys: keys, channel: 'ui' },
+          {
+            kind: 'reject',
+            target: { scope: 'operations', operationKeys: keys },
+            channel: 'ui',
+          },
           new Date(),
         );
         await prisma.changeproposals.addReviews(
           id,
           identityOf(reviewer),
-          { kind: 'reject', operationKeys: 'whole-proposal', channel: 'ui' },
+          { kind: 'reject', target: { scope: 'whole' }, channel: 'ui' },
           new Date(),
         );
       };

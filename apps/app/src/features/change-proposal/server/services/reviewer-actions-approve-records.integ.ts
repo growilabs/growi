@@ -9,7 +9,10 @@ import { beginActivity } from '~/server/service/activity/index';
 import { prisma } from '~/utils/prisma';
 
 import type { ChangeProposalDocument, ReviewerRef } from '../../interfaces';
-import type { CreateOperationInput } from '../models/change-proposal-types';
+import type {
+  CreateOperationInput,
+  ReviewEntry,
+} from '../models/change-proposal-types';
 import {
   type ChangeProposalService,
   createChangeProposalService,
@@ -60,18 +63,20 @@ describe('ChangeProposalService.approve: the records an approval leaves', () => 
   const keysOf = (proposal: ChangeProposalDocument): string[] =>
     proposal.operations.map((op) => op.key);
 
-  const reject = async (
-    proposalId: string,
-    operationKeys: readonly string[] | 'whole-proposal',
-  ) =>
-    expect(
+  const reject = async (proposalId: string, target: ReviewEntry['target']) => {
+    const entry: ReviewEntry =
+      target.scope === 'whole'
+        ? { kind: 'reject', target, channel: 'ui' }
+        : { kind: 'reject', target, channel: 'ui' };
+    return expect(
       await prisma.changeproposals.addReviews(
         proposalId,
         await loadViewerIdentity(users.subscriber._id.toString()),
-        { kind: 'reject', operationKeys, channel: 'ui' },
+        entry,
         new Date(),
       ),
     ).toEqual({ ok: true });
+  };
 
   // [operationKey, kind] of the reviewer's remaining records; '' is the whole rejection.
   const reviewsLeft = async (proposalId: string) =>
@@ -150,8 +155,11 @@ describe('ChangeProposalService.approve: the records an approval leaves', () => 
         kit.editInput(await kit.createPage('keyed-b')),
       ]);
       const [first, second] = keysOf(proposal);
-      await reject(proposal._id, [first, second]);
-      await reject(proposal._id, 'whole-proposal');
+      await reject(proposal._id, {
+        scope: 'operations',
+        operationKeys: [first, second],
+      });
+      await reject(proposal._id, { scope: 'whole' });
 
       await service.approve(proposal._id, actor(users.subscriber), [first]);
 
@@ -168,8 +176,11 @@ describe('ChangeProposalService.approve: the records an approval leaves', () => 
       const proposal = await pendingProposal([
         kit.editInput(await kit.createPage('whole')),
       ]);
-      await reject(proposal._id, keysOf(proposal));
-      await reject(proposal._id, 'whole-proposal');
+      await reject(proposal._id, {
+        scope: 'operations',
+        operationKeys: keysOf(proposal),
+      });
+      await reject(proposal._id, { scope: 'whole' });
 
       await service.approve(proposal._id, actor(users.subscriber));
 
@@ -179,7 +190,10 @@ describe('ChangeProposalService.approve: the records an approval leaves', () => 
     it('drops the record of an operation left pending because someone is editing its page (Reviewers Req 3.4, 2.10)', async () => {
       const page = await kit.createPage('edited');
       const proposal = await pendingProposal([kit.editInput(page)]);
-      await reject(proposal._id, keysOf(proposal));
+      await reject(proposal._id, {
+        scope: 'operations',
+        operationKeys: keysOf(proposal),
+      });
       kit.editingPageIds.add(page._id.toString());
 
       await service.approve(proposal._id, actor(users.subscriber));
@@ -195,7 +209,10 @@ describe('ChangeProposalService.approve: the records an approval leaves', () => 
     const proposal = await pendingProposal([
       kit.editInput(await kit.createPage('approved-before')),
     ]);
-    await reject(proposal._id, keysOf(proposal));
+    await reject(proposal._id, {
+      scope: 'operations',
+      operationKeys: keysOf(proposal),
+    });
     // Approved by the requester and still waiting for its apply.
     await prisma.changeproposals.markApproved(
       proposal._id,
@@ -215,7 +232,7 @@ describe('ChangeProposalService.approve: the records an approval leaves', () => 
         kit.editInput(await kit.createPage('conflict-open')),
       ]);
       const [key] = keysOf(proposal);
-      await reject(proposal._id, [key]);
+      await reject(proposal._id, { scope: 'operations', operationKeys: [key] });
       markApproved.spy.mockResolvedValueOnce({ ok: false, code: 'not-open' });
 
       const result = await service.approve(

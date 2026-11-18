@@ -48,13 +48,21 @@ export type AddReviewersResult =
   | { readonly ok: true; readonly added: readonly ReviewerInput[] }
   | { readonly ok: false; readonly code: 'not-found' | 'not-open' };
 
+// The whole-proposal case is its own variant, so a caller's keys can never be read as it.
+export type ReviewOperationsTarget = {
+  readonly scope: 'operations';
+  readonly operationKeys: readonly string[];
+};
+
+export type ReviewWholeTarget = { readonly scope: 'whole' };
+
 // A reject or abstain record on the chosen operations, or a rejection of the whole proposal.
 export type ReviewEntry = {
   readonly channel: ReviewChannel;
   readonly comment?: string;
 } & (
-  | { readonly kind: ReviewKind; readonly operationKeys: readonly string[] }
-  | { readonly kind: 'reject'; readonly operationKeys: 'whole-proposal' }
+  | { readonly kind: ReviewKind; readonly target: ReviewOperationsTarget }
+  | { readonly kind: 'reject'; readonly target: ReviewWholeTarget }
 );
 
 export type RecordedOutcome =

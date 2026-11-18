@@ -7,7 +7,11 @@ import {
   MAX_REVIEW_COMMENT_LENGTH,
   type ReviewKind,
 } from '../../interfaces';
-import type { ReviewEntry } from '../models/change-proposal-types';
+import type {
+  ReviewEntry,
+  ReviewOperationsTarget,
+  ReviewWholeTarget,
+} from '../models/change-proposal-types';
 import { buildDecisionResponse } from './decision-response';
 import { selectDecisionTargets } from './decision-targets';
 import { isWithinCodePoints } from './normalize-create-input';
@@ -51,32 +55,15 @@ export type ReviewRecordActionsDeps = {
   readonly now: () => Date;
 };
 
-// The whole-proposal case is its own variant, so a caller's keys can never be read as it.
-type OperationsTarget = {
-  readonly scope: 'operations';
-  readonly operationKeys: readonly string[];
-};
-
 type ReviewRequest = { readonly comment?: string } & (
-  | { readonly kind: ReviewKind; readonly target: OperationsTarget }
-  | { readonly kind: 'reject'; readonly target: { readonly scope: 'whole' } }
+  | { readonly kind: ReviewKind; readonly target: ReviewOperationsTarget }
+  | { readonly kind: 'reject'; readonly target: ReviewWholeTarget }
 );
 
-// The stored shape marks a whole rejection with a keys marker; only this builds it.
 const toEntry = (
   request: ReviewRequest,
   channel: ReviewEntry['channel'],
-): ReviewEntry => {
-  const { comment, target } = request;
-  return target.scope === 'whole'
-    ? { kind: 'reject', operationKeys: 'whole-proposal', comment, channel }
-    : {
-        kind: request.kind,
-        operationKeys: target.operationKeys,
-        comment,
-        channel,
-      };
-};
+): ReviewEntry => ({ ...request, channel });
 
 const ACTIVITY_OF = {
   reject: SupportedAction.ACTION_CHANGE_PROPOSAL_REJECT,
