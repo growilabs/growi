@@ -8,6 +8,7 @@ import mongoose from 'mongoose';
 
 import { getInstance } from '^/test/setup/crowi';
 
+import type { PageLoader } from '~/server/models/in-app-notification';
 import { prisma } from '~/utils/prisma';
 
 describe('inappnotifications.upsertByActivity', () => {
@@ -129,12 +130,19 @@ describe('inappnotifications.upsertByActivity', () => {
 });
 
 describe('inappnotifications.paginateAndIncludeTarget', () => {
+  const loadPagesFromDb: PageLoader = (ids) =>
+    mongoose
+      .model('Page')
+      .find({ _id: { $in: ids } })
+      .lean<Array<{ _id: { toString(): string } }>>()
+      .exec();
+
   const suffix = new ObjectId().toString();
   let ownerId: string;
   let targetUserId: string;
 
   beforeAll(async () => {
-    // registers the Mongoose Page model that Page targets are read through
+    // registers the Mongoose Page model read by loadPagesFromDb
     await getInstance();
     const owner = await prisma.users.create({
       data: {
@@ -163,13 +171,16 @@ describe('inappnotifications.paginateAndIncludeTarget', () => {
       },
     });
 
-    const result = await prisma.inappnotifications.paginateAndIncludeTarget({
-      where: { userId: ownerId },
-      include: { user: true },
-      orderBy: { createdAt: 'desc' },
-      limit: 10,
-      offset: 0,
-    });
+    const result = await prisma.inappnotifications.paginateAndIncludeTarget(
+      {
+        where: { userId: ownerId },
+        include: { user: true },
+        orderBy: { createdAt: 'desc' },
+        limit: 10,
+        offset: 0,
+      },
+      loadPagesFromDb,
+    );
 
     expect(result.totalDocs).toBe(1);
     expect(result.docs[0].user).toMatchObject({ username: `owner-${suffix}` });
@@ -216,10 +227,13 @@ describe('inappnotifications.paginateAndIncludeTarget', () => {
       },
     });
 
-    const result = await prisma.inappnotifications.paginateAndIncludeTarget({
-      where: { userId: ownerId, targetModel: 'PageBulkExportJob' },
-      include: { user: true },
-    });
+    const result = await prisma.inappnotifications.paginateAndIncludeTarget(
+      {
+        where: { userId: ownerId, targetModel: 'PageBulkExportJob' },
+        include: { user: true },
+      },
+      loadPagesFromDb,
+    );
 
     expect(result.docs[0].activities[0].user).toMatchObject({
       username: `target-${suffix}`,
@@ -247,11 +261,14 @@ describe('inappnotifications.paginateAndIncludeTarget', () => {
       },
     });
 
-    const result = await prisma.inappnotifications.paginateAndIncludeTarget({
-      where: { userId: ownerId, targetModel: 'ChangeProposal' },
-      limit: 10,
-      offset: 0,
-    });
+    const result = await prisma.inappnotifications.paginateAndIncludeTarget(
+      {
+        where: { userId: ownerId, targetModel: 'ChangeProposal' },
+        limit: 10,
+        offset: 0,
+      },
+      loadPagesFromDb,
+    );
 
     expect(result.docs[0].target).toEqual({ _id: proposalId });
   });
@@ -267,16 +284,19 @@ describe('inappnotifications.paginateAndIncludeTarget', () => {
       },
     });
 
-    const result = await prisma.inappnotifications.paginateAndIncludeTarget({
-      where: { userId: ownerId, targetModel: 'PageBulkExportJob' },
-      include: { user: true },
-    });
+    const result = await prisma.inappnotifications.paginateAndIncludeTarget(
+      {
+        where: { userId: ownerId, targetModel: 'PageBulkExportJob' },
+        include: { user: true },
+      },
+      loadPagesFromDb,
+    );
 
     expect(result.docs[0].target).toBeNull();
     expect(result.docs[0].activities).toEqual([]);
   });
 
-  it('resolves a Page target to the page document', async () => {
+  it('resolves a Page target through the supplied page loader', async () => {
     const pageId = new ObjectId();
     await mongoose.connection
       .collection('pages')
@@ -291,11 +311,14 @@ describe('inappnotifications.paginateAndIncludeTarget', () => {
       },
     });
 
-    const result = await prisma.inappnotifications.paginateAndIncludeTarget({
-      where: { userId: ownerId, targetModel: 'Page' },
-      limit: 10,
-      offset: 0,
-    });
+    const result = await prisma.inappnotifications.paginateAndIncludeTarget(
+      {
+        where: { userId: ownerId, targetModel: 'Page' },
+        limit: 10,
+        offset: 0,
+      },
+      loadPagesFromDb,
+    );
 
     expect(result.docs[0].target).toMatchObject({
       path: `/in-app-notification/${suffix}`,

@@ -1,7 +1,7 @@
 import type { HasObjectId, IPage, IPageHasId, IUser } from '@growi/core';
 import { SubscriptionStatusType } from '@growi/core';
 import { subDays } from 'date-fns/subDays';
-import type { Types } from 'mongoose';
+import mongoose, { type Types } from 'mongoose';
 
 import type {
   auditlogbulkexportjobs,
@@ -15,7 +15,10 @@ import {
 import type { PaginateResult } from '~/interfaces/in-app-notification';
 import { InAppNotificationStatuses } from '~/interfaces/in-app-notification';
 import type { ActivityDocument } from '~/server/models/activity';
-import type { HydratedNotification } from '~/server/models/in-app-notification';
+import type {
+  HydratedNotification,
+  PageLoader,
+} from '~/server/models/in-app-notification';
 import InAppNotificationSettings from '~/server/models/in-app-notification-settings';
 import Subscription from '~/server/models/subscription';
 import loggerFactory from '~/utils/logger';
@@ -27,6 +30,15 @@ import { type PreNotify, preNotifyService } from './pre-notify';
 import { getRoomNameWithId, RoomPrefix } from './socket-io/helper';
 
 const { STATUS_UNOPENED, STATUS_OPENED } = InAppNotificationStatuses;
+
+// TODO: once the Page model is migrated to prisma, read through prisma.pages
+// inside paginateAndIncludeTarget and stop passing `loadPages` from here.
+const loadPages: PageLoader = (pageIds) =>
+  mongoose
+    .model('Page')
+    .find({ _id: { $in: pageIds } })
+    .lean<Array<{ _id: { toString(): string } }>>()
+    .exec();
 
 const logger = loggerFactory('growi:service:inAppNotification');
 
@@ -121,13 +133,16 @@ export class InAppNotificationService {
     const { limit, offset, status } = queryOptions;
 
     try {
-      return await prisma.inappnotifications.paginateAndIncludeTarget({
-        where: { userId: String(userId), ...(status != null && { status }) },
-        orderBy: { createdAt: 'desc' },
-        include: { user: true },
-        limit,
-        offset,
-      });
+      return await prisma.inappnotifications.paginateAndIncludeTarget(
+        {
+          where: { userId: String(userId), ...(status != null && { status }) },
+          orderBy: { createdAt: 'desc' },
+          include: { user: true },
+          limit,
+          offset,
+        },
+        loadPages,
+      );
     } catch (err) {
       logger.error('Error', err);
       throw new Error(err);

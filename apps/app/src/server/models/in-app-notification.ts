@@ -4,7 +4,7 @@ import {
   toLegacyAttachmentShape,
   toLegacyUserShape,
 } from '@growi/core/dist/models/serializers';
-import mongoose, { Schema } from 'mongoose';
+import { Schema } from 'mongoose';
 
 import type {
   activities,
@@ -86,6 +86,12 @@ inAppNotificationSchema.index({
 getOrCreateModel('InAppNotification', inAppNotificationSchema);
 
 const UPSERT_BATCH_SIZE = 1000;
+
+// Page is not migrated to Prisma yet; the caller supplies the read so this
+// extension does not depend on the Mongoose model registry.
+export type PageLoader = (
+  pageIds: string[],
+) => Promise<Array<{ _id: { toString(): string } }>>;
 
 export interface UpsertByActivityParams {
   userIds: string[];
@@ -182,6 +188,7 @@ export const extension = Prisma.defineExtension((client) => {
             select?: never;
             omit?: never;
           },
+          loadPages: PageLoader,
         ): Promise<
           PaginateResult<
             WithHydratedTarget<Prisma.inappnotificationsGetPayload<A>>
@@ -245,13 +252,7 @@ export const extension = Prisma.defineExtension((client) => {
                   omit: { snapshot: true },
                   include: { user: true },
                 }),
-            pageIds.length === 0
-              ? []
-              : // TODO: read through prisma.pages once the Page model is migrated to prisma.
-                mongoose
-                  .model('Page')
-                  .find({ _id: { $in: pageIds } })
-                  .lean<Array<{ _id: { toString(): string } }>>(),
+            pageIds.length === 0 ? [] : loadPages(pageIds),
             userIds.length === 0
               ? []
               : db.users.findMany({ where: { id: { in: userIds } } }),
