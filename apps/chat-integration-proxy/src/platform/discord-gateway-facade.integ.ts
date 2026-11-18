@@ -100,8 +100,8 @@ describe('the Discord Gateway through the facade', () => {
     expect(signals[0]?.aborted).toBe(true);
   });
 
-  // A handler that throws (a Teams Graph failure rethrown from a keep
-  // command, say) is caught by the Chat instance and only logged; the SDK's
+  // A handler that throws (a Teams Graph failure rethrown from a conversation
+  // read, say) is caught by the Chat instance and only logged; the SDK's
   // default logger would print the error with the request it carried.
   it('reports what the Chat instance logs as one line about Discord, without what the error carried', async () => {
     const initialize = vi.spyOn(DiscordAdapter.prototype, 'initialize');

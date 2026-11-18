@@ -43,7 +43,6 @@ export type {
   CommandRequestKind,
   CommandTargeting,
   CommandTrait,
-  TypeableCommandName,
 } from './command-set.js';
 export {
   COMMAND_TRAITS,

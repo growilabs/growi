@@ -286,7 +286,7 @@ describe('a missing channel_permission row (the shared default)', () => {
       targeting: 'exactly-one',
       installationId: INSTALLATION,
       channel: CHANNEL,
-      commandName: 'keep',
+      commandName: 'create-page',
     });
 
     expect(outcome).toEqual({
@@ -353,7 +353,7 @@ describe('nothing to run against (Requirements 8.6 / 11.3)', () => {
       targeting: 'exactly-one',
       installationId: INSTALLATION,
       channel: CHANNEL,
-      commandName: 'keep',
+      commandName: 'create-page',
     });
 
     expect(outcome).toEqual({

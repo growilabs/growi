@@ -55,7 +55,6 @@ import {
   type PrivateReplyOrigin,
   privateReplyOriginOf,
   SEARCH_DEFAULT_LIMIT,
-  type TypeableCommandName,
 } from '../command/index.js';
 import {
   type FanOutCollector,
@@ -360,7 +359,7 @@ const previewMarkdown = (
  * whatever the user typed, and `COMMAND_TRAITS` / `SelectionRequest` are both
  * keyed by the declared vocabulary.
  */
-const isCommandName = (word: string): word is TypeableCommandName =>
+const isCommandName = (word: string): word is CommandName =>
   Object.hasOwn(COMMAND_TRAITS, word);
 
 /**

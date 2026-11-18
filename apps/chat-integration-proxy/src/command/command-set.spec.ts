@@ -16,11 +16,7 @@ import {
 // establishes this same convention for this app).
 describe('COMMAND_TRAITS completeness', () => {
   it('has a declared trait for every CommandName vocabulary value', () => {
-    // The protocol still lists `keep` until it is removed there (tasks.md 6.1);
-    // the proxy no longer declares it.
-    const commandNames = Object.values(COMMAND_NAMES).filter(
-      (name) => name !== 'keep',
-    );
+    const commandNames = Object.values(COMMAND_NAMES);
     expect(commandNames.length).toBeGreaterThan(0);
 
     for (const name of commandNames) {
@@ -97,12 +93,6 @@ describe('agent', () => {
       targeting: 'single',
     });
     expect(COMMAND_TRAITS[COMMAND_NAMES.agent].targeting).toBe('exactly-one');
-  });
-});
-
-describe('keep', () => {
-  it('is not a declared command any more (Requirement 15.1)', () => {
-    expect(Object.hasOwn(COMMAND_TRAITS, 'keep')).toBe(false);
   });
 });
 

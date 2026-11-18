@@ -215,7 +215,7 @@ describe('fromMessage', () => {
       slackThread(),
       message({
         isMention: true,
-        text: '@growi keep https://growi.example.com/page',
+        text: '@growi search https://growi.example.com/page',
         links: [link('https://growi.example.com/page')],
       }),
     );

@@ -73,18 +73,8 @@ export interface CommandTrait {
 export const SEARCH_DEFAULT_LIMIT = 10;
 
 /**
- * The shared vocabulary minus `keep`, which this app no longer runs.
- * `@growi/chat` still lists it until it is removed there (tasks.md 6.1),
- * after which this is `CommandName` again.
- */
-export type TypeableCommandName = Exclude<
-  CommandName,
-  typeof COMMAND_NAMES.keep
->;
-
-/**
  * The shared vocabulary's proxy-side traits, keyed by the SAME
- * `CommandName` union `@growi/chat` declares. `Record<TypeableCommandName,
+ * `CommandName` union `@growi/chat` declares. `Record<CommandName,
  * CommandTrait>` makes a missing entry a compile error, not a runtime gap
  * -- the same mechanism `@growi/chat`'s own `COMMAND_TRAITS` already uses
  * (design.md: 「宣言に無い言葉が打てず、性質を書いていないコマンドを
@@ -97,9 +87,7 @@ export type TypeableCommandName = Exclude<
  * segment. Adding a title field requires extending the protocol contract
  * first, out of scope here.
  */
-export const COMMAND_TRAITS: Readonly<
-  Record<TypeableCommandName, CommandTrait>
-> = {
+export const COMMAND_TRAITS: Readonly<Record<CommandName, CommandTrait>> = {
   [COMMAND_NAMES.search]: {
     fields: [
       {
