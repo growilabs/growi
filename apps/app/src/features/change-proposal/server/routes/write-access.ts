@@ -68,17 +68,35 @@ export const detectChannel = (req: AccessTokenParserReq): ReviewChannel =>
 
 // Every refusal a reviewer action words for its caller; the satisfies clause
 // fails the type check when a new ReviewerActionError has no answer here.
-const BAD_REQUEST_MESSAGE_OF = {
-  'comment-too-long': 'The comment is too long',
-  'requester-cannot-review':
-    'The requester cannot reject or abstain from their own change proposal',
-  'reviewer-not-found': 'A reviewer does not exist',
-  'too-many-reviewers': 'The change proposal would have too many reviewers',
-  'reviewers-disabled': 'Reviewers cannot be added on this wiki',
-  'invalid-request': 'The request is malformed',
+const BAD_REQUEST_OF = {
+  'comment-too-long': {
+    message: 'The comment is too long',
+    code: 'comment_too_long',
+  },
+  'requester-cannot-review': {
+    message:
+      'The requester cannot reject or abstain from their own change proposal',
+    code: 'requester_cannot_review',
+  },
+  'reviewer-not-found': {
+    message: 'A reviewer does not exist',
+    code: 'reviewer_not_found',
+  },
+  'too-many-reviewers': {
+    message: 'The change proposal would have too many reviewers',
+    code: 'too_many_reviewers',
+  },
+  'reviewers-disabled': {
+    message: 'Reviewers cannot be added on this wiki',
+    code: 'reviewers_disabled',
+  },
+  'invalid-request': {
+    message: 'The request is malformed',
+    code: 'invalid_request',
+  },
 } as const satisfies Record<
   Exclude<ReviewerActionError, 'not-found' | 'not-open' | 'user-not-allowed'>,
-  string
+  { message: string; code: string }
 >;
 
 export const respondWithServiceError = (
@@ -106,8 +124,8 @@ export const respondWithServiceError = (
     case 'invalid-request':
       return res.apiv3Err(
         new ErrorV3(
-          BAD_REQUEST_MESSAGE_OF[error.code],
-          error.code.replaceAll('-', '_'),
+          BAD_REQUEST_OF[error.code].message,
+          BAD_REQUEST_OF[error.code].code,
         ),
         400,
       );

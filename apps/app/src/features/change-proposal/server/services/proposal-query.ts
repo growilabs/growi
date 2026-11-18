@@ -41,6 +41,10 @@ import {
 } from './proposal-list-query';
 import { pageIdsOf, toProposalHeaderView } from './proposal-view-parts';
 import {
+  createReviewQueueQuery,
+  type ReviewQueuePage,
+} from './review-queue-query';
+import {
   type ReviewScopeResult,
   resolveReviewScopesWithPages,
 } from './review-scope-resolver';
@@ -64,6 +68,12 @@ import { toOperationView } from './to-operation-view';
 
 export type ProposalQuery = ProposalListQuery &
   RevisionMarksQuery & {
+    // The viewer's membership is read once here; the query itself never reads it.
+    listReviewQueue(
+      viewer: IUserHasId,
+      cursor: string | null,
+      limit: number,
+    ): Promise<ReviewQueuePage>;
     getForViewer(
       proposalId: string,
       viewer: IUserHasId,
@@ -351,67 +361,72 @@ const toOperationViews = (
  * page involved — the proposal's, its follow-ups' and reworks', and its base's —
  * is checked in a single findByIdsAndViewer call, read the same way as a revert reads it.
  */
-export const createProposalQuery = (
-  deps: ProposalQueryDeps,
-): ProposalQuery => ({
-  ...createProposalListQuery(deps.appliedListScan),
-  ...createRevisionMarksQuery(),
-  async getForViewer(proposalId, viewer) {
-    const proposal = await prisma.changeproposals.findProposal(proposalId);
-    if (proposal == null) {
-      return NOT_FOUND;
-    }
-    const viewerId = viewer._id.toString();
-    const isRequester = proposal.requester === viewerId;
+export const createProposalQuery = (deps: ProposalQueryDeps): ProposalQuery => {
+  const reviewQueue = createReviewQueueQuery(deps.appliedListScan);
+  return {
+    ...createProposalListQuery(deps.appliedListScan),
+    ...createRevisionMarksQuery(),
+    async listReviewQueue(viewer, cursor, limit) {
+      const identity = await loadViewerIdentity(viewer._id.toString());
+      return reviewQueue.listReviewQueue(identity, cursor, limit);
+    },
+    async getForViewer(proposalId, viewer) {
+      const proposal = await prisma.changeproposals.findProposal(proposalId);
+      if (proposal == null) {
+        return NOT_FOUND;
+      }
+      const viewerId = viewer._id.toString();
+      const isRequester = proposal.requester === viewerId;
 
-    const [relations, identity] = await Promise.all([
-      readRelations(proposal, isRequester),
-      loadViewerIdentity(viewerId),
-    ]);
-    const viewerScope = await readViewerScope(
-      proposal,
-      identity,
-      relatedToJudge(relations, isRequester),
-    );
-    const { role, visible, viewable } = viewerScope;
-    if (!isRequester && visible.length === 0) {
-      return NOT_FOUND;
-    }
+      const [relations, identity] = await Promise.all([
+        readRelations(proposal, isRequester),
+        loadViewerIdentity(viewerId),
+      ]);
+      const viewerScope = await readViewerScope(
+        proposal,
+        identity,
+        relatedToJudge(relations, isRequester),
+      );
+      const { role, visible, viewable } = viewerScope;
+      if (!isRequester && visible.length === 0) {
+        return NOT_FOUND;
+      }
 
-    const [revertabilityOf, participant] = await Promise.all([
-      readRevertabilityOf(proposal, visible, viewable, {
-        user: viewer,
-        services: deps.deletePermission,
-      }),
-      readParticipantViews(proposal, role, visible),
-    ]);
-    const { links, basedOn } = viewerRelations(
-      proposal,
-      relations,
-      isRequester,
-      viewerScope,
-    );
-    const operations = toOperationViews(viewerScope, {
-      links,
-      revertabilityOf,
-      decisionsOf: participant.decisionsOf,
-    });
-    return {
-      ok: true,
-      value: {
-        ...toProposalHeaderView({
-          id: proposal._id,
-          proposal,
-          visible,
-          role,
-          requester: participant.userOf(proposal.requester),
-          isPerPageNotificationsEnabled:
-            readChangeProposalSettings().perPageNotificationsEnabled,
+      const [revertabilityOf, participant] = await Promise.all([
+        readRevertabilityOf(proposal, visible, viewable, {
+          user: viewer,
+          services: deps.deletePermission,
         }),
-        ...participant.header,
-        ...(basedOn == null ? {} : { basedOn }),
-        operations,
-      },
-    };
-  },
-});
+        readParticipantViews(proposal, role, visible),
+      ]);
+      const { links, basedOn } = viewerRelations(
+        proposal,
+        relations,
+        isRequester,
+        viewerScope,
+      );
+      const operations = toOperationViews(viewerScope, {
+        links,
+        revertabilityOf,
+        decisionsOf: participant.decisionsOf,
+      });
+      return {
+        ok: true,
+        value: {
+          ...toProposalHeaderView({
+            id: proposal._id,
+            proposal,
+            visible,
+            role,
+            requester: participant.userOf(proposal.requester),
+            isPerPageNotificationsEnabled:
+              readChangeProposalSettings().perPageNotificationsEnabled,
+          }),
+          ...participant.header,
+          ...(basedOn == null ? {} : { basedOn }),
+          operations,
+        },
+      };
+    },
+  };
+};

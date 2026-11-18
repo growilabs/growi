@@ -43,7 +43,10 @@ export const createChangeProposalRouter = (
   // Fixed paths before /:id, which would otherwise take them as ids.
   router.get('/mine', listMineRouteHandlersFactory(crowi, getService));
   router.get('/applied', listAppliedRouteHandlersFactory(crowi, getService));
-  router.get('/review-queue', reviewQueueRouteHandlersFactory(crowi));
+  router.get(
+    '/review-queue',
+    reviewQueueRouteHandlersFactory(crowi, getService),
+  );
   router.post(
     '/revision-marks',
     revisionMarksRouteHandlersFactory(crowi, getService),

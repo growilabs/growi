@@ -8,13 +8,13 @@ import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import loggerFactory from '~/utils/logger';
 
-import {
-  createReviewQueueQuery,
-  isReviewQueueCursor,
-} from '../services/review-queue-query';
-import { loadViewerIdentity } from '../services/reviewer-identity';
+import { isReviewQueueCursor } from '../services/review-queue-query';
 import { limitValidator, toLimit } from './list-query-params';
-import { type AuthenticatedRequest, readAccessChain } from './read-access';
+import {
+  type AuthenticatedRequest,
+  type GetChangeProposalService,
+  readAccessChain,
+} from './read-access';
 
 const logger = loggerFactory(
   'growi:features:change-proposal:routes:review-queue',
@@ -38,8 +38,8 @@ const validator = [
 
 export const reviewQueueRouteHandlersFactory = (
   crowi: Crowi,
+  getService: GetChangeProposalService,
 ): RequestHandler[] => {
-  const reviewQueue = createReviewQueueQuery();
   return [
     ...readAccessChain(crowi),
     ...validator,
@@ -48,10 +48,8 @@ export const reviewQueueRouteHandlersFactory = (
       const { user } = req;
       assert(user != null, 'ensured by loginRequired');
       try {
-        // Read once per request; the query never reads the caller's groups itself.
-        const viewer = await loadViewerIdentity(user._id.toString());
-        const { items, nextCursor } = await reviewQueue.listReviewQueue(
-          viewer,
+        const { items, nextCursor } = await getService().listReviewQueue(
+          user,
           req.query.cursor ?? null,
           toLimit(req.query.limit),
         );
