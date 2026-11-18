@@ -249,8 +249,8 @@ apps/app/src/features/backlinks/
 
 ### Modified Files
 - `apps/app/src/server/crowi/index.ts` — instantiate and initialize `PageLinkService`
-  (subscribe to events) in the page-service setup phase, mirroring `search.ts`; **(B3)** also register
-  the backfill `CronService` (mirroring the page-bulk-export job-cron registration).
+  (subscribe to events) in the page-service setup phase, mirroring `search.ts`; `setupCron()` starts
+  the backfill poll through `PageLinkService.startBackfillPoll()`.
 - `apps/app/src/server/routes/apiv3/index.js` — register the backlinks route.
 - `apps/app/src/server/models/page-redirect.ts` — add `retrieveFromPathsRedirectingTo` (the reverse
   walk: which paths reach a given one) and re-implement `removePageRedirectsByToPath` over it, so
@@ -274,8 +274,9 @@ apps/app/src/features/backlinks/
 > Each file owns one responsibility. `extract-internal-link-paths.ts` is pure (its inputs are
 > parameters; no config or DB access); `target-page-resolution.ts` is not — it reads `Page` and the
 > Prisma `pageredirects` extension — but holds no state and is testable against a real collection.
-> `page-link-service.ts` is the only framework adapter (event wiring and config access); it hands
-> page ids to the queue and the handlers own the lifecycle logic.
+> `page-link-service.ts` is the only framework adapter (event wiring, starting the backfill poll
+> at boot, and config access); it hands page ids to the queue and the handlers own the lifecycle
+> logic.
 
 ## System Flows
 
@@ -944,7 +945,7 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
     attempts' own page cycles and the checkpoint write. At the defaults that is
     10 + 15 + 20 + 15 = **60 s**: long enough that a healthy loop never loses its claim between
     checkpoints, short enough that a dead owner's job is taken over within about one minute plus
-    one idle tick (B3.3: 1–5 min). A lower configured duty lengthens the lease with the rest.
+    one idle tick (one minute). A lower configured duty lengthens the lease with the rest.
 - **Failing page**: an error on a page (body read, parse or write) is retried in place up to 5
   attempts with a 5 s backoff, the live drain's `MAX_UPSERT_ATTEMPTS` shape, enough to ride out a
   replica-set failover. Then the page is logged, counted in `skippedPages`, and the walk moves on,
@@ -1047,8 +1048,9 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
   itself. The poll's next idle tick claims it atomically, so the same path also serves resume after a
   crash or a lapsed lease. The endpoint rejects a request while a run is active (`requested`, or
   `running` with a live lease) and when coverage is already `all`, and validates the scope (N a
-  positive integer, the date not in the future). Whether it also nudges an immediate claim, so the
-  admin does not wait up to one idle interval, is a B3.3 choice.
+  positive integer, the date not in the future). It does not nudge an immediate claim: the next
+  tick claims the request within one minute, and the endpoint stays independent of which instance
+  holds the poll.
 - **A scope resolves to one cutoff per run.** At the run's first claim the scope becomes `runCutoff`
   (a date; none for all pages) and is stored on the job document, so it does not float across
   restarts. `since` is that date; `maxPages` is the `updatedAt` of the Nth newest page, read from the
@@ -1180,7 +1182,8 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
   resumes from the saved marker — every tick, with no attempt cap or backoff, since a page-level
   failure is already absorbed by the failing-page policy and what remains is a systemic fault the
   admin sees in `lastError`. A completed run clears `lastError`. Idle cost is one primary-key read
-  per idle tick; the interval is a B3.3 choice (1 to 5 minutes).
+  per idle tick, so the poll ticks every minute: a pending request starts within a minute, and a
+  dead owner's job is taken over within about the lease (60 s) plus one tick.
 - **If the document goes missing**, the boot upsert recreates it as `coverage: none`: the admin
   settings read "not started", and a run redoes work already in `pagelinks`, which the idempotent
   upsert makes harmless. A run that finds its document gone at a checkpoint (its fenced write is

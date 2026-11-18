@@ -5,10 +5,17 @@ import type Crowi from '~/server/crowi';
 import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils';
 import type { PageDocument } from '~/server/models/page';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import type { IBacklink, ILinkTarget } from '../../interfaces/backlink';
+import { resolveBackfillPacing } from './backfill-pacing';
 import { findBacklinks } from './find-backlinks';
 import { findForwardLinkHealth } from './find-forward-link-health';
+import {
+  BACKFILL_POLL_CRON_SCHEDULE,
+  createAdminProgressEmitter,
+  PageLinkBackfillCron,
+} from './page-link-backfill-cron';
 import { handlePagesDelete } from './page-link-service-handlers';
 import { PageLinkUpsertQueue } from './page-link-upsert-queue';
 import { resolveUpsertQueuePacing } from './upsert-queue-pacing';
@@ -19,9 +26,9 @@ const logger = loggerFactory('growi:features:backlinks:page-link-service');
  * Crowi-facing entry point for the backlinks index.
  *
  * Deliberately thin: it owns only the wiring that needs a Crowi instance —
- * lifecycle-event subscription and config access — and delegates the work to
- * modules that need neither. The write side is paced by `PageLinkUpsertQueue`,
- * the read side is `findBacklinks`.
+ * lifecycle-event subscription, starting the backfill poll at boot, and config
+ * access — and delegates the work to modules that need none of it. The write
+ * side is paced by `PageLinkUpsertQueue`, the read side is `findBacklinks`.
  */
 export class PageLinkService {
   private crowi: Crowi;
@@ -49,6 +56,45 @@ export class PageLinkService {
     const pageLinkService = new PageLinkService(crowi);
     pageLinkService.registerEvents();
     return pageLinkService;
+  }
+
+  /**
+   * Boot step: create the backfill job document when it is missing, then start the backfill's
+   * idle poll unless every page is already covered.
+   *
+   * @returns the started poll, or null when none was scheduled
+   */
+  async startBackfillPoll(): Promise<PageLinkBackfillCron | null> {
+    await prisma.pagelinkbackfilljobs.ensureExists();
+    const job = await prisma.pagelinkbackfilljobs.findFirst({
+      select: { coverage: true },
+    });
+    // With every page covered no request can be accepted, so there is nothing to poll for.
+    if (job?.coverage === 'all') {
+      logger.info(
+        'backlinks backfill poll not scheduled: every page is covered',
+      );
+      return null;
+    }
+
+    const { configManager } = this.crowi;
+    const poll = new PageLinkBackfillCron({
+      cronSchedule: BACKFILL_POLL_CRON_SCHEDULE,
+      pacing: resolveBackfillPacing({
+        dutyCyclePercent: configManager.getConfig(
+          'backlinks:backfillDutyCyclePercent',
+        ),
+        maxPagesPerSecond: configManager.getConfig(
+          'backlinks:backfillMaxPagesPerSecond',
+        ),
+        maxBodyKiB: configManager.getConfig('backlinks:backfillMaxBodyKiB'),
+      }),
+      // Read per run: admins can change the site URL after boot.
+      getSiteUrl: () => configManager.getConfig('app:siteUrl'),
+      emitProgress: createAdminProgressEmitter(this.crowi.socketIoService),
+    });
+    poll.startCron();
+    return poll;
   }
 
   private registerEvents(): void {

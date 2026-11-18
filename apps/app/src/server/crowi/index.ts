@@ -503,6 +503,8 @@ class Crowi {
 
     startAccessTokenCron();
 
+    await this.pageLinkService.startBackfillPoll();
+
     // News feed sync cron
     const { NewsCronService } = await import(
       '~/features/news/server/services/news-cron-service'

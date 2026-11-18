@@ -30,6 +30,9 @@ export interface PageLinkBackfillCronDeps {
   readonly sleep?: (ms: number) => Promise<void>;
 }
 
+/** The idle poll runs every minute; design.md (PageLinkBackfillCron) has the reasoning. */
+export const BACKFILL_POLL_CRON_SCHEDULE = '* * * * *';
+
 interface JobClaimState {
   readonly status: string;
   readonly claimedBy: string | null;
