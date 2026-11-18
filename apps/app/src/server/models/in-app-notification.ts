@@ -1,4 +1,6 @@
+import type { IUser } from '@growi/core/dist/interfaces';
 import {
+  serializeUserSecurely,
   toLegacyAttachmentShape,
   toLegacyUserShape,
 } from '@growi/core/dist/models/serializers';
@@ -97,11 +99,6 @@ export interface UpsertByActivityParams {
   createdAt: Date;
   lastWeek: Date;
 }
-
-export const serializeUserSecurely = (user: users) => {
-  const { password, apiToken, email, ...rest } = toLegacyUserShape(user);
-  return user.isEmailPublished ? { ...rest, email } : rest;
-};
 
 type ActivityWithUser = Omit<activities, 'snapshot'> & { user: users | null };
 
@@ -284,7 +281,7 @@ export const extension = Prisma.defineExtension((client) => {
           for (const user of targetUsers) {
             targets.set(
               `${SupportedTargetModel.MODEL_USER}:${user.id}`,
-              serializeUserSecurely(user),
+              serializeUserSecurely(toLegacyUserShape(user) as IUser),
             );
           }
           const jobs: Array<

@@ -1,4 +1,9 @@
+import type { IUser } from '@growi/core/dist/interfaces';
 import { SCOPE } from '@growi/core/dist/interfaces';
+import {
+  serializeUserSecurely,
+  toLegacyUserShape,
+} from '@growi/core/dist/models/serializers';
 import type { Router } from 'express';
 import express from 'express';
 import { body } from 'express-validator';
@@ -10,7 +15,6 @@ import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import loginRequiredFactory from '~/server/middlewares/login-required';
-import { serializeUserSecurely } from '~/server/models/in-app-notification';
 
 import type { ApiV3Response } from './interfaces/apiv3-response';
 
@@ -190,11 +194,16 @@ export const setup = (crowi: Crowi): Router => {
             .filter((activityUser, i, self) => {
               return self.findIndex(({ id }) => id === activityUser.id) === i;
             })
-            .map((activityUser) => serializeUserSecurely(activityUser));
+            .map((activityUser) =>
+              serializeUserSecurely(toLegacyUserShape(activityUser) as IUser),
+            );
 
           return {
             ...doc,
-            user: docUser != null ? serializeUserSecurely(docUser) : null,
+            user:
+              docUser != null
+                ? serializeUserSecurely(toLegacyUserShape(docUser) as IUser)
+                : null,
             actionUsers,
           };
         },
