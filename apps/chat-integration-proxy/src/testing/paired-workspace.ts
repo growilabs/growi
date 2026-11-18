@@ -109,19 +109,36 @@ export const addChannel = async (
  * addressed in and one actor to address it.
  *
  * The actor gets a fresh id for the same reason the channel does.
+ *
+ * A workspace that cannot be finished is removed again before the failure is
+ * passed on: the database is shared by every run, and nothing else knows the
+ * installation exists. `steps` lets a test make that step fail.
  */
 export const openWorkspace = async (
   db: PrismaClient,
   platform: PlatformName,
+  steps: { readonly addChannel?: typeof addChannel } = {},
 ): Promise<Workspace> => {
   const installationId = await createInstallationRepository(
     db,
     passthroughCipher,
   ).save(platform, `W-${randomUUID()}`, `${platform} workspace`, {});
 
+  let channel: SdkChannelRef;
+  try {
+    channel = await (steps.addChannel ?? addChannel)(
+      db,
+      installationId,
+      platform,
+    );
+  } catch (error) {
+    await removeWorkspace(db, installationId);
+    throw error;
+  }
+
   return {
     installationId,
-    channel: await addChannel(db, installationId, platform),
+    channel,
     actor: actorOn(platform, { accountId: `user-${randomUUID()}` }),
   };
 };

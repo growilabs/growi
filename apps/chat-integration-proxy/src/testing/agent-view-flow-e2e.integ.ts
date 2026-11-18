@@ -1,4 +1,4 @@
-// Task 6.2, the second user flow: in Slack's AI app view, text typed in the DM
+// The `agent` flow in Slack's AI app view: text typed in the DM
 // with the bot is an `agent` request whatever its first word. The DM shows a
 // processing indicator, the answer arrives in the same thread, and every
 // request in one thread carries the same conversation key, so GROWI can

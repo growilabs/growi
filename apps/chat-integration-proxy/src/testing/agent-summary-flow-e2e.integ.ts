@@ -1,4 +1,4 @@
-// Task 6.2, the third user flow: someone asks for "this conversation" to be
+// The summary flow of `agent`: someone asks for "this conversation" to be
 // summarised into a page. GROWI accepts, then asks the proxy for the
 // conversation; the proxy reads the place the request was made in -- that
 // thread of that channel and nothing else -- and, once GROWI has made the

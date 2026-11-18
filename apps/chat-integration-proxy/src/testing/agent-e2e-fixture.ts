@@ -1,6 +1,6 @@
 // One Slack workspace paired with one fake GROWI that accepts every `agent`
 // request, behind a real `startProxy` boot -- the setup the three `agent`
-// user-flow suites (tasks.md 6.2) share.
+// user-flow suites share.
 //
 // TEST INFRASTRUCTURE, NOT PRODUCTION SURFACE -- see `signing-identity.ts`.
 //

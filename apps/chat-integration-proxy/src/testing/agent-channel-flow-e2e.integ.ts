@@ -1,4 +1,4 @@
-// Task 6.2, the first user flow: in a channel someone asks `@GROWI agent
+// The `agent` flow in a channel: someone asks `@GROWI agent
 // <question>`, the proxy acknowledges it with a reaction and hands it to GROWI,
 // and the answer GROWI sends later reaches that person alone (Requirements
 // 15.1, 15.5, 15.7).
