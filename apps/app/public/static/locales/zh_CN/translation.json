@@ -1235,6 +1235,15 @@
     },
     "achievement": {
       "settled_with_percent": "已完成（完成度 {{percent}}%）"
+    },
+    "review_term": {
+      "reviewer": "批准人",
+      "approve": "批准",
+      "reject": "驳回",
+      "abstain": "弃权",
+      "comment": "评论",
+      "purpose": "变更目的",
+      "decision": "决定"
     }
   },
   "plantuml": {

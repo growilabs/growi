@@ -1288,6 +1288,15 @@
     },
     "achievement": {
       "settled_with_percent": "Completed ({{percent}}% achieved)"
+    },
+    "review_term": {
+      "reviewer": "Reviewer",
+      "approve": "Approve",
+      "reject": "Reject",
+      "abstain": "Abstain",
+      "comment": "Comment",
+      "purpose": "Purpose of the change",
+      "decision": "Decision"
     }
   },
   "plantuml": {

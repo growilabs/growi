@@ -1215,6 +1215,15 @@
     },
     "achievement": {
       "settled_with_percent": "완료 (달성도 {{percent}}%)"
+    },
+    "review_term": {
+      "reviewer": "승인자",
+      "approve": "승인",
+      "reject": "반려",
+      "abstain": "기권",
+      "comment": "코멘트",
+      "purpose": "변경 목적",
+      "decision": "판단"
     }
   },
   "plantuml": {

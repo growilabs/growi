@@ -1186,7 +1186,7 @@
     "CHANGE_PROPOSAL_REVIEWER_ADD": "添加 Change Proposal 批准人",
     "CHANGE_PROPOSAL_REVIEWER_REMOVE": "移除 Change Proposal 批准人",
     "CHANGE_PROPOSAL_REVIEW_REQUEST": "Change Proposal 批准请求",
-    "CHANGE_PROPOSAL_REVIEW_RESULT": "Change Proposal 审阅结果",
+    "CHANGE_PROPOSAL_REVIEW_RESULT": "Change Proposal 决定结果",
     "ADMIN_CHANGE_PROPOSAL_SETTINGS_UPDATE": "更新 Change Proposal 设置",
     "ADMIN_SITE_URL_UPDATE": "更新站点 URL 设置",
     "ADMIN_MAIL_SMTP_UPDATE": "更新电子邮件（SMTP）设置",
