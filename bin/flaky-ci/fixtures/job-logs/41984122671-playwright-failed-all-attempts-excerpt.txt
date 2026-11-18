@@ -1,0 +1,15 @@
+2026-11-05T07:11:20.8859635Z ##[error]  1) [chromium] › playwright/20-basic-features/inline-comment.spec.ts:2138:3 › Inline comment - hover/click/tap on a saved body highlight opens a preview popover with simple reply (Req 2.1-2.5) › Requirement 2.3: submitting a reply from the popover posts it, and it appears nested under the origin item in the bottom list 
+    Test timeout of 30000ms exceeded.
+2026-11-05T07:12:43.2853986Z 
+2026-11-05T07:12:43.2854395Z     Error Context: playwright/output/20-basic-features-inline-c-e420c-gin-item-in-the-bottom-list-chromium-retry2/error-context.md
+2026-11-05T07:12:43.2854816Z 
+2026-11-05T07:12:43.2855208Z     Error Context: playwright/output/20-basic-features-inline-c-e420c-gin-item-in-the-bottom-list-chromium-retry2/error-context.md
+2026-11-05T07:12:43.2855619Z 
+2026-11-05T07:12:43.2855699Z   1 failed
+2026-11-05T07:12:43.2857086Z     [chromium] › playwright/20-basic-features/inline-comment.spec.ts:2138:3 › Inline comment - hover/click/tap on a saved body highlight opens a preview popover with simple reply (Req 2.1-2.5) › Requirement 2.3: submitting a reply from the popover posts it, and it appears nested under the origin item in the bottom list 
+2026-11-05T07:12:43.2858288Z   1 did not run
+2026-11-05T07:12:43.2858482Z   118 passed (5.1m)
+2026-11-05T07:12:43.2861247Z ##[notice]  1 failed
+    [chromium] › playwright/20-basic-features/inline-comment.spec.ts:2138:3 › Inline comment - hover/click/tap on a saved body highlight opens a preview popover with simple reply (Req 2.1-2.5) › Requirement 2.3: submitting a reply from the popover posts it, and it appears nested under the origin item in the bottom list 
+  1 did not run
+  118 passed (5.1m)

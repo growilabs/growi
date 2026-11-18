@@ -154,6 +154,37 @@ keymaps/emacs/
 └── navigation.ts     ← Movement and editing commands
 ```
 
+### Make Invalid States Unrepresentable (Don't Patch the Type Hole with a Test)
+
+When a bug exists because the types allowed a wrong value or a mix-up, fix the
+type, not the symptom. Do not close the hole with a runtime branch plus a
+regression test alone.
+
+- **Never carry an internal sentinel in the same field as untrusted input.**
+  A magic value shares one channel with caller-supplied data, so validation
+  cannot tell them apart. Use a discriminated union so the internal case cannot
+  be produced from outside.
+- **Validate at the boundary, then wrap.** Input that bypasses the route's
+  validators (AI tools, internal callers) is checked where it enters the
+  service and converted into the typed shape once; downstream code trusts the
+  type.
+- **A test for such a hole is a boundary check, not the fix.** Add it after the
+  type change, to assert that malformed input is refused. If the only
+  protection is a test plus an `if (action === ...)` branch, the design is still
+  wrong — say so in review and recommend the type change.
+
+```typescript
+// ❌ WRONG: the internal sentinel travels in the field that also carries caller input
+interface ApplyTarget {
+  readonly operationKeys: readonly string[] | 'whole-proposal';
+}
+
+// ✅ CORRECT: the internal case is a separate variant no caller-supplied key list can produce
+type ApplyTarget =
+  | { readonly scope: 'whole' }
+  | { readonly scope: 'operations'; readonly operationKeys: readonly string[] };
+```
+
 ## Module Public Surface: Barrel Files & Directory Boundaries
 
 Treat a directory as a **module with a single public entry point** (`index.ts`). The barrel declares the public API; everything else is an implementation detail.
@@ -313,6 +344,7 @@ Before marking work complete:
 - [ ] No hard-coded mode/variant checks in consumers (use declared metadata)
 - [ ] **Executors/loaders/runners receive their work-set as input** (don't `import` the dataset); items are declared in a single source, not special-cased in the consumer
 - [ ] Modules with multiple responsibilities split by domain
+- [ ] No internal sentinel value shares a field with untrusted input (use a discriminated union); a type hole is fixed in the type, not by a runtime branch plus a test alone
 - [ ] **Module public surface is minimal** — `index.ts` re-exports only what external callers need; internals stay unexported
 - [ ] **Cohesive internals are grouped in subdirectories** with their own barrel, not flattened into the parent
 - [ ] *(apps/app)* Import specifiers follow the no-extension convention — see `apps/app/.claude/rules/import-convention.md`
@@ -350,6 +382,9 @@ tradeoff that justifies it:
   data-driven; executors take their work-set as input rather than hard-coding it.
 - **Not a workaround in disguise** — it addresses the actual cause, rather than
   papering over a symptom in a way a maintainer would have to unwind later.
+- **Type holes closed in the type** — where the types allowed a wrong value or a
+  mix-up, the type itself was changed to rule it out; the hole is not held shut
+  by a runtime branch plus a test alone.
 
 These defaults must never veto a sound, explicitly-argued context judgment. If a
 default and the tradeoff judgment conflict, the judgment wins and the default is the

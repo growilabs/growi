@@ -71,8 +71,11 @@ test('should not be cleared and should prevent GrantSelector from modified', asy
  * @see https://redmine.weseek.co.jp/issues/115285
  */
 test('Successfully updating the page body', async ({ page }) => {
-  const page1Path = '/Sandbox/for-115285/page1';
-  const page2Path = '/Sandbox/for-115285/page2';
+  // Unique per attempt: duplicating onto a path an earlier attempt already
+  // created fails and leaves the modal open, so a retry could never pass.
+  const basePath = `/Sandbox/for-115285/${Date.now()}`;
+  const page1Path = `${basePath}/page1`;
+  const page2Path = `${basePath}/page2`;
 
   const page1Body = 'Hello';
   const page2Body = 'World';
@@ -100,6 +103,9 @@ test('Successfully updating the page body', async ({ page }) => {
   await expect(page.getByTestId('page-duplicate-modal')).toBeVisible();
   await page.locator('.form-control').fill(page2Path);
   await page.getByTestId('btn-duplicate').click();
+  await expect(page.getByTestId('page-duplicate-modal')).not.toBeVisible();
+  // The URL becomes the permalink, so the title is what tells page2 is shown.
+  await expect(page).toHaveTitle(/page2/);
 
   // Open Editor (page2)
   await page.getByTestId('editor-button').click();
