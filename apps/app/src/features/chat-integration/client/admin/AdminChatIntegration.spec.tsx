@@ -12,7 +12,7 @@
 //   - an active relation offers a disconnect (Requirement 9.7) that asks for
 //     confirmation, calls the unpair endpoint, and re-reads the relation list
 
-import { COMMAND_NAMES } from '@growi/chat';
+import { COMMAND_NAMES, COMMAND_TRAITS } from '@growi/chat';
 import {
   act,
   cleanup,
@@ -593,7 +593,14 @@ describe('AdminChatIntegration', () => {
         expect(
           within(rowFor('agent')).getByLabelText(DM_FIELD),
         ).toBeInTheDocument();
-        for (const other of ['search', 'create-page', 'link-preview', 'help']) {
+        // Every other row the screen shows, so a command added later is
+        // checked without editing this list.
+        const others = Object.values(COMMAND_NAMES).filter(
+          (name) =>
+            COMMAND_TRAITS[name].directMessagePolicy !== 'separate-flag',
+        );
+        expect(others).not.toEqual([]);
+        for (const other of others) {
           expect(within(rowFor(other)).queryByText(NOTICE)).toBeNull();
           expect(within(rowFor(other)).queryByLabelText(DM_FIELD)).toBeNull();
         }
