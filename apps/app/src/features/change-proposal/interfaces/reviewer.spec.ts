@@ -1,5 +1,4 @@
 import type {
-  AnyChangeProposalNotificationSnapshot,
   ApproveResponse,
   ChangeProposalView,
   DecisionResponse,
@@ -78,9 +77,6 @@ describe('reviewer interfaces barrel', () => {
     expectTypeOf<
       ReviewResultNotificationSnapshot['wholeRejection']
     >().not.toBeNever();
-    expectTypeOf<AnyChangeProposalNotificationSnapshot['kind']>().toEqualTypeOf<
-      'apply' | 'revert' | 'review-request' | 'review-result'
-    >();
   });
 
   it('declares the approve and decision responses', () => {

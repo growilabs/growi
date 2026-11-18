@@ -31,8 +31,3 @@ export type ReviewResultNotificationSnapshot = {
   // Present when the request recorded a whole-proposal rejection (the comment may be absent).
   readonly wholeRejection?: { readonly comment?: string };
 };
-
-export type AnyChangeProposalNotificationSnapshot =
-  | ChangeProposalNotificationSnapshot
-  | ReviewRequestNotificationSnapshot
-  | ReviewResultNotificationSnapshot;

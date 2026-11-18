@@ -7,7 +7,6 @@ export * from './expand-approval-targets';
 export * from './is-movable-source-path';
 export * from './judge-revertability';
 export * from './plan-apply-order';
-export * from './review-decision';
 export * from './review-scope';
 export * from './reviewer-model';
 export * from './select-auto-apply-targets';

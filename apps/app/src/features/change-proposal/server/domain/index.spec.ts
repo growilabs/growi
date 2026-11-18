@@ -7,7 +7,6 @@ describe('change-proposal domain barrel', () => {
         'activeReviewers',
         'buildProposalLinks',
         'buildRevertOperations',
-        'canApprove',
         'computeAchievement',
         'dedupeReviewerInputs',
         'deriveProposalStatus',
