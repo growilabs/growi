@@ -69,19 +69,23 @@ const NOTICE_RESULT_OF = {
 } as const satisfies Record<ReviewKind, string>;
 
 // An AI tool calls the service without the route's validators, so the shape is checked here too.
+// 'whole-proposal' is the service's own marker: only rejectAll may carry it, so a caller's
+// value for the keys is never mistaken for it.
 const findInvalidInput = (
+  action: ReviewerActionName,
   request: ReviewRequest,
 ): ReviewerActionError | null => {
   const { comment, operationKeys } = request;
   if (comment != null && typeof comment !== 'string') {
     return 'invalid-request';
   }
-  if (
-    operationKeys !== 'whole-proposal' &&
-    (!Array.isArray(operationKeys) ||
-      operationKeys.length === 0 ||
-      !operationKeys.every((key) => typeof key === 'string'))
-  ) {
+  const keysAreValid =
+    action === 'rejectAll'
+      ? operationKeys === 'whole-proposal'
+      : Array.isArray(operationKeys) &&
+        operationKeys.length > 0 &&
+        operationKeys.every((key) => typeof key === 'string');
+  if (!keysAreValid) {
     return 'invalid-request';
   }
   return comment != null &&
@@ -174,9 +178,12 @@ export const createReviewRecordActions = (
     proposalId: string,
     actor: ReviewActor,
     action: ReviewerActionName,
-    request: ReviewRequest,
+    given: ReviewRequest,
   ): Promise<ReviewerActionResult<DecisionResponse>> => {
-    const invalid = findInvalidInput(request);
+    const invalid = findInvalidInput(action, given);
+    // An empty comment means no comment, whichever way the action was reached.
+    const request: ReviewRequest =
+      given.comment === '' ? { ...given, comment: undefined } : given;
     if (invalid != null) {
       return fail(invalid);
     }

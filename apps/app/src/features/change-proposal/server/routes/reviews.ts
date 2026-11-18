@@ -51,12 +51,11 @@ const dispatchReview = (
   service: ChangeProposalService,
   proposalId: string,
   actor: ReviewActor,
-  { kind, operationKeys, comment: givenComment }: ReviewBody,
+  { kind, operationKeys, comment }: ReviewBody,
 ): ReviewOutcome | null => {
   if (hasTooManyKeys(operationKeys)) {
     return null;
   }
-  const comment = givenComment === '' ? undefined : givenComment;
   if (kind === 'reject') {
     return operationKeys === undefined
       ? service.rejectAll(proposalId, actor, comment)

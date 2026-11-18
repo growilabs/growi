@@ -745,5 +745,46 @@ describe('ChangeProposalService: rejecting and abstaining', () => {
       ).toEqual(invalid);
       expect(await recordsOf(proposal._id)).toEqual([]);
     });
+
+    it('refuses the whole-proposal marker sent as the operation keys, and keeps an earlier whole rejection', async () => {
+      const proposal = await pendingProposal([
+        kit.editInput(await kit.createPage('marker-keys')),
+      ]);
+      const invalid = { ok: false, error: { code: 'invalid-request' } };
+      await service.rejectAll(proposal._id, actor(users.subscriber));
+      const before = await recordsOf(proposal._id);
+      // A caller outside the route's validators can send any value.
+      const marker: readonly string[] = JSON.parse('"whole-proposal"');
+
+      expect(
+        await service.rejectOperations(
+          proposal._id,
+          actor(users.subscriber),
+          marker,
+        ),
+      ).toEqual(invalid);
+      expect(
+        await service.abstain(proposal._id, actor(users.subscriber), marker),
+      ).toEqual(invalid);
+      expect(await recordsOf(proposal._id)).toEqual(before);
+      expect(before).not.toEqual([]);
+    });
+
+    it('records an empty comment as no comment', async () => {
+      const proposal = await pendingProposal([
+        kit.editInput(await kit.createPage('empty-comment')),
+      ]);
+
+      await service.abstain(
+        proposal._id,
+        actor(users.subscriber),
+        keysOf(proposal),
+        '',
+      );
+
+      const { reviews } = await kit.reload(proposal._id);
+      expect(reviews.length).toBeGreaterThan(0);
+      expect(reviews.every((r) => r.comment == null)).toBe(true);
+    });
   });
 });
