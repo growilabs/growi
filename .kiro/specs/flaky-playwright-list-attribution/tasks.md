@@ -110,19 +110,19 @@
 - [ ] 7. 変更を `ci-flaky-test-detection` に書き戻し、この仕様を削除する
   - 7.1〜7.5 は `.claude/rules/spec-lifecycle.md` が定める書き戻しの作業で、
     対応する要件は無い
-- [ ] 7.1 `ci-flaky-test-detection` の `design.md` を書き換える
+- [x] 7.1 `ci-flaky-test-detection` の `design.md` を書き換える
   - 「Playwright の識別と確信度」の節を、一覧から読む決まりに書き換える。
     Revalidation Triggers に 2 項目を足す。スクリプトの一覧の `parse-job-log`
     の説明を合わせる
   - 経緯（以前はこうだった、など）は書かず、いまの決まりだけを書く
   - 完了の状態: 節の中に、注釈の数を条件にした記述が残っていない
-- [ ] 7.2 `ci-flaky-test-detection` の `requirements.md` に、この仕様の要件を足す
+- [x] 7.2 `ci-flaky-test-detection` の `requirements.md` に、この仕様の要件を足す
   - 既存の番号の後ろに足す。既存の番号は変えない
   - 完了の状態: この仕様の受け入れ条件がすべて、新しい番号で載っている
-- [ ] 7.3 この仕様の `research.md` の内容を、`ci-flaky-test-detection` の `research.md` に移す
+- [x] 7.3 この仕様の `research.md` の内容を、`ci-flaky-test-detection` の `research.md` に移す
   - 完了の状態: 調べた事実（注釈の 2 通りの形、一覧の形、実行が 2 回あること、
     題名の 2 種類の形）と、決めた理由が、移した先で読める
-- [ ] 7.4 `ci-flaky-test-detection` の `spec.json` の `updated_at` を更新する
+- [x] 7.4 `ci-flaky-test-detection` の `spec.json` の `updated_at` を更新する
   - `phase` と `approvals` は変えない
   - 完了の状態: `updated_at` だけが変わっている
 - [ ] 7.5 `.kiro/specs/flaky-playwright-list-attribution/` を削除する
