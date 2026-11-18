@@ -86,7 +86,7 @@ schema to build them on connect, and deploy never runs `prisma db push`).
 - Mongoose models: `Page` (`isAccessiblePageByViewer`, `PageQueryBuilder.addViewerCondition` /
   `addConditionToExcludeTrashed`); Prisma extensions: `revisions` (latest body), `pageredirects`.
 - `crowi.events.page` (subscribe only), apiv3 middleware (`accessTokenParser`, `loginRequired`, `adminRequired`),
-  `getModelSafely` + `createBatchStream`, `CronService` (node-cron base) and the
+  `getModelSafely`, `CronService` (node-cron base) and the
   admin Socket.IO channel for backfill progress (mirroring the page-bulk-export job).
 - **Constraint**: dependency direction is one-way — backlinks depends on page/render/grant
   subsystems; none of them may import backlinks.
@@ -212,13 +212,19 @@ apps/app/src/features/backlinks/
 │   │   ├── page-link-service-handlers.ts   # Crowi-free lifecycle handlers: drain-time upsert by id (re-read page + body -> extract -> resolve -> sync + re-resolve inbound), chunked delete reconcile with retry
 │   │   ├── page-link-upsert-queue.ts   # coalescing queue (Set<pageId> + duty-cycle paced drain) — requirement 3.5
 │   │   ├── upsert-queue-pacing.ts      # validates the configured pacing budget, per-value fallback to CONFIG_DEFINITIONS
+│   │   ├── pacing-config.ts            # per-value validators of the configured pacing numbers, shared by the drain and the backfill
 │   │   ├── find-user-group-ids-for-viewer.ts  # viewer's internal + external group ids, resolved once per request
 │   │   ├── is-page-readable-by-viewer.ts      # viewed-page gate: Page.isAccessiblePageByViewer(..., true)
 │   │   ├── find-backlinks.ts           # read query: backlink sources filtered by viewer grant
 │   │   ├── find-forward-link-health.ts # read query: a page's trashed/broken outbound targets, viewer-filtered
 │   │   ├── page-link-service.ts        # thin Crowi adapter: subscribes to crowi.events.page, owns config access, delegates
-│   │   ├── backfill-range.ts           # (B3) pure: scope + coverage -> the run's updatedAt range; coverage after a run
-│   │   └── page-link-backfill-cron.ts  # (B3) CronService start poll + self-paced, resumable backfill loop (in-memory path->id map)
+│   │   ├── duty-cycle-rest.ts          # pure: rest owed after measured work at a duty (shared by the drain and the backfill)
+│   │   ├── backfill-range.ts           # (B3) pure: the walk's page filter; scope cutoff + coverage -> the run's updatedAt range; coverage after a run
+│   │   ├── backfill-pacing.ts          # (B3) backfill config validation, rest with the page-rate floor, checkpoint cadence, lease length
+│   │   ├── backfill-link-resolver.ts   # (B3) in-memory path->id map + permalink id set (one projection query per run)
+│   │   ├── backfill-page.ts            # (B3) one page: body read, size cap, extract, resolve, write; bounded retries
+│   │   ├── page-link-backfill-run.ts   # (B3) one claimed run: first-claim cutoff/total, paced walk, fenced checkpoints and endings
+│   │   └── page-link-backfill-cron.ts  # (B3) CronService start poll: in-process guard, claim, admin progress emitter
 │   └── routes/
 │       ├── backlinks.ts                # apiv3 route factory (GET) — getBacklinksHandlerFactory
 │       └── backlinks-backfill-admin.ts # (B3) apiv3 admin routes: GET state, POST start (scope), POST stop, POST resume
@@ -875,8 +881,9 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
 - Runs as a **self-paced loop**, not a chunk per cron tick. The `CronService` (node-cron) poll only
   starts it: each idle tick reads the job document and, when it holds a start request or a run whose
   lease has expired, claims the job and runs the loop until the run completes, fails or is stopped. This departs from the page-bulk-export
-  chunk-per-tick shape; the scaffolding it reuses is the `CronService` base, `createBatchStream`
-  and the cursor→resume skeleton. Options compared are in research.md.
+  chunk-per-tick shape; the scaffolding it reuses is the `CronService` base and the
+  marker→resume skeleton, with keyset batches in place of a long-lived cursor (see the Batch / Job
+  Contract). Options compared are in research.md.
 - **Throttle = a duty cycle over measured time, with rest proportional to work, per page.** Because
   the job shares the single JS thread, the time it holds the thread is the only lever on
   contention with live traffic. After each page the loop rests `restRatio × pageCycleMs`, where
@@ -887,39 +894,66 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
   bounds the database operation rate. The duty is one operator-tunable value (default 25%; see the
   Delivery decision). The rest is also the yield, so there is no tick
   budget, no slice limit and no zero-length yield. The charged work is capped at the drain's
-  `MAX_CHARGED_EXTRACTION_MS` (5000 ms), which bounds the charge, not the resulting rest, so the
+  `MAX_CHARGED_WORK_MS` (5000 ms), which bounds the charge, not the resulting rest, so the
   configured duty stays exact for every legitimate measurement. A timer's 1 ms floor makes the
   duty slightly under target on tiny pages, which is the gentle direction.
-  The rest computation is shared with the live drain as one pure function; the drain's loop and
+  The rest computation is shared with the live drain as one pure function (`restMsFor` in
+  `duty-cycle-rest.ts`); the backfill then lengthens the rest to the page-rate floor when that is
+  longer (`restAfterBackfillPageMs` in `backfill-pacing.ts`). The drain's loop and
   `handlePageUpsertById` are not reused, because the backfill resolves through the in-memory map.
+  The charge is the time spent in a page's attempts, not the backoffs between retries.
   A page-denominated chunk was never a throttle: extraction cost spans ~700× across bodies.
 - **Bounded continuous blocking = one page.** The loop never holds the thread longer than one
   page's parse, plus its writes' synchronous part. The test is event-loop delay (max / p99), not
   duty cycle.
-- **Single-page overshoot (open — settle in B3.2)**: the per-page rest cannot interrupt a parse, so one
-  large body stalls the thread for its whole parse time (measured on the B2.2 pipeline: ~88 ms at
-  32.6 KiB, ~1.1 s at 333 KiB — a single stall, however low the configured duty). The rest that follows a large page (about 2.6 s at 25% after an 850 ms parse) is harmless: the
-  stall is the problem, and only a check made **before parsing** bounds it, and body size is that check: parse time is
-  linear in size (≈1.5 ms/KiB for text, ≈2.5 ms/KiB for table-dense bodies, ≈0.4 ms/KiB for code
-  and draw.io blocks), so 1 s is about 700 KiB of text or about 400 KiB of tables (see research.md). The
-  linearity depends on `micromark-extension-gfm-table` ≥ 2.1.2, pinned by a workspace override;
-  earlier versions are quadratic in table cells and a size cap would not bound them. Whether to
-  cap, at what size (to be chosen from the performance run, which must include table-heavy
-  bodies), and how skipped pages are recorded (log plus a count on the job document, so the gap
-  is visible rather than silent) is undecided. The save-time listener has the same single-page
-  exposure, so whether the cap is shared with it is part of that decision. Off-thread parsing is
-  the alternative and stays deferred.
-- **Checkpoint cadence (open — settle in B3.2)**: the progress marker, the processed count, the
-  lease renewal run every N pages or T seconds, not after every page.
-  The marker is advanced in memory only after a page's rows are written and saved at the
-  checkpoint, so a crash redoes at most one interval's pages, which the idempotent upsert makes
-  safe. `leaseExpiresAt` must outlast T plus the longest single rest (up to 15 s at 25% duty with
-  the charge capped at 5000 ms), or a healthy loop loses its claim between checkpoints. N, T and
-  the lease length are B3.2 choices, to be set from the performance run.
-- **Failing page (open — settle in B3.2)**: a page whose write keeps failing needs a policy so it
-  cannot stall the walk. The live drain's shape (a bounded number of attempts, then log and move
-  on) is the starting point; what the backfill adds is a count of skipped pages on the job document
-  so the gap is visible.
+- **Single-page overshoot — bounded by a body-size cap, checked before parsing.** The per-page
+  rest cannot interrupt a parse, so one large body stalls the thread for its whole parse time
+  (measured on the B2.2 pipeline: ~88 ms at 32.6 KiB, ~1.1 s at 333 KiB — a single stall, however
+  low the configured duty). The rest that follows a large page is harmless; the stall is the
+  problem, and only a check made **before parsing** bounds it. Parse time is linear in size
+  (≈1.5 ms/KiB for text, ≈2.5 ms/KiB for table-dense bodies, ≈0.4 ms/KiB for code and draw.io
+  blocks; see research.md), so a size cap is that check. The linearity depends on
+  `micromark-extension-gfm-table` ≥ 2.1.2, pinned by a workspace override; earlier versions are
+  quadratic in table cells and a size cap would not bound them.
+  - **The cap** is `backlinks:backfillMaxBodyKiB` (env `BACKLINKS_BACKFILL_MAX_BODY_KIB`),
+    **provisionally 256 KiB, to be confirmed by B3.4's performance run** (which must include
+    table-heavy bodies). Reasoning: it bounds a single stall at about 0.4 s for text and 0.65 s
+    for tables — under the 1 s points (~700 / ~400 KiB) with room for a slower host — while very
+    few wiki pages reach it. The size is measured in UTF-8 bytes of the stored body, so a body in
+    a multi-byte script reaches the cap at fewer characters, which errs toward the shorter stall.
+  - **A skipped page** is logged (page id, size, cap) and counted in the job document's
+    `skippedPages`, so the gap is visible rather than silent. Its rows stay as they are, and it
+    is indexed on its next save.
+  - **Not shared with the live listener.** The save-time listener parses a body because a user
+    just saved it, one page per save, the same exposure the page's own rendering already has;
+    skipping there would silently drop the links of a page someone is actively editing. The
+    backfill instead walks every large page of the wiki unattended in one run, which is where a
+    cap pays. The live listener therefore keeps parsing every body.
+  - Off-thread parsing is the alternative and stays deferred.
+- **Checkpoint cadence and lease** (`backfill-pacing.ts`; provisional, to be confirmed by B3.4's
+  performance run): the progress marker, the processed and skipped counts, and the lease renewal
+  are saved every **100 pages or 10 s, whichever comes first**, checked between pages. 10 s keeps
+  a Stop prompt (it takes effect at the next checkpoint) and redoes at most ~10 s of pages after a
+  crash; 100 pages bounds the redo when pages are fast. The marker is advanced in memory only
+  after a page's rows are written, and saved at the checkpoint, so a crash redoes at most one
+  interval's pages, which the idempotent upsert makes safe.
+  - **Lease length is derived, not configured**: between two checkpoints a healthy loop spends at
+    most the interval T, one page including its retry backoffs, and one rest, so
+    `leaseMs = T + longest rest + (attempts − 1) × backoff + margin`, where the longest rest is
+    `max(5000 ms × restRatio, 1000 / backfillMaxPagesPerSecond)` and the margin (15 s) covers the
+    attempts' own page cycles and the checkpoint write. At the defaults that is
+    10 + 15 + 20 + 15 = **60 s**: long enough that a healthy loop never loses its claim between
+    checkpoints, short enough that a dead owner's job is taken over within about one minute plus
+    one idle tick (B3.3: 1–5 min). A lower configured duty lengthens the lease with the rest.
+- **Failing page**: an error on a page (body read, parse or write) is retried in place up to 5
+  attempts with a 5 s backoff, the live drain's `MAX_UPSERT_ATTEMPTS` shape, enough to ride out a
+  replica-set failover. Then the page is logged, counted in `skippedPages`, and the walk moves on,
+  so a page that keeps failing cannot stall it; it is indexed on its next save. If the database is
+  down rather than the page bad, the next checkpoint write fails too, the run ends `failed`, and
+  the pages skipped since the last saved marker are redone on retry. **Known gap:** a page that
+  crashes the process, or stalls the thread past the lease, is retried by every owner that takes
+  the job over, with no cross-instance detection of "no progress"; the cap above makes the stall
+  case unlikely, and the crash case is not handled.
 - **No overlapping loops.** node-cron 3.0.3 does not await the tick callback and has no no-overlap
   option, so an idle tick that falls due while the loop is running would start a second loop on
   the same progress marker. An **in-process `isRunning` flag**, set when the loop starts and reset
@@ -942,15 +976,25 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
   matches a `running` or `failed` document whose lease has expired, so another instance takes over and
   resumes from the progress marker. The filter never matches `idle`, `stopped` or `complete`, so an
   admin's cancel or Stop that lands after the caller's read is not overridden.
-- **Write ordering vs. the live listener (open — settle in B3.2)**: the backfill reads a page body
-  and writes its rows later; the save-time listener may rewrite the same page's rows in between.
-  Whether a stale backfill write can overwrite fresher rows is not established by this design.
-- **In-memory resolution**: loads `{path → _id}` for all pages once (one lightweight projection
-  query) and resolves extracted links by hash lookup — **never** the live `resolveToPageIds` per page.
+- **Write ordering vs. the live listener — the narrow window is accepted.** The backfill reads a
+  page body and writes its rows a moment later, and the save-time listener may rewrite the same
+  page's rows in between, on this or another instance. A stale backfill write can then land after
+  a fresh live one; and because `replaceOutboundLinks` is two commands (upsert, then prune), two
+  replaces of one page that interleave can leave only the rows both sets share — rows matching
+  neither version. Either way the page's rows are wrong only until its next save. A read before
+  writing (compare `updatedAt` or the revision) would narrow but not close the window, at the cost
+  of a round trip per page, so it is not added. The same holds for the path map below: a page
+  created during a run is not in the run's snapshot, so a link to it written by the backfill reads
+  `broken` until the linking page is saved again.
+- **In-memory resolution** (`backfill-link-resolver.ts`): one lightweight projection query over
+  every page (`_id`, `path`, `isEmpty`), loaded at the start of each claimed run, builds `{path →
+  _id}` and resolves extracted links by hash lookup — **never** the live `resolveToPageIds` per
+  page. The path map holds non-empty pages, trashed ones included, matching the live path lookup.
   Redirect-following is skipped during backfill. For a **permalink** `toPath` (`isPermalink`),
-  resolution is an **existence check** against the set of known page ids (the map's values):
-  present → that id; absent → `null` (broken). The id is the target, so the path map is not
-  consulted for permalinks.
+  resolution is an **existence check** against the set of all known page ids, empty pages
+  included (the live permalink lookup does not filter them either): present → that id; absent →
+  `null` (broken). The id is the target, so the path map is not consulted for permalinks. Rows are
+  written through `syncOutboundLinks`, which drops self-links, as the live path does.
 
 **Contracts**: Batch [x] / State [x]
 
@@ -959,19 +1003,38 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
   poll is registered from `crowi` setup and, on every idle tick, claims a pending request or a run
   whose lease has expired; the loop then runs (paced). It is not scheduled at boot when coverage is
   already `all`, since nothing can start.
-- Input: a cursor page-batch (`Page.find(...).cursor({ batch_size })` + `createBatchStream`) in
-  `_id` order, restricted to the run's `updatedAt` range and starting after the progress
-  marker; body via `Revision.findById(page.revision).body`. The loop walks it page by page and
-  rests after each page; there is no per-tick chunk.
+- Input: keyset batches of 100 pages (`Page.find({ ...range filter, _id: { $gt: marker } })
+  .sort({ _id: 1 }).limit(100)`), restricted to the run's `updatedAt` range and starting after the
+  progress marker; body via the page's revision. Batches are re-queried rather than read from one
+  long-lived cursor, because the rests between pages could outlast the server's idle cursor
+  timeout; resuming after the marker then needs nothing extra. The loop walks each batch page by
+  page and rests after each page; there is no per-tick chunk.
 - Per page: `extractInternalLinkPaths(body, page.path, siteUrl)` → resolve each path via the in-memory
   map (or, for a permalink path, via the id-existence set) → that page's upserts. **`pagelinks` is a
   Prisma-only collection with no mongoose model, so there is no `Model.bulkWrite`**: a page's write
-  is either a `replaceOutboundLinks` call or a new batched model method on the extension —
-  and if it uses `$runCommandRaw`, its reply must go through `throwOnWriteErrors` like every other
-  raw write here. B3 decides which; `ordered: false` remains the intent for a page's rows.
+  is a `replaceOutboundLinks` call (through `syncOutboundLinks`), one per page.
+- **Batched I/O: not implemented; deferred to B3.4's DB-side numbers.** Each page costs its own
+  body read and its own writes. Grouping the body reads of a batch into one query and the
+  page-link writes into one bulk command would cut commands and round trips, which is most of
+  the cost for tiny pages, but not the documents read or written nor the oplog volume; whether
+  that is worth the extra shape is judged from B3.4's database-side measurements. If adopted, it
+  combines with the per-page rest (group the I/O, still rest after each page's parse).
 - Idempotency: unique `{fromPage,toPath}` + upsert; safe to re-run and to resume mid-run (4.3).
-- Progress/observability: emit processed / `runTotal` over the existing admin Socket.IO channel (as the
-  Elasticsearch reindex does).
+- Progress/observability: emit `{ status, processed, runTotal, skippedPages }` as
+  `SocketEventName.BacklinksBackfillProgress` over the existing admin Socket.IO channel (as the
+  Elasticsearch reindex does), when a run starts or resumes, at each checkpoint and when it ends
+  stopped or complete. An emit before the HTTP server attaches is dropped, not an error.
+- **Fenced writes.** Every write the running loop makes to the job document (the first-claim
+  write, each checkpoint, and the stopped / complete / failed endings) is one `findAndModify`
+  whose filter requires `claimedBy` to be this run's owner token and `status: running`. A write
+  that matches nothing is a refusal, not an error: the loop stops and writes nothing more (it
+  only calls the boot upsert, which changes nothing on an existing document and recreates a
+  deleted one). Only an unconfirmed write (`writeErrors` / `writeConcernError`) throws. The owner
+  token is minted per claim (host, pid and a UUID), so a stalled loop and its successor in the
+  same process cannot both pass the fence. An expired lease alone does not refuse the holder's
+  own checkpoint — only another claim or a status change does — so an admin's direct `stopped`
+  on an expired lease shuts a late writer out. The checkpoint returns the written document, and
+  the loop reads `stopRequested` from it, so there is no read-then-write gap.
 
 **Delivery decision: throttled, started by an administrator from the admin settings, with the scope chosen at start.**
 - **Started by an administrator, on-prem and GROWI.cloud alike.** The admin settings offer a start
@@ -991,6 +1054,14 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
   restarts. `since` is that date; `maxPages` is the `updatedAt` of the Nth newest page, read from the
   `updatedAt` index. Pages can tie on `updatedAt`, so a `maxPages` run covers N pages or slightly
   more. N counts from the newest page of the whole wiki, not from the edge of an earlier run.
+  When the wiki has fewer than N pages of the kind the walk scans, the scope is every page: the
+  run has no lower bound and ends with coverage `all`.
+- **First claim of a run.** The loop treats a claimed job whose `runTotal` is null as a new run:
+  it resolves the cutoff, counts `runTotal`, and in one fenced write stores both and resets the
+  marker, `processed` and `skippedPages`. A job with `runTotal` set is a resume (after Resume, a
+  crash, a lapsed lease or a failure) and continues from the marker. So a new start (B3.6) must
+  clear `runCutoff`, `runTotal`, the marker and the counts along with writing the request;
+  Resume keeps them.
 - **Coverage is recorded as a cutoff, not as progress.** The job document carries `coverage`
   (`none` / `partial` / `all`) and, when partial, `coveredSince`: every page with
   `updatedAt >= coveredSince` has been backfilled. A run walks only the uncovered gap, the pages with
@@ -1009,22 +1080,31 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
   define an `updatedAt` range, so it cannot stand in for coverage.
 - **Counts shown to the admin.** While a run is active: processed pages
   of `runTotal`, the number of pages in the run's range, counted once at the first claim and stored
-  on the job document so it does not move under the progress bar. After a partial run: the number of
+  on the job document so it does not move under the progress bar. The walk applies the range filter
+  as it reaches each batch, so `processed` can end above `runTotal` (a page created or edited into the
+  range during the run is walked but was not counted) or below it (a counted page trashed or edited
+  out of the range is not walked). The display absorbs both rather than the walk: the percent is
+  `floor(processed / runTotal × 100)` capped at 99 (0 while `runTotal` is 0) until the status is
+  `complete`, and 100 only then; the count reads `min(processed, runTotal)` of `runTotal`; and
+  `skippedPages` is shown as its own count ("N pages skipped; indexed on their next save"), never
+  folded into the percent, so a finished run never reads as unfinished. After a partial run: the number of
   pages not included, which is the count of pages with `updatedAt < coveredSince`, and the total
   page count, so the line can say "about N older pages are not included". These two are **computed
   when the state is read, not stored**, because pages are created and edited all the time and a
   stored figure would go stale; the count uses the `updatedAt` index and the same range filter as the
   walk. They are approximate and worded that way ("about"): pages edited after a run move out of the
-  uncovered range, and a percent after a partial run can drift. **Which pages count (open — settle
-  in B3.2):** the walk's page filter (for example whether empty or trashed pages are scanned) is
-  defined once, in `backfill-range.ts`, and used by the walk, `runTotal` and these counts, so a page
-  the backfill skips can never sit in "not included" forever.
+  uncovered range, and a percent after a partial run can drift. **Which pages count:** the walk
+  scans pages that are neither trashed (`status` not `deleted`) nor empty (`isEmpty` not true),
+  matched null-safely for legacy documents. A trashed source is not indexed by the live drain
+  either, and an empty page has no body. The filter is `BACKFILL_PAGE_CONDITION` in
+  `backfill-range.ts`, used by the walk, `runTotal`, the `maxPages` cutoff and these counts, so a
+  page the backfill skips can never sit in "not included" forever.
 - **Admin settings (what the admin sees).** One state at a time, read from the job document:
 
   | Job document | Shown | Controls |
   |---|---|---|
   | `coverage: none`, idle | "Backlinks have not been built for existing pages" (with the page count) | scope picker + Start |
-  | `requested` / `running` | processed of `runTotal` pages (count and percent), over the admin Socket.IO channel | Stop; Start disabled |
+  | `requested` / `running` | processed of `runTotal` pages (count and percent, capped as in "Counts shown to the admin"), over the admin Socket.IO channel | Stop; Start disabled |
   | `running` with `stopRequested` | "Stopping…" | none |
   | `failed` | the last error; the poll retries from the marker | none |
   | `stopped` | where it stopped (processed of `runTotal`) | Resume, or a new scope + Start |
@@ -1047,7 +1127,8 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
     `stopped` directly, since no loop will see the flag.
   - Only a claim from `requested` clears a stale `stopRequested`, so a Stop clicked as a run finishes
     cannot stop the next one at once. A take-over of a `running` or `failed` job keeps the flag, so a
-    live Stop still takes effect at the next owner's checkpoint.
+    live Stop still takes effect at the next owner's checkpoint. For the same reason the `failed`
+    ending keeps the flag; only the `stopped` and `complete` endings, which settle the run, clear it.
   - Resume (`POST resume`, valid only in `stopped`) sets `requested` and keeps `requestedScope`,
     `runCutoff` and the marker, so the run continues over the same range and redoes at most one
     checkpoint interval (idempotent upserts), the same path as crash recovery. A new start with a
@@ -1073,34 +1154,37 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
     charge stays.
   - **A floor on the interval between pages**, `backlinks:backfillMaxPagesPerSecond`, bounds the
     per-app DB operation rate directly, whatever the parse time (a 1.3 ms page would otherwise be
-    processed 100+ times a second). Default chosen in B3.2 from the performance run.
+    processed 100+ times a second). **Provisional default 20 pages/s, to be confirmed by B3.4's
+    performance run** (env `BACKLINKS_BACKFILL_MAX_PAGES_PER_SECOND`, a positive integer). A page
+    costs about three commands (body read, upsert, prune), so this bounds one app at about 60
+    commands/s on a shared cluster, while a 3k-page wiki still finishes in under 3 minutes and the
+    largest known (45k pages) in under 40.
   - **The duty** (below), unchanged.
-  - **Batched I/O (open — evaluate in B3.2).** Today each page costs its own body read and its own
-    write. Reading the bodies of a group of pages in one query and writing their rows with one bulk
-    operation would cut the number of commands and round trips, which is most of the cost for tiny
-    pages. It does not reduce the documents read or written, nor the oplog and replication
-    volume, so its benefit depends on how much of the load is per-command overhead; B3.4's
-    DB-side measurements decide whether it is worth the extra shape. It combines with the
-    per-page rest: group the I/O, but still rest after each page's parse.
-- **Duty** (config key and env name proposed; B3 fixes them): the loop runs at
-  `backlinks:backfillDutyCyclePercent` (default 25), operator-tunable so cloud can change it without a
-  release. It is separate from `backlinks:dutyCyclePercent`, which paces the live listener's queue.
+  - **Batched I/O**: not implemented; see the Batch / Job Contract (deferred to B3.4).
+- **Duty**: the loop runs at `backlinks:backfillDutyCyclePercent` (env
+  `BACKLINKS_BACKFILL_DUTY_CYCLE_PERCENT`, default 25), operator-tunable so cloud can change it
+  without a release. It is separate from `backlinks:dutyCyclePercent`, which paces the live
+  listener's queue. The three backfill values are validated like the live queue's (an unusable
+  value falls back, with a warning, to its default).
 - **The job document is both the control and the status surface.** The app upserts it at boot
   (`$setOnInsert`: idle, `coverage: none`); the admin endpoints write the request (`requestedScope`,
   `requestedAt`, `stopRequested`); the job writes everything else (`status`, `runCutoff`,
-  `coverage`, `coveredSince`, progress marker, `processed`, `runTotal`,
+  `coverage`, `coveredSince`, progress marker, `processed`, `skippedPages`, `runTotal`,
   claim/lease, `completedAt`, `lastError`). Infra reads `status` / `coverage` / `processed` /
   `lastError` to watch progress; it never has to write. It is a document and not a config key
   because completion is state the job writes, not a setting an operator edits, and a copy in config
   could disagree with it. The tick reads the document directly from the database, not through
   `configManager`. `complete` is not terminal: the document returns to rest after a run, and a new
-  run may start while coverage is not `all`. `failed` is not terminal either: the tick keeps reading
-  and retries (the retry policy is settled in B3.2 with the failing-page policy). Idle cost is one
-  primary-key read per idle tick; the interval is a B3.3 choice (1 to 5 minutes).
+  run may start while coverage is not `all`. `failed` is not terminal either: the failure write
+  records `lastError` and releases the claim, and the next idle tick claims the job again and
+  resumes from the saved marker — every tick, with no attempt cap or backoff, since a page-level
+  failure is already absorbed by the failing-page policy and what remains is a systemic fault the
+  admin sees in `lastError`. A completed run clears `lastError`. Idle cost is one primary-key read
+  per idle tick; the interval is a B3.3 choice (1 to 5 minutes).
 - **If the document goes missing**, the boot upsert recreates it as `coverage: none`: the admin
   settings read "not started", and a run redoes work already in `pagelinks`, which the idempotent
-  upsert makes harmless. A run that finds its document gone at a checkpoint stops and recreates it
-  instead of continuing. The rows in `pagelinks` stay valid either way.
+  upsert makes harmless. A run that finds its document gone at a checkpoint (its fenced write is
+  refused) stops and recreates it, through the boot upsert, instead of continuing. The rows in `pagelinks` stay valid either way.
 - The backlinks panel shows an "index still building / partial" state whenever coverage is not `all`
   or a run is active, so a gated or in-progress backfill is a visible gap and not a silent one; for
   a partial index it says that pages not edited since `coveredSince` are not included (4.4). Whether
@@ -1304,7 +1388,7 @@ interface IBacklinkResponse {
       by ~55 min) while still admitting ~3.3 s of blocking for three large ones. Resting in
       proportion to measured cost makes small pages effectively burst and large pages throttle
       themselves, off one operator knob.
-    - **The charge is capped**: the measured time is bounded by `MAX_CHARGED_EXTRACTION_MS` (5000)
+    - **The charge is capped**: the measured time is bounded by `MAX_CHARGED_WORK_MS` (5000)
       before the rest is computed, so the configured duty stays exact for every legitimate
       measurement and one pathological page cannot park the queue indefinitely.
     - **Config validity** (`upsert-queue-pacing.ts`): `backlinks:drainIntervalMs` must be a positive
@@ -1335,8 +1419,8 @@ interface IBacklinkResponse {
   per-page rest (duty cycle) and its bounded continuous block (one page) bound latency impact on live
   traffic; the in-memory `{path→_id}` map keeps link resolution CPU-bound, not round-trip-bound.
   Measured ~5 ms/page; full-speed ~10 min/100k pages, ~50 min/500k, scaled by duty cycle and page
-  size. Body reads remain one DB read per page unless B3.2 batches them (see Batched I/O in the
-  Delivery decision).
+  size. Body reads remain one DB read per page (batching is deferred to B3.4; see Batched I/O in
+  the Batch / Job Contract).
 
 ## Migration Strategy
 

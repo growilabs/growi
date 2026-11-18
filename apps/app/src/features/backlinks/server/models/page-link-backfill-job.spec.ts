@@ -41,3 +41,33 @@ describe('pagelinkbackfilljobs.tryClaim, given the reply MongoDB sends', () => {
     ).rejects.toThrow(/tryClaim failed.*waiting for replication timed out/);
   });
 });
+
+// The loop's own writes: a refusal is a result, an unconfirmed write is an error.
+describe('pagelinkbackfilljobs.checkpoint, given the reply MongoDB sends', () => {
+  const checkpointWithReply = (reply: Prisma.JsonObject) => {
+    const client = mock<PrismaClient>({
+      $runCommandRaw: vi.fn().mockResolvedValue(reply),
+    });
+    return createPageLinkBackfillJobModel(client).checkpoint(
+      'owner-a',
+      { progressMarker: null, processed: 1, skippedPages: 0 },
+      { leaseMs: 60_000 },
+    );
+  };
+
+  it('reports a refusal, not an error, when no document matched the fence', async () => {
+    await expect(checkpointWithReply({ ok: 1, value: null })).resolves.toBe(
+      null,
+    );
+  });
+
+  it('throws rather than reporting a checkpoint when the write concern was not satisfied', async () => {
+    await expect(
+      checkpointWithReply({
+        ok: 1,
+        value: { stopRequested: false },
+        writeConcernError: { code: 64, errmsg: 'waiting for replication' },
+      }),
+    ).rejects.toThrow(/checkpoint failed.*waiting for replication/);
+  });
+});

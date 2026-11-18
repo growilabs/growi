@@ -484,7 +484,7 @@ Independent of B4/B5.
   - _Boundary: PageLinkBackfillJob_
   - _Depends: B1.2_
 
-- [ ] B3.2 Implement the throttled, resumable backfill job
+- [x] B3.2 Implement the throttled, resumable backfill job
   - Implement a self-paced loop that walks the pages in `_id` order one at a time: build/reuse an
     in-memory path→id map (one projection query) for resolution instead of per-link lookups, extract
     links via the B1 extractor (passing the configured site URL), resolve permalink targets via an
@@ -569,6 +569,11 @@ Independent of B4/B5.
     per-app duration across a realistic page-count spread, estimate how many apps may
     overlap (the cloud control has no other bound, design.md), and decide whether the fixed limits suffice or the app needs to back
     off when its own database round trips slow down (design.md's fallback). Agree the success numbers before running
+  - Memory: the in-memory resolver (`backfill-link-resolver.ts`) holds every page's path and id for
+    the whole run, so the app's memory grows with the page count. In the same performance run,
+    measure the heap and RSS peak with and without the job, and extrapolate to the largest known
+    customer size. Decide whether the growth is negligible against the app's memory limit; if it is
+    not, revisit the in-memory resolution (design.md)
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.7, 4.9_
   - _Depends: B3.2_
 
@@ -597,13 +602,17 @@ Independent of B4/B5.
     `lastError`, and, computed on read, the number of pages not yet included and the total page count
     (the `updatedAt`-index count with the walk's page filter)); POST start with a
     scope (`all`, `maxPages` N, or `since` date), which writes `requestedScope`, `requestedAt` and
-    status `requested`; POST stop, which cancels an unclaimed request, sets `stopRequested` on a running
+    status `requested` and clears the previous run's `runCutoff`, `runTotal`, `progressMarker`,
+    `processed` and `skippedPages` in the same write (the loop treats a claimed job with
+    `runTotal == null` as a new run, design.md; without the reset a new start resumes the old
+    range); POST stop, which cancels an unclaimed request, sets `stopRequested` on a running
     run, and sets `stopped` directly when the run's lease has expired; and POST resume, valid only in
     `stopped`, which sets `requested` and keeps the scope, `runCutoff` and the marker. Validate the
     scope (N a positive integer, the date not in the future). Reject a start while a run is active
     and when coverage is `all`
-  - Done when a non-admin is refused on every route; a valid start writes the request and returns the
-    state; a start while a run is active, with coverage `all`, or with an invalid scope is rejected
+  - Done when a non-admin is refused on every route; a valid start writes the request, clears the
+    previous run's fields, and returns the state; a new start after a completed or stopped run walks
+    its own range rather than resuming the old one; a start while a run is active, with coverage `all`, or with an invalid scope is rejected
     without changing the document; two concurrent starts leave exactly one request; after a partial run the not-included count equals
     the number of seeded pages older than `coveredSince` and excludes pages the walk skips; stop cancels an
     unclaimed request, flags a running one, and ends an expired-lease run directly; resume is
@@ -614,7 +623,8 @@ Independent of B4/B5.
 
 - [ ] B3.7 Add the admin settings section and the panel's partial-index state
   - Add an SWR hook for the job state and a section in the admin settings with a scope picker (all
-    pages, newest N, edited after a date), progress (processed of `runTotal`, count and percent) over the admin Socket.IO channel, the
+    pages, newest N, edited after a date), progress (processed of `runTotal`, count and percent, capped at 99% until
+    `complete` and with skipped pages as their own count, per design.md's "Counts shown to the admin") over the admin Socket.IO channel, the
     not-included count in the partial-coverage line, and the states
     in design.md's table: not started, running, failed, stopping, stopped (Resume or a new scope), partial coverage (the
     control stays), all pages covered (a status line, no control). Choose where it sits in the admin
@@ -623,7 +633,8 @@ Independent of B4/B5.
     `all` or a run is active, saying that pages not edited since `coveredSince` are not included
   - Done when component tests render each state with the right text and controls (no start control
     when coverage is `all`, a disabled one while running), a started run's progress updates without a
-    reload, and the panel shows the partial state for a partial index and none for `all`
+    reload, a run whose `processed` passes `runTotal` reads 99% (count capped at `runTotal`) until it is
+    `complete` and 100% only then, and the panel shows the partial state for a partial index and none for `all`
   - _Requirements: 4.4, 4.5, 4.6, 4.7, 4.8, 4.9, 4.10_
   - _Boundary: BacklinksBackfillAdmin, BacklinksPanel_
   - _Depends: B3.6, B1.11_
