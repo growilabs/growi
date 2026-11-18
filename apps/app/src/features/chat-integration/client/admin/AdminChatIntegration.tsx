@@ -142,15 +142,8 @@ interface CommandFormState {
   readonly allowedInDirectMessage: boolean;
 }
 
-// GROWI no longer offers `keep`, so it gets no row. Naming it in the guard's
-// type makes deleting `COMMAND_NAMES.keep` a compile error here.
-const isOffered = (
-  name: CommandName,
-): name is Exclude<CommandName, typeof COMMAND_NAMES.keep> =>
-  name !== COMMAND_NAMES.keep;
-
-const OFFERED_COMMAND_NAMES: ReadonlyArray<CommandName> =
-  Object.values(COMMAND_NAMES).filter(isOffered);
+const ALL_COMMAND_NAMES: ReadonlyArray<CommandName> =
+  Object.values(COMMAND_NAMES);
 
 const hasSeparateDmFlag = (commandName: CommandName): boolean =>
   COMMAND_TRAITS[commandName].directMessagePolicy === 'separate-flag';
@@ -161,7 +154,7 @@ const toFormState = (
   const byCommand = new Map(
     channelPermissions.map((row) => [row.commandName, row]),
   );
-  const entries = OFFERED_COMMAND_NAMES.map(
+  const entries = ALL_COMMAND_NAMES.map(
     (commandName): [CommandName, CommandFormState] => {
       const row = byCommand.get(commandName);
       const allowedInDirectMessage = row?.allowedInDirectMessage === true;
@@ -233,7 +226,7 @@ const toChannelPermissions = (
   const channelPermissions: Array<
     RelationSettings['channelPermissions'][number]
   > = [];
-  for (const commandName of OFFERED_COMMAND_NAMES) {
+  for (const commandName of ALL_COMMAND_NAMES) {
     const { scope, channelIds, allowedInDirectMessage } = form[commandName];
     // The server rejects the flag, even `false`, for any other command.
     const dmFlag = hasSeparateDmFlag(commandName)
@@ -372,7 +365,7 @@ const ChannelPermissionsForm = ({
       data-testid="grw-chat-integration-permissions-form"
     >
       <p className="text-muted mb-2">Settings version: {version}</p>
-      {OFFERED_COMMAND_NAMES.map((commandName) => (
+      {ALL_COMMAND_NAMES.map((commandName) => (
         <div
           className="row align-items-center mb-2"
           key={commandName}

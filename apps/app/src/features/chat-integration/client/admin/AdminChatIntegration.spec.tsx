@@ -12,6 +12,7 @@
 //   - an active relation offers a disconnect (Requirement 9.7) that asks for
 //     confirmation, calls the unpair endpoint, and re-reads the relation list
 
+import { COMMAND_NAMES } from '@growi/chat';
 import {
   act,
   cleanup,
@@ -489,7 +490,7 @@ describe('AdminChatIntegration', () => {
       expect(mocks.toastSuccess).toHaveBeenCalled();
     });
 
-    it('lists a row only for each command GROWI offers, so no keep row is shown', async () => {
+    it('lists one row for each command in the vocabulary', async () => {
       stubApi({ relations: [ACTIVE_RELATION] });
 
       renderScreen();
@@ -498,9 +499,7 @@ describe('AdminChatIntegration', () => {
       const labels = screen
         .getAllByTestId('grw-chat-integration-permission-row')
         .map((row) => within(row).getByText(/^[a-z-]+$/).textContent);
-      expect([...labels].sort()).toEqual(
-        ['agent', 'create-page', 'help', 'link-preview', 'search'].sort(),
-      );
+      expect([...labels].sort()).toEqual(Object.values(COMMAND_NAMES).sort());
     });
 
     it('refuses to submit a channel id in a chat adapter encoding, and says which entry is wrong', async () => {
