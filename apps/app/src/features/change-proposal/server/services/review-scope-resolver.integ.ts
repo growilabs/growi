@@ -193,7 +193,7 @@ describe('resolveReviewScope', () => {
   });
 
   describe('a pending edit', () => {
-    it('is a decision target when the reviewer can view the page through a group, an external group or ownership (Reviewers Req 2.2, 5.6)', async () => {
+    it('is a decision target when the reviewer can view the page through a group, an external group or ownership (Req 16.2, 19.6)', async () => {
       const ops = [
         editOf('group', await createPage('member-group')),
         editOf('external', await createPage('member-external-group')),
@@ -207,7 +207,7 @@ describe('resolveReviewScope', () => {
       });
     });
 
-    it('is absent when the page belongs to a group the reviewer is not in (Reviewers Req 2.6, 5.4)', async () => {
+    it('is absent when the page belongs to a group the reviewer is not in (Req 16.6, 19.4)', async () => {
       const ops = [editOf('foreign', await createPage('foreign-group'))];
 
       expect(await resolve(ops)).toEqual({
@@ -217,7 +217,7 @@ describe('resolveReviewScope', () => {
       });
     });
 
-    it('is judged by the membership read for this request, not read again (Reviewers Req 5.9)', async () => {
+    it('is judged by the membership read for this request, not read again (Req 19.9)', async () => {
       const ops = [editOf('group', await createPage('member-group'))];
       const withoutGroups: ViewerIdentity = {
         ...identity,
@@ -231,7 +231,7 @@ describe('resolveReviewScope', () => {
   });
 
   describe('"anyone with the link" pages', () => {
-    it('keep every operation that rests on one away from the reviewer (Reviewers Req 5.6)', async () => {
+    it('keep every operation that rests on one away from the reviewer (Req 19.6)', async () => {
       const linkParent = await createPage('link');
       const publicParent = await createPage('public');
       const ops = [
@@ -260,7 +260,7 @@ describe('resolveReviewScope', () => {
 
   describe('pages that share the closest ancestor path', () => {
     // Pages outside the tree (parent: null) are not kept unique by path.
-    it('hide a create or a move when the reviewer cannot view one of them (Reviewers Req 5.6)', async () => {
+    it('hide a create or a move when the reviewer cannot view one of them (Req 19.6)', async () => {
       const foreign = await createPage('foreign-group');
       await createPage('public', foreign.path);
       const ops = [
@@ -271,7 +271,7 @@ describe('resolveReviewScope', () => {
       expect((await resolve(ops)).visible).toEqual([]);
     });
 
-    it('show them when the reviewer can view every one (Reviewers Req 2.2)', async () => {
+    it('show them when the reviewer can view every one (Req 16.2)', async () => {
       const grouped = await createPage('member-group');
       await createPage('public', grouped.path);
 
@@ -282,7 +282,7 @@ describe('resolveReviewScope', () => {
   });
 
   describe('the parent of a page that does not exist yet', () => {
-    it('skips an empty page and judges by the closest non-empty ancestor (Reviewers Req 2.2, 5.6)', async () => {
+    it('skips an empty page and judges by the closest non-empty ancestor (Req 16.2, 19.6)', async () => {
       const grandparent = await createPage('public');
       const emptyParent = await createPage(
         'public',
@@ -295,7 +295,7 @@ describe('resolveReviewScope', () => {
       ).toEqual({ visible: ['create'], targets: ['create'], stage: 'open' });
     });
 
-    it('does not let a viewable empty page stand in for an ancestor the reviewer cannot view (Reviewers Req 5.6)', async () => {
+    it('does not let a viewable empty page stand in for an ancestor the reviewer cannot view (Req 19.6)', async () => {
       const grandparent = await createPage('foreign-group');
       const emptyParent = await createPage(
         'public',
@@ -309,7 +309,7 @@ describe('resolveReviewScope', () => {
       ).toEqual([]);
     });
 
-    it('is the closest one, not a farther ancestor the reviewer can view (Reviewers Req 5.6)', async () => {
+    it('is the closest one, not a farther ancestor the reviewer can view (Req 19.6)', async () => {
       const top = await createPage('public');
       const middle = await createPage('foreign-group', `${top.path}/middle`);
 
@@ -320,7 +320,7 @@ describe('resolveReviewScope', () => {
   });
 
   describe('operations already applied', () => {
-    it('are decided by the rule for other viewers, on the page the operation produced (Reviewers Req 5.10)', async () => {
+    it('are decided by the rule for other viewers, on the page the operation produced (Req 19.10)', async () => {
       const parent = await createPage('public');
       const created = await createPage('foreign-group', `${parent.path}/made`);
       const ops = [
@@ -338,7 +338,7 @@ describe('resolveReviewScope', () => {
   });
 
   describe('the visible stage', () => {
-    it('reveals nothing about a pending operation the reviewer cannot view (Reviewers Req 5.6)', async () => {
+    it('reveals nothing about a pending operation the reviewer cannot view (Req 19.6)', async () => {
       const ops = [
         editOf('seen', await createPage('public'), 'failed'),
         editOf('hidden', await createPage('foreign-group'), 'pending'),
@@ -353,7 +353,7 @@ describe('resolveReviewScope', () => {
   });
 
   describe('a viewer who is neither requester nor reviewer', () => {
-    it('sees only applied operations, as before (Reviewers Req 5.10)', async () => {
+    it('sees only applied operations, as before (Req 19.10)', async () => {
       const page = await createPage('public');
       const ops = [editOf('pending', page), editOf('applied', page, 'applied')];
 

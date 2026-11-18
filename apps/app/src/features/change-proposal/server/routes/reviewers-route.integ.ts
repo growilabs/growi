@@ -36,7 +36,7 @@ describe('change-proposal reviewer routes', () => {
   });
 
   describe('PATCH /:id/reviewers', () => {
-    it('adds the reviewers with 204, and the activity keeps the one who added them (Reviewers Req 4.1, 6.10)', async () => {
+    it('adds the reviewers with 204, and the activity keeps the one who added them (Req 18.1, 20.10)', async () => {
       const proposal = await reviewedProposal();
       asUser(users.subscriber);
 
@@ -61,7 +61,7 @@ describe('change-proposal reviewer routes', () => {
       });
     });
 
-    it('removes the reviewers with 204, and the activity keeps the one who removed them (Reviewers Req 4.3, 6.10)', async () => {
+    it('removes the reviewers with 204, and the activity keeps the one who removed them (Req 18.3, 20.10)', async () => {
       const proposal = await reviewedProposal();
       asUser(users.requester);
 
@@ -84,7 +84,7 @@ describe('change-proposal reviewer routes', () => {
       });
     });
 
-    it('marks an addition and a removal sent with an access token as coming from the API (Reviewers Req 6.10)', async () => {
+    it('marks an addition and a removal sent with an access token as coming from the API (Req 20.10)', async () => {
       const added = await reviewedProposal();
       const removed = await reviewedProposal();
 
@@ -147,7 +147,7 @@ describe('change-proposal reviewer routes', () => {
       await expectOneUnsettledAttempt(endpointOf(proposal._id, 'reviewers'));
     });
 
-    it('answers an addition it cannot store with 400 and the reason (Reviewers Req 4.5, 4.9)', async () => {
+    it('answers an addition it cannot store with 400 and the reason (Req 18.5, 18.9)', async () => {
       const proposal = await reviewedProposal();
       const unknownUser = { kind: 'user', id: new Types.ObjectId().toString() };
       const tooMany = Array.from({ length: MAX_REVIEWERS }, () => ({
@@ -184,7 +184,7 @@ describe('change-proposal reviewer routes', () => {
       ]);
     });
 
-    it('answers a missing proposal, a stranger and a reviewer who sees none of its pages with one identical 404 (Reviewers Req 2.7)', async () => {
+    it('answers a missing proposal, a stranger and a reviewer who sees none of its pages with one identical 404 (Req 16.7)', async () => {
       const proposal = await reviewedProposal();
       const hidden = await reviewedProposal([
         await requesterOnlyPage('hidden'),
@@ -213,7 +213,7 @@ describe('change-proposal reviewer routes', () => {
       ]);
     });
 
-    it('answers a proposal that is no longer open with 409 not_open (Reviewers Req 4.8)', async () => {
+    it('answers a proposal that is no longer open with 409 not_open (Req 18.8)', async () => {
       const proposal = await settledReviewedProposal();
       asUser(users.requester);
 
@@ -228,7 +228,7 @@ describe('change-proposal reviewer routes', () => {
       ]);
     });
 
-    it('refuses a read-only requester and a guest without recording an activity (Reviewers Req 7.5)', async () => {
+    it('refuses a read-only requester and a guest without recording an activity (Req 21.5)', async () => {
       const proposal = await reviewedProposal(undefined, {
         requester: idOf(fixtures.readOnlyUser),
       });

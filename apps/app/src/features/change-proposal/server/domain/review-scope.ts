@@ -32,7 +32,7 @@ const ancestorCandidatesOf = (path: string): readonly string[] => {
   return candidates;
 };
 
-// A complete deletion never decides reviewers (see design.md, review-scope).
+// A complete deletion never decides reviewers (see design.md, Reviewer Domain).
 export const reviewScopeOf = (op: ReviewScopeOperation): ReviewScope => {
   switch (op.type) {
     case 'edit':

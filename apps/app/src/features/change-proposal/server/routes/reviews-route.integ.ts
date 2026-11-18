@@ -34,7 +34,7 @@ describe('change-proposal reviewer routes', () => {
   });
 
   describe('POST /:id/reviews', () => {
-    it('records a rejection of the chosen operation without changing its state, and the activity keeps the reviewer (Reviewers Req 3.1, 6.8)', async () => {
+    it('records a rejection of the chosen operation without changing its state, and the activity keeps the reviewer (Req 17.1, 20.8)', async () => {
       const proposal = await reviewedProposal();
       const [op] = proposal.operations;
       asUser(users.subscriber);
@@ -71,7 +71,7 @@ describe('change-proposal reviewer routes', () => {
       });
     });
 
-    it('records a rejection of the whole proposal when no keys are given, treating an empty comment as none (Reviewers Req 3.2)', async () => {
+    it('records a rejection of the whole proposal when no keys are given, treating an empty comment as none (Req 17.2)', async () => {
       const proposal = await reviewedProposal();
       asUser(users.subscriber);
 
@@ -99,7 +99,7 @@ describe('change-proposal reviewer routes', () => {
       });
     });
 
-    it('records an abstention of the chosen operation, and the activity keeps the reviewer (Reviewers Req 3.3, 6.8)', async () => {
+    it('records an abstention of the chosen operation, and the activity keeps the reviewer (Req 17.3, 20.8)', async () => {
       const proposal = await reviewedProposal();
       const [op] = proposal.operations;
       asUser(users.subscriber);
@@ -128,7 +128,7 @@ describe('change-proposal reviewer routes', () => {
       });
     });
 
-    it('marks a review sent with an access token as coming from the API (Reviewers Req 6.8)', async () => {
+    it('marks a review sent with an access token as coming from the API (Req 20.8)', async () => {
       const proposal = await reviewedProposal();
 
       const readScope = await postReview(proposal._id, {
@@ -224,7 +224,7 @@ describe('change-proposal reviewer routes', () => {
       expect((await kit.reload(proposal._id)).reviews).toEqual(before);
     });
 
-    it('answers a comment over the limit with 400 comment_too_long (Reviewers Req 3.6)', async () => {
+    it('answers a comment over the limit with 400 comment_too_long (Req 17.6)', async () => {
       const proposal = await reviewedProposal();
       asUser(users.subscriber);
 
@@ -238,7 +238,7 @@ describe('change-proposal reviewer routes', () => {
       expect((await kit.reload(proposal._id)).reviews).toEqual([]);
     });
 
-    it('answers the requester with 400 requester_cannot_review (Reviewers Req 3.10)', async () => {
+    it('answers the requester with 400 requester_cannot_review (Req 17.10)', async () => {
       const proposal = await reviewedProposal();
       asUser(users.requester);
 
@@ -257,7 +257,7 @@ describe('change-proposal reviewer routes', () => {
       expect((await kit.reload(proposal._id)).reviews).toEqual([]);
     });
 
-    it('answers a missing proposal, a stranger and a reviewer who sees none of its pages with one identical 404 (Reviewers Req 2.7, 3.11)', async () => {
+    it('answers a missing proposal, a stranger and a reviewer who sees none of its pages with one identical 404 (Req 16.7, 17.11)', async () => {
       const proposal = await reviewedProposal();
       const hidden = await reviewedProposal([
         await requesterOnlyPage('hidden'),
@@ -279,7 +279,7 @@ describe('change-proposal reviewer routes', () => {
       expect((await kit.reload(proposal._id)).reviews).toEqual([]);
     });
 
-    it('answers a reviewer with nothing left to decide with 409 not_open (Reviewers Req 2.9)', async () => {
+    it('answers a reviewer with nothing left to decide with 409 not_open (Req 16.9)', async () => {
       const proposal = await settledReviewedProposal();
       asUser(users.subscriber);
 
@@ -290,7 +290,7 @@ describe('change-proposal reviewer routes', () => {
       expect((await kit.reload(proposal._id)).reviews).toEqual([]);
     });
 
-    it('refuses a read-only reviewer and a guest without recording an activity (Reviewers Req 7.5)', async () => {
+    it('refuses a read-only reviewer and a guest without recording an activity (Req 21.5)', async () => {
       const proposal = await kit.storeProposal(
         [kit.editInput(await kit.createPage('read-only'))],
         {

@@ -144,7 +144,7 @@ describe('ChangeProposalService.approve: the records an approval leaves', () => 
   });
 
   describe("the approver's own reject and abstain records", () => {
-    it('drops the records of the approved operations but keeps the whole rejection on a keyed approval (Reviewers Req 3.4)', async () => {
+    it('drops the records of the approved operations but keeps the whole rejection on a keyed approval (Req 17.4)', async () => {
       const proposal = await pendingProposal([
         kit.editInput(await kit.createPage('keyed-a')),
         kit.editInput(await kit.createPage('keyed-b')),
@@ -167,7 +167,7 @@ describe('ChangeProposalService.approve: the records an approval leaves', () => 
       expect(await reviewsLeft(proposal._id)).toHaveLength(2);
     });
 
-    it('drops the whole rejection too on a whole approval (Reviewers Req 3.4)', async () => {
+    it('drops the whole rejection too on a whole approval (Req 17.4)', async () => {
       const proposal = await pendingProposal([
         kit.editInput(await kit.createPage('whole')),
       ]);
@@ -182,7 +182,7 @@ describe('ChangeProposalService.approve: the records an approval leaves', () => 
       expect(await reviewsLeft(proposal._id)).toEqual([]);
     });
 
-    it('drops the record of an operation left pending because someone is editing its page (Reviewers Req 3.4, 2.10)', async () => {
+    it('drops the record of an operation left pending because someone is editing its page (Req 17.4, 16.10)', async () => {
       const page = await kit.createPage('edited');
       const proposal = await pendingProposal([kit.editInput(page)]);
       await reject(proposal._id, {
@@ -200,7 +200,7 @@ describe('ChangeProposalService.approve: the records an approval leaves', () => 
     });
   });
 
-  it('drops the record of an operation whose approval another request already wrote (Reviewers Req 3.4)', async () => {
+  it('drops the record of an operation whose approval another request already wrote (Req 17.4)', async () => {
     const proposal = await pendingProposal([
       kit.editInput(await kit.createPage('approved-before')),
     ]);
@@ -222,7 +222,7 @@ describe('ChangeProposalService.approve: the records an approval leaves', () => 
   });
 
   describe('an approval the write gave up on after write conflicts', () => {
-    it('leaves the reject record, records nothing and answers the operation as still pending while the proposal is open (Reviewers Req 3.4, 6.5, 6.8)', async () => {
+    it('leaves the reject record, records nothing and answers the operation as still pending while the proposal is open (Req 17.4, 20.5, 20.8)', async () => {
       const proposal = await pendingProposal([
         kit.editInput(await kit.createPage('conflict-open')),
       ]);
@@ -256,7 +256,7 @@ describe('ChangeProposalService.approve: the records an approval leaves', () => 
       expect(await resultNotifications(proposal._id)).toEqual([]);
     });
 
-    it('answers not-open when the proposal closed meanwhile (Reviewers Req 2.9)', async () => {
+    it('answers not-open when the proposal closed meanwhile (Req 16.9)', async () => {
       const proposal = await pendingProposal([
         kit.editInput(await kit.createPage('conflict-closed')),
       ]);
@@ -277,7 +277,7 @@ describe('ChangeProposalService.approve: the records an approval leaves', () => 
   });
 
   describe('activities', () => {
-    it("records the approval on the request's activity with its ip, and the apply as the requester on a new one without it (Reviewers Req 6.8, 6.9)", async () => {
+    it("records the approval on the request's activity with its ip, and the apply as the requester on a new one without it (Req 20.8, 20.9)", async () => {
       const proposal = await pendingProposal([
         kit.editInput(await kit.createPage('activity')),
       ]);
@@ -318,7 +318,7 @@ describe('ChangeProposalService.approve: the records an approval leaves', () => 
       expect(rows).toHaveLength(2);
     });
 
-    it('records no approval when the request approved nothing (Reviewers Req 6.8)', async () => {
+    it('records no approval when the request approved nothing (Req 20.8)', async () => {
       const proposal = await pendingProposal([
         kit.editInput(await kit.createPage('nothing-a')),
         kit.editInput(await kit.createPage('nothing-b')),

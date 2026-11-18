@@ -21,7 +21,7 @@ describe('toProposalHeaderView', () => {
     'reviewer',
     'other',
   ])('viewerRole for %s', (role) => {
-    it('is the role the caller derived (Reviewers Req 5.1)', () => {
+    it('is the role the caller derived (Req 19.1)', () => {
       const view = toProposalHeaderView({ ...baseArgs, role });
 
       expect(view.viewerRole).toBe(role);
@@ -47,14 +47,14 @@ describe('toProposalHeaderView', () => {
     it.each<ViewerRole>([
       'reviewer',
       'other',
-    ])('comes from the visible operations alone for %s, never the actual stage (Reviewers Req 5.6)', (role) => {
+    ])('comes from the visible operations alone for %s, never the actual stage (Req 19.6)', (role) => {
       expect(toProposalHeaderView({ ...args, role }).status).toBe(
         'not-applied',
       );
     });
   });
 
-  it('reads a reviewer the stage of a visible operation skipped by the discard (Reviewers Req 5.6)', () => {
+  it('reads a reviewer the stage of a visible operation skipped by the discard (Req 19.6)', () => {
     const view = toProposalHeaderView({
       ...baseArgs,
       proposal: { ...baseArgs.proposal, lifecycle: 'discarded' },
@@ -65,7 +65,7 @@ describe('toProposalHeaderView', () => {
     expect(view.status).toBe('discarded');
   });
 
-  it('keeps the requester-only state and the stored lastAppliedAt from a reviewer (Reviewers Req 5.6, 5.8)', () => {
+  it('keeps the requester-only state and the stored lastAppliedAt from a reviewer (Req 19.6, 19.8)', () => {
     const appliedAt = new Date('2026-01-02T00:00:00Z');
     const view = toProposalHeaderView({
       ...baseArgs,

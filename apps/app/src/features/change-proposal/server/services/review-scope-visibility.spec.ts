@@ -91,7 +91,7 @@ const decide = (
 };
 
 describe('decideReviewScope for a reviewer', () => {
-  it('returns a pending edit whose page the reviewer can view as a decision target (Reviewers Req 2.2, 5.6)', () => {
+  it('returns a pending edit whose page the reviewer can view as a decision target (Req 16.2, 19.6)', () => {
     expect(
       decide(
         [edit('a', 'pending', 'p1')],
@@ -101,13 +101,13 @@ describe('decideReviewScope for a reviewer', () => {
     ).toEqual({ visible: ['a'], targets: ['a'], stage: 'open' });
   });
 
-  it('treats an operation on a page the reviewer cannot view as absent (Reviewers Req 2.6, 5.4)', () => {
+  it('treats an operation on a page the reviewer cannot view as absent (Req 16.6, 19.4)', () => {
     expect(decide([edit('a', 'pending', 'p1')], 'reviewer', facts({}))).toEqual(
       { visible: [], targets: [], stage: 'settled' },
     );
   });
 
-  it('hides an operation on an "anyone with the link" page (Reviewers Req 5.6)', () => {
+  it('hides an operation on an "anyone with the link" page (Req 19.6)', () => {
     expect(
       decide(
         [edit('a', 'pending', 'p1')],
@@ -117,7 +117,7 @@ describe('decideReviewScope for a reviewer', () => {
     ).toEqual([]);
   });
 
-  it('judges a create by its closest non-empty ancestor (Reviewers Req 2.2, 5.6)', () => {
+  it('judges a create by its closest non-empty ancestor (Req 16.2, 19.6)', () => {
     const ops = [create('a', 'pending', '/x/y/new')];
     const nonEmpty = { '/x': 'px', '/': 'root' };
     expect(
@@ -129,7 +129,7 @@ describe('decideReviewScope for a reviewer', () => {
     ).toEqual([]);
   });
 
-  it('hides a create whose closest ancestor is an "anyone with the link" page (Reviewers Req 5.6)', () => {
+  it('hides a create whose closest ancestor is an "anyone with the link" page (Req 19.6)', () => {
     expect(
       decide(
         [create('a', 'pending', '/x/new')],
@@ -139,7 +139,7 @@ describe('decideReviewScope for a reviewer', () => {
     ).toEqual([]);
   });
 
-  it('hides a create when no ancestor can be resolved, even the root (Reviewers Req 5.6)', () => {
+  it('hides a create when no ancestor can be resolved, even the root (Req 19.6)', () => {
     expect(
       decide(
         [create('a', 'pending', '/x/new')],
@@ -149,7 +149,7 @@ describe('decideReviewScope for a reviewer', () => {
     ).toEqual({ visible: [], targets: [], stage: 'settled' });
   });
 
-  it('hides an operation that rests on no page at all, such as a create at the root (Reviewers Req 5.6)', () => {
+  it('hides an operation that rests on no page at all, such as a create at the root (Req 19.6)', () => {
     expect(
       decide(
         [create('a', 'pending', '/')],
@@ -159,7 +159,7 @@ describe('decideReviewScope for a reviewer', () => {
     ).toEqual({ visible: [], targets: [], stage: 'settled' });
   });
 
-  it('hides a create or a move when any page sharing the closest ancestor path cannot be viewed (Reviewers Req 5.6)', () => {
+  it('hides a create or a move when any page sharing the closest ancestor path cannot be viewed (Req 19.6)', () => {
     const ops = [
       create('create', 'pending', '/x/new'),
       move('move', 'pending', 'src', '/x/moved'),
@@ -189,7 +189,7 @@ describe('decideReviewScope for a reviewer', () => {
     ).toEqual(['create', 'move']);
   });
 
-  it('requires both the move source and the destination parent to be viewable (Reviewers Req 2.2, 5.6)', () => {
+  it('requires both the move source and the destination parent to be viewable (Req 16.2, 19.6)', () => {
     const ops = [move('a', 'pending', 'src', '/dest/moved')];
     const nonEmpty = { '/dest': 'pd' };
     expect(
@@ -211,7 +211,7 @@ describe('decideReviewScope for a reviewer', () => {
     ).toEqual([]);
   });
 
-  it('shows skipped, stale and failed operations by the review scope but only pending ones are targets (Reviewers Req 2.2)', () => {
+  it('shows skipped, stale and failed operations by the review scope but only pending ones are targets (Req 16.2)', () => {
     const ops = [
       edit('pending', 'pending', 'p1'),
       edit('skipped', 'skipped', 'p1'),
@@ -225,7 +225,7 @@ describe('decideReviewScope for a reviewer', () => {
     });
   });
 
-  it('decides applied, reverted and revert-refused operations by the rule for other viewers (Reviewers Req 5.10)', () => {
+  it('decides applied, reverted and revert-refused operations by the rule for other viewers (Req 19.10)', () => {
     // The parent is viewable, the created page is not: the reviewer judged the
     // pending create by the parent, but the applied one by the created page.
     const nonEmpty = { '/x': 'px' };
@@ -244,7 +244,7 @@ describe('decideReviewScope for a reviewer', () => {
     ).toEqual(['pending-create', 'reverted']);
   });
 
-  it('derives the stage only from visible operations (Reviewers Req 5.6)', () => {
+  it('derives the stage only from visible operations (Req 19.6)', () => {
     const ops = [edit('seen', 'failed', 'p1'), edit('hidden', 'pending', 'p2')];
     expect(decide(ops, 'reviewer', facts({ viewable: ['p1'] }))).toEqual({
       visible: ['seen'],
@@ -271,7 +271,7 @@ describe('decideReviewScope for the requester and other viewers', () => {
     });
   });
 
-  it('keeps the current rule for a viewer who is neither requester nor reviewer (Reviewers Req 5.10)', () => {
+  it('keeps the current rule for a viewer who is neither requester nor reviewer (Req 19.10)', () => {
     expect(decide(ops, 'other', f)).toEqual({
       visible: ['applied'],
       targets: [],

@@ -195,7 +195,7 @@ describe('listReviewQueue', () => {
     await mongoose.model('User').deleteMany({ _id: { $in: userIds } });
   });
 
-  it('lists the open proposals naming the viewer, a group or an external group of the viewer, oldest first (Reviewers Req 5.5)', async () => {
+  it('lists the open proposals naming the viewer, a group or an external group of the viewer, oldest first (Req 19.5)', async () => {
     const reviewer = await newReviewer();
     const page = await createPage('public', 'named');
     const byUser = await store([edit(page)], [naming(reviewer)]);
@@ -223,7 +223,7 @@ describe('listReviewQueue', () => {
     expect(nextCursor).toBeNull();
   });
 
-  it('shows each item as a reviewer sees it, with the purpose and the reviewers but nothing only the requester gets (Reviewers Req 5.5)', async () => {
+  it('shows each item as a reviewer sees it, with the purpose and the reviewers but nothing only the requester gets (Req 19.5)', async () => {
     const reviewer = await newReviewer();
     const page = await createPage('public', 'as-reviewer');
     const proposal = await store([edit(page)], [naming(reviewer)]);
@@ -250,7 +250,7 @@ describe('listReviewQueue', () => {
     expect(item).not.toHaveProperty('wholeRejections');
   });
 
-  it('leaves out proposals with no decision target for the viewer, and proposals the viewer is no longer a reviewer of (Reviewers Req 5.5, 5.6)', async () => {
+  it('leaves out proposals with no decision target for the viewer, and proposals the viewer is no longer a reviewer of (Req 19.5, 19.6)', async () => {
     const reviewer = await newReviewer();
     const other = await newReviewer();
     await storeWithoutTarget(reviewer);
@@ -300,7 +300,7 @@ describe('listReviewQueue', () => {
     expect(idsOf(items)).toEqual([listed._id]);
   });
 
-  it('leaves out a proposal the viewer requested, even when naming themselves (Reviewers Req 5.5)', async () => {
+  it('leaves out a proposal the viewer requested, even when naming themselves (Req 19.5)', async () => {
     const reviewer = await newReviewer();
     await store(
       [edit(await createPage('public', 'own'))],
@@ -317,7 +317,7 @@ describe('listReviewQueue', () => {
     expect(items).toEqual([]);
   });
 
-  it('pages through every listed proposal once, oldest first, by the cursor (Reviewers Req 5.5)', async () => {
+  it('pages through every listed proposal once, oldest first, by the cursor (Req 19.5)', async () => {
     const reviewer = await newReviewer();
     const first = await storeWithTarget(reviewer);
     const second = await storeWithTarget(reviewer);
@@ -333,7 +333,7 @@ describe('listReviewQueue', () => {
     expect(pages.slice(0, 3)).toEqual([[first._id], [second._id], [third._id]]);
   });
 
-  it('gives the last listed proposal as the cursor once the limit is reached, even when more proposals follow (Reviewers Req 5.5)', async () => {
+  it('gives the last listed proposal as the cursor once the limit is reached, even when more proposals follow (Req 19.5)', async () => {
     const reviewer = await newReviewer();
     const first = await storeWithTarget(reviewer);
     await storeWithTarget(reviewer);
@@ -349,7 +349,7 @@ describe('listReviewQueue', () => {
     expect(idsOf(page.items)).toEqual([first._id]);
   });
 
-  it('stops at the scan budget with the last listed proposal as the cursor, not the last scanned one, and goes on from there without repeats (Reviewers Req 5.5)', async () => {
+  it('stops at the scan budget with the last listed proposal as the cursor, not the last scanned one, and goes on from there without repeats (Req 19.5)', async () => {
     const reviewer = await newReviewer();
     const first = await storeWithTarget(reviewer);
     await storeWithoutTarget(reviewer);
@@ -377,7 +377,7 @@ describe('listReviewQueue', () => {
     expect(lastPage).toEqual({ items: [], nextCursor: null });
   });
 
-  it('ends the listing with a null cursor when the scan budget runs out before anything is listed, leaving later proposals out of that pass (Reviewers Req 5.5)', async () => {
+  it('ends the listing with a null cursor when the scan budget runs out before anything is listed, leaving later proposals out of that pass (Req 19.5)', async () => {
     const reviewer = await newReviewer();
     const first = await storeWithTarget(reviewer);
     for (let i = 0; i < 4; i += 1) {
@@ -394,7 +394,7 @@ describe('listReviewQueue', () => {
     ).toEqual({ items: [], nextCursor: null });
   });
 
-  it('does not reveal, through the cursor, an open proposal whose visible operations are all settled while a hidden one is pending (Reviewers Req 5.6)', async () => {
+  it('does not reveal, through the cursor, an open proposal whose visible operations are all settled while a hidden one is pending (Req 19.6)', async () => {
     const reviewer = await newReviewer();
     const listed = await storeWithTarget(reviewer);
     await storeWithoutTarget(reviewer);
@@ -434,7 +434,7 @@ describe('listReviewQueue', () => {
     ],
     ['a zero limit', null, 0],
     ['a fractional limit', null, 1.5],
-  ] as const)('answers %s with an empty page (Reviewers Req 5.5)', async (_label, cursor, limit) => {
+  ] as const)('answers %s with an empty page (Req 19.5)', async (_label, cursor, limit) => {
     const reviewer = await newReviewer();
     await storeWithTarget(reviewer);
 
@@ -447,7 +447,7 @@ describe('listReviewQueue', () => {
     ).toEqual({ items: [], nextCursor: null });
   });
 
-  it('tells a well-formed cursor from a malformed one, for the route to reject with 400 (Reviewers Req 5.5)', () => {
+  it('tells a well-formed cursor from a malformed one, for the route to reject with 400 (Req 19.5)', () => {
     const id = new mongoose.Types.ObjectId().toString();
     expect(isReviewQueueCursor(id)).toBe(true);
     expect(isReviewQueueCursor(id.toUpperCase())).toBe(false);
@@ -455,7 +455,7 @@ describe('listReviewQueue', () => {
     expect(isReviewQueueCursor('')).toBe(false);
   });
 
-  it('shows a proposal with operations on pages the viewer cannot view exactly like one without them (Reviewers Req 5.6)', async () => {
+  it('shows a proposal with operations on pages the viewer cannot view exactly like one without them (Req 19.6)', async () => {
     const reviewer = await newReviewer();
     const hidden = await createPage('hidden', 'hidden-edit');
     const hiddenParent = await createPage('hidden', 'hidden-parent');
@@ -512,7 +512,7 @@ describe('listReviewQueue', () => {
     }
   });
 
-  it('reads no group membership and checks viewing once per scanned batch, not once per proposal (Reviewers Req 5.5)', async () => {
+  it('reads no group membership and checks viewing once per scanned batch, not once per proposal (Req 19.5)', async () => {
     const reviewer = await newReviewer();
     for (let i = 0; i < 4; i += 1) {
       // biome-ignore lint/performance/noAwaitInLoops: proposals created in order

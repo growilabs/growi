@@ -31,7 +31,7 @@ describe('keysApprovedBy', () => {
 });
 
 describe('buildApproveResponse', () => {
-  it('reports only the reported keys although the apply ran others too (Reviewers Req 2.6, 5.6)', () => {
+  it('reports only the reported keys although the apply ran others too (Req 16.6, 19.6)', () => {
     const operations = [
       edit(0, { status: 'applied' }),
       edit(1, { status: 'applied' }),
@@ -48,7 +48,7 @@ describe('buildApproveResponse', () => {
     ).toEqual({ type: 'done', results: [{ key: 'k0', status: 'applied' }] });
   });
 
-  it('answers a key the apply did not handle with its state as read, keeping operation order (Reviewers Req 2.11)', () => {
+  it('answers a key the apply did not handle with its state as read, keeping operation order (Req 16.11)', () => {
     const operations = [
       edit(0, { status: 'skipped', reason: 'skipped-by-requester' }),
       edit(1, { status: 'pending', reason: 'page-being-edited' }),
@@ -80,7 +80,7 @@ describe('buildApproveResponse', () => {
     ).toEqual({ type: 'done', results: [{ key: 'k0', status: 'applied' }] });
   });
 
-  it('adds the reported states to an in-progress answer (Reviewers Req 2.5)', () => {
+  it('adds the reported states to an in-progress answer (Req 16.5)', () => {
     expect(
       buildApproveResponse(
         [edit(0), edit(1, { status: 'applied' })],

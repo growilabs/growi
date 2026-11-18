@@ -51,7 +51,7 @@ const isNamedIn = (
 ): boolean => reviewers.some((r) => r.kind === input.kind && r.id === input.id);
 
 // Only the reviewers this request would add count: the switch stops storing new
-// ones, and the limit adds them to the active ones (Reviewers Req 4.6, 4.9).
+// ones, and the limit adds them to the active ones (Req 18.6, 18.9).
 const selectNewReviewers = async (
   { proposal, identity }: ReviewerActionContext,
   given: readonly ReviewerInput[],
@@ -156,7 +156,7 @@ export const createReviewerMembershipActions = (
       const { proposal, identity } = authorized.value;
       const active = activeReviewers(proposal.reviewers);
       const named = given.filter((input) => isNamedIn(active, input));
-      // Naming no reviewer removes nothing, so there is nothing to record (Reviewers Req 4.7).
+      // Naming no reviewer removes nothing, so there is nothing to record (Req 18.7).
       if (named.length === 0) {
         return DONE;
       }

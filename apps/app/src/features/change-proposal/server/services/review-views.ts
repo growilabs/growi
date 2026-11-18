@@ -123,7 +123,7 @@ const toReviewerView = (
 /**
  * The proposal-level fields only participants get: the purpose and reviewers
  * for the requester and reviewers, whole-proposal rejections for the requester
- * alone (Reviewers Req 3.8, 5.7, 5.8).
+ * alone (Req 17.8, 19.7, 19.8).
  */
 export const toParticipantHeaderFields = (args: {
   readonly role: ViewerRole;

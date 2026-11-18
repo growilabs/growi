@@ -155,7 +155,7 @@ describe('ChangeProposal model (Prisma extension)', () => {
     });
   });
 
-  describe('reviewer fields (Reviewers Req 1.1, 1.8)', () => {
+  describe('reviewer fields (Req 15.1, 15.8)', () => {
     const approveRaw = (id: string, approver: string) =>
       mongoose.connection.collection('changeproposals').updateOne(
         { _id: new mongoose.Types.ObjectId(id) },
@@ -828,7 +828,7 @@ describe('ChangeProposal model (Prisma extension)', () => {
       decisionToken: undefined,
     };
 
-    it('writes the approver, channel, time and request token on the chosen pending operation of a user reviewer (Reviewers Req 2.1, 2.8)', async () => {
+    it('writes the approver, channel, time and request token on the chosen pending operation of a user reviewer (Req 16.1, 16.8)', async () => {
       const reviewerId = newObjectId();
       const created = await createProposal({
         reviewers: [reviewerRef('user', reviewerId)],
@@ -856,7 +856,7 @@ describe('ChangeProposal model (Prisma extension)', () => {
       );
     });
 
-    it('writes the approval of a member of a reviewer user group or external user group (Reviewers Req 2.4)', async () => {
+    it('writes the approval of a member of a reviewer user group or external user group (Req 16.4)', async () => {
       const userGroupId = newObjectId();
       const externalGroupId = newObjectId();
       const created = await createProposal({
@@ -892,7 +892,7 @@ describe('ChangeProposal model (Prisma extension)', () => {
       );
     });
 
-    it('writes the approval of the requester even when only other people are reviewers (Reviewers Req 2.3)', async () => {
+    it('writes the approval of the requester even when only other people are reviewers (Req 16.3)', async () => {
       const requester = newRequester();
       const created = await createProposal({
         requester,
@@ -908,7 +908,7 @@ describe('ChangeProposal model (Prisma extension)', () => {
       );
     });
 
-    it('writes nothing for a user who is neither the requester nor a reviewer, and answers not-found (Reviewers Req 2.7)', async () => {
+    it('writes nothing for a user who is neither the requester nor a reviewer, and answers not-found (Req 16.7)', async () => {
       const groupId = newObjectId();
       const created = await createProposal({
         reviewers: [
@@ -930,7 +930,7 @@ describe('ChangeProposal model (Prisma extension)', () => {
       );
     });
 
-    it('answers not-found to a reviewer removed just before the write, and writes nothing (Reviewers Req 2.7)', async () => {
+    it('answers not-found to a reviewer removed just before the write, and writes nothing (Req 16.7)', async () => {
       const removedReviewer = newObjectId();
       const created = await createProposal({
         reviewers: [
@@ -963,7 +963,7 @@ describe('ChangeProposal model (Prisma extension)', () => {
       });
     });
 
-    it('answers not-open to a reviewer and to the requester on a closed proposal (Reviewers Req 2.9)', async () => {
+    it('answers not-open to a reviewer and to the requester on a closed proposal (Req 16.9)', async () => {
       const reviewerId = newObjectId();
       const created = await createProposal({
         reviewers: [reviewerRef('user', reviewerId)],
@@ -991,7 +991,7 @@ describe('ChangeProposal model (Prisma extension)', () => {
       );
     });
 
-    it('keeps the first approval when another reviewer approves the same operation later (Reviewers Req 2.5)', async () => {
+    it('keeps the first approval when another reviewer approves the same operation later (Req 16.5)', async () => {
       const first = newObjectId();
       const second = newObjectId();
       const created = await createProposal({
@@ -1021,7 +1021,7 @@ describe('ChangeProposal model (Prisma extension)', () => {
     });
 
     it(
-      'writes the approval of exactly one of many concurrent group members (Reviewers Req 2.5)',
+      'writes the approval of exactly one of many concurrent group members (Req 16.5)',
       async () => {
         for (let round = 0; round < ROUNDS; round++) {
           const groupId = newObjectId();
@@ -1054,7 +1054,7 @@ describe('ChangeProposal model (Prisma extension)', () => {
       CONCURRENCY_TIMEOUT_MS,
     );
 
-    it('lets another reviewer approve again after the operation went back to waiting (Reviewers Req 2.10)', async () => {
+    it('lets another reviewer approve again after the operation went back to waiting (Req 16.10)', async () => {
       const first = newObjectId();
       const second = newObjectId();
       const created = await createProposal({

@@ -29,7 +29,7 @@ export type ReviewScopeFacts = {
   readonly nonEmptyPageIdByPath: ReadonlyMap<string, readonly string[]>;
 };
 
-// Applied operations keep the rule for other viewers (Reviewers Req 5.10).
+// Applied operations keep the rule for other viewers (Req 19.10).
 const isJudgedByReviewScope = (
   op: ReviewScopeOperation,
   role: ViewerRole,

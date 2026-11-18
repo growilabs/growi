@@ -115,7 +115,7 @@ describe('the reviewer flow through the routes', () => {
     await mongoose.model('UserGroup').deleteMany({ _id: groupId });
   });
 
-  it('waits for the reviewers, and a group member approving what another reviewer rejected applies it as the requester, with the notifications and activities (Reviewers Req 1.11, 2.1, 2.4, 3.9, 6.1, 6.2, 6.5, 6.8, 7.2)', async () => {
+  it('waits for the reviewers, and a group member approving what another reviewer rejected applies it as the requester, with the notifications and activities (Req 15.11, 16.1, 16.4, 17.9, 20.1, 20.2, 20.5, 20.8, 21.2)', async () => {
     const first = await kit.createPage('flow-first');
     const second = await kit.createPage('flow-second');
 
@@ -241,7 +241,7 @@ describe('the reviewer flow through the routes', () => {
     ]);
   });
 
-  it('sends a rework back to the reviewers of its base, who approve it as the requester (Reviewers Req 6.1, 7.2, 8.4, 8.5)', async () => {
+  it('sends a rework back to the reviewers of its base, who approve it as the requester (Req 20.1, 21.2, 22.4, 22.5)', async () => {
     const page = await kit.createPage('rework');
     const base = await create({
       operations: [editOf(page, 'base change')],

@@ -142,7 +142,7 @@ export const createReviewerActions = (
   const runApply = async (proposalId: string): Promise<ApplyResult> => {
     try {
       // The background form records the apply as the requester on its own activity,
-      // without the approver's ip and endpoint (see design.md, proposal-activity).
+      // without the approver's ip and endpoint (see design.md, ProposalActivity).
       return await applier.apply(proposalId, { kind: 'background' });
     } catch (err) {
       // The approvals are saved, so the maintenance cron resumes the apply.

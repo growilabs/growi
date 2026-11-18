@@ -196,7 +196,7 @@ describe('ChangeProposalService.approve', () => {
       ]);
     });
 
-    it('does not re-apply an operation that is no longer pending, and reports it as it stands (Reviewers Req 2.11)', async () => {
+    it('does not re-apply an operation that is no longer pending, and reports it as it stands (Req 16.11)', async () => {
       const page = await kit.createPage('twice');
       const other = await kit.createPage('twice-other');
       const proposal = await storeWaiting([

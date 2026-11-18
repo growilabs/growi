@@ -53,7 +53,7 @@ export type ReviewerActionContext = {
   readonly scope: ReviewScopeResult;
 };
 
-// Reviews are a reviewer's opinion; the requester skips or discards instead (Reviewers Req 3.10).
+// Reviews are a reviewer's opinion; the requester skips or discards instead (Req 17.10).
 const REVIEWER_ONLY_ACTIONS: ReadonlySet<ReviewerActionName> = new Set([
   'rejectOperations',
   'rejectAll',
@@ -71,7 +71,7 @@ export const fail = (
 });
 
 // The requester knows the whole proposal; anyone else is answered from the stage
-// their visible operations imply (see design.md, reviewer-actions step 3).
+// their visible operations imply (see design.md, ReviewerActions step 4).
 const isOpenTo = ({ role, proposal, scope }: ReviewerActionContext): boolean =>
   role === 'requester'
     ? proposal.lifecycle === 'open'
@@ -81,7 +81,7 @@ const isOpenTo = ({ role, proposal, scope }: ReviewerActionContext): boolean =>
  * The steps all six reviewer actions share, in this order: who may act at all,
  * then whether they see anything, and only then whether the proposal is still
  * open — so a caller who sees nothing gets the missing-proposal answer even for
- * a closed proposal (Reviewers Req 2.7, 3.11).
+ * a closed proposal (Req 16.7, 17.11).
  */
 export const authorizeReviewerAction = async (
   proposalId: string,

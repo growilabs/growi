@@ -53,7 +53,7 @@ const toCreatedRef = (
   addedAt: createdAt,
 });
 
-// The switch only guards reviewers given here; inherited ones were stored before (design: feature switch).
+// The switch only guards reviewers given here; inherited ones were stored before (see design.md, Settings).
 // No reviewers given passes with none, leaving the choice to inheritance or the default.
 export const checkGivenReviewers = async (
   given: readonly ReviewerInput[] | undefined,

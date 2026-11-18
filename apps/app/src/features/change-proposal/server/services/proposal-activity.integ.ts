@@ -23,11 +23,11 @@ const REVERTER_USERNAME = 'cpProposalActivityReverter';
 const REVIEWER_USERNAME = 'cpProposalActivityReviewer';
 
 const REVIEW_ACTIONS = [
-  [SupportedAction.ACTION_CHANGE_PROPOSAL_APPROVE, '6.8, 6.9'],
-  [SupportedAction.ACTION_CHANGE_PROPOSAL_REJECT, '6.8'],
-  [SupportedAction.ACTION_CHANGE_PROPOSAL_ABSTAIN, '6.8'],
-  [SupportedAction.ACTION_CHANGE_PROPOSAL_REVIEWER_ADD, '6.10'],
-  [SupportedAction.ACTION_CHANGE_PROPOSAL_REVIEWER_REMOVE, '6.10'],
+  [SupportedAction.ACTION_CHANGE_PROPOSAL_APPROVE, '20.8, 20.9'],
+  [SupportedAction.ACTION_CHANGE_PROPOSAL_REJECT, '20.8'],
+  [SupportedAction.ACTION_CHANGE_PROPOSAL_ABSTAIN, '20.8'],
+  [SupportedAction.ACTION_CHANGE_PROPOSAL_REVIEWER_ADD, '20.10'],
+  [SupportedAction.ACTION_CHANGE_PROPOSAL_REVIEWER_REMOVE, '20.10'],
 ] as const;
 
 describe('recordProposalActivity', () => {
@@ -54,7 +54,7 @@ describe('recordProposalActivity', () => {
 
   beforeAll(async () => {
     crowi = await getInstance();
-    // Apply, revert (7.5) and the review actions (Reviewers Req 6.8, 6.10) must
+    // Apply, revert (7.5) and the review actions (Req 20.8, 20.10) must
     // be recorded even with the audit log turned off.
     await configManager.updateConfigs({ 'app:auditLogEnabled': false });
 
@@ -165,7 +165,7 @@ describe('recordProposalActivity', () => {
 
   it.each(
     REVIEW_ACTIONS,
-  )('records %s on the request activity with the channel, the operator and the request ip although the response finishes right after, even with the audit log off (Reviewers Req %s)', async (action) => {
+  )('records %s on the request activity with the channel, the operator and the request ip although the response finishes right after, even with the audit log off (Req %s)', async (action) => {
     const proposalId = new mongoose.Types.ObjectId().toString();
     const { activityId: routeActivityId } = beginActivity({
       ip: TEST_IP,
@@ -201,7 +201,7 @@ describe('recordProposalActivity', () => {
     });
   });
 
-  it('records a review action without a request activity under the reviewer, with the channel (Reviewers Req 6.8)', async () => {
+  it('records a review action without a request activity under the reviewer, with the channel (Req 20.8)', async () => {
     const proposalId = new mongoose.Types.ObjectId().toString();
 
     const { activityId } = recordProposalActivity(crowi, {

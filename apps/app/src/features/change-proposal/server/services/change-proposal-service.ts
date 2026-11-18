@@ -252,7 +252,7 @@ export const createChangeProposalService = (
   const reviewNotifier = deps.reviewNotifier ?? createReviewNotifier(crowi);
   const now = deps.now ?? (() => new Date());
 
-  // With a reviewer other than the requester, auto-apply writes nothing, so the saved proposal is current (tasks.md 3.3).
+  // With a reviewer other than the requester, auto-apply writes nothing, so the saved proposal is current (see design.md, ChangeProposalService).
   const notifyReviewers = async (
     proposal: ChangeProposalDocument,
     activityId: string,

@@ -44,7 +44,7 @@ const scopeOf = (
 });
 
 describe('selectDecisionTargets', () => {
-  it('ignores a requested key on a page the viewer cannot see, as if it did not exist (Reviewers Req 2.6)', () => {
+  it('ignores a requested key on a page the viewer cannot see, as if it did not exist (Req 16.6)', () => {
     const operations = build([
       { key: 'shown', type: 'edit', pageId: 'p1' },
       { key: 'hidden', type: 'edit', pageId: 'p2' },
@@ -59,7 +59,7 @@ describe('selectDecisionTargets', () => {
     expect(targets).toEqual({ requestedKeys: [], targetKeys: [] });
   });
 
-  it('does not let a hidden key pull in a visible operation on the same page (Reviewers Req 2.6)', () => {
+  it('does not let a hidden key pull in a visible operation on the same page (Req 16.6)', () => {
     // The move is hidden (its destination parent is not viewable) while the edit on the same page is not.
     const operations = build([
       { key: 'edit', type: 'edit', pageId: 'p1' },
@@ -75,7 +75,7 @@ describe('selectDecisionTargets', () => {
     expect(targets).toEqual({ requestedKeys: [], targetKeys: [] });
   });
 
-  it('adds the other pending operations on a requested page, but only visible ones (Reviewers Req 2.6)', () => {
+  it('adds the other pending operations on a requested page, but only visible ones (Req 16.6)', () => {
     const operations = build([
       { key: 'edit', type: 'edit', pageId: 'p1' },
       { key: 'move', type: 'move', pageId: 'p1' },
@@ -95,7 +95,7 @@ describe('selectDecisionTargets', () => {
     });
   });
 
-  it('reports a visible operation that is no longer pending without deciding it (Reviewers Req 2.11)', () => {
+  it('reports a visible operation that is no longer pending without deciding it (Req 16.11)', () => {
     const operations = build([
       { key: 'applied', type: 'edit', pageId: 'p1', status: 'applied' },
       { key: 'pending', type: 'edit', pageId: 'p2' },
@@ -113,7 +113,7 @@ describe('selectDecisionTargets', () => {
     });
   });
 
-  it('takes every visible pending operation and nothing hidden for the whole proposal (Reviewers Req 2.2)', () => {
+  it('takes every visible pending operation and nothing hidden for the whole proposal (Req 16.2)', () => {
     const operations = build([
       { key: 'shown', type: 'edit', pageId: 'p1' },
       { key: 'hidden', type: 'edit', pageId: 'p2' },

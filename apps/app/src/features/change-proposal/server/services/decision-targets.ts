@@ -15,7 +15,7 @@ const keysOf = (
 ): readonly string[] => operations.filter(include).map((op) => op.key);
 
 /**
- * A hidden key is treated as a missing one (Reviewers Req 2.6): it neither
+ * A hidden key is treated as a missing one (Req 16.6): it neither
  * counts as requested nor pulls in the operations on its page, and a requested
  * key pulls in only the visible operations on its page.
  */

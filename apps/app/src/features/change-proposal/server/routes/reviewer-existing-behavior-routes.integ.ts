@@ -31,7 +31,7 @@ describe('reviewer routes leave the existing behaviour alone', () => {
     crowi = await getInstance();
   });
 
-  it('answers a reviewer who skips, discards or switches the per-page notifications as for a missing proposal, while the requester still switches them (Reviewers Req 3.10, 8.1, 8.3)', async () => {
+  it('answers a reviewer who skips, discards or switches the per-page notifications as for a missing proposal, while the requester still switches them (Req 17.10, 22.1, 22.3)', async () => {
     const proposal = await t.reviewedProposal();
     const [key] = proposal.operations.map((op) => op.key);
     const missing = new Types.ObjectId().toString();
@@ -65,7 +65,7 @@ describe('reviewer routes leave the existing behaviour alone', () => {
     ]).toEqual(['open', ['pending'], true]);
   });
 
-  it('refuses, while reviewers are switched off, an addition naming someone new next to an existing reviewer, and stores neither (Reviewers Req 1.1, 4.6)', async () => {
+  it('refuses, while reviewers are switched off, an addition naming someone new next to an existing reviewer, and stores neither (Req 15.1, 18.6)', async () => {
     const proposal = await t.reviewedProposal();
     await t.setReviewersEnabled(false);
     asUser(users.requester);
@@ -82,7 +82,7 @@ describe('reviewer routes leave the existing behaviour alone', () => {
     await t.expectOneUnsettledAttempt(t.endpointOf(proposal._id, 'reviewers'));
   });
 
-  it('does not let the requester approve, even by its key, an operation on a page it can no longer view (Reviewers Req 2.1)', async () => {
+  it('does not let the requester approve, even by its key, an operation on a page it can no longer view (Req 16.1)', async () => {
     const shared = await kit.createPage('requester-shared');
     const created = await crowi.pageService.create(
       kit.nextPath('requester-lost'),

@@ -607,7 +607,7 @@ describe('Change Proposal review activity declarations', () => {
     'CHANGE_PROPOSAL_REVIEWER_REMOVE',
   ];
 
-  it('Reviewers Req 6.8/6.10 — declares the five review actions with their literal values', () => {
+  it('Req 20.8/20.10 — declares the five review actions with their literal values', () => {
     expect(SupportedAction.ACTION_CHANGE_PROPOSAL_APPROVE).toBe(
       'CHANGE_PROPOSAL_APPROVE',
     );
@@ -625,7 +625,7 @@ describe('Change Proposal review activity declarations', () => {
     );
   });
 
-  it('Reviewers Req 6.8/6.10 — records the review actions regardless of audit log settings and lists them in the audit log groups', () => {
+  it('Req 20.8/20.10 — records the review actions regardless of audit log settings and lists them in the audit log groups', () => {
     for (const action of reviewActions) {
       expect(AllEssentialActions).toContain(action);
       expect(AllMediumGroupActions).toContain(action);
@@ -636,7 +636,7 @@ describe('Change Proposal review activity declarations', () => {
 });
 
 describe('isChangeProposalReviewActivity', () => {
-  it('Reviewers Req 6.8 — narrows a review activity so reviewChannel is readable', () => {
+  it('Req 20.8 — narrows a review activity so reviewChannel is readable', () => {
     const activity: Pick<IActivity, 'action' | 'snapshot'> = {
       action: SupportedAction.ACTION_CHANGE_PROPOSAL_APPROVE,
       snapshot: { username: 'alice', reviewChannel: 'api' },
@@ -650,7 +650,7 @@ describe('isChangeProposalReviewActivity', () => {
     expect(activity.snapshot?.username).toBe('alice');
   });
 
-  it('Reviewers Req 6.8/6.10 — matches every one of the five review actions', () => {
+  it('Req 20.8/20.10 — matches every one of the five review actions', () => {
     for (const action of [
       SupportedAction.ACTION_CHANGE_PROPOSAL_APPROVE,
       SupportedAction.ACTION_CHANGE_PROPOSAL_REJECT,
@@ -683,7 +683,7 @@ describe('isChangeProposalReviewActivity', () => {
 });
 
 describe('ChangeProposalReviewSnapshot type', () => {
-  it('Reviewers Req 6.8 — carries an optional username and an optional review channel', () => {
+  it('Req 20.8 — carries an optional username and an optional review channel', () => {
     expectTypeOf<ChangeProposalReviewSnapshot>().toEqualTypeOf<{
       username?: string;
       reviewChannel?: ReviewChannel;

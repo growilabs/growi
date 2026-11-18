@@ -28,7 +28,7 @@ const decisions = {
 };
 
 describe('toOperationView', () => {
-  it('gives a reviewer the proposed body, the rank and whether the base is the latest on a decision target (Reviewers Req 5.2)', () => {
+  it('gives a reviewer the proposed body, the rank and whether the base is the latest on a decision target (Req 19.2)', () => {
     const view = toOperationView(pendingEdit, {
       role: 'reviewer',
       reviewTarget: { order: 1, baseIsLatest: false },
@@ -67,7 +67,7 @@ describe('toOperationView', () => {
   it.each<ViewerRole>([
     'requester',
     'reviewer',
-  ])('gives the %s the decision records (Reviewers Req 3.8, 5.7)', (role) => {
+  ])('gives the %s the decision records (Req 17.8, 19.7)', (role) => {
     expect(toOperationView(pendingEdit, { role, decisions })).toMatchObject(
       decisions,
     );

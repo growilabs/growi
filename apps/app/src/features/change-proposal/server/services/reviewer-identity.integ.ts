@@ -94,7 +94,7 @@ describe('loadViewerIdentity', () => {
       .deleteMany({ _id: { $in: [member._id, loner._id] } });
   });
 
-  it('reads user groups and external groups into separate sets (Reviewers Req 2.4)', async () => {
+  it('reads user groups and external groups into separate sets (Req 16.4)', async () => {
     const identity = await loadViewerIdentity(member._id.toString());
 
     expect(identity).toEqual({
@@ -112,7 +112,7 @@ describe('loadViewerIdentity', () => {
     });
   });
 
-  it('stops counting a group once the membership is removed (Reviewers Req 5.9)', async () => {
+  it('stops counting a group once the membership is removed (Req 19.9)', async () => {
     const temporary = await UserGroup.create({ name: 'cpIdentityTemporary' });
     try {
       await UserGroupRelation.create({

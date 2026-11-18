@@ -9,7 +9,7 @@ const toIdSet = (ids: readonly unknown[]): ReadonlySet<string> =>
 /**
  * Reads the user's groups from the same relations the page viewing check reads,
  * so being a reviewer through a group and viewing that group's pages agree.
- * Read once per request and passed on (Reviewers Req 5.9: membership at that time).
+ * Read once per request and passed on (Req 19.9: membership at that time).
  */
 export const loadViewerIdentity = async (
   userId: string,

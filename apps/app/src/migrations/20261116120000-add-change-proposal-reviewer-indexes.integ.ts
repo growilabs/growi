@@ -45,7 +45,7 @@ describe('add-change-proposal-reviewer-indexes', () => {
     await collection.deleteMany({ requester });
   });
 
-  it('creates the reviewer queue index on lifecycle, reviewers.id and _id, and down drops it (Reviewers Req 5.5)', async () => {
+  it('creates the reviewer queue index on lifecycle, reviewers.id and _id, and down drops it (Req 19.5)', async () => {
     await migrate.down(mongoose.connection.db);
     expect(await findReviewerIndex()).toBeUndefined();
 
@@ -61,7 +61,7 @@ describe('add-change-proposal-reviewer-indexes', () => {
     await migrate.up(mongoose.connection.db);
   });
 
-  it('backfills empty reviewers and reviews on a legacy proposal, which then reads through Prisma with no reviewers (Reviewers Req 1.4)', async () => {
+  it('backfills empty reviewers and reviews on a legacy proposal, which then reads through Prisma with no reviewers (Req 15.4)', async () => {
     const legacy = legacyProposal(requester);
     await collection.insertOne(legacy);
 

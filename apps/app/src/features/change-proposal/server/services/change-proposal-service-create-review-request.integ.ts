@@ -181,13 +181,13 @@ describe('ChangeProposalService.createProposal: the review request notification'
     await kit.tearDown();
   });
 
-  it('sends nothing when no reviewers are given (Reviewers Req 6.1)', async () => {
+  it('sends nothing when no reviewers are given (Req 20.1)', async () => {
     const proposalId = createdId(await create());
 
     expect(await notificationsOf(proposalId)).toEqual([]);
   });
 
-  it('sends nothing when the requester alone is the reviewer, which still auto-applies (Reviewers Req 6.1)', async () => {
+  it('sends nothing when the requester alone is the reviewer, which still auto-applies (Req 20.1)', async () => {
     await configManager.updateConfigs({
       'changeProposal:autoApplyPolicy': 'all',
     });
@@ -199,7 +199,7 @@ describe('ChangeProposalService.createProposal: the review request notification'
     expect(await notificationsOf(proposalId)).toEqual([]);
   });
 
-  it('notifies each individual reviewer once with the id and the action of the create activity, and not the requester (Reviewers Req 6.1)', async () => {
+  it('notifies each individual reviewer once with the id and the action of the create activity, and not the requester (Req 20.1)', async () => {
     const emit = vi.spyOn(crowi.events.activity, 'emit');
 
     const proposalId = createdId(
@@ -227,7 +227,7 @@ describe('ChangeProposalService.createProposal: the review request notification'
     }
   });
 
-  it('keeps the pages a reviewer cannot view out of the notification (Reviewers Req 6.3)', async () => {
+  it('keeps the pages a reviewer cannot view out of the notification (Req 20.3)', async () => {
     const visible = kit.nextPath('visible');
 
     const proposalId = createdId(
@@ -253,7 +253,7 @@ describe('ChangeProposalService.createProposal: the review request notification'
     expect(snapshot.pages).toEqual([{ path: visible }]);
   });
 
-  it('sends nothing to a reviewer who can decide none of the operations (Reviewers Req 6.4)', async () => {
+  it('sends nothing to a reviewer who can decide none of the operations (Req 20.4)', async () => {
     const proposalId = createdId(
       await create({
         reviewers: [userInput(users.other)],
@@ -264,7 +264,7 @@ describe('ChangeProposalService.createProposal: the review request notification'
     expect(await notificationsOf(proposalId)).toEqual([]);
   });
 
-  it('still creates the proposal when saving the notification fails (Reviewers Req 6.1)', async () => {
+  it('still creates the proposal when saving the notification fails (Req 20.1)', async () => {
     vi.spyOn(InAppNotification, 'insertMany').mockRejectedValue(
       new Error('insert failed'),
     );
@@ -292,7 +292,7 @@ describe('ChangeProposalService.createProposal: the review request notification'
         },
       ]);
 
-    it('notifies the inherited active reviewers, including one the base had added by another user (Reviewers Req 6.1)', async () => {
+    it('notifies the inherited active reviewers, including one the base had added by another user (Req 20.1)', async () => {
       const { id, failedKey } = await base();
 
       const proposalId = createdId(
@@ -313,7 +313,7 @@ describe('ChangeProposalService.createProposal: the review request notification'
       ]);
     });
 
-    it('sends nothing when the follow-up drops the inherited reviewers with an empty list (Reviewers Req 6.1)', async () => {
+    it('sends nothing when the follow-up drops the inherited reviewers with an empty list (Req 20.1)', async () => {
       const { id, failedKey } = await base();
 
       const proposalId = createdId(

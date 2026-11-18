@@ -616,7 +616,7 @@ describe('ProposalNotifier.notifyApplied', () => {
     expect(notSent).toEqual(sent);
   });
 
-  it('sends the same aggregated notifications to the same users whether the proposal has reviewers or not (Reviewers Req 6.7)', async () => {
+  it('sends the same aggregated notifications to the same users whether the proposal has reviewers or not (Req 20.7)', async () => {
     const page = await createPage('with-reviewers');
     await subscribe(users.subscriber, page);
     const addedAt = new Date();

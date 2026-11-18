@@ -239,7 +239,7 @@ describe('ChangeProposalService: adding and removing reviewers', () => {
   });
 
   describe('an addition', () => {
-    it('stores users and groups together once each, with who added them and when (Reviewers Req 4.1, 4.2, 4.10)', async () => {
+    it('stores users and groups together once each, with who added them and when (Req 18.1, 18.2, 18.10)', async () => {
       const proposal = await pendingProposal();
 
       const result = await service.addReviewers(
@@ -256,7 +256,7 @@ describe('ChangeProposalService: adding and removing reviewers', () => {
       ]);
     });
 
-    it('notifies only the users it made reviewers: not one who already was, not a group’s members (Reviewers Req 4.11, 6.1, 6.2)', async () => {
+    it('notifies only the users it made reviewers: not one who already was, not a group’s members (Req 18.11, 20.1, 20.2)', async () => {
       const proposal = await pendingProposal();
 
       await service.addReviewers(proposal._id, actor(users.requester), [
@@ -268,7 +268,7 @@ describe('ChangeProposalService: adding and removing reviewers', () => {
       expect(await requestedUserIds(proposal._id)).toEqual([idOf(extra.added)]);
     });
 
-    it('does not notify the one who added, even when they add themselves (Reviewers Req 4.11, 6.1)', async () => {
+    it('does not notify the one who added, even when they add themselves (Req 18.11, 20.1)', async () => {
       const proposal = await pendingProposal([storedRef(groupInput())]);
 
       const result = await service.addReviewers(
@@ -288,7 +288,7 @@ describe('ChangeProposalService: adding and removing reviewers', () => {
       expect(await requestedUserIds(proposal._id)).toEqual([idOf(extra.added)]);
     });
 
-    it('records one reviewer-add activity, as the one who added, with the channel, and sends the review request under its action (Reviewers Req 6.10)', async () => {
+    it('records one reviewer-add activity, as the one who added, with the channel, and sends the review request under its action (Req 20.10)', async () => {
       const proposal = await pendingProposal();
 
       await service.addReviewers(
@@ -319,7 +319,7 @@ describe('ChangeProposalService: adding and removing reviewers', () => {
       );
     });
 
-    it('changes nothing and sends and logs nothing when everyone it names already is a reviewer (Reviewers Req 4.6)', async () => {
+    it('changes nothing and sends and logs nothing when everyone it names already is a reviewer (Req 18.6)', async () => {
       const proposal = await pendingProposal();
       const before = await reviewersOf(proposal);
 
@@ -335,7 +335,7 @@ describe('ChangeProposalService: adding and removing reviewers', () => {
       await noActivityAfterAWhile(proposal._id);
     });
 
-    it('sends and logs nothing when another request made the same user a reviewer just before its write (Reviewers Req 4.6)', async () => {
+    it('sends and logs nothing when another request made the same user a reviewer just before its write (Req 18.6)', async () => {
       const proposal = await pendingProposal();
       const requester = await loadViewerIdentity(idOf(users.requester));
       addReviewers.spy.mockImplementationOnce(async (...args) => {
@@ -362,7 +362,7 @@ describe('ChangeProposalService: adding and removing reviewers', () => {
       await noActivityAfterAWhile(proposal._id);
     });
 
-    it('refuses a user or group that does not exist and adds none of the request (Reviewers Req 4.5)', async () => {
+    it('refuses a user or group that does not exist and adds none of the request (Req 18.5)', async () => {
       const proposal = await pendingProposal();
       const before = await reviewersOf(proposal);
       const missingId = new mongoose.Types.ObjectId().toString();
@@ -394,7 +394,7 @@ describe('ChangeProposalService: adding and removing reviewers', () => {
           }),
         );
 
-      it('counts the reviewers already there, and refuses going over it (Reviewers Req 4.9)', async () => {
+      it('counts the reviewers already there, and refuses going over it (Req 18.9)', async () => {
         const proposal = await pendingProposal([
           storedRef(userInput(users.subscriber)),
           ...strangerRefs(MAX_REVIEWERS - 2),
@@ -414,7 +414,7 @@ describe('ChangeProposalService: adding and removing reviewers', () => {
         expect(await reviewersOf(proposal)).toEqual(before);
       });
 
-      it('counts neither removed reviewers, nor a name given twice, nor one already a reviewer (Reviewers Req 4.6, 4.9)', async () => {
+      it('counts neither removed reviewers, nor a name given twice, nor one already a reviewer (Req 18.6, 18.9)', async () => {
         const removed: ReviewerRef = {
           ...storedRef(userInput(extra.member)),
           removedBy: idOf(users.requester),
@@ -442,7 +442,7 @@ describe('ChangeProposalService: adding and removing reviewers', () => {
     describe('while reviewers are switched off', () => {
       beforeEach(() => setReviewersEnabled(false));
 
-      it('refuses a user or group other than the requester (design.md, 要件との差と読み方 3)', async () => {
+      it('refuses a user or group other than the requester (research.md, the reviewer switch Decision)', async () => {
         const proposal = await pendingProposal();
         const before = await reviewersOf(proposal);
 
@@ -457,7 +457,7 @@ describe('ChangeProposalService: adding and removing reviewers', () => {
         expect(await reviewersOf(proposal)).toEqual(before);
       });
 
-      it('still lets the requester be added (design.md, 要件との差と読み方 3)', async () => {
+      it('still lets the requester be added (research.md, the reviewer switch Decision)', async () => {
         const proposal = await pendingProposal();
 
         expect(
@@ -470,7 +470,7 @@ describe('ChangeProposalService: adding and removing reviewers', () => {
         );
       });
 
-      it('still answers naming only someone already a reviewer as done, changing, sending and logging nothing (Reviewers Req 4.6)', async () => {
+      it('still answers naming only someone already a reviewer as done, changing, sending and logging nothing (Req 18.6)', async () => {
         const proposal = await pendingProposal();
         const before = await reviewersOf(proposal);
 
@@ -517,7 +517,7 @@ describe('ChangeProposalService: adding and removing reviewers', () => {
       });
     });
 
-    it('keeps both of two additions by different people at the same time (Reviewers Req 4.1)', async () => {
+    it('keeps both of two additions by different people at the same time (Req 18.1)', async () => {
       const proposal = await pendingProposal();
 
       const results = await Promise.all([
@@ -541,7 +541,7 @@ describe('ChangeProposalService: adding and removing reviewers', () => {
   });
 
   describe('a removal', () => {
-    it('marks who removed whom and when, keeps the entries, and keeps their review records (Reviewers Req 4.3, 4.10, 4.12)', async () => {
+    it('marks who removed whom and when, keeps the entries, and keeps their review records (Req 18.3, 18.10, 18.12)', async () => {
       const proposal = await pendingProposal([
         storedRef(userInput(users.subscriber)),
         storedRef(userInput(extra.added)),
@@ -570,7 +570,7 @@ describe('ChangeProposalService: adding and removing reviewers', () => {
       ).toEqual([[idOf(users.subscriber), 'reject']]);
     });
 
-    it('leaves the requester as the only reviewer once none is left (Reviewers Req 4.4)', async () => {
+    it('leaves the requester as the only reviewer once none is left (Req 18.4)', async () => {
       const proposal = await pendingProposal();
       const [key] = proposal.operations.map((op) => op.key);
 
@@ -597,7 +597,7 @@ describe('ChangeProposalService: adding and removing reviewers', () => {
       });
     });
 
-    it('records one reviewer-remove activity, as the one who removed, with the channel (Reviewers Req 6.10)', async () => {
+    it('records one reviewer-remove activity, as the one who removed, with the channel (Req 20.10)', async () => {
       const proposal = await pendingProposal();
 
       await service.removeReviewers(
@@ -622,7 +622,7 @@ describe('ChangeProposalService: adding and removing reviewers', () => {
       ]);
     });
 
-    it('changes and logs nothing for a name that is not a reviewer (Reviewers Req 4.7)', async () => {
+    it('changes and logs nothing for a name that is not a reviewer (Req 18.7)', async () => {
       const proposal = await pendingProposal([
         storedRef(userInput(users.subscriber)),
         {
@@ -644,7 +644,7 @@ describe('ChangeProposalService: adding and removing reviewers', () => {
       await noActivityAfterAWhile(proposal._id);
     });
 
-    it('still works while reviewers are switched off (design.md, 要件との差と読み方 3)', async () => {
+    it('still works while reviewers are switched off (research.md, the reviewer switch Decision)', async () => {
       await setReviewersEnabled(false);
       const proposal = await pendingProposal();
 
@@ -680,7 +680,7 @@ describe('ChangeProposalService: adding and removing reviewers', () => {
   });
 
   describe('who may not change the reviewers', () => {
-    it('refuses both on a proposal that is no longer open, the requester included (Reviewers Req 4.8)', async () => {
+    it('refuses both on a proposal that is no longer open, the requester included (Req 18.8)', async () => {
       const proposal = await pendingProposal();
       await prisma.changeproposals.skipPendingOperations(
         proposal._id,
@@ -707,7 +707,7 @@ describe('ChangeProposalService: adding and removing reviewers', () => {
       expect(await reviewersOf(proposal)).toEqual(before);
     });
 
-    it('answers a stranger, a reviewer who sees no operation and a missing proposal alike (Reviewers Req 2.7)', async () => {
+    it('answers a stranger, a reviewer who sees no operation and a missing proposal alike (Req 16.7)', async () => {
       const proposal = await pendingProposal(undefined, [
         kit.editInput(await requesterOnlyPage('hidden')),
       ]);

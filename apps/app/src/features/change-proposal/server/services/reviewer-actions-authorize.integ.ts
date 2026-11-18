@@ -156,7 +156,7 @@ describe('authorizeReviewerAction', () => {
 
     it.each(
       ALL_ACTIONS,
-    )('get the same answer as for a missing proposal: %s (Reviewers Req 2.7, 3.11)', async (action) => {
+    )('get the same answer as for a missing proposal: %s (Req 16.7, 17.11)', async (action) => {
       const answers = await Promise.all([
         authorize(missingId, users.subscriber, action),
         authorize('not-an-object-id', users.subscriber, action),
@@ -171,7 +171,7 @@ describe('authorizeReviewerAction', () => {
 
     it.each(
       ALL_ACTIONS,
-    )('are not told a proposal is closed: %s (Reviewers Req 2.7, 3.11)', async (action) => {
+    )('are not told a proposal is closed: %s (Req 16.7, 17.11)', async (action) => {
       // A reviewer who sees the closed proposal is told so; the others must not be.
       expect(await authorize(seenClosed._id, users.subscriber, action)).toEqual(
         { ok: false, error: { code: 'not-open' } },
@@ -189,7 +189,7 @@ describe('authorizeReviewerAction', () => {
   describe('a reviewer', () => {
     it.each(
       ALL_ACTIONS,
-    )('who sees a pending operation may go on with %s, given what they may decide (Reviewers Req 2.6)', async (action) => {
+    )('who sees a pending operation may go on with %s, given what they may decide (Req 16.6)', async (action) => {
       const shared = await kit.createPage(`reviewer-${action}`);
       const hidden = await ownedPage(
         `reviewer-hidden-${action}`,
@@ -215,7 +215,7 @@ describe('authorizeReviewerAction', () => {
 
     it.each(
       ALL_ACTIONS,
-    )('is told not-open once nothing they see is pending, though the proposal is still open: %s (Reviewers Req 2.11, 4.8)', async (action) => {
+    )('is told not-open once nothing they see is pending, though the proposal is still open: %s (Req 16.11, 18.8)', async (action) => {
       const shared = await kit.createPage(`stage-${action}`);
       const hidden = await ownedPage(`stage-hidden-${action}`, users.requester);
       const proposal = await pendingProposal(
@@ -235,7 +235,7 @@ describe('authorizeReviewerAction', () => {
       });
     });
 
-    it('cannot pull a hidden operation into a decision by naming its key (Reviewers Req 2.6)', async () => {
+    it('cannot pull a hidden operation into a decision by naming its key (Req 16.6)', async () => {
       const shared = await kit.createPage('keys-shared');
       const hidden = await ownedPage('keys-hidden', users.requester);
       const proposal = await pendingProposal(
@@ -262,7 +262,7 @@ describe('authorizeReviewerAction', () => {
   describe('the requester', () => {
     it.each(
       REVIEW_ACTIONS,
-    )('may not %s, even when listed as a reviewer (Reviewers Req 3.10)', async (action) => {
+    )('may not %s, even when listed as a reviewer (Req 17.10)', async (action) => {
       const shared = await kit.createPage(`requester-review-${action}`);
       const proposal = await pendingProposal(
         [kit.editInput(shared)],
@@ -277,7 +277,7 @@ describe('authorizeReviewerAction', () => {
 
     it.each(
       REQUESTER_ACTIONS,
-    )('may go on with %s without being a reviewer (Reviewers Req 2.3, 4.1, 4.3)', async (action) => {
+    )('may go on with %s without being a reviewer (Req 16.3, 18.1, 18.3)', async (action) => {
       const shared = await kit.createPage(`requester-act-${action}`);
       const proposal = await pendingProposal(
         [kit.editInput(shared)],
@@ -293,7 +293,7 @@ describe('authorizeReviewerAction', () => {
       ]);
     });
 
-    it('is judged by the actual stage, so an open proposal with nothing they still see is not closed to them (Reviewers Req 2.9)', async () => {
+    it('is judged by the actual stage, so an open proposal with nothing they still see is not closed to them (Req 16.9)', async () => {
       const lost = await ownedPage('requester-lost', users.other);
       const proposal = await pendingProposal([kit.editInput(lost)], []);
 
@@ -315,7 +315,7 @@ describe('authorizeReviewerAction', () => {
   describe('a read-only user', () => {
     it.each(
       ALL_ACTIONS,
-    )('is refused %s even as a reviewer, whether or not the proposal exists (Reviewers Req 7.5)', async (action) => {
+    )('is refused %s even as a reviewer, whether or not the proposal exists (Req 21.5)', async (action) => {
       const shared = await kit.createPage(`read-only-${action}`);
       const proposal = await pendingProposal(
         [kit.editInput(shared)],

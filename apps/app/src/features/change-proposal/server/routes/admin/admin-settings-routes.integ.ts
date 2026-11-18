@@ -421,7 +421,7 @@ describe('change-proposal admin settings routes', () => {
       expect(reloaded.operations.map((op) => op.status)).toEqual(['skipped']);
     });
 
-    it('withdraws a pending proposal with reviewers too, which then leaves the reviewer queue (Reviewers Req 7.7)', async () => {
+    it('withdraws a pending proposal with reviewers too, which then leaves the reviewer queue (Req 21.7)', async () => {
       const page = await kit.createPage('withdrawn-reviewed');
       const proposal = await kit.storeProposal([kit.editInput(page)], {
         approve: false,

@@ -101,7 +101,7 @@ export const visiblePagesOf = (
 };
 
 // These lists apply the other-viewer rule to reviewers too, and say so in the
-// role (Reviewers Req 5.10).
+// role (Req 19.10).
 const toVisibleSummary = (
   summary: ChangeProposalSummary,
   role: ViewerRole,

@@ -188,7 +188,7 @@ describe('ChangeProposalService: rejecting and abstaining', () => {
   });
 
   describe('a rejection of operations', () => {
-    it('records who rejected, when, from where and the comment as typed, and changes neither the operations nor the stage (Reviewers Req 3.1, 3.5, 3.9)', async () => {
+    it('records who rejected, when, from where and the comment as typed, and changes neither the operations nor the stage (Req 17.1, 17.5, 17.9)', async () => {
       const proposal = await pendingProposal([
         kit.editInput(await kit.createPage('reject-a')),
         kit.editInput(await kit.createPage('reject-b')),
@@ -240,7 +240,7 @@ describe('ChangeProposalService: rejecting and abstaining', () => {
       ]);
     });
 
-    it('lets the reviewer read their own record back, comment as typed (Reviewers Req 3.7, 3.8)', async () => {
+    it('lets the reviewer read their own record back, comment as typed (Req 17.7, 17.8)', async () => {
       const proposal = await pendingProposal([
         kit.editInput(await kit.createPage('read-back')),
       ]);
@@ -264,7 +264,7 @@ describe('ChangeProposalService: rejecting and abstaining', () => {
       ]);
     });
 
-    it('still lets another reviewer or the requester approve what was rejected, and applies it (Reviewers Req 3.9)', async () => {
+    it('still lets another reviewer or the requester approve what was rejected, and applies it (Req 17.9)', async () => {
       const byOther = await kit.createPage('approved-by-other');
       const byRequester = await kit.createPage('approved-by-requester');
       const proposal = await pendingProposal(
@@ -293,7 +293,7 @@ describe('ChangeProposalService: rejecting and abstaining', () => {
   });
 
   describe('an abstention', () => {
-    it('is recorded as an abstention, and the operation stays the reviewer’s to approve (Reviewers Req 3.3)', async () => {
+    it('is recorded as an abstention, and the operation stays the reviewer’s to approve (Req 17.3)', async () => {
       const proposal = await pendingProposal([
         kit.editInput(await kit.createPage('abstain')),
       ]);
@@ -326,7 +326,7 @@ describe('ChangeProposalService: rejecting and abstaining', () => {
       );
     });
 
-    it('replaces the same reviewer’s earlier rejection of the operation (Reviewers Req 3.4)', async () => {
+    it('replaces the same reviewer’s earlier rejection of the operation (Req 17.4)', async () => {
       const proposal = await pendingProposal([
         kit.editInput(await kit.createPage('replaced')),
       ]);
@@ -356,7 +356,7 @@ describe('ChangeProposalService: rejecting and abstaining', () => {
   });
 
   describe('a rejection of the whole proposal', () => {
-    it('adds one record with no operation, writes nothing on any operation and answers no operation (Reviewers Req 3.2, 3.9)', async () => {
+    it('adds one record with no operation, writes nothing on any operation and answers no operation (Req 17.2, 17.9)', async () => {
       const proposal = await pendingProposal([
         kit.editInput(await kit.createPage('whole-visible')),
         kit.editInput(await requesterOnlyPage('whole-hidden')),
@@ -391,7 +391,7 @@ describe('ChangeProposalService: rejecting and abstaining', () => {
       );
     });
 
-    it('is returned to the requester and never to the reviewer who made it (Reviewers Req 3.8)', async () => {
+    it('is returned to the requester and never to the reviewer who made it (Req 17.8)', async () => {
       const proposal = await pendingProposal([
         kit.editInput(await kit.createPage('whole-read')),
       ]);
@@ -417,7 +417,7 @@ describe('ChangeProposalService: rejecting and abstaining', () => {
       expect(reviewerView).not.toHaveProperty('wholeRejections');
     });
 
-    it('notifies the requester although it names no operation (Reviewers Req 6.5)', async () => {
+    it('notifies the requester although it names no operation (Req 20.5)', async () => {
       const proposal = await pendingProposal([
         kit.editInput(await kit.createPage('whole-notified')),
       ]);
@@ -438,7 +438,7 @@ describe('ChangeProposalService: rejecting and abstaining', () => {
   });
 
   describe('the comment length', () => {
-    it('counts code points, so the limit in emoji is accepted (Reviewers Req 3.6)', async () => {
+    it('counts code points, so the limit in emoji is accepted (Req 17.6)', async () => {
       const proposal = await pendingProposal([
         kit.editInput(await kit.createPage('emoji-limit')),
       ]);
@@ -458,7 +458,7 @@ describe('ChangeProposalService: rejecting and abstaining', () => {
       ]);
     });
 
-    it('refuses one code point over the limit and records and sends nothing (Reviewers Req 3.6)', async () => {
+    it('refuses one code point over the limit and records and sends nothing (Req 17.6)', async () => {
       const proposal = await pendingProposal([
         kit.editInput(await kit.createPage('too-long')),
       ]);
@@ -495,7 +495,7 @@ describe('ChangeProposalService: rejecting and abstaining', () => {
       await noActivityAfterAWhile(proposal._id);
     });
 
-    it('gives a stranger and a missing proposal the same answer, so it tells nothing about the proposal (Reviewers Req 2.7, 3.11)', async () => {
+    it('gives a stranger and a missing proposal the same answer, so it tells nothing about the proposal (Req 16.7, 17.11)', async () => {
       const proposal = await pendingProposal([
         kit.editInput(await kit.createPage('too-long-stranger')),
       ]);
@@ -516,7 +516,7 @@ describe('ChangeProposalService: rejecting and abstaining', () => {
   });
 
   describe('what the request records and reports', () => {
-    it('records and notifies only the visible pending operations, never a hidden or already applied one it named (Reviewers Req 2.6, 2.11, 6.5)', async () => {
+    it('records and notifies only the visible pending operations, never a hidden or already applied one it named (Req 16.6, 16.11, 20.5)', async () => {
       const shared = await kit.createPage('report-shared');
       const hidden = await requesterOnlyPage('report-hidden');
       const done = await kit.createPage('report-done');
@@ -553,7 +553,7 @@ describe('ChangeProposalService: rejecting and abstaining', () => {
       ]);
     });
 
-    it('records the rejection as a reject activity and the abstention as an abstain activity, with the channel, and notifies each under the action of its activity (Reviewers Req 6.8)', async () => {
+    it('records the rejection as a reject activity and the abstention as an abstain activity, with the channel, and notifies each under the action of its activity (Req 20.8)', async () => {
       const proposal = await pendingProposal([
         kit.editInput(await kit.createPage('activity-a')),
         kit.editInput(await kit.createPage('activity-b')),
@@ -608,7 +608,7 @@ describe('ChangeProposalService: rejecting and abstaining', () => {
       ]);
     });
 
-    it('records, notifies and logs nothing when nothing it named is still pending (Reviewers Req 2.11, 6.5, 6.8)', async () => {
+    it('records, notifies and logs nothing when nothing it named is still pending (Req 16.11, 20.5, 20.8)', async () => {
       const proposal = await pendingProposal([
         kit.editInput(await kit.createPage('nothing-done')),
         kit.editInput(await kit.createPage('nothing-left')),
@@ -666,7 +666,7 @@ describe('ChangeProposalService: rejecting and abstaining', () => {
         clientVersion: 'test',
       });
 
-    it('fails the request instead of answering it as recorded, keeps the earlier record and sends and logs nothing (Reviewers Req 3.4, 6.5, 6.8)', async () => {
+    it('fails the request instead of answering it as recorded, keeps the earlier record and sends and logs nothing (Req 17.4, 20.5, 20.8)', async () => {
       const proposal = await pendingProposal([
         kit.editInput(await kit.createPage('conflict')),
       ]);
@@ -707,7 +707,7 @@ describe('ChangeProposalService: rejecting and abstaining', () => {
   });
 
   describe('who may not record a decision', () => {
-    it('refuses the requester even on a closed proposal, before telling it is closed (Reviewers Req 3.10)', async () => {
+    it('refuses the requester even on a closed proposal, before telling it is closed (Req 17.10)', async () => {
       const proposal = await pendingProposal([
         kit.editInput(await kit.createPage('requester-closed')),
       ]);
@@ -723,7 +723,7 @@ describe('ChangeProposalService: rejecting and abstaining', () => {
       ).toEqual({ ok: false, error: { code: 'requester-cannot-review' } });
     });
 
-    it('answers someone neither the requester nor a reviewer as if the proposal did not exist, and records nothing (Reviewers Req 3.11)', async () => {
+    it('answers someone neither the requester nor a reviewer as if the proposal did not exist, and records nothing (Req 17.11)', async () => {
       const proposal = await pendingProposal([
         kit.editInput(await kit.createPage('stranger')),
       ]);

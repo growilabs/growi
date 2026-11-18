@@ -206,7 +206,7 @@ describe('ReviewNotifier.notifyReviewRequest', () => {
       });
     });
 
-    it('notifies only the individual users who became reviewers, not the requester, the adder, group members or a suspended user, under the action of the activity that added them (Reviewers Req 4.11, 6.1, 6.2)', async () => {
+    it('notifies only the individual users who became reviewers, not the requester, the adder, group members or a suspended user, under the action of the activity that added them (Req 18.11, 20.1, 20.2)', async () => {
       const notifications = await notificationsFor(proposal._id);
 
       expect(recipientNames(notifications)).toEqual(['member', 'outsider']);
@@ -221,7 +221,7 @@ describe('ReviewNotifier.notifyReviewRequest', () => {
       }
     });
 
-    it('builds each notification from the pages its recipient may decide, a create by its path alone (Reviewers Req 6.3)', async () => {
+    it('builds each notification from the pages its recipient may decide, a create by its path alone (Req 20.3)', async () => {
       const notifications = await notificationsFor(proposal._id);
 
       const forMember = snapshotFor(notifications, 'member');
@@ -246,7 +246,7 @@ describe('ReviewNotifier.notifyReviewRequest', () => {
       ]);
     });
 
-    it('stores nothing about a page the recipient cannot view or may only view by link (Reviewers Req 4.11, 6.3)', async () => {
+    it('stores nothing about a page the recipient cannot view or may only view by link (Req 18.11, 20.3)', async () => {
       const notifications = await notificationsFor(proposal._id);
       const forOutsider = notifications.find(
         (n) => n.user.toString() === idOf(users.outsider),
@@ -266,7 +266,7 @@ describe('ReviewNotifier.notifyReviewRequest', () => {
     });
   });
 
-  it('sends nothing to a reviewer with no operation to decide (Reviewers Req 6.4)', async () => {
+  it('sends nothing to a reviewer with no operation to decide (Req 20.4)', async () => {
     const reviewers = [userReviewer('outsider')];
     const proposal = await storeProposal(reviewers, [
       editInput(pages.group),

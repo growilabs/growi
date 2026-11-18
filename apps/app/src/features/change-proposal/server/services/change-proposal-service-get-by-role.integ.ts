@@ -125,7 +125,7 @@ describe('ChangeProposalService reads by viewer role', () => {
     return items.find((item) => item.id === proposalId);
   };
 
-  // A participant's own additions (Reviewers Req 3.8, 5.7), outside what 5.10 keeps.
+  // A participant's own additions (Req 17.8, 19.7), outside what 5.10 keeps.
   const PARTICIPANT_FIELDS: ReadonlySet<string> = new Set([
     'approval',
     'rejections',
@@ -136,7 +136,7 @@ describe('ChangeProposalService reads by viewer role', () => {
       Object.entries(op).filter(([field]) => !PARTICIPANT_FIELDS.has(field)),
     );
 
-  // What Reviewers Req 5.10 keeps: the applied operations shown and the state read from them.
+  // What Req 19.10 keeps: the applied operations shown and the state read from them.
   const appliedViewFacts = (view: ChangeProposalView) => ({
     operations: view.operations.map(withoutParticipantFields),
     status: view.status,
@@ -191,7 +191,7 @@ describe('ChangeProposalService reads by viewer role', () => {
   });
 
   describe('a reviewer', () => {
-    it('gets a pending proposal with only the operations on pages they may view (Reviewers Req 5.1, 5.6)', async () => {
+    it('gets a pending proposal with only the operations on pages they may view (Req 19.1, 19.6)', async () => {
       const shared = await kit.createPage('reviewer-shared');
       const hidden = await hiddenPage('reviewer-hidden');
       const proposal = await pendingProposal(
@@ -221,7 +221,7 @@ describe('ChangeProposalService reads by viewer role', () => {
       expect(serialized).not.toContain(keyOf(proposal, 2));
     });
 
-    it('is a reviewer through a group they belong to (Reviewers Req 5.1)', async () => {
+    it('is a reviewer through a group they belong to (Req 19.1)', async () => {
       const shared = await kit.createPage('group-shared');
       const proposal = await pendingProposal(
         [kit.editInput(shared)],
@@ -236,7 +236,7 @@ describe('ChangeProposalService reads by viewer role', () => {
       expect(view.operations.map((op) => op.key)).toEqual([keyOf(proposal, 0)]);
     });
 
-    it('reads the overall status from the visible operations alone, never the actual stage (Reviewers Req 5.6)', async () => {
+    it('reads the overall status from the visible operations alone, never the actual stage (Req 19.6)', async () => {
       const occupied = await kit.createPage('status-occupied');
       const hidden = await hiddenPage('status-hidden');
       const proposal = await pendingProposal(
@@ -271,7 +271,7 @@ describe('ChangeProposalService reads by viewer role', () => {
       expect(forRequester.status).toBe('discarded');
     });
 
-    it('is answered exactly as for a missing proposal when no operation is on a page they may view (Reviewers Req 5.4)', async () => {
+    it('is answered exactly as for a missing proposal when no operation is on a page they may view (Req 19.4)', async () => {
       const hidden = await hiddenPage('none-hidden');
       const proposal = await pendingProposal(
         [kit.editInput(hidden)],
@@ -292,7 +292,7 @@ describe('ChangeProposalService reads by viewer role', () => {
   });
 
   describe('a viewer who is neither the requester nor a reviewer', () => {
-    it('never gets a pending operation, even on a page they may view (Reviewers Req 5.3)', async () => {
+    it('never gets a pending operation, even on a page they may view (Req 19.3)', async () => {
       const applied = await kit.createPage('other-applied');
       const waiting = await kit.createPage('other-waiting');
       const onlyPending = await pendingProposal(
@@ -330,7 +330,7 @@ describe('ChangeProposalService reads by viewer role', () => {
       expect(result).toMatchObject({ ok: true });
     };
 
-    it('returns the same applied operations and state in get and the applied list (Reviewers Req 5.10)', async () => {
+    it('returns the same applied operations and state in get and the applied list (Req 19.10)', async () => {
       const applied = await kit.createPage('before-after-applied');
       const hidden = await hiddenPage('before-after-hidden');
       const proposal = await pendingProposal(
@@ -372,7 +372,7 @@ describe('ChangeProposalService reads by viewer role', () => {
       );
     });
 
-    it('keeps the applied list on its applied operations while the get shows the reviewer a pending one (Reviewers Req 5.1, 5.10)', async () => {
+    it('keeps the applied list on its applied operations while the get shows the reviewer a pending one (Req 19.1, 19.10)', async () => {
       const applied = await kit.createPage('list-applied');
       const waiting = await kit.createPage('list-waiting');
       const proposal = await pendingProposal(

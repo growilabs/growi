@@ -86,7 +86,7 @@ describe('toChangeProposalDocument', () => {
     });
   });
 
-  describe('reviewer fields (Reviewers Req 1.1, 1.8)', () => {
+  describe('reviewer fields (Req 15.1, 15.8)', () => {
     const REVIEWER_ID = '65f000000000000000000005';
     const ADDER_ID = '65f000000000000000000006';
     const ADDED_AT = new Date('2026-10-02T00:00:00Z');

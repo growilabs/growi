@@ -130,7 +130,7 @@ const scanReviewQueue = async (
     }
   }
   // Never the last scanned id (it reveals the proposal is open) nor the input
-  // cursor (the client would loop); see design.md review-queue-query's owner decision.
+  // cursor (the client would loop); see design.md, ReviewQueueQuery.
   return { matched, next: lastListed };
 };
 

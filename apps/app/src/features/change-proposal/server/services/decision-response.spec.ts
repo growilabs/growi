@@ -16,7 +16,7 @@ const edit = (
 });
 
 describe('buildDecisionResponse', () => {
-  it('answers the reported keys only, in operation order, with a null reason when there is none (Reviewers Req 2.6, 2.11)', () => {
+  it('answers the reported keys only, in operation order, with a null reason when there is none (Req 16.6, 16.11)', () => {
     const operations = [
       edit(0, { status: 'skipped', reason: 'skipped-by-requester' }),
       edit(1),

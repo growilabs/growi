@@ -81,7 +81,7 @@ const toPagePaths = (viewable: ViewablePages): ReadonlyMap<string, string> =>
   new Map([...viewable.pages].map(([id, page]) => [id, page.path]));
 
 // The proposal as this user sees it, with its role read from the stored
-// reviewers and the user's groups at this moment (Reviewers Req 5.9).
+// reviewers and the user's groups at this moment (Req 19.9).
 const resolveFor = async (
   proposal: ChangeProposalDocument,
   userId: string,
@@ -107,7 +107,7 @@ const resolveFor = async (
   return { scope: scopes[0], pagePaths: toPagePaths(viewable) };
 };
 
-// Reviewers Req 6.3, 6.4: only the pages this reviewer may decide, and nothing
+// Req 20.3, 20.4: only the pages this reviewer may decide, and nothing
 // at all when there is none.
 const pagesForReviewer = async (
   proposal: ChangeProposalDocument,
@@ -172,7 +172,7 @@ const buildReviewRequestInputs = async ({
 };
 
 // Items come from the requester's own view of the proposal, so an operation
-// on a page the requester can no longer view stays out (Reviewers Req 6.5).
+// on a page the requester can no longer view stays out (Req 20.5).
 const buildReviewResultSnapshot = async ({
   proposal,
   reviewer,
@@ -240,7 +240,7 @@ export const createReviewNotifier = (crowi: Crowi): ReviewNotifier => ({
   },
 
   async notifyReviewResult(args) {
-    // Reviewers Req 6.6: the requester's own decision is not reported back.
+    // Req 20.6: the requester's own decision is not reported back.
     if (args.reviewer._id.toString() === args.proposal.requester) {
       return;
     }

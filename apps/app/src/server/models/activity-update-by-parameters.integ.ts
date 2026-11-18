@@ -154,7 +154,7 @@ describe('updateByParameters — snapshot persistence (read back from DB)', () =
     expect(persisted.snapshot.pageId).toBeNull();
   });
 
-  it('Reviewers Req 6.8 — an update snapshot carrying only the review channel persists it and keeps the existing username', async () => {
+  it('Req 20.8 — an update snapshot carrying only the review channel persists it and keeps the existing username', async () => {
     const unsettled = await arrangeUnsettledActivity({
       userId: new Types.ObjectId().toHexString(),
       username: 'grace',

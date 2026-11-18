@@ -203,7 +203,7 @@ describe('change-proposal write routes', () => {
   }, 60_000);
 
   describe('POST /:id/approve', () => {
-    it('applies every pending operation, records the approval on the request and the apply on its own activity (Reviewers Req 6.8, 6.9)', async () => {
+    it('applies every pending operation, records the approval on the request and the apply on its own activity (Req 20.8, 20.9)', async () => {
       asUser(users.requester);
       const proposal = await newPendingProposal();
 
@@ -229,7 +229,7 @@ describe('change-proposal write routes', () => {
       ]);
     });
 
-    it("lets a reviewer approve, keeping the reviewer's ip on the approval and off the requester's apply (Reviewers Req 2.1, 6.9)", async () => {
+    it("lets a reviewer approve, keeping the reviewer's ip on the approval and off the requester's apply (Req 16.1, 20.9)", async () => {
       const page = await kit.createPage('by-reviewer');
       const proposal = await kit.storeProposal([kit.editInput(page)], {
         approve: false,

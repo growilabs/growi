@@ -43,7 +43,7 @@ const typeSpecificFields = (
 };
 
 // The requester's order is the stored index; a reviewer's is a rank among what
-// they see, given on decision targets only (Reviewers Req 5.2).
+// they see, given on decision targets only (Req 19.2).
 const participantFields = (
   op: OperationRecord,
   { role, reviewTarget, decisions }: OperationViewExtras,

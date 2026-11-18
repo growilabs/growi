@@ -27,7 +27,7 @@ import {
 } from './reviewer-action-auth';
 
 // A reject never stops an approval or an apply: like an abstention it is only a
-// record and a notice (see design.md, 要件との差と読み方 10).
+// record and a notice (see research.md's reject-and-abstain Decision).
 export type ReviewRecordActions = {
   rejectOperations(
     proposalId: string,
@@ -182,7 +182,7 @@ export const createReviewRecordActions = (
     const context = authorized.value;
     const { proposal } = context;
     const { entry, reported } = chooseRecorded(context, request);
-    // Nothing it named is still pending, so there is nothing to record (Reviewers Req 2.11).
+    // Nothing it named is still pending, so there is nothing to record (Req 16.11).
     if (
       entry.target.scope === 'operations' &&
       entry.target.operationKeys.length === 0

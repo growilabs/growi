@@ -168,7 +168,7 @@ describe('ChangeProposalService.approve by a reviewer', () => {
   });
 
   describe('what a reviewer approves and how it is written', () => {
-    it('applies the chosen operation with the requester as the author and records who approved it (Reviewers Req 2.1, 2.8, 7.2)', async () => {
+    it('applies the chosen operation with the requester as the author and records who approved it (Req 16.1, 16.8, 21.2)', async () => {
       const page = await kit.createPage('author');
       const left = await kit.createPage('author-left');
       const proposal = await pendingProposal([
@@ -200,7 +200,7 @@ describe('ChangeProposalService.approve by a reviewer', () => {
       expect(await bodyOf(page)).toBe('reviewed body');
     });
 
-    it('applies once when one member of a reviewer group approves, even with two members at once (Reviewers Req 2.4, 2.5)', async () => {
+    it('applies once when one member of a reviewer group approves, even with two members at once (Req 16.4, 16.5)', async () => {
       const page = await kit.createPage('group-race');
       const proposal = await pendingProposal(
         [kit.editInput(page, 'group body')],
@@ -230,7 +230,7 @@ describe('ChangeProposalService.approve by a reviewer', () => {
       expect(approvals.map((row) => row.userId)).toEqual([op.approvedBy]);
     });
 
-    it('lets the requester approve without being a reviewer, and does not notify them of their own approval (Reviewers Req 2.3, 6.6)', async () => {
+    it('lets the requester approve without being a reviewer, and does not notify them of their own approval (Req 16.3, 20.6)', async () => {
       const page = await kit.createPage('requester');
       const proposal = await pendingProposal([kit.editInput(page)]);
       const [key] = keysOf(proposal);
@@ -253,7 +253,7 @@ describe('ChangeProposalService.approve by a reviewer', () => {
       expect(await resultNotifications(proposal._id)).toEqual([]);
     });
 
-    it('sends the requester one result notification naming only what this request approved (Reviewers Req 6.5)', async () => {
+    it('sends the requester one result notification naming only what this request approved (Req 20.5)', async () => {
       const done = await kit.createPage('notified-done');
       const now = await kit.createPage('notified-now');
       const proposal = await pendingProposal([
@@ -289,7 +289,7 @@ describe('ChangeProposalService.approve by a reviewer', () => {
     });
   });
 
-  it('notifies and records only the operation this request wrote, not one another approval already wrote (Reviewers Req 6.5, 6.8)', async () => {
+  it('notifies and records only the operation this request wrote, not one another approval already wrote (Req 20.5, 20.8)', async () => {
     const before = await kit.createPage('written-before');
     const now = await kit.createPage('written-now');
     const proposal = await pendingProposal([
@@ -317,7 +317,7 @@ describe('ChangeProposalService.approve by a reviewer', () => {
   });
 
   describe('what a reviewer never reaches', () => {
-    it('answers only for the operations the reviewer sees, though the apply also writes the hidden ones others approved (Reviewers Req 2.2, 2.6, 5.6)', async () => {
+    it('answers only for the operations the reviewer sees, though the apply also writes the hidden ones others approved (Req 16.2, 16.6, 19.6)', async () => {
       const shared = await kit.createPage('visible');
       const hidden = await ownedPage('hidden', users.requester);
       const proposal = await pendingProposal([
@@ -362,7 +362,7 @@ describe('ChangeProposalService.approve by a reviewer', () => {
       ]);
     });
 
-    it('does not approve a hidden operation named by its key (Reviewers Req 2.6, 7.4)', async () => {
+    it('does not approve a hidden operation named by its key (Req 16.6, 21.4)', async () => {
       const shared = await kit.createPage('named-visible');
       const hidden = await ownedPage('named-hidden', users.requester);
       const proposal = await pendingProposal([
@@ -391,7 +391,7 @@ describe('ChangeProposalService.approve by a reviewer', () => {
       expect(await resultNotifications(proposal._id)).toEqual([]);
     });
 
-    it("writes with the requester's permission, so a page only the reviewer may write fails and stays unchanged (Reviewers Req 7.1, 7.3, 7.4)", async () => {
+    it("writes with the requester's permission, so a page only the reviewer may write fails and stays unchanged (Req 21.1, 21.3, 21.4)", async () => {
       const page = await groupPage('reviewer-writable');
       const proposal = await pendingProposal(
         [kit.editInput(page, 'should not land')],
@@ -419,7 +419,7 @@ describe('ChangeProposalService.approve by a reviewer', () => {
     it.each([
       'expired',
       'withdrawn',
-    ] as const)('refuses a %s proposal as not open and writes nothing (Reviewers Req 2.9)', async (closing) => {
+    ] as const)('refuses a %s proposal as not open and writes nothing (Req 16.9)', async (closing) => {
       const page = await kit.createPage(`closed-${closing}`);
       // Only a proposal past its expiry closes as expired.
       const proposal = await kit.storeProposal([kit.editInput(page)], {
@@ -442,7 +442,7 @@ describe('ChangeProposalService.approve by a reviewer', () => {
       expect([op.status, op.approvedAt]).toEqual(['skipped', undefined]);
     });
 
-    it('refuses a discarded and a settled proposal as not open (Reviewers Req 2.9)', async () => {
+    it('refuses a discarded and a settled proposal as not open (Req 16.9)', async () => {
       const discarded = await pendingProposal([
         kit.editInput(await kit.createPage('discarded')),
       ]);
@@ -461,7 +461,7 @@ describe('ChangeProposalService.approve by a reviewer', () => {
       ).toEqual(NOT_OPEN);
     });
 
-    it('leaves an operation pending and approvable again when someone is editing its page (Reviewers Req 2.10, 7.6)', async () => {
+    it('leaves an operation pending and approvable again when someone is editing its page (Req 16.10, 21.6)', async () => {
       const page = await kit.createPage('being-edited');
       const proposal = await pendingProposal(
         [kit.editInput(page, 'after editing')],
@@ -500,7 +500,7 @@ describe('ChangeProposalService.approve by a reviewer', () => {
       expect(await bodyOf(page)).toBe('after editing');
     });
 
-    it('reports an already applied key as it now stands without writing it again (Reviewers Req 2.11)', async () => {
+    it('reports an already applied key as it now stands without writing it again (Req 16.11)', async () => {
       const page = await kit.createPage('applied-before');
       const left = await kit.createPage('applied-before-left');
       const proposal = await pendingProposal([
@@ -532,7 +532,7 @@ describe('ChangeProposalService.approve by a reviewer', () => {
       expect(await resultNotifications(proposal._id)).toEqual([]);
     });
 
-    it('keeps the approval for the run holding the lease and answers the visible operations as they stand (Reviewers Req 2.5)', async () => {
+    it('keeps the approval for the run holding the lease and answers the visible operations as they stand (Req 16.5)', async () => {
       const page = await kit.createPage('leased');
       const hidden = await ownedPage('leased-hidden', users.requester);
       const proposal = await pendingProposal([
@@ -575,7 +575,7 @@ describe('ChangeProposalService.approve by a reviewer', () => {
   });
 
   describe('the requester', () => {
-    it('leaves pending, rather than fails, an operation on a page they can no longer see (Reviewers Req 2.1)', async () => {
+    it('leaves pending, rather than fails, an operation on a page they can no longer see (Req 16.1)', async () => {
       const shared = await kit.createPage('requester-kept');
       const lost = await ownedPage('requester-lost', users.other);
       const proposal = await pendingProposal(

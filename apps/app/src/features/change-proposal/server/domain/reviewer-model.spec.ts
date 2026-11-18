@@ -33,7 +33,7 @@ const viewer = (
 });
 
 describe('activeReviewers', () => {
-  it('drops removed reviewers and keeps the rest in order (Reviewers Req 4.4)', () => {
+  it('drops removed reviewers and keeps the rest in order (Req 18.4)', () => {
     const list = [
       ref('user', 'a'),
       ref('user', 'b', true),
@@ -44,29 +44,29 @@ describe('activeReviewers', () => {
 });
 
 describe('isReviewer', () => {
-  it('matches the requester when they are listed next to other reviewers (Reviewers Req 1.3)', () => {
+  it('matches the requester when they are listed next to other reviewers (Req 15.3)', () => {
     const list = [ref('user', 'req'), ref('user', 'u1')];
     expect(isReviewer(list, 'req', viewer('req'))).toBe(true);
   });
 
-  it('matches a user reviewer by id (Reviewers Req 1.2)', () => {
+  it('matches a user reviewer by id (Req 15.2)', () => {
     expect(isReviewer([ref('user', 'u1')], 'req', viewer('u1'))).toBe(true);
     expect(isReviewer([ref('user', 'u1')], 'req', viewer('u2'))).toBe(false);
   });
 
-  it('matches a GROWI user group by membership (Reviewers Req 1.2, 2.4)', () => {
+  it('matches a GROWI user group by membership (Req 15.2, 16.4)', () => {
     const list = [ref('user-group', 'g1')];
     expect(isReviewer(list, 'req', viewer('u', ['g1']))).toBe(true);
     expect(isReviewer(list, 'req', viewer('u', ['g2']))).toBe(false);
   });
 
-  it('matches an external user group only against external memberships (Reviewers Req 1.2)', () => {
+  it('matches an external user group only against external memberships (Req 15.2)', () => {
     const list = [ref('external-user-group', 'e1')];
     expect(isReviewer(list, 'req', viewer('u', [], ['e1']))).toBe(true);
     expect(isReviewer(list, 'req', viewer('u', ['e1'], []))).toBe(false);
   });
 
-  it('matches when any of a mix of users and groups applies (Reviewers Req 1.2)', () => {
+  it('matches when any of a mix of users and groups applies (Req 15.2)', () => {
     const list = [
       ref('user', 'u1'),
       ref('user-group', 'g1'),
@@ -78,24 +78,24 @@ describe('isReviewer', () => {
     expect(isReviewer(list, 'req', viewer('x', ['g9'], ['e9']))).toBe(false);
   });
 
-  it('stops matching a user who left the group (Reviewers Req 5.9)', () => {
+  it('stops matching a user who left the group (Req 19.9)', () => {
     const list = [ref('user-group', 'g1')];
     expect(isReviewer(list, 'req', viewer('u', ['g1']))).toBe(true);
     expect(isReviewer(list, 'req', viewer('u', []))).toBe(false);
   });
 
-  it('treats only the requester as reviewer when there are no reviewers (Reviewers Req 1.4)', () => {
+  it('treats only the requester as reviewer when there are no reviewers (Req 15.4)', () => {
     expect(isReviewer([], 'req', viewer('req'))).toBe(true);
     expect(isReviewer([], 'req', viewer('other'))).toBe(false);
   });
 
-  it('falls back to the requester when every reviewer was removed (Reviewers Req 4.4)', () => {
+  it('falls back to the requester when every reviewer was removed (Req 18.4)', () => {
     const list = [ref('user', 'u1', true), ref('user-group', 'g1', true)];
     expect(isReviewer(list, 'req', viewer('req'))).toBe(true);
     expect(isReviewer(list, 'req', viewer('u1', ['g1']))).toBe(false);
   });
 
-  it('does not count the requester when other reviewers are set (Reviewers Req 2.3)', () => {
+  it('does not count the requester when other reviewers are set (Req 16.3)', () => {
     expect(isReviewer([ref('user', 'u1')], 'req', viewer('req'))).toBe(false);
   });
 
@@ -111,32 +111,32 @@ describe('isReviewer', () => {
 });
 
 describe('hasForeignReviewer', () => {
-  it('is false with no reviewers (Reviewers Req 1.11)', () => {
+  it('is false with no reviewers (Req 15.11)', () => {
     expect(hasForeignReviewer([], 'req')).toBe(false);
   });
 
-  it('is false when the only reviewer is the requester (Reviewers Req 1.11)', () => {
+  it('is false when the only reviewer is the requester (Req 15.11)', () => {
     expect(hasForeignReviewer([ref('user', 'req')], 'req')).toBe(false);
   });
 
-  it('is true for another user (Reviewers Req 1.11)', () => {
+  it('is true for another user (Req 15.11)', () => {
     expect(hasForeignReviewer([ref('user', 'u1')], 'req')).toBe(true);
   });
 
   it.each([
     ['user-group' as const],
     ['external-user-group' as const],
-  ])('is true for a %s even if its id equals the requester id (Reviewers Req 1.11)', (kind) => {
+  ])('is true for a %s even if its id equals the requester id (Req 15.11)', (kind) => {
     expect(hasForeignReviewer([ref(kind, 'req')], 'req')).toBe(true);
   });
 
-  it('ignores removed reviewers (Reviewers Req 1.11)', () => {
+  it('ignores removed reviewers (Req 15.11)', () => {
     expect(hasForeignReviewer([ref('user', 'u1', true)], 'req')).toBe(false);
   });
 });
 
 describe('dedupeReviewerInputs', () => {
-  it('merges entries with the same kind and id, keeping the first (Reviewers Req 1.6)', () => {
+  it('merges entries with the same kind and id, keeping the first (Req 15.6)', () => {
     const inputs: ReviewerInput[] = [
       { kind: 'user', id: 'a' },
       { kind: 'user-group', id: 'a' },
@@ -170,7 +170,7 @@ describe('deriveViewerRole', () => {
     expect(deriveViewerRole('req', list, viewer('x', ['g1']))).toBe('reviewer');
   });
 
-  it('is other for everyone else, including after leaving the group (Reviewers Req 5.9)', () => {
+  it('is other for everyone else, including after leaving the group (Req 19.9)', () => {
     const list = [ref('user-group', 'g1')];
     expect(deriveViewerRole('req', list, viewer('x', []))).toBe('other');
     expect(deriveViewerRole('req', [], viewer('x'))).toBe('other');

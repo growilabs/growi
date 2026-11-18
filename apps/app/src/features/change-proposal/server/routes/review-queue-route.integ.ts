@@ -34,7 +34,7 @@ describe('change-proposal reviewer routes', () => {
         : [...ids, ...(await queuedIdsFrom(res.body.nextCursor))];
     };
 
-    it('lists the proposals waiting for the caller as a reviewer instead of looking up a proposal by that id (Reviewers Req 5.5)', async () => {
+    it('lists the proposals waiting for the caller as a reviewer instead of looking up a proposal by that id (Req 19.5)', async () => {
       const mine = await reviewedProposal();
       const notMine = await kit.storeProposal(
         [kit.editInput(await kit.createPage('not-mine'))],
@@ -58,7 +58,7 @@ describe('change-proposal reviewer routes', () => {
       expect(ids).not.toContain(notMine._id);
     });
 
-    it('continues after the cursor, oldest first (Reviewers Req 5.5)', async () => {
+    it('continues after the cursor, oldest first (Req 19.5)', async () => {
       const older = await reviewedProposal();
       const newer = await reviewedProposal();
       asUser(users.subscriber);
@@ -76,7 +76,7 @@ describe('change-proposal reviewer routes', () => {
       ]);
     });
 
-    it('lists only the pages the caller may view (Reviewers Req 5.6)', async () => {
+    it('lists only the pages the caller may view (Req 19.6)', async () => {
       const visiblePage = await kit.createPage('visible');
       const hiddenPage = await requesterOnlyPage('hidden');
       const proposal = await reviewedProposal([visiblePage, hiddenPage]);

@@ -166,13 +166,13 @@ describe('selectAutoApplyTargets', () => {
           'the requester and another user',
           [reviewer('user', 'u1'), reviewer('user', 'u2')],
         ],
-      ])('selects nothing when %s is a reviewer (Reviewers Req 1.11)', (_label, reviewers) => {
+      ])('selects nothing when %s is a reviewer (Req 15.11)', (_label, reviewers) => {
         expect(
           selectAutoApplyTargets(policy, ops, facts, 'u1', null, reviewers),
         ).toEqual([]);
       });
 
-      it('selects nothing for a follow-up with another reviewer (Reviewers Req 8.5)', () => {
+      it('selects nothing for a follow-up with another reviewer (Req 22.5)', () => {
         expect(
           selectAutoApplyTargets(policy, ops, facts, 'u1', 'follow-up', [
             reviewer('user', 'u2'),
@@ -180,7 +180,7 @@ describe('selectAutoApplyTargets', () => {
         ).toEqual([]);
       });
 
-      it('follows the policy when the requester alone is the reviewer (Reviewers Req 8.2)', () => {
+      it('follows the policy when the requester alone is the reviewer (Req 22.2)', () => {
         expect(
           selectAutoApplyTargets(policy, ops, facts, 'u1', null, [
             reviewer('user', 'u1'),

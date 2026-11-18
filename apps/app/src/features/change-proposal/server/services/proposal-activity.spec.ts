@@ -6,7 +6,7 @@ import type { RecordProposalActivityArgs } from './proposal-activity';
 type ArgsFor<A> = Extract<RecordProposalActivityArgs, { action: A }>;
 
 describe('RecordProposalActivityArgs', () => {
-  it('requires the channel on every review action (Reviewers Req 6.8, 6.10)', () => {
+  it('requires the channel on every review action (Req 20.8, 20.10)', () => {
     expectTypeOf<
       ArgsFor<
         | typeof SupportedAction.ACTION_CHANGE_PROPOSAL_APPROVE

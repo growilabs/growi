@@ -20,7 +20,7 @@ import {
 } from '.';
 
 describe('reviewer interfaces barrel', () => {
-  it('declares the reviewer, comment and purpose limits (Reviewers Req 1.7, 1.9, 3.6)', () => {
+  it('declares the reviewer, comment and purpose limits (Req 15.7, 15.9, 17.6)', () => {
     expect(MAX_REVIEWERS).toBe(20);
     expect(MAX_REVIEW_COMMENT_LENGTH).toBe(500);
     expect(MAX_PURPOSE_LENGTH).toBe(2000);
@@ -46,7 +46,7 @@ describe('reviewer interfaces barrel', () => {
     expectTypeOf<ReviewRecord['channel']>().toEqualTypeOf<ReviewChannel>();
   });
 
-  it('adds the role and the reviewer-facing values to the views (Reviewers Req 5.1, 5.2, 5.7)', () => {
+  it('adds the role and the reviewer-facing values to the views (Req 19.1, 19.2, 19.7)', () => {
     expectTypeOf<
       ChangeProposalView['viewerRole']
     >().toEqualTypeOf<ViewerRole>();

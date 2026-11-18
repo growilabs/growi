@@ -25,7 +25,7 @@ describe('ChangeProposal model (Prisma extension)', () => {
       return (read?.reviewers ?? []).filter((r) => r.removedAt == null);
     };
 
-    it('adds users, user groups and external user groups with who added them and when (Reviewers Req 4.1, 4.2, 4.10)', async () => {
+    it('adds users, user groups and external user groups with who added them and when (Req 18.1, 18.2, 18.10)', async () => {
       const created = await createProposal();
       const actor = identityOf(created.requester);
       const inputs = [
@@ -53,7 +53,7 @@ describe('ChangeProposal model (Prisma extension)', () => {
       );
     });
 
-    it('lets an active reviewer, including a group member, add a reviewer (Reviewers Req 4.1)', async () => {
+    it('lets an active reviewer, including a group member, add a reviewer (Req 18.1)', async () => {
       const groupId = newObjectId();
       const created = await createProposal({
         reviewers: [reviewerRef('user-group', groupId)],
@@ -75,7 +75,7 @@ describe('ChangeProposal model (Prisma extension)', () => {
       ]);
     });
 
-    it('changes nothing and reports nothing added for a reviewer who is already active (Reviewers Req 4.6)', async () => {
+    it('changes nothing and reports nothing added for a reviewer who is already active (Req 18.6)', async () => {
       const existing = reviewerRef('user', newObjectId());
       const created = await createProposal({ reviewers: [existing] });
 
@@ -91,7 +91,7 @@ describe('ChangeProposal model (Prisma extension)', () => {
       expect(read?.reviewers).toStrictEqual([existing]);
     });
 
-    it('treats the same id under another kind as a different reviewer (Reviewers Req 4.6)', async () => {
+    it('treats the same id under another kind as a different reviewer (Req 18.6)', async () => {
       const sharedId = newObjectId();
       const created = await createProposal({
         reviewers: [reviewerRef('user', sharedId)],
@@ -110,7 +110,7 @@ describe('ChangeProposal model (Prisma extension)', () => {
       });
     });
 
-    it('marks a removed reviewer with who removed them and when, and keeps the entry (Reviewers Req 4.3, 4.10)', async () => {
+    it('marks a removed reviewer with who removed them and when, and keeps the entry (Req 18.3, 18.10)', async () => {
       const kept = reviewerRef('user', newObjectId());
       const removed = reviewerRef('user-group', newObjectId());
       const created = await createProposal({ reviewers: [kept, removed] });
@@ -132,7 +132,7 @@ describe('ChangeProposal model (Prisma extension)', () => {
       ]);
     });
 
-    it('lets a reviewer remove themselves (Reviewers Req 4.3)', async () => {
+    it('lets a reviewer remove themselves (Req 18.3)', async () => {
       const self = reviewerRef('user', newObjectId());
       const created = await createProposal({ reviewers: [self] });
 
@@ -147,7 +147,7 @@ describe('ChangeProposal model (Prisma extension)', () => {
       expect(await activeEntriesOf(created._id)).toStrictEqual([]);
     });
 
-    it('changes nothing when the reviewer to remove is not an active reviewer (Reviewers Req 4.7)', async () => {
+    it('changes nothing when the reviewer to remove is not an active reviewer (Req 18.7)', async () => {
       const existing = reviewerRef('user', newObjectId());
       const created = await createProposal({ reviewers: [existing] });
 
@@ -163,7 +163,7 @@ describe('ChangeProposal model (Prisma extension)', () => {
       expect(read?.reviewers).toStrictEqual([existing]);
     });
 
-    it('adds a new entry for a removed reviewer added back, and a later removal leaves the old record as it was (Reviewers Req 4.10)', async () => {
+    it('adds a new entry for a removed reviewer added back, and a later removal leaves the old record as it was (Req 18.10)', async () => {
       const reviewerId = newObjectId();
       const created = await createProposal();
       const actor = identityOf(created.requester);
@@ -204,7 +204,7 @@ describe('ChangeProposal model (Prisma extension)', () => {
       ]);
     });
 
-    it('keeps the approvals, rejections and abstentions of a removed reviewer (Reviewers Req 4.12)', async () => {
+    it('keeps the approvals, rejections and abstentions of a removed reviewer (Req 18.12)', async () => {
       const reviewer = reviewerRef('user', newObjectId());
       const created = await createProposal({ reviewers: [reviewer] });
       const [approved, abstained] = created.operations.map((op) => op.key);
@@ -255,7 +255,7 @@ describe('ChangeProposal model (Prisma extension)', () => {
       expect(after?.operations).toStrictEqual(before?.operations);
     });
 
-    it('accepts a malformed reviewer id to remove and changes nothing (Reviewers Req 4.7)', async () => {
+    it('accepts a malformed reviewer id to remove and changes nothing (Req 18.7)', async () => {
       const existing = reviewerRef('user', newObjectId());
       const created = await createProposal({ reviewers: [existing] });
 
@@ -271,7 +271,7 @@ describe('ChangeProposal model (Prisma extension)', () => {
       expect(read?.reviewers).toStrictEqual([existing]);
     });
 
-    it('answers not-open and changes nothing on a closed proposal (Reviewers Req 4.8)', async () => {
+    it('answers not-open and changes nothing on a closed proposal (Req 18.8)', async () => {
       const existing = reviewerRef('user', newObjectId());
       const created = await createProposal({ reviewers: [existing] });
       await prisma.changeproposals.closeIfStillOpen(
@@ -300,7 +300,7 @@ describe('ChangeProposal model (Prisma extension)', () => {
       expect(read?.reviewers).toStrictEqual([existing]);
     });
 
-    it('answers not-found and changes nothing for someone who is neither the requester nor a reviewer (Reviewers Req 2.7)', async () => {
+    it('answers not-found and changes nothing for someone who is neither the requester nor a reviewer (Req 16.7)', async () => {
       const existing = reviewerRef('user', newObjectId());
       const created = await createProposal({ reviewers: [existing] });
       const outsider = identityOf(newObjectId());
@@ -325,7 +325,7 @@ describe('ChangeProposal model (Prisma extension)', () => {
     });
 
     it(
-      'keeps every reviewer added concurrently by different people (Reviewers Req 4.1)',
+      'keeps every reviewer added concurrently by different people (Req 18.1)',
       async () => {
         for (let round = 0; round < ROUNDS; round++) {
           const actors = Array.from({ length: CONCURRENCY }, () =>
@@ -364,7 +364,7 @@ describe('ChangeProposal model (Prisma extension)', () => {
     );
 
     it(
-      'adds the same reviewer only once when many people add them concurrently (Reviewers Req 4.6)',
+      'adds the same reviewer only once when many people add them concurrently (Req 18.6)',
       async () => {
         for (let round = 0; round < ROUNDS; round++) {
           const actors = Array.from({ length: CONCURRENCY }, () =>
@@ -412,7 +412,7 @@ describe('ChangeProposal model (Prisma extension)', () => {
       return { created, reviewer, other, first, second };
     };
 
-    it('records a rejection of each chosen operation with who, when, the comment and the channel (Reviewers Req 3.1)', async () => {
+    it('records a rejection of each chosen operation with who, when, the comment and the channel (Req 17.1)', async () => {
       const { created, reviewer, first, second } = await setUp();
       const now = new Date();
 
@@ -441,7 +441,7 @@ describe('ChangeProposal model (Prisma extension)', () => {
       );
     });
 
-    it('records a rejection of the whole proposal without an operation key (Reviewers Req 3.2)', async () => {
+    it('records a rejection of the whole proposal without an operation key (Req 17.2)', async () => {
       const { created, reviewer } = await setUp();
       const now = new Date();
 
@@ -458,7 +458,7 @@ describe('ChangeProposal model (Prisma extension)', () => {
       ]);
     });
 
-    it('records an abstention of a chosen operation (Reviewers Req 3.3)', async () => {
+    it('records an abstention of a chosen operation (Req 17.3)', async () => {
       const { created, reviewer, first } = await setUp();
       const now = new Date();
 
@@ -484,7 +484,7 @@ describe('ChangeProposal model (Prisma extension)', () => {
       ]);
     });
 
-    it('leaves the status and approval of every operation and the lifecycle as they were (Reviewers Req 3.9)', async () => {
+    it('leaves the status and approval of every operation and the lifecycle as they were (Req 17.9)', async () => {
       const { created, reviewer, other, first, second } = await setUp();
       await prisma.changeproposals.markApproved(
         created._id,
@@ -520,7 +520,7 @@ describe('ChangeProposal model (Prisma extension)', () => {
       expect(after?.operations).toStrictEqual(before?.operations);
     });
 
-    it('replaces the same person’s earlier record of the same operation, and leaves other records alone (Reviewers Req 3.4)', async () => {
+    it('replaces the same person’s earlier record of the same operation, and leaves other records alone (Req 17.4)', async () => {
       const { created, reviewer, other, first, second } = await setUp();
       const earlier = new Date(Date.now() - 1000);
       const later = new Date();
@@ -592,7 +592,7 @@ describe('ChangeProposal model (Prisma extension)', () => {
       );
     });
 
-    it('replaces the same person’s earlier whole rejection, and keeps their records of operations (Reviewers Req 3.4)', async () => {
+    it('replaces the same person’s earlier whole rejection, and keeps their records of operations (Req 17.4)', async () => {
       const { created, reviewer, first } = await setUp();
       const later = new Date();
       await prisma.changeproposals.addReviews(
@@ -642,7 +642,7 @@ describe('ChangeProposal model (Prisma extension)', () => {
       expect(reviews.filter((r) => r.operationKey === first)).toHaveLength(1);
     });
 
-    it('answers not-found and records nothing for someone who is not a reviewer (Reviewers Req 3.11)', async () => {
+    it('answers not-found and records nothing for someone who is not a reviewer (Req 17.11)', async () => {
       const { created, first } = await setUp();
 
       const result = await prisma.changeproposals.addReviews(
@@ -660,7 +660,7 @@ describe('ChangeProposal model (Prisma extension)', () => {
       expect(await reviewsOf(created._id)).toStrictEqual([]);
     });
 
-    it('answers not-open and records nothing on a closed proposal (Reviewers Req 2.9)', async () => {
+    it('answers not-open and records nothing on a closed proposal (Req 16.9)', async () => {
       const { created, reviewer, first } = await setUp();
       await prisma.changeproposals.closeIfStillOpen(
         created._id,
@@ -714,7 +714,7 @@ describe('ChangeProposal model (Prisma extension)', () => {
         return fixture;
       };
 
-      it('answers not-open and keeps the earlier record when the proposal has closed (Reviewers Req 3.4, 2.9)', async () => {
+      it('answers not-open and keeps the earlier record when the proposal has closed (Req 17.4, 16.9)', async () => {
         const { created, reviewer, first } = await setUpWithRejection();
         await prisma.changeproposals.closeIfStillOpen(
           created._id,
@@ -730,7 +730,7 @@ describe('ChangeProposal model (Prisma extension)', () => {
         ]);
       });
 
-      it('answers not-found and keeps the earlier record when the reviewer has been removed (Reviewers Req 3.4, 4.12)', async () => {
+      it('answers not-found and keeps the earlier record when the reviewer has been removed (Req 17.4, 18.12)', async () => {
         const { created, reviewer, first } = await setUpWithRejection();
         await prisma.changeproposals.removeReviewers(
           created._id,
@@ -748,7 +748,7 @@ describe('ChangeProposal model (Prisma extension)', () => {
       });
 
       it(
-        'never loses both records when the proposal closes during the replacement (Reviewers Req 3.4)',
+        'never loses both records when the proposal closes during the replacement (Req 17.4)',
         async () => {
           for (let round = 0; round < ROUNDS * 3; round++) {
             const { created, reviewer, first } = await setUpWithRejection();
@@ -774,7 +774,7 @@ describe('ChangeProposal model (Prisma extension)', () => {
       );
 
       it(
-        'never loses both records when the reviewer is removed during the replacement (Reviewers Req 3.4, 4.12)',
+        'never loses both records when the reviewer is removed during the replacement (Req 17.4, 18.12)',
         async () => {
           for (let round = 0; round < ROUNDS * 3; round++) {
             const { created, reviewer, first } = await setUpWithRejection();
@@ -825,7 +825,7 @@ describe('ChangeProposal model (Prisma extension)', () => {
         );
       };
 
-      it('removes the approver’s records of the approved operations, and keeps their whole rejection and others’ records (Reviewers Req 3.4)', async () => {
+      it('removes the approver’s records of the approved operations, and keeps their whole rejection and others’ records (Req 17.4)', async () => {
         const { created, reviewer, other, first, second } = await setUp();
         await rejectEverything(created._id, reviewer, [first, second]);
         await rejectEverything(created._id, other, [first]);
@@ -846,7 +846,7 @@ describe('ChangeProposal model (Prisma extension)', () => {
         expect(reviews.filter((r) => r.by === other)).toHaveLength(2);
       });
 
-      it('also removes the approver’s whole rejection when the whole proposal is approved (Reviewers Req 3.4)', async () => {
+      it('also removes the approver’s whole rejection when the whole proposal is approved (Req 17.4)', async () => {
         const { created, reviewer, other, first, second } = await setUp();
         await rejectEverything(created._id, reviewer, [first, second]);
         await rejectEverything(created._id, other, [first]);
@@ -863,7 +863,7 @@ describe('ChangeProposal model (Prisma extension)', () => {
         expect(reviews.filter((r) => r.by === other)).toHaveLength(2);
       });
 
-      it('removes the approver’s records even after the approval closed the proposal (Reviewers Req 3.4)', async () => {
+      it('removes the approver’s records even after the approval closed the proposal (Req 17.4)', async () => {
         const { created, reviewer, first, second } = await setUp();
         await rejectEverything(created._id, reviewer, [first, second]);
         await prisma.changeproposals.closeIfStillOpen(

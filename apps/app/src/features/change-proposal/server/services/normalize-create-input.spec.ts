@@ -10,7 +10,7 @@ const userIds = (count: number): readonly string[] =>
   Array.from({ length: count }, (_, i) => `user-${i}`);
 
 describe('normalizeCreateInput: purpose', () => {
-  it(`accepts a purpose of ${MAX_PURPOSE_LENGTH} code points (emoji count once) and keeps it as is (Reviewers Req 1.8, 1.9)`, () => {
+  it(`accepts a purpose of ${MAX_PURPOSE_LENGTH} code points (emoji count once) and keeps it as is (Req 15.8, 15.9)`, () => {
     const purpose = '😀'.repeat(MAX_PURPOSE_LENGTH);
 
     const result = normalizeCreateInput({ ...minimal, purpose });
@@ -18,7 +18,7 @@ describe('normalizeCreateInput: purpose', () => {
     expect(result).toMatchObject({ ok: true, value: { purpose } });
   });
 
-  it(`rejects a purpose of ${MAX_PURPOSE_LENGTH + 1} code points (Reviewers Req 1.9)`, () => {
+  it(`rejects a purpose of ${MAX_PURPOSE_LENGTH + 1} code points (Req 15.9)`, () => {
     const result = normalizeCreateInput({
       ...minimal,
       purpose: 'あ'.repeat(MAX_PURPOSE_LENGTH + 1),
@@ -48,7 +48,7 @@ describe('normalizeCreateInput: purpose', () => {
 });
 
 describe('normalizeCreateInput: reviewers', () => {
-  it('copies users, user groups and external groups, dropping extra fields (Reviewers Req 1.2)', () => {
+  it('copies users, user groups and external groups, dropping extra fields (Req 15.2)', () => {
     const result = normalizeCreateInput({
       ...minimal,
       reviewers: [
@@ -70,7 +70,7 @@ describe('normalizeCreateInput: reviewers', () => {
     });
   });
 
-  it('collapses the same user or group given twice into one (Reviewers Req 1.6)', () => {
+  it('collapses the same user or group given twice into one (Req 15.6)', () => {
     const result = normalizeCreateInput({
       ...minimal,
       reviewers: [
@@ -91,7 +91,7 @@ describe('normalizeCreateInput: reviewers', () => {
     });
   });
 
-  it(`accepts ${MAX_REVIEWERS} reviewers, and ${MAX_REVIEWERS + 1} entries when one is a duplicate (Reviewers Req 1.7)`, () => {
+  it(`accepts ${MAX_REVIEWERS} reviewers, and ${MAX_REVIEWERS + 1} entries when one is a duplicate (Req 15.7)`, () => {
     const atLimit = userIds(MAX_REVIEWERS).map((id) => ({ kind: 'user', id }));
 
     expect(normalizeCreateInput({ ...minimal, reviewers: atLimit }).ok).toBe(
@@ -105,7 +105,7 @@ describe('normalizeCreateInput: reviewers', () => {
     ).toMatchObject({ ok: true, value: { reviewers: atLimit } });
   });
 
-  it(`rejects ${MAX_REVIEWERS + 1} different reviewers (Reviewers Req 1.7)`, () => {
+  it(`rejects ${MAX_REVIEWERS + 1} different reviewers (Req 15.7)`, () => {
     const result = normalizeCreateInput({
       ...minimal,
       reviewers: userIds(MAX_REVIEWERS + 1).map((id) => ({ kind: 'user', id })),

@@ -139,7 +139,7 @@ describe('ReviewNotifier.notifyReviewResult', () => {
     await mongoose.model('User').deleteMany({ _id: { $in: userIds } });
   });
 
-  it('sends the requester one notification per request, with the activity of that request and its action (Reviewers Req 6.5)', async () => {
+  it('sends the requester one notification per request, with the activity of that request and its action (Req 20.5)', async () => {
     const proposal = await storeProposal();
     const { publicEdit, create } = keysOf(proposal);
     const activityId = new mongoose.Types.ObjectId().toString();
@@ -177,7 +177,7 @@ describe('ReviewNotifier.notifyReviewResult', () => {
     });
   });
 
-  it('leaves out an operation on a page the requester cannot view, and stores nothing about it (Reviewers Req 6.5)', async () => {
+  it('leaves out an operation on a page the requester cannot view, and stores nothing about it (Req 20.5)', async () => {
     const proposal = await storeProposal();
     const { publicEdit, groupEdit } = keysOf(proposal);
 
@@ -203,7 +203,7 @@ describe('ReviewNotifier.notifyReviewResult', () => {
     expect(raw).not.toContain(idOf(pages.group));
   });
 
-  it('sends nothing when every decided operation is on a page the requester cannot view (Reviewers Req 6.5)', async () => {
+  it('sends nothing when every decided operation is on a page the requester cannot view (Req 20.5)', async () => {
     const proposal = await storeProposal();
 
     await createReviewNotifier(crowi).notifyReviewResult({
@@ -222,7 +222,7 @@ describe('ReviewNotifier.notifyReviewResult', () => {
     expect(await notificationsFor(proposal._id)).toHaveLength(0);
   });
 
-  it('carries an abstention with its comment (Reviewers Req 6.5)', async () => {
+  it('carries an abstention with its comment (Req 20.5)', async () => {
     const proposal = await storeProposal();
 
     await createReviewNotifier(crowi).notifyReviewResult({
@@ -243,7 +243,7 @@ describe('ReviewNotifier.notifyReviewResult', () => {
     ]);
   });
 
-  it('leaves out an approved create whose created page the requester cannot view (Reviewers Req 6.5)', async () => {
+  it('leaves out an approved create whose created page the requester cannot view (Req 20.5)', async () => {
     const stored = await storeProposal();
     const { create } = keysOf(stored);
     // As the applier hands the proposal back after applying the create.
@@ -271,7 +271,7 @@ describe('ReviewNotifier.notifyReviewResult', () => {
     expect(await notificationsFor(proposal._id)).toHaveLength(0);
   });
 
-  it('sends a whole-proposal rejection even with no operation in it (Reviewers Req 6.5)', async () => {
+  it('sends a whole-proposal rejection even with no operation in it (Req 20.5)', async () => {
     const proposal = await storeProposal();
 
     await createReviewNotifier(crowi).notifyReviewResult({
@@ -290,7 +290,7 @@ describe('ReviewNotifier.notifyReviewResult', () => {
     expect(snapshot.wholeRejection).toEqual({ comment: 'not this way' });
   });
 
-  it('sends nothing for an approval by the requester (Reviewers Req 6.6)', async () => {
+  it('sends nothing for an approval by the requester (Req 20.6)', async () => {
     const proposal = await storeProposal();
 
     await createReviewNotifier(crowi).notifyReviewResult({

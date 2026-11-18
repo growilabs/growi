@@ -59,7 +59,7 @@ describe('readChangeProposalSettings', () => {
     expect(settings.pendingExpirationSeconds).toBeNull();
   });
 
-  it('reports the reviewers feature as enabled when its switch is on (Reviewers Req 1.1)', () => {
+  it('reports the reviewers feature as enabled when its switch is on (Req 15.1)', () => {
     stubConfigs({ ...allDefaults, 'app:changeProposalReviewersEnabled': true });
 
     expect(readChangeProposalSettings().isReviewersEnabled).toBe(true);

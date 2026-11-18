@@ -135,7 +135,7 @@ describe('createByParameters — snapshot persistence (read back from DB)', () =
     expect(persisted?.snapshot.fileSize).toBeNull();
   });
 
-  it('Reviewers Req 6.8 — persists the review channel of a change proposal review snapshot together with username', async () => {
+  it('Req 20.8 — persists the review channel of a change proposal review snapshot together with username', async () => {
     await prisma.activities.createByParameters({
       action: SupportedAction.ACTION_CHANGE_PROPOSAL_APPROVE,
       ip: TEST_IP,
@@ -157,7 +157,7 @@ describe('createByParameters — snapshot persistence (read back from DB)', () =
     expect(persisted?.snapshot.username).toBe('erin');
   });
 
-  it('Reviewers Req 6.8/6.10 — the emit settle path keeps the operator username when the snapshot carries only the review channel', async () => {
+  it('Req 20.8/20.10 — the emit settle path keeps the operator username when the snapshot carries only the review channel', async () => {
     // The review recorders emit a snapshot holding only reviewChannel; the
     // operator name comes from the request context stashed by the middleware.
     const activityId = new Types.ObjectId().toString();

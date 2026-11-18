@@ -165,7 +165,7 @@ const readViewerScope = async (
 /**
  * The participant-only parts of the view and the names they show. Per-operation
  * records are kept only on the visible operations, whole-proposal ones only for
- * the requester (Reviewers Req 3.8); anyone else gets none of them.
+ * the requester (Req 17.8); anyone else gets none of them.
  */
 const readParticipantViews = async (
   proposal: ChangeProposalDocument,

@@ -155,7 +155,7 @@ describe('ChangeProposalService.createProposal: reviewers and purpose', () => {
   });
 
   describe('what is saved', () => {
-    it('saves users, a user group, an external group and the requester as reviewers, with who added them and when (Reviewers Req 1.1, 1.2, 1.3)', async () => {
+    it('saves users, a user group, an external group and the requester as reviewers, with who added them and when (Req 15.1, 15.2, 15.3)', async () => {
       const reviewers: ReviewerInput[] = [
         userInput(users.other),
         userInput(users.subscriber),
@@ -169,7 +169,7 @@ describe('ChangeProposalService.createProposal: reviewers and purpose', () => {
       expect(stored.reviewers).toEqual(reviewers.map(storedAt));
     });
 
-    it('saves the same user or group given twice only once (Reviewers Req 1.6)', async () => {
+    it('saves the same user or group given twice only once (Req 15.6)', async () => {
       const { stored } = await createdOk(
         await create({
           reviewers: [
@@ -187,13 +187,13 @@ describe('ChangeProposalService.createProposal: reviewers and purpose', () => {
       ]);
     });
 
-    it('saves no reviewers when none are given, so the requester alone is the reviewer (Reviewers Req 1.4, 8.1)', async () => {
+    it('saves no reviewers when none are given, so the requester alone is the reviewer (Req 15.4, 22.1)', async () => {
       const { stored } = await createdOk(await create());
 
       expect(stored.reviewers).toEqual([]);
     });
 
-    it('saves the purpose exactly as given, markup included (Reviewers Req 1.8, 1.10)', async () => {
+    it('saves the purpose exactly as given, markup included (Req 15.8, 15.10)', async () => {
       const purpose = '<script>alert(1)</script> **太字** の目的\n2 行目 😀';
 
       const { stored } = await createdOk(await create({ purpose }));
@@ -201,7 +201,7 @@ describe('ChangeProposalService.createProposal: reviewers and purpose', () => {
       expect(stored.purpose).toBe(purpose);
     });
 
-    it(`saves a purpose of ${MAX_PURPOSE_LENGTH} emoji, counted as code points (Reviewers Req 1.9)`, async () => {
+    it(`saves a purpose of ${MAX_PURPOSE_LENGTH} emoji, counted as code points (Req 15.9)`, async () => {
       const purpose = '😀'.repeat(MAX_PURPOSE_LENGTH);
 
       const { stored } = await createdOk(await create({ purpose }));
@@ -215,7 +215,7 @@ describe('ChangeProposalService.createProposal: reviewers and purpose', () => {
       ['a user', 'user'],
       ['a user group', 'user-group'],
       ['an external group', 'external-user-group'],
-    ] as const)('refuses %s that does not exist (Reviewers Req 1.5)', async (_label, kind) => {
+    ] as const)('refuses %s that does not exist (Req 15.5)', async (_label, kind) => {
       const before = await countProposals();
 
       const result = await create({
@@ -234,7 +234,7 @@ describe('ChangeProposalService.createProposal: reviewers and purpose', () => {
       ['suspended', UserStatus.STATUS_SUSPENDED],
       ['deleted', UserStatus.STATUS_DELETED],
       ['invited', UserStatus.STATUS_INVITED],
-    ] as const)('refuses a %s user as a reviewer that does not exist (Reviewers Req 1.5)', async (label, status) => {
+    ] as const)('refuses a %s user as a reviewer that does not exist (Req 15.5)', async (label, status) => {
       const username = `cpServiceCreateReviewersInactive-${label}`;
       const User = mongoose.model<IUserHasId>('User');
       const inactive = await User.create({
@@ -256,7 +256,7 @@ describe('ChangeProposalService.createProposal: reviewers and purpose', () => {
       }
     });
 
-    it('refuses an id that is not an object id as a reviewer that does not exist (Reviewers Req 1.5)', async () => {
+    it('refuses an id that is not an object id as a reviewer that does not exist (Req 15.5)', async () => {
       const before = await countProposals();
 
       const result = await create({
@@ -270,7 +270,7 @@ describe('ChangeProposalService.createProposal: reviewers and purpose', () => {
       expect(await countProposals()).toBe(before);
     });
 
-    it(`refuses ${MAX_REVIEWERS + 1} reviewers (Reviewers Req 1.7)`, async () => {
+    it(`refuses ${MAX_REVIEWERS + 1} reviewers (Req 15.7)`, async () => {
       const before = await countProposals();
 
       const result = await create({
@@ -290,7 +290,7 @@ describe('ChangeProposalService.createProposal: reviewers and purpose', () => {
       expect(await countProposals()).toBe(before);
     });
 
-    it(`refuses a purpose of ${MAX_PURPOSE_LENGTH + 1} code points (Reviewers Req 1.9)`, async () => {
+    it(`refuses a purpose of ${MAX_PURPOSE_LENGTH + 1} code points (Req 15.9)`, async () => {
       const before = await countProposals();
 
       const result = await create({
@@ -330,7 +330,7 @@ describe('ChangeProposalService.createProposal: reviewers and purpose', () => {
       expect(await countProposals()).toBe(before);
     });
 
-    it('accepts the requester alone as the reviewer, and no reviewers at all (Reviewers Req 1.3, 8.1)', async () => {
+    it('accepts the requester alone as the reviewer, and no reviewers at all (Req 15.3, 22.1)', async () => {
       const own = await createdOk(
         await create({ reviewers: [userInput(users.requester)] }),
       );
@@ -354,7 +354,7 @@ describe('ChangeProposalService.createProposal: reviewers and purpose', () => {
           'the requester and another user',
           () => [userInput(users.requester), userInput(users.other)],
         ],
-      ])('applies nothing and keeps every operation pending when %s is a reviewer (Reviewers Req 1.11)', async (_label, reviewers) => {
+      ])('applies nothing and keeps every operation pending when %s is a reviewer (Req 15.11)', async (_label, reviewers) => {
         const { apply, stored } = await createdOk(
           await create({
             reviewers: reviewers(),
@@ -372,7 +372,7 @@ describe('ChangeProposalService.createProposal: reviewers and purpose', () => {
         ]);
       });
 
-      it('applies by the policy as before when the requester alone is the reviewer (Reviewers Req 8.2)', async () => {
+      it('applies by the policy as before when the requester alone is the reviewer (Req 22.2)', async () => {
         const { apply, stored } = await createdOk(
           await create({ reviewers: [userInput(users.requester)] }),
         );
@@ -381,7 +381,7 @@ describe('ChangeProposalService.createProposal: reviewers and purpose', () => {
         expect(stored.operations.map((op) => op.status)).toEqual(['applied']);
       });
 
-      it('applies by the policy as before when no reviewers are given (Reviewers Req 8.1, 8.2)', async () => {
+      it('applies by the policy as before when no reviewers are given (Req 22.1, 22.2)', async () => {
         const { apply, stored } = await createdOk(await create());
 
         expect(apply).toMatchObject({ type: 'done' });
@@ -419,7 +419,7 @@ describe('ChangeProposalService.createProposal: reviewers and purpose', () => {
 
     beforeEach(() => setPolicy('all'));
 
-    it('inherits the active reviewers of the base, not the removed ones, and applies nothing (Reviewers Req 8.4, 8.5)', async () => {
+    it('inherits the active reviewers of the base, not the removed ones, and applies nothing (Req 22.4, 22.5)', async () => {
       const base = await storeSettledBase([
         refOf(userInput(users.other)),
         refOf({ kind: 'user-group', id: groupId }),
@@ -444,7 +444,7 @@ describe('ChangeProposalService.createProposal: reviewers and purpose', () => {
       expect(stored.operations.map((op) => op.status)).toEqual(['pending']);
     });
 
-    it('inherits the reviewers even while the reviewers switch is off (Reviewers Req 8.4)', async () => {
+    it('inherits the reviewers even while the reviewers switch is off (Req 22.4)', async () => {
       const base = await storeSettledBase([refOf(userInput(users.other))]);
       await setReviewersEnabled(false);
 
@@ -461,7 +461,7 @@ describe('ChangeProposalService.createProposal: reviewers and purpose', () => {
       expect(stored.reviewers).toEqual([storedAt(userInput(users.other))]);
     });
 
-    it('takes the reviewers given at creation instead of the inherited ones, and auto-applies when only the requester is left (Reviewers Req 8.4)', async () => {
+    it('takes the reviewers given at creation instead of the inherited ones, and auto-applies when only the requester is left (Req 22.4)', async () => {
       const base = await storeSettledBase([refOf(userInput(users.other))]);
 
       const { apply, stored } = await createdOk(
@@ -480,7 +480,7 @@ describe('ChangeProposalService.createProposal: reviewers and purpose', () => {
       expect(stored.operations.map((op) => op.status)).toEqual(['applied']);
     });
 
-    it('drops the inherited reviewers when an empty list is given at creation (Reviewers Req 8.4)', async () => {
+    it('drops the inherited reviewers when an empty list is given at creation (Req 22.4)', async () => {
       const base = await storeSettledBase([refOf(userInput(users.other))]);
 
       const { stored } = await createdOk(
@@ -498,7 +498,7 @@ describe('ChangeProposalService.createProposal: reviewers and purpose', () => {
       expect(stored.operations.map((op) => op.status)).toEqual(['applied']);
     });
 
-    it('derives from a base stored before reviewers existed as before: no reviewers, applied by the policy (Reviewers Req 8.1)', async () => {
+    it('derives from a base stored before reviewers existed as before: no reviewers, applied by the policy (Req 22.1)', async () => {
       const base = await storeSettledBase([]);
       await mongoose.connection
         .collection('changeproposals')
@@ -523,7 +523,7 @@ describe('ChangeProposalService.createProposal: reviewers and purpose', () => {
     });
   });
 
-  it('creates and applies a revert proposal of a proposal with reviewers as before, with no reviewers of its own (Reviewers Req 8.6)', async () => {
+  it('creates and applies a revert proposal of a proposal with reviewers as before, with no reviewers of its own (Req 22.6)', async () => {
     const page = await kit.createPage('revert-edit');
     const original = await kit.storeProposal(
       [kit.editInput(page, 'proposed body')],

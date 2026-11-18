@@ -236,7 +236,7 @@ describe('ChangeProposalService.getForViewer: reviewer values and decision recor
   };
 
   describe('a reviewer', () => {
-    it('gets the purpose as stored and the reviewers with names, never the whole-proposal rejections (Reviewers Req 1.10, 3.8, 5.1, 5.7)', async () => {
+    it('gets the purpose as stored and the reviewers with names, never the whole-proposal rejections (Req 15.10, 17.8, 19.1, 19.7)', async () => {
       const { proposal } = await pendingFixture('reviewer-header');
 
       const view = viewOf(
@@ -263,7 +263,7 @@ describe('ChangeProposalService.getForViewer: reviewer values and decision recor
       expect(view).not.toHaveProperty('requesterState');
     });
 
-    it('gets the body, the base freshness and the rank on the decision targets only (Reviewers Req 5.2)', async () => {
+    it('gets the body, the base freshness and the rank on the decision targets only (Req 19.2)', async () => {
       const { proposal, sharedKey, createKey } =
         await pendingFixture('reviewer-values');
 
@@ -286,7 +286,7 @@ describe('ChangeProposalService.getForViewer: reviewer values and decision recor
       });
     });
 
-    it('reads a base revision that has moved on as not the latest (Reviewers Req 5.2)', async () => {
+    it('reads a base revision that has moved on as not the latest (Req 19.2)', async () => {
       const page = await kit.createPage('reviewer-moved-base');
       const proposal = await pendingProposal([kit.editInput(page)], {
         reviewers: [userReviewer(users.subscriber)],
@@ -306,7 +306,7 @@ describe('ChangeProposalService.getForViewer: reviewer values and decision recor
       expect(view.operations[0]?.baseIsLatest).toBe(false);
     });
 
-    it('gets the latest decision per person and the approval on the operations they see only (Reviewers Req 3.4, 3.8, 5.7)', async () => {
+    it('gets the latest decision per person and the approval on the operations they see only (Req 17.4, 17.8, 19.7)', async () => {
       const { proposal, sharedKey } = await pendingFixture('reviewer-records');
 
       const view = viewOf(
@@ -328,7 +328,7 @@ describe('ChangeProposalService.getForViewer: reviewer values and decision recor
       });
     });
 
-    it('learns nothing of the operations on pages they may not view (Reviewers Req 5.6, 5.7)', async () => {
+    it('learns nothing of the operations on pages they may not view (Req 19.6, 19.7)', async () => {
       const { proposal, hidden, hiddenKey } =
         await pendingFixture('reviewer-leak');
 
@@ -352,7 +352,7 @@ describe('ChangeProposalService.getForViewer: reviewer values and decision recor
   });
 
   describe('the requester', () => {
-    it('gets every decision record, the whole-proposal rejections and who approved, including themselves (Reviewers Req 2.8, 3.8)', async () => {
+    it('gets every decision record, the whole-proposal rejections and who approved, including themselves (Req 16.8, 17.8)', async () => {
       const { proposal, hiddenKey } = await pendingFixture('requester-records');
 
       const view = viewOf(
@@ -379,7 +379,7 @@ describe('ChangeProposalService.getForViewer: reviewer values and decision recor
       expect(JSON.stringify(view)).not.toContain('@example.com');
     });
 
-    it('learns nothing of an operation on a page they may no longer view, even what a reviewer recorded on it (Reviewers Req 3.8, 5.6)', async () => {
+    it('learns nothing of an operation on a page they may no longer view, even what a reviewer recorded on it (Req 17.8, 19.6)', async () => {
       const shared = await kit.createPage('requester-leak-shared');
       const created = await crowi.pageService.create(
         kit.nextPath('requester-leak-hidden'),
@@ -424,7 +424,7 @@ describe('ChangeProposalService.getForViewer: reviewer values and decision recor
   });
 
   describe('a viewer who is neither the requester nor a reviewer', () => {
-    it('gets the applied operations without any purpose, reviewer or decision record (Reviewers Req 3.8, 5.10)', async () => {
+    it('gets the applied operations without any purpose, reviewer or decision record (Req 17.8, 19.10)', async () => {
       const shared = await kit.createPage('other-shared');
       const hidden = await hiddenPage('other-hidden');
       const proposal = await pendingProposal(
@@ -496,7 +496,7 @@ describe('ChangeProposalService.getForViewer: reviewer values and decision recor
   });
 
   describe('links to follow-ups, reworks and the base', () => {
-    it('decides each linked proposal by the role the viewer has in it, and drops one with no operation they may view (Reviewers Req 5.4, 5.6)', async () => {
+    it('decides each linked proposal by the role the viewer has in it, and drops one with no operation they may view (Req 19.4, 19.6)', async () => {
       const base = await kit.createPage('links-base');
       const visible = await kit.createPage('links-visible');
       const hidden = await hiddenPage('links-hidden');
@@ -535,7 +535,7 @@ describe('ChangeProposalService.getForViewer: reviewer values and decision recor
       expect(findByIdsAndViewer).toHaveBeenCalledTimes(1);
     });
 
-    it('narrows the link back to the base by the role the viewer has in the base (Reviewers Req 5.6)', async () => {
+    it('narrows the link back to the base by the role the viewer has in the base (Req 19.6)', async () => {
       const shared = await kit.createPage('base-shared');
       const hidden = await hiddenPage('base-hidden');
       const page = await kit.createPage('base-rework');
@@ -589,7 +589,7 @@ describe('ChangeProposalService.getForViewer: reviewer values and decision recor
     });
   });
 
-  it('answers a reviewer with no visible operation exactly as for a missing proposal, records or not (Reviewers Req 5.4)', async () => {
+  it('answers a reviewer with no visible operation exactly as for a missing proposal, records or not (Req 19.4)', async () => {
     const hidden = await hiddenPage('none-hidden');
     const proposal = await pendingProposal([kit.editInput(hidden)], {
       reviewers: [userReviewer(users.subscriber)],

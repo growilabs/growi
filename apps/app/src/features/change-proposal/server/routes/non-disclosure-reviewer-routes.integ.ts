@@ -177,7 +177,7 @@ describe('reviewer routes never disclose operations a viewer cannot see', () => 
   });
 
   describe('the reviewer, who sees some of the pages', () => {
-    it('reads the proposal and the review request exactly as one without the hidden operation, records on it included (Reviewers Req 3.8, 5.6, 5.7, 6.3)', async () => {
+    it('reads the proposal and the review request exactly as one without the hidden operation, records on it included (Req 17.8, 19.6, 19.7, 20.3)', async () => {
       const { x, y } = await twins('read');
       const peerAnswers = await as(peer(), async () => [
         await t.postReview(x.id, {
@@ -219,7 +219,7 @@ describe('reviewer routes never disclose operations a viewer cannot see', () => 
       }
     });
 
-    it('gets the same answers to its rejections, abstention and approval, and leaves the same activities, when it names the hidden operation (Reviewers Req 2.6, 5.6, 6.8)', async () => {
+    it('gets the same answers to its rejections, abstention and approval, and leaves the same activities, when it names the hidden operation (Req 16.6, 19.6, 20.8)', async () => {
       const { x, y } = await twins('decide');
       const absentKey = randomUUID();
 
@@ -280,7 +280,7 @@ describe('reviewer routes never disclose operations a viewer cannot see', () => 
       expect(JSON.stringify(rows)).not.toContain(x.hidden);
     });
 
-    it('meets a proposal whose visible operations are settled as closed, though a hidden one is still pending (Reviewers Req 2.9, 5.6)', async () => {
+    it('meets a proposal whose visible operations are settled as closed, though a hidden one is still pending (Req 16.9, 19.6)', async () => {
       const { x, y } = await twins('settled');
       await as(reviewer(), async () => {
         expect((await t.postAction(x.id, 'approve')).status).toBe(200);
@@ -304,7 +304,7 @@ describe('reviewer routes never disclose operations a viewer cannot see', () => 
       expect(shapesOf(afterwards.x)).toEqual(shapesOf(afterwards.y));
     });
 
-    it('does not let approving a visible edit pull in a move of the same page under a parent it cannot view (Reviewers Req 2.6, 5.6)', async () => {
+    it('does not let approving a visible edit pull in a move of the same page under a parent it cannot view (Req 16.6, 19.6)', async () => {
       const page = await kit.createPage('grouped-edit');
       const hiddenParent = await groupPage('grouped-hidden-parent');
       const x = await store(
@@ -341,7 +341,7 @@ describe('reviewer routes never disclose operations a viewer cannot see', () => 
       expect([move.status, move.approvedAt ?? null]).toEqual(['pending', null]);
     });
 
-    it('never finds, while paging the queue honestly, a proposal it is named on but whose pages it cannot view (Reviewers Req 5.5, 5.6)', async () => {
+    it('never finds, while paging the queue honestly, a proposal it is named on but whose pages it cannot view (Req 19.5, 19.6)', async () => {
       const before = await store(
         [edit(await kit.createPage('queue-before'))],
         [reviewer()],
@@ -379,7 +379,7 @@ describe('reviewer routes never disclose operations a viewer cannot see', () => 
   });
 
   describe('the requester, who can no longer view one of the pages', () => {
-    it('learns nothing of what the reviewer did on that page: not in the proposal, nor in any notification (Reviewers Req 3.8, 6.5)', async () => {
+    it('learns nothing of what the reviewer did on that page: not in the proposal, nor in any notification (Req 17.8, 20.5)', async () => {
       const shared = await kit.createPage('requester-shared');
       const created = await pageBy('requester-lost', reviewer(), {
         grant: PageGrant.GRANT_OWNER,
@@ -462,7 +462,7 @@ describe('reviewer routes never disclose operations a viewer cannot see', () => 
   });
 
   describe('a user who is neither the requester nor a reviewer', () => {
-    it('is answered for a pending proposal exactly as for a missing one, even on pages it can view (Reviewers Req 2.7, 5.3)', async () => {
+    it('is answered for a pending proposal exactly as for a missing one, even on pages it can view (Req 16.7, 19.3)', async () => {
       const proposal = await store(
         [edit(await kit.createPage('stranger-pending'))],
         [reviewer()],
@@ -486,7 +486,7 @@ describe('reviewer routes never disclose operations a viewer cannot see', () => 
       expect(await notificationsOf(stranger(), proposal._id)).toEqual([]);
     });
 
-    it('reads a partly applied proposal exactly as one with nothing left pending (Reviewers Req 5.3, 5.10)', async () => {
+    it('reads a partly applied proposal exactly as one with nothing left pending (Req 19.3, 19.10)', async () => {
       const x = await store(
         [
           edit(await kit.createPage('stranger-applied')),

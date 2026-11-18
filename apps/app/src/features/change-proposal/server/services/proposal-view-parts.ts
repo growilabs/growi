@@ -119,7 +119,7 @@ export const readRequesters = async (
  * non-requesters) lastAppliedAt come from the visible operations only, so
  * nothing counts or dates an operation the viewer may not see (requirements 9.4, 9.10).
  * For non-requesters even the stage is the one the visible operations imply
- * (Reviewers Req 5.6).
+ * (Req 19.6).
  */
 export const toProposalHeaderView = (args: {
   readonly id: string;

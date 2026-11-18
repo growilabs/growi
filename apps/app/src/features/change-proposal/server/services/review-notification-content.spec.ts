@@ -39,7 +39,7 @@ const move = (key: string, pageId: string): OperationRecord => ({
 });
 
 describe('selectReviewRequestRecipientIds', () => {
-  it('picks individual users only, never a group (Reviewers Req 6.2)', () => {
+  it('picks individual users only, never a group (Req 20.2)', () => {
     expect(
       selectReviewRequestRecipientIds(
         [
@@ -54,7 +54,7 @@ describe('selectReviewRequestRecipientIds', () => {
     ).toEqual(['u1', 'u2']);
   });
 
-  it('leaves out the requester and the user who added the reviewers (Reviewers Req 6.1)', () => {
+  it('leaves out the requester and the user who added the reviewers (Req 20.1)', () => {
     expect(
       selectReviewRequestRecipientIds(
         [
@@ -76,7 +76,7 @@ describe('buildReviewRequestPages', () => {
     ['p2', '/two'],
   ]);
 
-  it('lists only the decision targets, a create by the path it would create (Reviewers Req 6.3)', () => {
+  it('lists only the decision targets, a create by the path it would create (Req 20.3)', () => {
     const operations = [
       edit('k1', 'p1'),
       edit('k2', 'p2'),
@@ -115,7 +115,7 @@ describe('buildReviewResultContent', () => {
     create('k3', '/new'),
   ];
 
-  it('builds items from the decided operations the requester sees, with the comment (Reviewers Req 6.5)', () => {
+  it('builds items from the decided operations the requester sees, with the comment (Req 20.5)', () => {
     expect(
       buildReviewResultContent(
         operations,
@@ -158,7 +158,7 @@ describe('buildReviewResultContent', () => {
     ).toBeNull();
   });
 
-  it('builds a whole-proposal rejection with no items, comment or not (Reviewers Req 6.5)', () => {
+  it('builds a whole-proposal rejection with no items, comment or not (Req 20.5)', () => {
     expect(
       buildReviewResultContent(
         operations,

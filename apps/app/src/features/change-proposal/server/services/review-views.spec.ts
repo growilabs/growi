@@ -41,7 +41,7 @@ const edit = (
 });
 
 describe('latestReviews', () => {
-  it('keeps only the newest record per person and key, whatever its kind (Reviewers Req 3.4)', () => {
+  it('keeps only the newest record per person and key, whatever its kind (Req 17.4)', () => {
     const latest = latestReviews([
       review({ by: 'u1', at: at(1), operationKey: 'k1', comment: 'first' }),
       review({
@@ -71,7 +71,7 @@ describe('latestReviews', () => {
 describe('toOperationDecisionViews', () => {
   const requesterId = 'req';
 
-  it('splits the latest records on the operation into rejections and abstentions (Reviewers Req 3.8, 5.7)', () => {
+  it('splits the latest records on the operation into rejections and abstentions (Req 17.8, 19.7)', () => {
     const views = toOperationDecisionViews({
       op: edit('k1', 0),
       latest: latestReviews([
@@ -92,7 +92,7 @@ describe('toOperationDecisionViews', () => {
     });
   });
 
-  it('returns a comment exactly as stored, without interpreting it (Reviewers Req 3.7)', () => {
+  it('returns a comment exactly as stored, without interpreting it (Req 17.7)', () => {
     const comment = '<script>alert(1)</script> **bold**';
     const views = toOperationDecisionViews({
       op: edit('k1', 0),
@@ -107,7 +107,7 @@ describe('toOperationDecisionViews', () => {
   it.each([
     ['a reviewer', 'u1', false],
     ['the requester', requesterId, true],
-  ])('tells whether the approval came from the requester when %s approved (Reviewers Req 2.8)', (_label, approvedBy, byRequester) => {
+  ])('tells whether the approval came from the requester when %s approved (Req 16.8)', (_label, approvedBy, byRequester) => {
     const views = toOperationDecisionViews({
       op: edit('k1', 0, {
         approvedAt: at(5),
@@ -186,7 +186,7 @@ describe('toParticipantHeaderFields', () => {
     },
   ];
 
-  it('gives the requester the purpose, the reviewers and the whole-proposal rejections (Reviewers Req 3.8, 5.1, 5.7)', () => {
+  it('gives the requester the purpose, the reviewers and the whole-proposal rejections (Req 17.8, 19.1, 19.7)', () => {
     expect(fieldsFor('requester')).toEqual({
       purpose: '<b>why</b>',
       reviewers: reviewerViews,
@@ -196,7 +196,7 @@ describe('toParticipantHeaderFields', () => {
     });
   });
 
-  it('gives a reviewer the purpose as stored and the reviewers, never the whole-proposal rejections (Reviewers Req 1.10, 3.8, 5.7)', () => {
+  it('gives a reviewer the purpose as stored and the reviewers, never the whole-proposal rejections (Req 15.10, 17.8, 19.7)', () => {
     expect(fieldsFor('reviewer')).toEqual({
       purpose: '<b>why</b>',
       reviewers: reviewerViews,
@@ -209,7 +209,7 @@ describe('toParticipantHeaderFields', () => {
 });
 
 describe('reviewTargetValuesOf', () => {
-  it('ranks the decision targets among the visible operations and tells whether an edit base is still the latest revision (Reviewers Req 5.2)', () => {
+  it('ranks the decision targets among the visible operations and tells whether an edit base is still the latest revision (Req 19.2)', () => {
     const applied = edit('k-applied', 2, { status: 'applied' });
     const stale = edit('k-stale-base', 7);
     const latestBase = edit('k-latest-base', 4);
