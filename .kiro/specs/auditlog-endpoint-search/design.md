@@ -17,7 +17,7 @@
 - IP アドレスの検索（後続のタスク）
 - エクスポートのモーダルの絞り込みの変更
 - URL を貼り付けたときの正規化、自由入力による絞り込み
-- 候補 API とサーバー側の候補の検索の変更
+- 候補 API とサーバー側の候補の検索の変更（validator の `q` の上限値を共有の定数に置き換えることだけは行う。上限値と契約は変えない）
 - 一覧のクエリの性能改善（インデックスを効かせる書き換え）
 
 ## Boundary Commitments
@@ -107,12 +107,12 @@ apps/app/src/client/components/Admin/AuditLog/AuditLogSearchTypeahead/
 ```
 
 ### Modified Files
-- `apps/app/src/interfaces/activity.ts` — `ISearchFilter` に `endpoints?: string[]` を足す
+- `apps/app/src/interfaces/activity.ts` — `ISearchFilter` に `endpoints?: string[]` を足す。候補 API の `q` の上限 `AUDITLOG_SUGGESTION_QUERY_MAX_LENGTH`（100）を足す
 - `apps/app/src/server/routes/apiv3/build-activity-list-where.ts` — endpoint の条件（パス部分の完全一致）を足す。`usernames` / `endpoints` の型の判定を `Array.isArray` を含む形にする
 - `apps/app/src/server/routes/apiv3/build-activity-list-where.spec.ts` — endpoint の条件の単体テストを足す
 - `apps/app/src/server/routes/apiv3/fetch-activity-list.ts` — `resolveActivityListWhere` で `endpoints` を受け渡す
 - `apps/app/src/server/routes/apiv3/fetch-activity-list.integ.ts`（新規） — 実際の MongoDB で、パス部分の完全一致と正規表現の記号のエスケープを確かめる
-- `apps/app/src/server/routes/apiv3/activity.ts` — OpenAPI の `searchFilter` の説明に `endpoints` を足す
+- `apps/app/src/server/routes/apiv3/activity.ts` — OpenAPI の `searchFilter` の説明に `endpoints` を足す。候補 API の validator の `q` の上限を、リテラルの 100 から `AUDITLOG_SUGGESTION_QUERY_MAX_LENGTH` に置き換える（値は変えない）
 - `apps/app/src/client/components/Admin/AuditLog/build-search-filter.ts` / `.spec.ts` — `endpoints` を受け取る
 - `apps/app/src/client/components/Admin/AuditLogManagement.tsx` — `AuditLogUsernameTypeahead` を `AuditLogSearchTypeahead` に置き換え、選択済みの endpoint を状態に持ち、リセットで検索欄を初期状態に戻す
 - `apps/app/public/static/locales/{en_US,fr_FR,ja_JP,ko_KR,zh_CN}/admin.json` — `audit_log_management.search.*` の文言を足す
@@ -155,6 +155,7 @@ sequenceDiagram
 | 1.4 | 選択を外すと条件から外れる | AuditLogSearchTypeahead, AuditLogManagement | `onChange` | — |
 | 1.5 | 候補から選んだ値だけが条件 | AuditLogSearchTypeahead, search-suggestion-options | 自由入力なし（`allowNew` を使わない）、古い候補を `filterBy` で除く | — |
 | 1.6 | 空のときは候補を出さない | useAuditLogSearchSuggestions | 空の keyword ではリクエストしない | — |
+| 1.7 | 100 文字を超える入力では取得しない | useAuditLogSearchSuggestions | `AUDITLOG_SUGGESTION_QUERY_MAX_LENGTH` | — |
 | 2.1 | パス部分の完全一致 | BuildActivityListWhere | `buildEndpointWhere` | — |
 | 2.2 | クエリ文字列を除いて判定 | BuildActivityListWhere | `buildEndpointWhere` | — |
 | 2.3 | 前方一致だけの別 URL を含めない | BuildActivityListWhere | `buildEndpointWhere` | — |
@@ -184,7 +185,7 @@ sequenceDiagram
 | ResolveActivityListWhere（拡張） | Server / pure | `endpoints` を受け渡す | 1.3 | BuildActivityListWhere（P0） | Service |
 | search-scopes | Client / data | 検索対象の種類の表 | 3.2, 3.4 | — | State |
 | search-suggestion-options | Client / pure | 候補を出すかの判定と、候補一覧のグループの組み立て | 1.1, 1.5, 3.3, 3.7, 4.1, 4.2 | search-scopes（P0） | Service |
-| useAuditLogSearchSuggestions | Client / hook | scope に応じて field ごとに候補を取得する | 1.1, 1.6, 3.4, 3.5, 4.1 | `useSWRxAuditlogSuggestions`（P0） | Service |
+| useAuditLogSearchSuggestions | Client / hook | scope に応じて field ごとに候補を取得する | 1.1, 1.6, 1.7, 3.4, 3.5, 4.1 | `useSWRxAuditlogSuggestions`（P0） | Service |
 | AuditLogSearchTypeahead | Client / UI | 検索欄 | 1.2, 1.4, 1.5, 3.1, 3.2, 3.9, 4.3, 5.3 | 上記 3 つ（P0）、`react-bootstrap-typeahead`（P0） | State |
 | AuditLogManagement（変更） | Client / UI | 選択済みの値を一覧の条件に渡す | 1.2, 3.6, 5.1, 5.3 | AuditLogSearchTypeahead（P0）、`buildActivitySearchFilter`（P0） | — |
 
@@ -198,6 +199,10 @@ export type ISearchFilter = {
   dates?: { startDate: string | null; endDate: string | null };
   actions?: SupportedActionType[];
 };
+
+// Upper bound of the suggestion API's `q`. Shared by the route validator and
+// the client so the client never sends a query the server would reject.
+export const AUDITLOG_SUGGESTION_QUERY_MAX_LENGTH = 100;
 ```
 
 ### Server
@@ -328,7 +333,7 @@ export function isSameSuggestion(a: SuggestionOption, b: SuggestionOption): bool
 | Field | Detail |
 |---|---|
 | Intent | scope と keyword から、対象の field ごとに候補 API を呼び、`FieldSuggestionResult` の配列を返す |
-| Requirements | 1.1, 1.6, 3.4, 3.5, 4.1 |
+| Requirements | 1.1, 1.6, 1.7, 3.4, 3.5, 4.1 |
 
 **Contracts**: Service [x]
 
@@ -341,6 +346,7 @@ export function useAuditLogSearchSuggestions(
 ): readonly FieldSuggestionResult[];
 ```
 - `useSWRxAuditlogSuggestions('username', q, 5)` と `useSWRxAuditlogSuggestions('endpoint', q, 5)` を毎回同じ順序で呼ぶ（rules of hooks）。scope の対象でない field には空の keyword を渡し、リクエストしない（`useSWRxAuditlogSuggestions` は空の keyword でキーを `null` にする）。
+- 前後の空白を除いた keyword が `AUDITLOG_SUGGESTION_QUERY_MAX_LENGTH` を超えるときも、すべての field に空の keyword を渡してリクエストしない。結果は候補 0 件・失敗なし・読み込み中なしになり、候補も失敗の表示も出ない（1.7）。候補 API は前後の空白を除いた q を受け取るので（`useSWRxAuditlogSuggestions` が trim する）、比べる長さも trim した後の長さにする。
 - username の結果は `activeUsernames` / `inactiveUsernames` から `status` 付きのオプションに、endpoint の結果は `endpoint.endpoints` からオプションに変換する。
 - SWR の `error` があれば `error: true` を返す。読み込み中の判定は既存の `toUsernameSuggestions` と同じく、エラー時は読み込み中にしない。
 
@@ -417,7 +423,7 @@ export type AuditLogSearchTypeaheadProps = {
 
 ### Integration Tests
 - `fetch-activity-list.integ.ts`（実際の MongoDB）: `/_api/v3/page` を選ぶと `/_api/v3/page` と `/_api/v3/page?x=1` が返り、`/_api/v3/pages` と `/_API/v3/page` は返らないこと。`(` や `.` を含むパスも一致すること（Prisma の `startsWith` がエスケープしない振る舞いの固定）（2.1–2.4）
-- `useAuditLogSearchSuggestions`: scope が「すべて」なら 2 field、「URL」なら endpoint だけをリクエストすること。空の keyword ではリクエストしないこと。一方の field のリクエストが失敗しても、もう一方の結果が返ること（1.6, 3.4, 4.1）
+- `useAuditLogSearchSuggestions`: scope が「すべて」なら 2 field、「URL」なら endpoint だけをリクエストすること。空の keyword ではリクエストしないこと。前後の空白を除いて 101 文字以上の keyword ではリクエストせず、失敗も返さないこと（100 文字ちょうどならリクエストすること）。一方の field のリクエストが失敗しても、もう一方の結果が返ること（1.6, 1.7, 3.4, 4.1）
 
 ### Component Tests
 - `AuditLogSearchTypeahead`:

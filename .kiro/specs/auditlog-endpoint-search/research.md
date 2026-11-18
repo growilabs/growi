@@ -181,3 +181,41 @@
 - Prisma のバージョンアップで `startsWith` がエスケープするようになり、二重エスケープで一致しなくなる — 正規表現の記号を含むパスと `/_api/v3/pages` の除外を確かめる integ テストで検知する。
 - 一覧のクエリが全件走査のまま — 今の username・action の絞り込みと同じ水準。activities は既定で 30 日で消える。改善は本 spec の範囲外。
 - `react-bootstrap-typeahead` 6.3.2 は、候補一覧を開くかを `isShown`（`open` / `minLength` / `showMenu` / `text`）だけで決め、結果の件数は見ない。フィルタ後の結果が 0 件でも `renderMenu` は呼ばれる — `renderMenu` が結果が空のときに早期 return すると、失敗表示だけの場合（要件 4.2）が消える。早期 return せず、コンポーネントテストで固定する。
+
+---
+
+## Gap Analysis: 候補 API の契約の再確認（2026-11-18）
+
+候補 API の `endpoint` 対応がベースブランチ（`feat/179911-url-fuzzy-search`）に入ったため、そのコードで設計の前提を確かめ直した。spec のブランチにはまだ取り込んでいない（タスク 3.1 で取り込む）ので、`git show origin/feat/179911-url-fuzzy-search:<path>` で読んだ。
+
+### 前提どおりだったこと
+
+| 設計の前提 | ベースブランチのコード |
+|---|---|
+| `AUDITLOG_SUGGESTION_FIELDS` に `endpoint` がある | `['username', 'endpoint']`（`interfaces/activity.ts`） |
+| レスポンスは `endpoint?: { endpoints: string[] }` | 同じ（`AuditlogSuggestionsResponse`） |
+| `useSWRxAuditlogSuggestions(field, q, limit = 5)` は空の q でキーを `null` にする | 変更なし（`stores/activity.ts`） |
+| 複数 field は `Promise.all` で、1 つでも失敗したら 500 | `searchAuditlogSuggestions` が `Promise.all` |
+| データベースでの検索の失敗は warn ログを出して空の候補を返す | `searchAuditlogFieldValues` が `catch` して `[]` |
+| endpoint の検索語は `?` 以降を捨て、空なら空の候補を返す | `pathQ === ''` で `{ endpoint: { endpoints: [] } }` |
+| データベースでの検索の最小文字数は username 2、endpoint 1 | `auditlog-suggestion-field-specs.ts` のとおり |
+| 一覧の絞り込み・画面・入力欄・翻訳・`activity-log-snapshot` の spec は変わっていない | spec のブランチとの差分は `interfaces/activity.ts` と `routes/apiv3/activity.ts`（候補 API の OpenAPI）だけ |
+| `activity-log-snapshot/design.md` の段落は古いまま | 「`search.ts` の ES フォールバック専用」の記述が残っている（タスク 5 の対象） |
+
+### 新しく見つかったこと
+
+- **101 文字以上の入力が「取得できませんでした」になる（Research Needed）**
+  - 候補 API の validator は `q` を `isLength({ max: 100 })` で検証し、超えると 400 を返す。`useSWRxAuditlogSuggestions` は長さを見ずにリクエストする。
+  - 設計は SWR の `error` をそのまま「取得できませんでした」の表示にするので、101 文字以上を入力すると、「すべて」なら両方の種類に失敗の表示が出る。要件 4 の「サーバーのエラー応答」には当たるが、入力が長すぎるだけで、取得に失敗したわけではない。
+  - 選択肢:
+    1. 101 文字以上ではリクエストせず、候補なしとして扱う（上限 100 を、validator と画面で同じ定数として持つ）
+    2. 400 を失敗として扱わず、候補なしとして扱う
+    3. 今の設計のまま（長い入力でも失敗の表示を出す）
+  - **決定: 1**。上限 100 を `interfaces/activity.ts` の `AUDITLOG_SUGGESTION_QUERY_MAX_LENGTH` として持ち、候補 API の validator と画面の `useAuditLogSearchSuggestions` の両方が使う。画面は前後の空白を除いた長さで比べる（`useSWRxAuditlogSuggestions` が trim した q を送るため）。要件に 1.7 を足し、要件 4 の対象から外した。
+  - 理由: 2 は 400 の理由を画面側で推し量ることになり、別の理由の 400（validator の他の項目）まで候補なしに見えてしまう。1 は送る前に判定するので、サーバーの応答の解釈に依存しない。
+  - 残る制約: クエリ文字列を含めて 100 文字を超える値は、パス部分が短くても候補が出ない（候補 API の上限による。要件の Boundary Context に記載）。
+
+### 影響
+
+- 上の 1 点（要件 1.7、設計の共有定数とフックの判定、タスク 3.1・3.2）を除き、設計とタスクの変更は不要。
+- タスク 3.1（ベースブランチの取り込み）で、spec のブランチとの差分は小さく、競合が起きそうなファイル（spec が変更する予定のファイル）は含まれていない。
