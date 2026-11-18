@@ -23,6 +23,7 @@ import {
 } from './backfill-page';
 import {
   BACKFILL_PAGE_CONDITION,
+  type BackfillCoverage,
   backfillPageFilter,
   coverageAfterRun,
   runRangeFor,
@@ -110,6 +111,22 @@ const advance = (
   skippedPages: progress.skippedPages + (outcome === 'skipped' ? 1 : 0),
 });
 
+const NO_PROGRESS: BackfillProgress = {
+  progressMarker: null,
+  processed: 0,
+  skippedPages: 0,
+};
+
+/** What a run walks and reports against, fixed at its first claim. */
+interface RunPlan {
+  readonly runCutoff: Date | null;
+  readonly runTotal: number;
+  /** Where the walk continues from: nothing on a new run, the last checkpoint on a resume. */
+  readonly progress: BackfillProgress;
+}
+
+type RunEnd = 'complete' | 'stopped' | 'refused';
+
 /**
  * One run of a claimed job: resolve the scope at the first claim, walk the range in `_id` order
  * after the saved marker, checkpoint, and end it as complete or stopped.
@@ -121,101 +138,114 @@ export const runClaimedBackfill = async (
   owner: string,
   deps: BackfillRunDeps,
 ): Promise<void> => {
-  const jobs = prisma.pagelinkbackfilljobs;
-  const onRefused = async (): Promise<void> => {
-    logger.warn(
-      { owner },
-      'backlinks backfill lost its claim on the job; stopping without writing',
-    );
-    // A no-op on a document that still exists; recreates a deleted one idle.
-    await jobs.ensureExists();
-  };
-
-  let progress: BackfillProgress = {
-    progressMarker: null,
-    processed: 0,
-    skippedPages: 0,
-  };
-  let runTotal = 0;
-  const emit = (status: BacklinksBackfillProgressData['status']) =>
-    deps.emitProgress({ status, runTotal, ...progressCounts(progress) });
-
   try {
-    const job = await jobs.findFirst({});
-    if (job == null || job.claimedBy !== owner) {
-      await onRefused();
-      return;
-    }
-    const coverage = toBackfillCoverage(job.coverage, job.coveredSince);
-
-    let runCutoff: Date | null;
-    if (job.runTotal == null) {
-      runCutoff = await resolveRunCutoff(job.requestedScope);
-      const range = runRangeFor(runCutoff, coverage);
-      runTotal =
-        range == null
-          ? 0
-          : await getPageModel().countDocuments(backfillPageFilter(range));
-      const started = await jobs.startRun(
-        owner,
-        { runCutoff, runTotal },
-        { leaseMs: deps.leaseMs },
-      );
-      if (!started) {
-        await onRefused();
-        return;
-      }
-    } else {
-      runCutoff = job.runCutoff;
-      runTotal = job.runTotal;
-      progress = {
-        progressMarker: job.progressMarker,
-        processed: job.processed,
-        skippedPages: job.skippedPages,
-      };
-    }
-    emit('running');
-
-    const range = runRangeFor(runCutoff, coverage);
-    if (range != null) {
-      const end = await walk({ owner, range, initial: progress }, deps, {
-        advanced: (next) => {
-          progress = next;
-        },
-        checkpointed: () => emit('running'),
-      });
-      if (end === 'refused') {
-        await onRefused();
-        return;
-      }
-      if (end === 'stopped') {
-        emit('stopped');
-        return;
-      }
-    }
-
-    const completed = await jobs.finishComplete(
-      owner,
-      progress,
-      toCoverageRecord(coverageAfterRun(runCutoff, coverage)),
-    );
-    if (!completed) {
-      await onRefused();
-      return;
-    }
-    emit('complete');
-    logger.info(
-      { ...progressCounts(progress), runTotal },
-      'backlinks backfill run complete',
-    );
+    const end = await runToEnd(owner, deps);
+    if (end === 'refused') await onRefused(owner);
   } catch (err) {
     logger.error({ err, owner }, 'backlinks backfill run failed');
-    const recorded = await jobs.finishFailed(
+    const recorded = await prisma.pagelinkbackfilljobs.finishFailed(
       owner,
       err instanceof Error ? err.message : String(err),
     );
-    if (!recorded) await onRefused();
+    if (!recorded) await onRefused(owner);
   }
+};
+
+const onRefused = async (owner: string): Promise<void> => {
+  logger.warn(
+    { owner },
+    'backlinks backfill lost its claim on the job; stopping without writing',
+  );
+  // A no-op on a document that still exists; recreates a deleted one idle.
+  await prisma.pagelinkbackfilljobs.ensureExists();
+};
+
+const runToEnd = async (
+  owner: string,
+  deps: BackfillRunDeps,
+): Promise<RunEnd> => {
+  const jobs = prisma.pagelinkbackfilljobs;
+  const job = await jobs.findFirst({});
+  if (job == null || job.claimedBy !== owner) return 'refused';
+  const coverage = toBackfillCoverage(job.coverage, job.coveredSince);
+
+  // `runTotal` is written once, at the first claim, so it tells a new run from a resume.
+  const plan =
+    job.runTotal == null
+      ? await beginRun(owner, job.requestedScope, coverage, deps)
+      : {
+          runCutoff: job.runCutoff,
+          runTotal: job.runTotal,
+          progress: {
+            progressMarker: job.progressMarker,
+            processed: job.processed,
+            skippedPages: job.skippedPages,
+          },
+        };
+  if (plan == null) return 'refused';
+
+  const emit = (
+    status: BacklinksBackfillProgressData['status'],
+    progress: BackfillProgress,
+  ) =>
+    deps.emitProgress({
+      status,
+      runTotal: plan.runTotal,
+      ...progressCounts(progress),
+    });
+  emit('running', plan.progress);
+
+  const range = runRangeFor(plan.runCutoff, coverage);
+  const { end, progress } =
+    range == null
+      ? { end: 'exhausted' as const, progress: plan.progress }
+      : await walk({ owner, range, initial: plan.progress }, deps, {
+          onCheckpoint: (saved) => emit('running', saved),
+        });
+  if (end === 'refused') return 'refused';
+  if (end === 'stopped') {
+    emit('stopped', progress);
+    return 'stopped';
+  }
+
+  const completed = await jobs.finishComplete(
+    owner,
+    progress,
+    toCoverageRecord(coverageAfterRun(plan.runCutoff, coverage)),
+  );
+  if (!completed) return 'refused';
+  emit('complete', progress);
+  logger.info(
+    { ...progressCounts(progress), runTotal: plan.runTotal },
+    'backlinks backfill run complete',
+  );
+  return 'complete';
+};
+
+/**
+ * The first claim of a run: resolve the scope to its cutoff, count the pages in range, and store
+ * both with the progress reset.
+ *
+ * @returns null when the claim was lost before the write
+ */
+const beginRun = async (
+  owner: string,
+  scope: RequestedScope | null,
+  coverage: BackfillCoverage,
+  deps: BackfillRunDeps,
+): Promise<RunPlan | null> => {
+  const runCutoff = await resolveRunCutoff(scope);
+  const range = runRangeFor(runCutoff, coverage);
+  const runTotal =
+    range == null
+      ? 0
+      : await getPageModel().countDocuments(backfillPageFilter(range));
+  const started = await prisma.pagelinkbackfilljobs.startRun(
+    owner,
+    { runCutoff, runTotal },
+    { leaseMs: deps.leaseMs },
+  );
+  return started ? { runCutoff, runTotal, progress: NO_PROGRESS } : null;
 };
 
 const progressCounts = (progress: BackfillProgress) => ({
@@ -228,12 +258,6 @@ const toCoverageRecord = (coverage: ReturnType<typeof coverageAfterRun>) =>
     ? { coverage: 'partial' as const, coveredSince: coverage.coveredSince }
     : { coverage: 'all' as const, coveredSince: null };
 
-interface WalkListener {
-  /** After each page, with the marker past it: the caller's progress for any ending. */
-  readonly advanced: (progress: BackfillProgress) => void;
-  readonly checkpointed: () => void;
-}
-
 interface WalkTarget {
   readonly owner: string;
   readonly range: UpdatedAtRange;
@@ -241,12 +265,20 @@ interface WalkTarget {
   readonly initial: BackfillProgress;
 }
 
+interface WalkResult {
+  readonly end: WalkEnd;
+  /** The progress past the last page walked, saved or not: complete saves it. */
+  readonly progress: BackfillProgress;
+}
+
 /** Walks the range page by page, resting after each, checkpointing every N pages or T ms. */
 const walk = async (
   { owner, range, initial }: WalkTarget,
   deps: BackfillRunDeps,
-  listener: WalkListener,
-): Promise<WalkEnd> => {
+  {
+    onCheckpoint,
+  }: { readonly onCheckpoint: (saved: BackfillProgress) => void },
+): Promise<WalkResult> => {
   const jobs = prisma.pagelinkbackfilljobs;
   let lastCheckpointAt = deps.now();
   let pagesSinceCheckpoint = 0;
@@ -265,13 +297,12 @@ const walk = async (
     // outlast the server's idle cursor timeout.
     // biome-ignore lint/performance/noAwaitInLoops: the walk is sequential and paced by design
     const batch = await fetchBatch(range, progress.progressMarker);
-    if (batch.length === 0) return 'exhausted';
+    if (batch.length === 0) return { end: 'exhausted', progress };
 
     for (const page of batch) {
       // biome-ignore lint/performance/noAwaitInLoops: one page at a time is the throttle
       const { outcome, workMs } = await backfillPage(page, ctx);
       progress = advance(progress, page._id, outcome);
-      listener.advanced(progress);
       pagesSinceCheckpoint += 1;
 
       if (
@@ -281,11 +312,11 @@ const walk = async (
         const reply = await jobs.checkpoint(owner, progress, {
           leaseMs: deps.leaseMs,
         });
-        if (reply == null) return 'refused';
-        listener.checkpointed();
+        if (reply == null) return { end: 'refused', progress };
+        onCheckpoint(progress);
         if (reply.stopRequested) {
           const stopped = await jobs.finishStopped(owner, progress);
-          return stopped ? 'stopped' : 'refused';
+          return { end: stopped ? 'stopped' : 'refused', progress };
         }
         lastCheckpointAt = deps.now();
         pagesSinceCheckpoint = 0;
