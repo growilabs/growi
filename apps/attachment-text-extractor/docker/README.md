@@ -1,6 +1,16 @@
 GROWI Attachment Text Extractor docker image
 ==============================================
 
+Supported tags and respective Dockerfile links
+------------------------------------------------
+
+* [`1.0.0`, `1.0`, `1`, `latest` (Dockerfile)](https://github.com/growilabs/growi/blob/attachment-text-extractor/v1.0.0/apps/attachment-text-extractor/docker/Dockerfile)
+
+Images are published for `linux/amd64` and `linux/arm64`.
+
+What is this
+------------
+
 Extracts the text of an attachment (PDF, Office documents, CSV, HTML, plain text)
 for GROWI's full-text search. It parses untrusted files, so each conversion runs
 in a short-lived child process under memory and time limits.
@@ -23,17 +33,20 @@ No deployment manifests are shipped.
 > measurement started by hand (`workflow_dispatch`), and behaviour under a real
 > orchestrator (probes, rolling update, termination grace).
 
-Build and run
--------------
+Run
+---
 
-The build context is the repository root (the pnpm workspace is needed):
 ```bash
-docker build -f apps/attachment-text-extractor/docker/Dockerfile -t attachment-text-extractor .
-
 docker run -d --read-only --user 10001:10001 --cap-drop ALL \
   --security-opt no-new-privileges --memory 2g \
   -e ATTACHMENT_EXTRACTOR_SERVICE_TOKEN -p 127.0.0.1:8000:8000 \
-  attachment-text-extractor
+  growilabs/attachment-text-extractor:1
+```
+
+To build the image yourself, use the repository root as the build context (the
+pnpm workspace is needed):
+```bash
+docker build -f apps/attachment-text-extractor/docker/Dockerfile -t attachment-text-extractor .
 ```
 
 The service listens on `0.0.0.0:8000` (IPv4 only); no setting changes the address.
