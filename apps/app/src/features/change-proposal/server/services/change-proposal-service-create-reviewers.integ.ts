@@ -5,6 +5,7 @@ import { getInstance } from '^/test/setup/crowi';
 
 import ExternalUserGroup from '~/features/external-user-group/server/models/external-user-group';
 import type Crowi from '~/server/crowi';
+import { UserStatus } from '~/server/models/user/conts';
 import UserGroup from '~/server/models/user-group';
 import { configManager } from '~/server/service/config-manager';
 import { prisma } from '~/utils/prisma';
@@ -226,6 +227,33 @@ describe('ChangeProposalService.createProposal: reviewers and purpose', () => {
         error: { code: 'reviewer-not-found' },
       });
       expect(await countProposals()).toBe(before);
+    });
+
+    it.each([
+      ['registered', UserStatus.STATUS_REGISTERED],
+      ['suspended', UserStatus.STATUS_SUSPENDED],
+      ['deleted', UserStatus.STATUS_DELETED],
+      ['invited', UserStatus.STATUS_INVITED],
+    ] as const)('refuses a %s user as a reviewer that does not exist (Reviewers Req 1.5)', async (label, status) => {
+      const username = `cpServiceCreateReviewersInactive-${label}`;
+      const User = mongoose.model<IUserHasId>('User');
+      const inactive = await User.create({
+        name: username,
+        username,
+        email: `${username}@example.com`,
+        status,
+      });
+      const before = await countProposals();
+
+      try {
+        expect(await create({ reviewers: [userInput(inactive)] })).toEqual({
+          ok: false,
+          error: { code: 'reviewer-not-found' },
+        });
+        expect(await countProposals()).toBe(before);
+      } finally {
+        await User.deleteMany({ _id: inactive._id });
+      }
     });
 
     it('refuses an id that is not an object id as a reviewer that does not exist (Reviewers Req 1.5)', async () => {

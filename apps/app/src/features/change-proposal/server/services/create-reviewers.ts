@@ -1,5 +1,6 @@
 import { isValidObjectId } from '@growi/core/dist/utils/objectid-utils';
 
+import { UserStatus } from '~/server/models/user/conts';
 import { prisma } from '~/utils/prisma';
 
 import type {
@@ -14,7 +15,11 @@ const COUNT_BY_KIND: Record<
   ReviewerKind,
   (ids: readonly string[]) => Promise<number>
 > = {
-  user: (ids) => prisma.users.count({ where: { id: { in: [...ids] } } }),
+  // A user who is not active cannot act on a proposal, so naming one is refused like a missing one.
+  user: (ids) =>
+    prisma.users.count({
+      where: { id: { in: [...ids] }, status: UserStatus.STATUS_ACTIVE },
+    }),
   'user-group': (ids) =>
     prisma.usergroups.count({ where: { id: { in: [...ids] } } }),
   'external-user-group': (ids) =>

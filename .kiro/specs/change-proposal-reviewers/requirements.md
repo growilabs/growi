@@ -76,7 +76,7 @@ core の「本要件で使う言い方」の語（Change Proposal、操作、依
 2. The Change Proposal System shall 承認者として、複数のユーザー、複数のユーザーグループ、およびその混在を受け付ける。
 3. The Change Proposal System shall 依頼した人自身を、承認者として指定することを受け付ける。
 4. Where 作成のときに承認者が指定されなかった場合, the Change Proposal System shall 依頼した人だけを承認者とみなす。そのため、既存の Change Proposal と、承認者を指定しない入口の振る舞いは変わらない。
-5. If 指定された承認者のユーザーまたはグループが存在しない場合, then the Change Proposal System shall その Change Proposal を保存せず、受け付けない理由を返す。
+5. If 指定された承認者のユーザーまたはグループが存在しない場合、または指定されたユーザーが有効な状態でない場合（未承認・停止中・削除済み・招待中）, then the Change Proposal System shall その Change Proposal を保存せず、受け付けない理由を返す。
 6. If 指定された承認者に、同じユーザーまたは同じグループが重ねて含まれている場合, then the Change Proposal System shall 重ねた分を 1 つにまとめて保存する。
 7. If 承認者の数が、決められた上限を超える場合, then the Change Proposal System shall その Change Proposal を保存せず、上限を超えたことを返す。上限の値は設計で決め、管理者の設定にはしない。
 8. When 入口が Change Proposal の作成を求めるときに変更の目的を指定した場合, the Change Proposal System shall それを Change Proposal とともに保存する。
@@ -127,7 +127,7 @@ core の「本要件で使う言い方」の語（Change Proposal、操作、依
 2. The Change Proposal System shall 承認者を追加するときに、複数のユーザー、複数のグループ、およびその混在を受け付ける。
 3. When 依頼した人または承認者である人が、承認待ちの Change Proposal から、承認者を削除した場合, the Change Proposal System shall その承認者を外す。削除できるのは、誰が追加した承認者でも、自分自身でもよい。
 4. When 承認者が 1 人も残らなくなった場合, the Change Proposal System shall 依頼した人だけを承認者とみなす（Requirement 1.4 と同じ）。
-5. If 追加しようとした承認者のユーザーまたはグループが存在しない場合, then the Change Proposal System shall 追加せず、受け付けない理由を返す。
+5. If 追加しようとした承認者のユーザーまたはグループが存在しない場合、または追加しようとしたユーザーが有効な状態でない場合（未承認・停止中・削除済み・招待中）, then the Change Proposal System shall 追加せず、受け付けない理由を返す。
 6. If 追加しようとした承認者がすでに承認者として指定されている場合, then the Change Proposal System shall 何も変えずに成功として返す。
 7. If 削除しようとした承認者が、承認者として指定されていない場合, then the Change Proposal System shall 何も変えずに成功として返す。
 8. If 段階が承認待ちでない Change Proposal について、承認者の追加または削除を求められた場合, then the Change Proposal System shall 変えず、変えられない状態であることを返す。
