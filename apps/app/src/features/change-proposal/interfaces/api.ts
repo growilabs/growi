@@ -12,6 +12,12 @@ import type {
   Revertability,
   RevertRefusalReason,
 } from './change-proposal';
+import type {
+  ApprovalView,
+  ReviewDecisionView,
+  ReviewerView,
+  ViewerRole,
+} from './reviewer';
 
 export type ProposalLinkView = {
   readonly proposalId: string;
@@ -37,6 +43,13 @@ export type OperationView = {
   readonly revertTarget?: ProposalMark;
   readonly revertability?: Revertability;
   readonly linkedProposals?: readonly ProposalLinkView[];
+  // Reviewer-facing values. Hidden from anyone who is neither the requester nor a reviewer.
+  // Requester: the original index; reviewer: the rank among the operations that reviewer sees.
+  readonly order?: number;
+  readonly baseIsLatest?: boolean;
+  readonly approval?: ApprovalView;
+  readonly rejections?: readonly ReviewDecisionView[];
+  readonly abstentions?: readonly ReviewDecisionView[];
 };
 
 export type PerPageNotificationsView = {
@@ -63,6 +76,11 @@ export type ChangeProposalView = {
   readonly lastAppliedAt?: string;
   readonly status: ProposalStatus;
   readonly isRequester: boolean;
+  readonly viewerRole: ViewerRole;
+  readonly purpose?: string;
+  readonly reviewers?: readonly ReviewerView[];
+  // Requester only: the latest whole-proposal rejection per person.
+  readonly wholeRejections?: readonly ReviewDecisionView[];
   readonly revertOf?: string;
   readonly basedOn?: BasedOn;
   readonly requesterState?: RequesterProposalState;
@@ -95,7 +113,17 @@ export type ApplyResult =
         readonly reason?: OperationReason;
       }[];
     }
-  | { readonly type: 'in-progress' };
+  | {
+      readonly type: 'in-progress';
+      // The viewer's operations as freshly read, so a client can show progress.
+      readonly results?: readonly {
+        readonly key: string;
+        readonly status: OperationStatus;
+        readonly reason?: OperationReason;
+      }[];
+    };
+
+export type ApproveResponse = ApplyResult;
 
 export type RevertResult = {
   readonly revertProposalId?: string;

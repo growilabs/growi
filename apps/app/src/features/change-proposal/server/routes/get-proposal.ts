@@ -34,7 +34,10 @@ export const proposalNotFound = (): ErrorV3 =>
  *          Returns only the operations on pages the caller may view; a viewer other than
  *          the requester gets no proposed bodies, no requester state and no pending
  *          operations. A missing, malformed or entirely invisible proposal gets one
- *          identical 404. Requires the `read:features:page` scope.
+ *          identical 404. The requester and the reviewers also get reviewer-facing values:
+ *          reviewers and, per operation, order, baseIsLatest, approval (with byRequester,
+ *          true when the requester approved it), rejections and abstentions; the
+ *          requester alone gets wholeRejections. Requires the `read:features:page` scope.
  *        parameters:
  *          - name: id
  *            in: path

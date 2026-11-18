@@ -1278,6 +1278,15 @@
     },
     "achievement": {
       "settled_with_percent": "完了（達成度 {{percent}}%）"
+    },
+    "review_term": {
+      "reviewer": "承認者",
+      "approve": "承認",
+      "reject": "却下",
+      "abstain": "放棄",
+      "comment": "コメント",
+      "purpose": "変更の目的",
+      "decision": "判断"
     }
   },
   "plantuml": {

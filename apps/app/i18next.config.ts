@@ -145,6 +145,7 @@ export default defineConfig({
       'change_proposal.lifecycle.*',
       'change_proposal.link.*',
       'change_proposal.achievement.*',
+      'change_proposal.review_term.*',
     ],
 
     primaryLanguage: 'en_US',

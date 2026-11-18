@@ -5,9 +5,7 @@
   "language": "ja",
   "phase": "tasks-generated",
   "derived_from": "attachment-search",
-  "dependencies": [
-    "attachment-search-text-extractor"
-  ],
+  "dependencies": ["attachment-search-text-extractor"],
   "approvals": {
     "requirements": {
       "generated": true,
