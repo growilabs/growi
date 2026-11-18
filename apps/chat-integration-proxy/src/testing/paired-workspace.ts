@@ -36,10 +36,16 @@ import {
   createChannelPermissionRepository,
   createInstallationChannelRepository,
   createInstallationRepository,
+  createOwnKeyRepository,
+  createPairingOrderRepository,
   createPeerKeyRepository,
+  createPendingAgentRequestRepository,
+  createPendingCollectionRepository,
+  createProcessedNotificationRepository,
   createRelationRepository,
   type PrismaClient,
 } from '../db/index.js';
+import { createInstallationStore } from '../platform/index.js';
 import { createRelationKeyService } from '../relation/index.js';
 import type { SdkChannelRef } from '../types/index.js';
 import { actorOn, channelOn, sdkChannelIdOn } from './chat-events.js';
@@ -219,3 +225,47 @@ export const permitWrite = (
     COMMAND_NAMES.createPage,
     [nativeChannelIdOf(channel)],
   );
+
+/**
+ * Lets `agent` run in this channel and, when `inDirectMessage` is set, in a
+ * DM too. `agent` is a write command judged in a DM by its own flag alone, so
+ * a channel-only row refuses every DM request.
+ */
+export const permitAgent = (
+  db: PrismaClient,
+  relationId: string,
+  channel: SdkChannelRef,
+  options: { readonly inDirectMessage: boolean },
+): Promise<void> =>
+  createChannelPermissionRepository(db).upsert(
+    relationId,
+    COMMAND_NAMES.agent,
+    [nativeChannelIdOf(channel)],
+    { allowedInDirectMessage: options.inDirectMessage },
+  );
+
+/**
+ * Deletes one workspace made by `openWorkspace` and everything paired with it,
+ * through the same removal the proxy runs when an app is uninstalled. The
+ * database is shared by every run, so a test cleans up what it made -- and
+ * only that.
+ */
+export const removeWorkspace = (
+  db: PrismaClient,
+  installationId: string,
+): Promise<void> =>
+  createInstallationStore({
+    installations: createInstallationRepository(db, passthroughCipher),
+    relations: createRelationRepository(db),
+    ownKeys: createOwnKeyRepository(db, passthroughCipher),
+    peerKeys: createPeerKeyRepository(db),
+    channelPermissions: createChannelPermissionRepository(db),
+    pendingCollections: createPendingCollectionRepository(db),
+    pendingAgentRequests: createPendingAgentRequestRepository(db),
+    processedNotifications: createProcessedNotificationRepository(db),
+    pairingOrders: createPairingOrderRepository(db),
+    channels: createInstallationChannelRepository(db),
+    // Removal never refreshes an inventory.
+    refreshChannels: () => Promise.resolve(),
+    onChannelRefreshFailed: () => {},
+  }).remove(installationId);

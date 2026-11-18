@@ -19,6 +19,7 @@ import type { ChatAccountRef, PlatformName } from '@growi/chat';
 
 import { testSdkChannelId } from '../capabilities/test-channels.js';
 import type {
+  EventInstallation,
   InteractionRef,
   PlatformEvent,
   SdkChannelId,
@@ -124,6 +125,13 @@ interface MentionOverrides extends EventOverrides {
   readonly text: string;
   readonly inDirectMessage?: boolean;
   readonly messageId?: string;
+  /** The thread the message was posted in; omitted, it was posted outside one. */
+  readonly threadRootId?: string;
+  /**
+   * What the receiving connection says about the workspace. A DM is listed in
+   * no channel inventory, so without it no installation can be chosen there.
+   */
+  readonly installation?: EventInstallation;
 }
 
 /**
@@ -138,6 +146,7 @@ export const mentionOn = (
 ): PlatformEvent => {
   const inDirectMessage = options.inDirectMessage ?? false;
   const messageId = options.messageId ?? `${platform}-message-1`;
+  const threadRootId = options.threadRootId ?? null;
   return {
     kind: 'mention',
     platform,
@@ -147,13 +156,17 @@ export const mentionOn = (
     textWithoutBotAddress: options.text.replace(FAKE_BOT_ADDRESS, '').trim(),
     inDirectMessage,
     messageId,
-    // Outside a thread: a DM request is answered under itself.
-    threadRootId: null,
-    replyThreadRootId: inDirectMessage ? messageId : null,
+    // The same two roots `platform/thread-roots.ts` gives: inside a thread the
+    // answer goes there; outside one, a DM request is answered under itself.
+    threadRootId,
+    replyThreadRootId: threadRootId ?? (inDirectMessage ? messageId : null),
     interaction:
       options.interaction === undefined
         ? interactionOn(platform)
         : options.interaction,
+    ...(options.installation == null
+      ? {}
+      : { installation: options.installation }),
   };
 };
 
