@@ -22,6 +22,7 @@ export const getServerSideSearchConfigurationProps: GetServerSideProps<
         ),
         isAttachmentFullTextSearchEnabled: isAttachmentFullTextSearchEnabled(
           searchService.isConfigured,
+          configManager,
         ),
       },
     },

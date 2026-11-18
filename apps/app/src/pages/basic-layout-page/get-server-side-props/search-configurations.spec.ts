@@ -1,13 +1,19 @@
 import type { GetServerSidePropsContext } from 'next';
 import { describe, expect, it } from 'vitest';
+import { mock } from 'vitest-mock-extended';
 
-import { configManager } from '~/server/service/config-manager';
+import type { CrowiRequest } from '~/interfaces/crowi-request';
 
 import { getServerSideSearchConfigurationProps } from './search-configurations';
 
-// crowi.configManager is this same singleton in production
+// The Next.js server bundle holds its own copy of this module, which never
+// loads the config: only crowi.configManager can be read during SSR.
 vi.mock('~/server/service/config-manager', () => ({
-  configManager: { getConfig: vi.fn() },
+  configManager: {
+    getConfig: () => {
+      throw new Error('Config is not loaded');
+    },
+  },
 }));
 
 // Helper to build a minimal context with configurable crowi dependencies
@@ -32,7 +38,8 @@ const createMockContext = (opts: {
     'app:attachmentFullTextSearch:extractorToken': extractorToken,
   };
 
-  vi.mocked(configManager.getConfig).mockImplementation(
+  const configManager = mock<CrowiRequest['crowi']['configManager']>();
+  configManager.getConfig.mockImplementation(
     (key: string) => configMap[key] as never,
   );
 
