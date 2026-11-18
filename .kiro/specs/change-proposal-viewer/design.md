@@ -78,6 +78,13 @@
 - core の `requesterState.perPageNotifications`（ページごとの通知の指定 `value` と管理者の設定 `isEnabledBySettings`）の形と、依頼した人にだけ返す扱い
 - core の `requesterState`（段階と達成度）・`OperationView.linkedProposals`・`ChangeProposalView.basedOn` の形と、依頼した人以外に返す条件、`selectRemainingOperations` の決め方、段階とつながりの言葉の表の名前
 - `REQUESTER_ACTION_SLOTS` の部品が受け取る値（`ProposalActionSlotProps` / `OperationActionSlotProps`）と、表の鍵（入口の種類）。`change-proposal-ai-agent` の `ProposalFollowUpAction` / `OperationReworkAction` が同じ値を受け取って `'ai-chat'` の行に登録されているので、変えるときは ai-agent の部品も合わせて直す
+- core の承認者の機能（core の要件 15–22）。次の core の契約は、viewer がこれまで前提にしてきた形と違うので、viewer の承認の画面と承認待ちの一覧を作るときに確かめ直す:
+  - core は承認待ちの Change Proposal を、依頼した人だけでなく承認者である人にも返す（取得と、承認者としての一覧 `GET /change-proposals/review-queue`）。承認者には「待ち」「失敗」「古い」「飛ばした」の操作も返る。承認待ちを依頼した人以外に見せない前提で書かれた viewer の要件（1.3・1.8・2.10・2.12・11.4・13.4）と、design の U5・U6 は、この契約に合わせて確かめ直す。依頼した人以外に返す全体の状態は、見える操作と、見える操作だけから決めた段階から決まるので、承認者には「承認待ち」も返る
+  - `ChangeProposalView` に `viewerRole`・`purpose`・`reviewers`・`wholeRejections`、`OperationView` に `order`・`baseIsLatest`・`approval`・`rejections`・`abstentions` がある。却下と放棄は操作の状態を変えず、記録としてだけ返る（表示は操作の状態ではなく、この記録から作る）
+  - 承認の応答（`{ result: ApplyResult }`）の `in-progress` に、省略できる `results`（見える操作の読み直した状態）がある
+  - 通知に新しい種類がある（snapshot の `kind` が `review-request` と `review-result`）。`review-request` の `pages` の項目は、承認待ちの新規作成では `id` を持たず `path` だけである
+  - **通知を読む処理の確かめ直しが要る**: 承認者への通知と結果の通知は、通知のためだけの action を持たず、きっかけになった activity の action で保存される（承認者への通知は `CHANGE_PROPOSAL_CREATE` か `CHANGE_PROPOSAL_REVIEWER_ADD`、結果の通知は `CHANGE_PROPOSAL_APPROVE`・`CHANGE_PROPOSAL_REJECT`・`CHANGE_PROPOSAL_ABSTAIN`）。どの形かは snapshot の `kind` で見分ける。本書の `parseChangeProposalNotification(action, snapshot)` は action で snapshot の形を選ぶので、今の設計のままでは、これらの通知は null になり一覧に出ない。通知の表示を足すときは、形を `kind` で選ぶように確かめ直す
+  - activity に新しい 5 つの action（`CHANGE_PROPOSAL_APPROVE`・`_REJECT`・`_ABSTAIN`・`_REVIEWER_ADD`・`_REVIEWER_REMOVE`）があり、その snapshot は経路の項目 `reviewChannel` を持つ（型 `ChangeProposalReviewSnapshot`）
 
 ## Architecture
 

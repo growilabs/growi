@@ -85,6 +85,13 @@
 - viewer の `requester-action-slots.ts` の部品の props（`ProposalActionSlotProps = { proposal: ChangeProposalView }`、`OperationActionSlotProps = { proposal: ChangeProposalView; operation: OperationView }`）と、場所を出す条件（依頼した人だけ）。`ProposalFollowUpAction` と `OperationReworkAction` はこの形に合わせている
 - チャットの API の入力の `proposalBase` の形と上限（`MAX_PROPOSAL_BASE_KEYS`）、チャットの送信の部品（transport の `prepareSendMessagesRequest`）が呼び出しごとの `body` を残すこと
 - Prisma の版を上げたとき（条件付きの更新を 1 回の処理として扱えることを、保留中の案を同時に 2 回進める結合試験と、読んだページの記録を同時に足す結合試験で確かめ直す。research.md の「2 つの新しいコレクションは Prisma で読み書きし、索引は migration で作る」）
+- core の承認者の機能（core の要件 15–22）。次の core の契約は、本 spec がこれまで前提にしてきた形と違うので、承認者を指定する入口を作るとき（または core との結合を確かめ直すとき）に確かめ直す:
+  - `createProposal` の入力に、省略できる `purpose` と `reviewers` がある。後続・見直しで `reviewers` を省くと、元の Change Proposal の承認者を引き継ぐ。依頼した人以外の承認者がいる Change Proposal は、自動反映の方針にかかわらず作成の直後に反映されない
+  - `createProposal` が返す誤りに、`reviewers-disabled`・`reviewer-not-found` と、`input-rejected` の `too-many-reviewers`・`purpose-too-long`・`invalid-reviewer` がある。「core の誤りの対応表」はすべての値を扱う前提なので、この 5 つを表に入れる
+  - 承認の入口は core の `approve(proposalId, actor, operationKeys?)`（`actor` は利用者・経路・`ApplyTrigger`）で、依頼した人と承認者に共通である。承認の応答（`ApplyResult`）の `in-progress` に、省略できる `results`（見える操作の読み直した状態）がある（既存の読み手にとっては追加の項目）。依頼した人が提出後に閲覧できなくなったページの操作は、承認の対象にならず、「失敗」ではなく「待ち」のまま残る
+  - core は承認待ちを承認者である人にも返す。本 spec の承認・飛ばす・破棄の画面は依頼した人だけを前提にしているので、承認者向けに出し分けるかは別に判断する
+  - activity に新しい 5 つの action（承認・却下・放棄・承認者の追加・削除）があり、その snapshot は経路の項目 `reviewChannel`（AI の道具からは `'ai-tool'`）を持つ。通知に新しい種類（snapshot の `kind` が `review-request`・`review-result`）があり、その action はきっかけになった activity のものである（本 spec は通知の action を読まない）
+  - core は、設定キー `app:changeProposalReviewersEnabled`（初期値は無効）が有効になるまで、承認者の指定と追加を受け付けない。本 spec の承認者の指定の入口が入ったあとで有効にする
 
 ## Architecture
 

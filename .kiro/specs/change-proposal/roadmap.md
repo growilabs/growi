@@ -6,7 +6,7 @@
 
 GROWI の AI 機能は、今は検索と、読んだページをもとにした回答だけで、ページを書き換えることはできない。一方で、ページの編集・新規作成・移動による整理を AI に任せたいという需要がある。将来は GROWI Vault（git で wiki を取得する機能）からの書き込みや、MCP 経由の外部の AI からの書き込みも受け付けたい。
 
-この umbrella は、それらの書き込みをすべて **Change Proposal** という単位で扱う仕組みを作る。Change Proposal は、複数のページに対する操作（編集・新規作成・移動）をまとめた変更のかたまりである。管理者の設定に応じて自動で反映するか、依頼した本人がページ単位で承認してから反映する。反映した後は、本人も他のユーザーも、Change Proposal 単位で変更を確かめ、取り消せる。
+この umbrella は、それらの書き込みをすべて **Change Proposal** という単位で扱う仕組みを作る。Change Proposal は、複数のページに対する操作（編集・新規作成・移動）をまとめた変更のかたまりである。管理者の設定に応じて自動で反映するか、依頼した本人または本人が指定した承認者（ユーザー・グループ）がページ単位で承認してから反映する。反映した後は、本人も他のユーザーも、Change Proposal 単位で変更を確かめ、取り消せる。
 
 ## Approach Decision
 
@@ -29,14 +29,15 @@ GROWI の AI 機能は、今は検索と、読んだページをもとにした�
 ## Scope
 
 - **In**:
-  - Change Proposal のデータ、状態の移り変わり、サーバー側での反映と取り消し、管理者の設定 — `change-proposal-core`
+  - Change Proposal のデータ、状態の移り変わり、サーバー側での反映と取り消し、管理者の設定、承認者（指定・承認・却下と放棄の記録・通知） — `change-proposal-core`
   - GROWI AI Agent のチャットから Change Proposal を作る道具と、チャット画面での承認 — `change-proposal-ai-agent`
   - 反映済みの Change Proposal を他のユーザーにも見せる画面と、画面からの取り消し — `change-proposal-viewer`
 - **Out**:
   - ページの自動要約（別の施策で進行中）
   - ページの削除、閲覧範囲の変更、公開・非公開の切り替えを AI に任せること
   - 差分の塊ごとの部分承認
-  - 承認待ちの Change Proposal を本人以外に見せること（将来。Vault からの push と一緒に考える）
+  - 承認待ちの Change Proposal を、本人と承認者以外に見せること
+  - 同じ Change Proposal の操作を差し替えて再レビューを頼むこと（将来。Vault からの push と一緒に考える）
   - Recent Changes の一覧を Change Proposal 単位でまとめ直すこと（将来）
   - AI が自分から始める作業（古い内容の検出、定期実行など）
 
@@ -65,6 +66,7 @@ GROWI の AI 機能は、今は検索と、読んだページをもとにした�
   - 表示用の共通部品: 操作の種類・状態・理由の文言の表と、差分表示の設定は core が `features/change-proposal/client/shared/` に持ち、ai-agent と viewer はそれを使う。値を決めているのが core だから。
   - 本人にだけ見せる部分: viewer が詳細ページに入口ごとの置き場所（本人向けの内容と、本人向けの操作の 2 つ）を用意し、ai-agent が AI の要約と会話を出す部品と、後続・見直しを頼むボタンの部品をそこに登録する。ai-agent のこの 2 つのタスクだけが viewer に依存する。
   - ページごとの通知の指定: 出すかの判断（管理者の設定と Change Proposal ごとの指定の両方が有効なときだけ）と、指定を変える API は core が持つ。指定を切り替える画面は承認と同じ入口の画面（AI チャットでは ai-agent のチャット画面）が持ち、viewer は詳細ページに指定の値を表示するだけにする（research.md の決定 8）。
+  - 承認者: 承認者の保存・判定・承認と却下・放棄の記録・通知・API は core が持つ（core の要件 15–22）。承認の画面と承認待ちの一覧は viewer、承認者を指定する入口は ai-agent が足す。**公開の順序**: viewer の承認の画面と承認待ちの一覧、ai-agent の承認者の指定の入口が入るまで、core の設定キー `app:changeProposalReviewersEnabled`（初期値は無効）を有効にしない。無効の間、core は承認者の指定と追加を受け付けないので、通知を受け取っても操作できない状態が生まれない。
   - 完了・達成度・後続と見直しのつながり（`basedOn`）: 段階の移り変わり、達成度の数え方、つながりの保存と検査、見る人ごとの絞り込みは core が持つ。後続・見直しの中身と、それを頼むボタンは入口（ai-agent）が持つ。viewer は core が返したものを表示するだけにする（research.md の決定 7）。
 - **Cross-spec touchpoints**（複数の spec が触るもの）:
   - `@growi/core` の変更: core がリビジョンの型に項目を足し、ai-agent が置き換えを当てる純関数 `applyStringEdits` を足す。どちらも changeset が要る。
@@ -76,13 +78,12 @@ GROWI の AI 機能は、今は検索と、読んだページをもとにした�
 - [x] change-proposal-core -- Change Proposal のデータ・状態・サーバー側の反映と取り消し・管理者の設定・通知のまとめ。Dependencies: none
 - [x] change-proposal-ai-agent -- GROWI AI Agent から Change Proposal を作る道具、書き込みの守り、チャット画面での承認。Dependencies: change-proposal-core（詳細ページへの部品の登録の 2 タスクだけ change-proposal-viewer にも依存）
 - [x] change-proposal-viewer -- 反映済みの Change Proposal の詳細ページ、ページ履歴と Recent Changes の印、画面からの取り消し。Dependencies: change-proposal-core
-- [ ] change-proposal-reviewers -- amend spec。Change Proposal に承認者（ユーザー・グループ）を持たせ、依頼した人以外が承認できるようにする。最後のタスクで change-proposal-core に内容を戻して削除する。Dependencies: change-proposal-core
 
 ## Future (brief はまだ作らない)
 
 - **GROWI Vault からの push**: 決まった場所のブランチ（例: `refs/heads/proposals/*`）への push を Change Proposal に変換する。`growi-vault` ファミリー側の sub-spec として作る。前提として、配った commit を push のときまで残す仕組みと、ファイルから元のページとリビジョンをたどる仕組みが要る（`research.md` 参照）。
 - **MCP の入口**（`change-proposal-mcp`）: 外部の AI からの書き込みを Change Proposal として受け付ける。
-- **承認待ちの Change Proposal を編集者にも見せる**: プルリクエストのように他の人に承認を頼む流れ。Vault からの push と一緒に考える。
+- **同じ Change Proposal の再レビュー**: 承認者の意見を受けて、同じ Change Proposal の操作を差し替え、もう一度承認を頼む流れ。Vault からの push と一緒に考える。
 - **Recent Changes を Change Proposal 単位でまとめ直す**: ページの一覧ではなく、出来事の一覧として作り直す必要がある。
 - **見出し単位の承認、元の版が変わった案の自動の合わせ込み、AI が自分から始める作業**。
 
