@@ -34,13 +34,15 @@ type Req = AuthenticatedRequest<
  *    /change-proposals/{id}/approve:
  *      post:
  *        tags: [ChangeProposals]
- *        summary: Approve and apply pending operations of the caller's change proposal
+ *        summary: Approve and apply pending operations of a change proposal, as its requester or a reviewer
  *        description: >
  *          Approves the chosen pending operations (each chosen key also approves the other
  *          pending operations on the same page), or every pending operation when
  *          operationKeys is omitted, and applies them before responding. "in-progress"
  *          means another run holds the apply; it applies the approved operations.
- *          Only the requester may approve; anyone else gets the same 404 as a missing id.
+ *          The requester and the reviewers may approve, each only the operations on pages
+ *          they may view; anyone else, and a reviewer who may view none of its pages, gets
+ *          the same 404 as a missing id.
  *          Requires the `write:features:page` scope.
  *        parameters:
  *          - name: id
@@ -90,7 +92,7 @@ type Req = AuthenticatedRequest<
  *          403:
  *            description: Not authenticated or insufficient scope
  *          404:
- *            description: The proposal does not exist or the caller is not its requester (code notfound)
+ *            description: The proposal does not exist, or the caller is neither its requester nor a reviewer who may view one of its pages (code notfound)
  *          409:
  *            description: The proposal is no longer open (code not_open)
  */

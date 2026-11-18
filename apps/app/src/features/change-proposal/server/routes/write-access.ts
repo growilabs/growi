@@ -66,6 +66,21 @@ export const requestTrigger = (res: ApiV3Response): ApplyTrigger => {
 export const detectChannel = (req: AccessTokenParserReq): ReviewChannel =>
   extractAccessToken(req) == null ? 'ui' : 'api';
 
+// Every refusal a reviewer action words for its caller; the satisfies clause
+// fails the type check when a new ReviewerActionError has no answer here.
+const BAD_REQUEST_MESSAGE_OF = {
+  'comment-too-long': 'The comment is too long',
+  'requester-cannot-review':
+    'The requester cannot reject or abstain from their own change proposal',
+  'reviewer-not-found': 'A reviewer does not exist',
+  'too-many-reviewers': 'The change proposal would have too many reviewers',
+  'reviewers-disabled': 'Reviewers cannot be added on this wiki',
+  'invalid-request': 'The request is malformed',
+} as const satisfies Record<
+  Exclude<ReviewerActionError, 'not-found' | 'not-open' | 'user-not-allowed'>,
+  string
+>;
+
 export const respondWithServiceError = (
   res: ApiV3Response,
   error: { readonly code: ServiceError['code'] | ReviewerActionError },
@@ -83,8 +98,21 @@ export const respondWithServiceError = (
         new ErrorV3('This user may not change proposals', 'user_not_allowed'),
         403,
       );
+    case 'comment-too-long':
+    case 'requester-cannot-review':
+    case 'reviewer-not-found':
+    case 'too-many-reviewers':
+    case 'reviewers-disabled':
+    case 'invalid-request':
+      return res.apiv3Err(
+        new ErrorV3(
+          BAD_REQUEST_MESSAGE_OF[error.code],
+          error.code.replaceAll('-', '_'),
+        ),
+        400,
+      );
     default:
-      // Codes only createProposal returns; no write route here can produce them.
+      // Codes only createProposal returns; no route here creates a proposal.
       return res.apiv3Err(
         new ErrorV3('Unexpected change proposal error', 'unexpected_error'),
         500,
