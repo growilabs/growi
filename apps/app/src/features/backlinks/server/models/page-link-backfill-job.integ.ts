@@ -269,7 +269,7 @@ describe('pagelinkbackfilljobs (integration)', () => {
       });
     });
 
-    it('clears a stale stopRequested when claiming', async () => {
+    it('clears a stale stopRequested when claiming a requested job', async () => {
       await patchJobDocument({ stopRequested: true });
 
       await prisma.pagelinkbackfilljobs.tryClaim('owner-a', {
@@ -434,10 +434,12 @@ describe('pagelinkbackfilljobs (integration)', () => {
 
       it('still applies for the holder whose lease has expired while nobody took over', async () => {
         await expireLease();
+        const before = await readStoredJob();
 
         const reply = await write(OWNER);
 
         expect(refused(reply)).toBe(false);
+        expect(await readStoredJob()).not.toEqual(before);
       });
 
       // An admin Stop that lands on an expired lease ends the run directly; the old owner, still

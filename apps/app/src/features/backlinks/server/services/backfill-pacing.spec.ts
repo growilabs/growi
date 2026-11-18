@@ -2,9 +2,11 @@ import { CONFIG_DEFINITIONS } from '~/server/service/config-manager/config-defin
 
 import {
   BACKFILL_CHECKPOINT_INTERVAL_MS,
+  BACKFILL_PAGE_RETRY_BACKOFF_MS,
   type BackfillPacing,
   backfillLeaseMsFor,
   longestBackfillRestMs,
+  MAX_BACKFILL_PAGE_ATTEMPTS,
   resolveBackfillPacing,
   restAfterBackfillPageMs,
 } from './backfill-pacing';
@@ -97,9 +99,14 @@ describe('backfillLeaseMsFor', () => {
     pacing(),
     pacing({ dutyCyclePercent: 1 }),
     pacing({ dutyCyclePercent: 100, maxPagesPerSecond: 1 }),
-  ])('outlasts the checkpoint interval plus the longest single rest (%o)', (p) => {
+  ])('outlasts the checkpoint interval, one page with its retry backoffs, and the longest single rest (%o)', (p) => {
+    const retryBackoffsMs =
+      (MAX_BACKFILL_PAGE_ATTEMPTS - 1) * BACKFILL_PAGE_RETRY_BACKOFF_MS;
+
     expect(backfillLeaseMsFor(p)).toBeGreaterThan(
-      BACKFILL_CHECKPOINT_INTERVAL_MS + longestBackfillRestMs(p),
+      BACKFILL_CHECKPOINT_INTERVAL_MS +
+        retryBackoffsMs +
+        longestBackfillRestMs(p),
     );
   });
 
