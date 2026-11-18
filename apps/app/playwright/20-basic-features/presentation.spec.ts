@@ -55,3 +55,39 @@ test('Slide page (slide: true frontmatter) renders without crashing', async ({
   await page.reload();
   await expect(viewSlides).toBeVisible();
 });
+
+test('Marp page (marp: true frontmatter) renders without crashing', async ({
+  page,
+}) => {
+  await page.goto('/Sandbox/marp-test');
+
+  // open the editor
+  await page.getByTestId('editor-button').click();
+  await expect(page.getByTestId('grw-editor-navbar-bottom')).toBeVisible();
+
+  // fill the editor with Marp content
+  await page
+    .locator('.cm-content')
+    .fill('---\nmarp: true\n---\n# Slide 1\n---\n# Slide 2');
+
+  // Unlike `slide: true`, this deck is rendered by marp-core (MarpSlides).
+  const previewSlides = page
+    .getByTestId('page-editor-preview-body')
+    .locator('svg[data-marpit-svg]');
+  await expect(previewSlides).toHaveCount(2);
+
+  // save
+  await page.keyboard.press('Control+s');
+
+  // Scope to the visible deck; the hidden editor preview also holds one.
+  const viewSlides = page
+    .locator('.slides')
+    .filter({ visible: true })
+    .locator('svg[data-marpit-svg]');
+
+  await page.getByTestId('view-button').click();
+  await expect(viewSlides).toHaveCount(2);
+
+  await page.reload();
+  await expect(viewSlides).toHaveCount(2);
+});

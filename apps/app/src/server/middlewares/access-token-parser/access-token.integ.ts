@@ -1,5 +1,5 @@
 import { faker } from '@faker-js/faker';
-import { SCOPE } from '@growi/core/dist/interfaces';
+import { SCOPE, type Scope } from '@growi/core/dist/interfaces';
 import type { AccessTokenParserReq } from '@growi/core/dist/interfaces/server';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import type { Response } from 'express';
@@ -254,5 +254,79 @@ describe('access-token-parser middleware for access token with scopes', () => {
     expect(reqMock.user).toBeDefined();
     expect(reqMock.user?._id).toStrictEqual(targetUser._id);
     expect(serializeUserSecurely).toHaveBeenCalledOnce();
+  });
+
+  describe('admin scopes', () => {
+    const oneDayLater = () => new Date(Date.now() + 1000 * 60 * 60 * 24);
+
+    const createUser = (admin: boolean) =>
+      User.create({
+        name: faker.person.fullName(),
+        username: faker.string.uuid(),
+        password: faker.internet.password(),
+        lang: 'en_US',
+        admin,
+      });
+
+    const parse = async (token: string, requiredScopes: Scope[]) => {
+      const reqMock = mock<AccessTokenParserReq>({ user: undefined });
+      reqMock.query.access_token = token;
+      await parserForAccessToken(requiredScopes)(reqMock, mock<Response>());
+      return reqMock.user;
+    };
+
+    it('should not authenticate a non-admin user holding an admin scope on an admin route', async () => {
+      // a token minted before issuance rejected admin scopes for non-admins
+      const user = await createUser(false);
+      const { token } = await AccessToken.generateToken(
+        user._id,
+        oneDayLater(),
+        [SCOPE.WRITE.ADMIN.ALL],
+      );
+
+      const parsedUser = await parse(token, [SCOPE.READ.ADMIN.APP]);
+
+      expect(parsedUser).toBeUndefined();
+    });
+
+    it('should still authenticate a non-admin user holding an admin scope on a non-admin route', async () => {
+      const user = await createUser(false);
+      const { token } = await AccessToken.generateToken(
+        user._id,
+        oneDayLater(),
+        [SCOPE.WRITE.ALL],
+      );
+
+      const parsedUser = await parse(token, [SCOPE.READ.FEATURES.PAGE]);
+
+      expect(parsedUser?._id).toStrictEqual(user._id);
+    });
+
+    it('should authenticate an admin user on an admin route', async () => {
+      const user = await createUser(true);
+      const { token } = await AccessToken.generateToken(
+        user._id,
+        oneDayLater(),
+        [SCOPE.WRITE.ADMIN.ALL],
+      );
+
+      const parsedUser = await parse(token, [SCOPE.READ.ADMIN.APP]);
+
+      expect(parsedUser?._id).toStrictEqual(user._id);
+    });
+
+    it('should not authenticate on an admin route once the token owner is demoted from admin', async () => {
+      const user = await createUser(true);
+      const { token } = await AccessToken.generateToken(
+        user._id,
+        oneDayLater(),
+        [SCOPE.WRITE.ADMIN.ALL],
+      );
+      await User.updateOne({ _id: user._id }, { admin: false });
+
+      const parsedUser = await parse(token, [SCOPE.READ.ADMIN.APP]);
+
+      expect(parsedUser).toBeUndefined();
+    });
   });
 });

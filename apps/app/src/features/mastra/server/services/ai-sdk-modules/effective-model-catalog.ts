@@ -3,11 +3,13 @@ import { prisma } from '~/utils/prisma';
 
 import type { AiProvider } from '../../../interfaces/ai-provider';
 import {
+  type ModelCatalog,
   type ModelCatalogEntry,
   pickSelectableModels,
 } from './build-model-catalog';
 import {
   BUNDLED_CATALOG_GENERATED_AT,
+  BUNDLED_CATALOG_MODELS,
   getSelectableModels,
 } from './model-catalog';
 
@@ -15,16 +17,25 @@ const logger = loggerFactory(
   'growi:features:mastra:services:effective-model-catalog',
 );
 
-/**
- * A synchronous per-provider accessor over the resolved EFFECTIVE catalog.
- * Catalog-less providers (e.g. 'azure-openai') fail soft to [] (Req 3.1).
- */
 type EffectiveModelPicker = (provider: AiProvider) => ModelCatalogEntry[];
 
+export type EffectiveCatalog = {
+  readonly source: 'bundled' | 'refreshed';
+  /** When the content was fetched from models.dev (refreshed: fetchedAt, bundled: _generatedAt). */
+  readonly contentFetchedAt: Date;
+  readonly models: ModelCatalog;
+};
+
+const bundledCatalog = (): EffectiveCatalog => ({
+  source: 'bundled',
+  contentFetchedAt: BUNDLED_CATALOG_GENERATED_AT,
+  models: BUNDLED_CATALOG_MODELS,
+});
+
 /**
- * Resolve the EFFECTIVE catalog ONCE and return a synchronous per-provider
- * accessor over it. The effective catalog is the NEWER of the persisted
- * refreshed catalog (Req 9) and the bundled committed asset (Req 9.5):
+ * Resolve the EFFECTIVE catalog in a single read: the NEWER of the persisted
+ * refreshed catalog (Req 9) and the bundled committed asset (Req 9.5). This is
+ * the only place the two are compared. Never throws.
  *
  * - no refreshed snapshot → bundled (the offline default)
  * - refreshed snapshot present → the refreshed one, UNLESS the image now
@@ -40,67 +51,84 @@ type EffectiveModelPicker = (provider: AiProvider) => ModelCatalogEntry[];
  *
  * The read itself performs no external communication — it consults local
  * storage (MongoDB) and the statically imported bundled asset only (Req 2).
- * Kept separate from model-catalog.ts so the bundled read stays a pure,
- * I/O-free module.
+ */
+export const resolveEffectiveCatalog = async (): Promise<EffectiveCatalog> => {
+  try {
+    const refreshed = await prisma.mastrarefreshedmodelcatalogs.getSingleton();
+
+    if (refreshed != null) {
+      // "Strictly newer" so a tie — the normal "refreshed on the currently
+      // deployed image" case — and an unparsable timestamp (NaN never compares
+      // greater) resolve to the refreshed snapshot. An image ROLLBACK (bundled
+      // generation older than the superseded one) also keeps the refreshed
+      // snapshot, which is correct: it holds live-fetched data.
+      const bundledIsNewer =
+        BUNDLED_CATALOG_GENERATED_AT.getTime() >
+        refreshed.supersededBundledGeneratedAt.getTime();
+
+      if (!bundledIsNewer) {
+        return {
+          source: 'refreshed',
+          contentFetchedAt: refreshed.fetchedAt,
+          models: refreshed.models,
+        };
+      }
+    }
+  } catch (err) {
+    // Any persistence failure (a document a different code version wrote that
+    // Prisma cannot map, a transient MongoDB error) degrades to the bundled
+    // catalog instead of turning every read into a 500.
+    logger.warn(
+      'Failed to read the refreshed model catalog; serving the bundled catalog instead',
+      err,
+    );
+  }
+
+  return bundledCatalog();
+};
+
+/**
+ * Look up one entry (with its pricing, when known) in a resolved catalog.
+ * Catalog-less providers (e.g. 'azure-openai') yield undefined (Req 3.1).
+ */
+export const findCatalogEntry = (
+  catalog: EffectiveCatalog,
+  provider: AiProvider,
+  modelId: string,
+): ModelCatalogEntry | undefined =>
+  pickSelectableModels(catalog.models, provider).find((m) => m.id === modelId);
+
+/**
+ * Resolve the effective catalog ONCE and return a synchronous per-provider
+ * accessor over it. Catalog-less providers fail soft to [] (Req 3.1).
  *
  * Returning a picker (rather than one provider's models) lets a multi-provider
  * caller — e.g. buildModelDisplayNameResolver over the whole allow-list — read
- * the persisted singleton a SINGLE time and then resolve every provider from
- * the one in-memory result, instead of one DB read per provider.
+ * the persisted singleton a SINGLE time instead of once per provider.
  */
 export const getEffectiveModelPicker =
   async (): Promise<EffectiveModelPicker> => {
-    try {
-      const refreshed =
-        await prisma.mastrarefreshedmodelcatalogs.getSingleton();
-
-      if (refreshed != null) {
-        // "Strictly newer" so a tie — the normal "refreshed on the currently
-        // deployed image" case — and an unparsable timestamp (NaN never compares
-        // greater) resolve to the refreshed snapshot. An image ROLLBACK (bundled
-        // generation older than the superseded one) also keeps the refreshed
-        // snapshot, which is correct: it holds live-fetched data.
-        const bundledIsNewer =
-          BUNDLED_CATALOG_GENERATED_AT.getTime() >
-          refreshed.supersededBundledGeneratedAt.getTime();
-
-        if (!bundledIsNewer) {
-          // Shared accessor (same as the bundled read): catalog-less providers
-          // (e.g. 'azure-openai') fail soft to [] (Req 3.1).
-          //
-          // Defense in depth: getSingleton validates the snapshot on read, but if
-          // a corrupt value ever slips through (e.g. a non-iterable provider
-          // entry), the per-provider pick must degrade to the bundled catalog,
-          // never throw into the caller (a 500 on every read). The guard lives in
-          // the returned accessor because the pick — and thus the throw — happens
-          // when a provider is looked up, not when the singleton is read.
-          return (provider) => {
-            try {
-              return pickSelectableModels(refreshed.models, provider);
-            } catch (err) {
-              logger.warn(
-                'The persisted model-catalog snapshot is unusable; serving the bundled catalog instead',
-                err,
-              );
-              return getSelectableModels(provider);
-            }
-          };
-        }
-      }
-    } catch (err) {
-      // The refreshed branch must never take the endpoint down: any persistence
-      // failure (a document a different code version wrote that Prisma cannot
-      // map, a transient MongoDB error) degrades to the bundled catalog — the
-      // static import below cannot fail — instead of turning every
-      // available-models read into a 500.
-      logger.warn(
-        'Failed to read the refreshed model catalog; serving the bundled catalog instead',
-        err,
-      );
+    const catalog = await resolveEffectiveCatalog();
+    if (catalog.source === 'bundled') {
+      return (provider) => pickSelectableModels(catalog.models, provider);
     }
 
-    // Bundled fallback: getSelectableModels IS the (provider) → entries accessor.
-    return getSelectableModels;
+    // Defense in depth: getSingleton validates the snapshot on read, but if a
+    // corrupt value ever slips through (e.g. a non-iterable provider entry),
+    // the per-provider pick must degrade to the bundled catalog, never throw
+    // into the caller. The guard lives here because the throw happens when a
+    // provider is looked up, not when the singleton is read.
+    return (provider) => {
+      try {
+        return pickSelectableModels(catalog.models, provider);
+      } catch (err) {
+        logger.warn(
+          'The persisted model-catalog snapshot is unusable; serving the bundled catalog instead',
+          err,
+        );
+        return getSelectableModels(provider);
+      }
+    };
   };
 
 /**

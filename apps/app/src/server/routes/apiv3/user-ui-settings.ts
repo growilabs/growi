@@ -33,6 +33,9 @@ export const validatorForPutUserUISettings = [
     .optional()
     .isString()
     .isLength({ max: MAX_MODEL_KEY_LENGTH }),
+  // Format only: the usable range depends on the viewport, so the client
+  // clamps the value (see the ai-chat-sidebar-resize spec's research.md).
+  body('settings.aiChatSidebarWidth').optional().isInt({ min: 1 }).toInt(),
 ];
 
 export const setup = (): Router => {
@@ -64,6 +67,8 @@ export const setup = (): Router => {
    *                     type: boolean
    *                   aiChatSelectedModelKey:
    *                     type: string
+   *                   aiChatSidebarWidth:
+   *                     type: number
    *     responses:
    *       200:
    *         description: The user's UI settings
@@ -84,6 +89,8 @@ export const setup = (): Router => {
    *                   type: boolean
    *                 aiChatSelectedModelKey:
    *                   type: string
+   *                 aiChatSidebarWidth:
+   *                   type: number
    */
   router.put(
     '/',
@@ -99,6 +106,7 @@ export const setup = (): Router => {
         currentProductNavWidth: settings.currentProductNavWidth,
         preferCollapsedModeByUser: settings.preferCollapsedModeByUser,
         aiChatSelectedModelKey: settings.aiChatSelectedModelKey,
+        aiChatSidebarWidth: settings.aiChatSidebarWidth,
       };
 
       if (user == null) {

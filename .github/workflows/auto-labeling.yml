@@ -1,15 +1,21 @@
 name: Auto-labeling
 
+# pull_request_target (not pull_request): PRs from forks get a read-only token
+# under pull_request and cannot be labeled. Never check out or run PR code here.
 on:
-  pull_request:
+  pull_request_target:
     branches:
       - master
       - dev/*.*.*
     # Only following types are handled by the action, but one can default to all as well
     types: [opened, reopened, edited, synchronize]
 
+permissions:
+  contents: read
+  pull-requests: write
+
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 

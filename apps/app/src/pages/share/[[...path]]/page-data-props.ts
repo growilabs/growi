@@ -35,7 +35,7 @@ export const getPageDataForInitial = async (
   context: GetServerSidePropsContext,
 ): Promise<GetServerSidePropsResult<ShareLinkPageStatesProps>> => {
   const req = context.req as CrowiRequest;
-  const { crowi, params } = req;
+  const { crowi } = req;
   const { pageService, pageGrantService, configManager } = crowi;
 
   if (mongooseModel == null) {
@@ -45,8 +45,19 @@ export const getPageDataForInitial = async (
     Page = mongooseModel<IPage, PageModel>('Page');
   }
 
+  // Read the link id from the Next.js route params, not Express' req.params:
+  // /_next/data requests on client-side navigation skip the /share/:linkId route.
+  const pathSegments = context.params?.path;
+  const linkId =
+    Array.isArray(pathSegments) && pathSegments.length === 1
+      ? pathSegments[0]
+      : undefined;
+  if (linkId == null) {
+    return notFoundProps;
+  }
+
   const shareLink = await prisma.sharelinks.findUnique({
-    where: { id: params.linkId },
+    where: { id: linkId },
   });
 
   // not found

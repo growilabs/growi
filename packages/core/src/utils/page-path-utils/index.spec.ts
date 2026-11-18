@@ -5,6 +5,7 @@ import {
   isMovablePage,
   isTopPage,
   isUsersProtectedPages,
+  omitDuplicateAreaPageFromPages,
   omitDuplicateAreaPathFromPaths,
 } from './index.js';
 
@@ -171,6 +172,58 @@ describe.concurrent('isCreatablePage test', () => {
       expect(omitDuplicateAreaPathFromPaths(paths)).toStrictEqual(
         expectedPaths,
       );
+    });
+
+    test.concurrent('Should treat regular expression metacharacters in paths literally', () => {
+      const paths = ['/C++', '/C++/intro', '/memo(draft', '/memo(draft/a'];
+      const expectedPaths = ['/C++', '/memo(draft'];
+
+      expect(omitDuplicateAreaPathFromPaths(paths)).toStrictEqual(
+        expectedPaths,
+      );
+    });
+
+    test.concurrent('Should not omit a path that only matches when "." is a wildcard', () => {
+      const paths = ['/a.b', '/axb/c'];
+
+      expect(omitDuplicateAreaPathFromPaths(paths)).toStrictEqual(paths);
+    });
+  });
+
+  describe.concurrent('Test omitDuplicateAreaPageFromPages', () => {
+    test.concurrent('Should omit pages under another page, case-insensitively', () => {
+      const pages = [{ path: '/A' }, { path: '/a/B' }, { path: '/AA' }];
+
+      expect(omitDuplicateAreaPageFromPages(pages)).toStrictEqual([
+        { path: '/A' },
+        { path: '/AA' },
+      ]);
+    });
+
+    test.concurrent('Should keep pages with the same path', () => {
+      const pages = [
+        { path: '/A', id: 1 },
+        { path: '/A', id: 2 },
+      ];
+
+      expect(omitDuplicateAreaPageFromPages(pages)).toStrictEqual(pages);
+    });
+
+    test.concurrent('Should treat regular expression metacharacters in paths literally', () => {
+      const pages = [
+        { path: '/C++' },
+        { path: '/C++/intro' },
+        { path: '/memo(draft' },
+        { path: '/a.b' },
+        { path: '/axb/c' },
+      ];
+
+      expect(omitDuplicateAreaPageFromPages(pages)).toStrictEqual([
+        { path: '/C++' },
+        { path: '/memo(draft' },
+        { path: '/a.b' },
+        { path: '/axb/c' },
+      ]);
     });
   });
 

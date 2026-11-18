@@ -5,8 +5,28 @@
  * fleet of pods would otherwise hit the same DB or external endpoint at once.
  * Jittering the start de-synchronizes them. The delay only spreads the work out
  * — it does not serialize it — so callers must still be idempotent.
+ *
+ * When `signal` aborts, the sleep ends early and resolves (it never rejects),
+ * so the caller simply continues without the remaining delay.
  */
-export const randomSleep = (maxMs: number): Promise<void> => {
+export const randomSleep = (
+  maxMs: number,
+  signal?: AbortSignal,
+): Promise<void> => {
   const ms = Math.floor(Math.random() * maxMs);
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  return new Promise((resolve) => {
+    if (signal?.aborted) {
+      resolve();
+      return;
+    }
+    const onAbort = (): void => {
+      clearTimeout(timer);
+      resolve();
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
 };

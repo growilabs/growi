@@ -1087,7 +1087,7 @@ export const setup = (crowi) => {
    */
   router.get(
     '/external-accounts/',
-    accessTokenParser([SCOPE.READ.USER_SETTINGS.EXTERNAL_ACCOUNT]),
+    accessTokenParser([SCOPE.READ.ADMIN.USER_MANAGEMENT]),
     loginRequiredStrictly,
     adminRequired,
     async (req, res) => {
@@ -1143,7 +1143,7 @@ export const setup = (crowi) => {
    */
   router.delete(
     '/external-accounts/:id/remove',
-    accessTokenParser([SCOPE.WRITE.USER_SETTINGS.EXTERNAL_ACCOUNT]),
+    accessTokenParser([SCOPE.WRITE.ADMIN.USER_MANAGEMENT]),
     loginRequiredStrictly,
     adminRequired,
     apiV3FormValidator,

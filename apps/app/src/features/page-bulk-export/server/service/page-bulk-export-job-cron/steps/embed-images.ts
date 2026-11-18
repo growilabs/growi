@@ -5,11 +5,12 @@ import type { IUser } from '@growi/core';
 import type { HydratedDocument } from 'mongoose';
 
 import type Crowi from '~/server/crowi';
-import { ResponseMode } from '~/server/interfaces/attachment';
 import type { AttachmentWithComputed } from '~/server/models/attachment';
 import { isAttachmentAccessibleToViewer } from '~/server/service/attachment/resolve-accessible-attachment';
 import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
+
+import { toRelativeHref } from './to-relative-href';
 
 const logger = loggerFactory('growi:features:page-bulk-export:embed-images');
 
@@ -27,28 +28,77 @@ const logger = loggerFactory('growi:features:page-bulk-export:embed-images');
 const ATTACHMENT_IMG_SRC = /src="\/attachment\/([0-9a-z]{24})"/g;
 
 /**
- * Directory (relative to a job's html output dir) that downloaded/relayed
- * attachment images are written into. Mirrors `_bulk-export.css`'s
- * leading-underscore convention so pdf-converter's `*.html`-only scan never
- * mistakes these for pages.
+ * Directory (relative to a job's html output dir) that downloaded attachment
+ * images are written into, once per job. pdf-converter scans the job dir
+ * recursively for `*.html`, so the directory name does not keep assets out
+ * of that scan — the extensions chosen by `toAssetFileName` do.
  */
 const ASSETS_DIRNAME = '_bulk-export-assets';
 
 /**
+ * File extensions for image content types whose rendering in pdf-converter's
+ * Chromium depends on the extension (SVG renders only as `.svg`). Other
+ * `image/*` types are saved without an extension: Chromium sniffs raster
+ * images from their bytes.
+ */
+const IMAGE_EXTENSIONS: Readonly<Record<string, string>> = {
+  'image/png': '.png',
+  'image/jpeg': '.jpg',
+  'image/gif': '.gif',
+  'image/webp': '.webp',
+  'image/avif': '.avif',
+  'image/bmp': '.bmp',
+  'image/svg+xml': '.svg',
+};
+
+/**
+ * Image file-name extensions accepted for an `application/octet-stream`
+ * upload, i.e. one whose type the uploading client could not tell.
+ */
+const IMAGE_FILE_NAME_EXTENSIONS: ReadonlySet<string> = new Set([
+  ...Object.values(IMAGE_EXTENSIONS),
+  '.jpeg',
+]);
+
+/**
+ * Name of the local copy of an attachment, or `undefined` when it must not be
+ * embedded. Image content types qualify, with the extension taken from the
+ * content type. An `application/octet-stream` upload qualifies only when its
+ * file name has an extension in `IMAGE_FILE_NAME_EXTENSIONS`. Any other
+ * extension from the uploaded file name is never used: a `.html` asset would
+ * be converted by pdf-converter as if it were a page.
+ */
+function toAssetFileName(
+  attachment: AttachmentWithComputed,
+): string | undefined {
+  const { id, fileFormat, fileName } = attachment;
+  if (fileFormat.startsWith('image/')) {
+    return `${id}${IMAGE_EXTENSIONS[fileFormat] ?? ''}`;
+  }
+  if (fileFormat === 'application/octet-stream') {
+    const extension = path.extname(fileName).toLowerCase();
+    if (IMAGE_FILE_NAME_EXTENSIONS.has(extension)) {
+      return `${id}${extension}`;
+    }
+  }
+  return undefined;
+}
+
+/**
  * Rewrite `/attachment/<id>` image sources in `htmlString` to something
- * `pdf-converter`'s `file://` navigation can actually load. Only handles
- * RELAY-mode storage (the local filesystem and GridFS `fileUploadService`
- * implementations): the attachment's bytes are fetched server-side (this
- * runs inside the `app` process, which already has full access to
+ * `pdf-converter`'s `file://` navigation can actually load: the attachment's
+ * bytes are fetched server-side via `fileUploadService.findDeliveryFile()`
+ * (this runs inside the `app` process, which already has full access to
  * fileUploadService — no HTTP round-trip or session cookie needed) and
  * saved once per job into `ASSETS_DIRNAME` on the shared
  * `page_bulk_export_tmp` volume; the `src` becomes a relative path to that
  * local copy, same pattern as the shared CSS file.
  *
- * REDIRECT-mode (S3/GCS) and DELEGATE-mode storage are not handled here and
- * are left as-is (best effort — the image will be missing from the PDF,
- * but the page still converts). See growilabs/growi#<ISSUE_NUMBER> for
- * background and follow-up on those modes.
+ * This is independent of the storage's response mode: RELAY / REDIRECT /
+ * DELEGATE only decide how the `/attachment/:id` route answers a browser,
+ * while `findDeliveryFile()` reads with the app's own credentials in every
+ * mode. Signed URLs are deliberately not used, since they can expire before
+ * pdf-converter loads the HTML (see growilabs/growi#11830).
  *
  * Reuses `isAttachmentAccessibleToViewer` — the same page-viewer permission
  * check the `/attachment/:id` route enforces via `resolveAccessibleAttachment`
@@ -65,6 +115,8 @@ export async function embedAttachmentImages(
     outputDir,
     crowi,
     exportingUser,
+    downloadTimeoutMs,
+    signal,
   }: {
     /** absolute path the HTML will be written to (used to compute the
      * relative href to ASSETS_DIRNAME) */
@@ -77,21 +129,18 @@ export async function embedAttachmentImages(
     /** the user who requested the export (pageBulkExportJob.user, resolved
      * once per job by the caller) — permission checks run as this user */
     exportingUser: HydratedDocument<IUser> | undefined;
+    /** upper bound for downloading a single attachment, storage request
+     * included; an image that takes longer is left out of the PDF */
+    downloadTimeoutMs: number;
+    /** aborts when the export job is cleaned up; embedding then stops and
+     * rejects with `signal.reason` instead of skipping the image */
+    signal: AbortSignal;
   },
 ): Promise<string> {
   const matches = [...htmlString.matchAll(ATTACHMENT_IMG_SRC)];
   if (matches.length === 0) {
     return htmlString;
   }
-
-  const { fileUploadService } = crowi;
-  if (fileUploadService.determineResponseMode() !== ResponseMode.RELAY) {
-    // REDIRECT (S3/GCS) and DELEGATE modes aren't handled yet; leave the
-    // HTML untouched rather than guess.
-    return htmlString;
-  }
-
-  const assetsDir = path.join(outputDir, ASSETS_DIRNAME);
 
   // De-dupe: the same attachment can appear more than once on a page.
   const uniqueIds = [...new Set(matches.map((m) => m[1]))];
@@ -100,67 +149,28 @@ export async function embedAttachmentImages(
   const attachments = await prisma.attachments.findMany({
     where: { id: { in: uniqueIds } },
   });
-  const attachmentById = new Map<string, AttachmentWithComputed>(
-    attachments.map((a) => [a.id, a]),
-  );
 
+  const assetOptions: AssetOptions = {
+    assetsDir: path.join(outputDir, ASSETS_DIRNAME),
+    fileUploadService: crowi.fileUploadService,
+    exportingUser,
+    downloadTimeoutMs,
+    signal,
+  };
   const replacements = new Map<string, string>();
-
-  await Promise.all(
-    uniqueIds.map(async (id) => {
-      try {
-        const attachment = attachmentById.get(id);
-        if (attachment == null) return;
-
-        const isAccessible = await isAttachmentAccessibleToViewer(
-          attachment,
-          exportingUser,
-          false,
-        );
-        if (!isAccessible) {
-          logger.warn(
-            "Skipping attachment %s for bulk export: exporting user can't access the page it belongs to.",
-            id,
-          );
-          return;
-        }
-
-        const assetFileName = `${id}${path.extname(attachment.fileName ?? '')}`;
-        const assetFilePath = path.join(assetsDir, assetFileName);
-
-        // Written once per job; subsequent pages reusing the same
-        // attachment just reference the already-written file.
-        if (!fs.existsSync(assetFilePath)) {
-          await fs.promises.mkdir(assetsDir, { recursive: true });
-          const readable = await fileUploadService.findDeliveryFile(attachment);
-          const writeStream = fs.createWriteStream(assetFilePath);
-          try {
-            await pipeline(readable, writeStream);
-          } catch (streamErr) {
-            // Don't leave a truncated file behind — a later reference to the
-            // same attachment in this job would otherwise treat it as
-            // "already downloaded" via the fs.existsSync check above, and
-            // silently embed a corrupted image.
-            await fs.promises.rm(assetFilePath, { force: true });
-            throw streamErr;
-          }
-        }
-
-        const relativeHref = path
-          .relative(path.dirname(fileOutputPath), assetFilePath)
-          .split(path.sep)
-          .map(encodeURIComponent)
-          .join('/');
-        replacements.set(id, relativeHref);
-      } catch (err) {
-        logger.warn(
-          'Failed to embed attachment image %s for bulk export: %o',
-          id,
-          err,
-        );
-      }
-    }),
-  );
+  // One download at a time: with cloud storage every download is a network
+  // request, and a page may reference hundreds of images.
+  for (const attachment of attachments) {
+    signal.throwIfAborted();
+    // biome-ignore lint/performance/noAwaitInLoops: downloads are deliberately sequential (see above)
+    const assetFilePath = await prepareAsset(attachment, assetOptions);
+    if (assetFilePath != null) {
+      replacements.set(
+        attachment.id,
+        toRelativeHref(fileOutputPath, assetFilePath),
+      );
+    }
+  }
 
   if (replacements.size === 0) {
     return htmlString;
@@ -169,5 +179,137 @@ export async function embedAttachmentImages(
   return htmlString.replace(ATTACHMENT_IMG_SRC, (fullMatch, id) => {
     const replacement = replacements.get(id);
     return replacement != null ? `src="${replacement}"` : fullMatch;
+  });
+}
+
+type AssetOptions = {
+  assetsDir: string;
+  fileUploadService: Crowi['fileUploadService'];
+  exportingUser: HydratedDocument<IUser> | undefined;
+  downloadTimeoutMs: number;
+  signal: AbortSignal;
+};
+
+/**
+ * Make sure the job has a local copy of `attachment` and return its path, or
+ * `undefined` when the image is to be left out of the PDF (no access, not an
+ * image, or the download failed). Best effort: a failure only drops this
+ * image, never the page — unless the job itself is cancelled.
+ */
+async function prepareAsset(
+  attachment: AttachmentWithComputed,
+  {
+    assetsDir,
+    fileUploadService,
+    exportingUser,
+    downloadTimeoutMs,
+    signal,
+  }: AssetOptions,
+): Promise<string | undefined> {
+  try {
+    const isAccessible = await isAttachmentAccessibleToViewer(
+      attachment,
+      exportingUser,
+      false,
+    );
+    if (!isAccessible) {
+      logger.warn(
+        "Skipping attachment %s for bulk export: exporting user can't access the page it belongs to.",
+        attachment.id,
+      );
+      return undefined;
+    }
+
+    const assetFileName = toAssetFileName(attachment);
+    if (assetFileName == null) {
+      logger.warn(
+        'Skipping attachment %s for bulk export: content type %s is not an image.',
+        attachment.id,
+        attachment.fileFormat,
+      );
+      return undefined;
+    }
+    const assetFilePath = path.join(assetsDir, assetFileName);
+
+    // Written once per job; subsequent pages reusing the same
+    // attachment just reference the already-written file.
+    if (!fs.existsSync(assetFilePath)) {
+      await fs.promises.mkdir(assetsDir, { recursive: true });
+      await downloadAsset(
+        fileUploadService,
+        attachment,
+        assetFilePath,
+        AbortSignal.any([signal, AbortSignal.timeout(downloadTimeoutMs)]),
+      );
+    }
+    return assetFilePath;
+  } catch (err) {
+    if (signal.aborted) {
+      throw signal.reason;
+    }
+    logger.warn(
+      'Failed to embed attachment image %s for bulk export: %o',
+      attachment.id,
+      err,
+    );
+    return undefined;
+  }
+}
+
+async function downloadAsset(
+  fileUploadService: Crowi['fileUploadService'],
+  attachment: AttachmentWithComputed,
+  assetFilePath: string,
+  signal: AbortSignal,
+): Promise<void> {
+  const readable = await untilAborted(
+    fileUploadService.findDeliveryFile(attachment),
+    signal,
+  );
+  try {
+    await pipeline(readable, fs.createWriteStream(assetFilePath), { signal });
+  } catch (err) {
+    // Don't leave a truncated file behind — a later reference to the same
+    // attachment in this job would otherwise treat it as "already
+    // downloaded" via the fs.existsSync check in prepareAsset, and silently
+    // embed a corrupted image.
+    await fs.promises.rm(assetFilePath, { force: true });
+    throw err;
+  }
+}
+
+/**
+ * Settle with `readablePromise`, or reject with `signal.reason` as soon as
+ * `signal` aborts — `findDeliveryFile()` takes no signal of its own, and the
+ * storage request behind it can hang. A stream that arrives after the abort
+ * is destroyed so its connection is not left open.
+ */
+function untilAborted(
+  readablePromise: Promise<NodeJS.ReadableStream>,
+  signal: AbortSignal,
+): Promise<NodeJS.ReadableStream> {
+  return new Promise((resolve, reject) => {
+    const onAbort = () => reject(signal.reason);
+    if (signal.aborted) {
+      onAbort();
+    } else {
+      signal.addEventListener('abort', onAbort, { once: true });
+    }
+    readablePromise.then(
+      (readable) => {
+        signal.removeEventListener('abort', onAbort);
+        if (signal.aborted) {
+          if ('destroy' in readable && typeof readable.destroy === 'function') {
+            readable.destroy();
+          }
+          return;
+        }
+        resolve(readable);
+      },
+      (err) => {
+        signal.removeEventListener('abort', onAbort);
+        reject(err);
+      },
+    );
   });
 }

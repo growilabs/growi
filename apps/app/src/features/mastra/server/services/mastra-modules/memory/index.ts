@@ -4,6 +4,8 @@ import { MongoDBStore } from '@mastra/mongodb';
 import { getMongoUri } from '~/server/util/mongoose-utils';
 import loggerFactory from '~/utils/logger';
 
+import { titleGeneration } from './title-generation';
+
 const logger = loggerFactory('growi:service:mastra:memory');
 
 const mongoUri = getMongoUri();
@@ -27,7 +29,7 @@ export const memory = new Memory({
     dbName,
   }),
   options: {
-    generateTitle: true,
+    generateTitle: titleGeneration,
     lastMessages: 30,
   },
 });

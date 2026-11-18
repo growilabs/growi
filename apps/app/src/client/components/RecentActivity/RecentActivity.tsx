@@ -1,10 +1,6 @@
 import React, { type JSX, useCallback, useEffect, useState } from 'react';
 
 import { toastError } from '~/client/util/toastr';
-import type {
-  ActivityHasTargetPage,
-  IActivityHasId,
-} from '~/interfaces/activity';
 import { useSWRxRecentActivity } from '~/stores/recent-activity';
 import loggerFactory from '~/utils/logger';
 
@@ -17,21 +13,9 @@ type RecentActivityProps = {
   userId: string;
 };
 
-const hasTargetPage = (
-  activity: IActivityHasId,
-): activity is ActivityHasTargetPage => {
-  return (
-    activity.user != null &&
-    typeof activity.user === 'object' &&
-    activity.target != null &&
-    typeof activity.target === 'object'
-  );
-};
-
 export const RecentActivity = (props: RecentActivityProps): JSX.Element => {
   const { userId } = props;
 
-  const [activities, setActivities] = useState<ActivityHasTargetPage[]>([]);
   const [activePage, setActivePage] = useState(1);
   const [limit] = useState(10);
   const [offset, setOffset] = useState(0);
@@ -56,15 +40,10 @@ export const RecentActivity = (props: RecentActivityProps): JSX.Element => {
     if (error) {
       logger.error({ err: error }, 'Failed to fetch recent activity data');
       toastError(error);
-      return;
     }
+  }, [error]);
 
-    if (paginatedData) {
-      const activitiesWithPages = paginatedData.docs.filter(hasTargetPage);
-
-      setActivities(activitiesWithPages);
-    }
-  }, [paginatedData, error]);
+  const activities = paginatedData?.docs ?? [];
 
   const totalItemsCount = paginatedData?.totalDocs || 0;
   const needsPagination = totalItemsCount > limit;

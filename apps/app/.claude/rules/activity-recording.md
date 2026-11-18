@@ -30,7 +30,8 @@ and dropped the operator from audit rows.
 - The emit (and any code the emit depends on) must run **before `res.apiv3()`**,
   with **no `await` between `res.apiv3()` and the emit**. If deciding whether to
   emit needs an `await` (e.g. a DB check), do that await before the response too
-  — see `routes/apiv3/page/update-page.ts` (`generateUpdateActivity`). A bare
+  — see `service/page-save/page-notifications.ts` (`emitPageUpdateActivity`),
+  awaited before `res.apiv3()` in `routes/apiv3/page/update-page.ts`. A bare
   emit right after `res.apiv3()` with no await happens to be safe but is fragile;
   put it before the response anyway — see `routes/apiv3/page/create-page.ts`.
 - If the activity genuinely must be emitted **after** the response (work that

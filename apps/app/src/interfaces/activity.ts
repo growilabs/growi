@@ -9,6 +9,7 @@ const MODEL_COMMENT = 'Comment';
 const MODEL_PAGE_BULK_EXPORT_JOB = 'PageBulkExportJob';
 const MODEL_AUDIT_LOG_BULK_EXPORT_JOB = 'AuditLogBulkExportJob';
 export const MODEL_ATTACHMENT = 'Attachment';
+const MODEL_CHANGE_PROPOSAL = 'ChangeProposal';
 
 // Action
 const ACTION_UNSETTLED = 'UNSETTLED';
@@ -100,6 +101,11 @@ const ACTION_SEARCH_PAGE_VIEW = 'SEARCH_PAGE_VIEW';
 const ACTION_ADMIN_APP_SETTINGS_UPDATE = 'ADMIN_APP_SETTING_UPDATE';
 const ACTION_ADMIN_AI_SETTING_UPDATE = 'ADMIN_AI_SETTING_UPDATE';
 const ACTION_ADMIN_AI_MODEL_CATALOG_REFRESH = 'ADMIN_AI_MODEL_CATALOG_REFRESH';
+const ACTION_CHANGE_PROPOSAL_CREATE = 'CHANGE_PROPOSAL_CREATE';
+const ACTION_CHANGE_PROPOSAL_APPLY = 'CHANGE_PROPOSAL_APPLY';
+const ACTION_CHANGE_PROPOSAL_REVERT = 'CHANGE_PROPOSAL_REVERT';
+const ACTION_ADMIN_CHANGE_PROPOSAL_SETTINGS_UPDATE =
+  'ADMIN_CHANGE_PROPOSAL_SETTINGS_UPDATE';
 const ACTION_ADMIN_SITE_URL_UPDATE = 'ADMIN_SITE_URL_UPDATE';
 const ACTION_ADMIN_MAIL_SMTP_UPDATE = 'ADMIN_MAIL_SMTP_UPDATE';
 const ACTION_ADMIN_MAIL_SES_UPDATE = 'ADMIN_MAIL_SES_UPDATE';
@@ -263,6 +269,7 @@ export const SupportedTargetModel = {
   MODEL_PAGE_BULK_EXPORT_JOB,
   MODEL_AUDIT_LOG_BULK_EXPORT_JOB,
   MODEL_ATTACHMENT,
+  MODEL_CHANGE_PROPOSAL,
 } as const;
 
 export const SupportedEventModel = {
@@ -279,6 +286,7 @@ export const SupportedActionCategory = {
   SEARCH: 'Search',
   USER: 'User',
   ADMIN: 'Admin',
+  CHANGE_PROPOSAL: 'ChangeProposal',
 } as const;
 
 export const SupportedAction = {
@@ -353,6 +361,10 @@ export const SupportedAction = {
   ACTION_ADMIN_APP_SETTINGS_UPDATE,
   ACTION_ADMIN_AI_SETTING_UPDATE,
   ACTION_ADMIN_AI_MODEL_CATALOG_REFRESH,
+  ACTION_CHANGE_PROPOSAL_CREATE,
+  ACTION_CHANGE_PROPOSAL_APPLY,
+  ACTION_CHANGE_PROPOSAL_REVERT,
+  ACTION_ADMIN_CHANGE_PROPOSAL_SETTINGS_UPDATE,
   ACTION_ADMIN_SITE_URL_UPDATE,
   ACTION_ADMIN_MAIL_SMTP_UPDATE,
   ACTION_ADMIN_MAIL_SES_UPDATE,
@@ -509,6 +521,8 @@ export const EssentialActionGroup = {
   ACTION_AUDIT_LOG_BULK_EXPORT_FAILED,
   ACTION_AUDIT_LOG_BULK_EXPORT_JOB_EXPIRED,
   ACTION_AUDIT_LOG_BULK_EXPORT_NO_RESULTS,
+  ACTION_CHANGE_PROPOSAL_APPLY,
+  ACTION_CHANGE_PROPOSAL_REVERT,
 } as const;
 
 export const ActionGroupSize = {
@@ -582,6 +596,9 @@ export const MediumActionGroup = {
   ACTION_ATTACHMENT_DOWNLOAD,
   ACTION_SEARCH_PAGE,
   ACTION_SEARCH_PAGE_VIEW,
+  ACTION_CHANGE_PROPOSAL_CREATE,
+  ACTION_CHANGE_PROPOSAL_APPLY,
+  ACTION_CHANGE_PROPOSAL_REVERT,
 } as const;
 
 // MediumActionGroup + All Actions by Admin Users - PAGE_VIEW
@@ -591,6 +608,7 @@ export const LargeActionGroup = {
   ACTION_ADMIN_APP_SETTINGS_UPDATE,
   ACTION_ADMIN_AI_SETTING_UPDATE,
   ACTION_ADMIN_AI_MODEL_CATALOG_REFRESH,
+  ACTION_ADMIN_CHANGE_PROPOSAL_SETTINGS_UPDATE,
   ACTION_ADMIN_SITE_URL_UPDATE,
   ACTION_ADMIN_MAIL_SMTP_UPDATE,
   ACTION_ADMIN_MAIL_SES_UPDATE,
@@ -734,6 +752,9 @@ const adminRegExp = new RegExp(
   `^${SupportedActionCategory.ADMIN.toUpperCase()}_`,
 );
 
+// Written out because upper-casing the category name would give CHANGEPROPOSAL_
+const changeProposalRegExp = /^CHANGE_PROPOSAL_/;
+
 export const PageActions = AllSupportedActions.filter((action) =>
   action.match(pageRegExp),
 );
@@ -760,6 +781,9 @@ export const UserActions = AllSupportedActions.filter((action) =>
 );
 export const AdminActions = AllSupportedActions.filter((action) =>
   action.match(adminRegExp),
+);
+export const ChangeProposalActions = AllSupportedActions.filter((action) =>
+  action.match(changeProposalRegExp),
 );
 
 /*
@@ -858,24 +882,31 @@ export type ActivityHasUserId = IActivityHasId & {
   user: IUserHasId;
 };
 
-export type ActivityHasTargetPage = IActivityHasId & {
-  user: IUserHasId;
-  target: IPopulatedPageTarget;
-};
-
-import type { PageGrant } from '@growi/core';
-export interface IPopulatedPageTarget {
+export type IUserActivityTargetPage = {
   _id: string;
   path: string;
-  status: string;
-  grant?: PageGrant;
-  wip: boolean;
-  deletedAt: Date;
-}
+};
 
-export interface PopulatedUserActivitiesResult {
-  serializedPaginationResult: PaginateResult<ActivityHasTargetPage>;
-}
+export type IUserActivityUser = {
+  _id: string;
+  username: string;
+  name: string;
+  // Absent for a user whose image URL has not been generated yet.
+  imageUrlCached?: string;
+};
+
+export type IUserActivity = {
+  _id: string;
+  action: SupportedActivityActionType;
+  // ISO 8601 string, as it travels in the JSON response.
+  createdAt: string;
+  user: IUserActivityUser;
+  target: IUserActivityTargetPage;
+};
+
+export type UserActivitiesResult = {
+  serializedPaginationResult: PaginateResult<IUserActivity>;
+};
 
 export type ISearchFilter = {
   usernames?: string[];

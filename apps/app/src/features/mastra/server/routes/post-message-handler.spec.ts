@@ -22,6 +22,7 @@ import type { IUserHasId } from '@growi/core';
 import type { Request, RequestHandler } from 'express';
 import { mock } from 'vitest-mock-extended';
 
+import type { UsageMeter } from '~/features/ai-usage/server';
 import type Crowi from '~/server/crowi';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 
@@ -84,9 +85,15 @@ vi.mock('ai', () => ({
   pipeUIMessageStreamToResponse,
   validateUIMessages: vi.fn(),
 }));
-vi.mock('@mastra/ai-sdk', () => ({
-  toAISdkStream: vi.fn(),
+const { toAISdkStream } = vi.hoisted(() => ({
+  toAISdkStream: vi.fn((): ReadableStream<unknown> => new ReadableStream()),
 }));
+vi.mock('@mastra/ai-sdk', () => ({ toAISdkStream }));
+
+const { createUsageMeter } = vi.hoisted(() => ({
+  createUsageMeter: vi.fn<(params: unknown) => UsageMeter>(),
+}));
+vi.mock('~/features/ai-usage/server', () => ({ createUsageMeter }));
 
 vi.mock('~/server/middlewares/access-token-parser', () => ({
   accessTokenParser: () => vi.fn(),
@@ -235,5 +242,114 @@ describe('post-message handler — model selection (Req 4.3, 4.6)', () => {
     const safe = createArgs.onError(new Error('boom: secret leak'));
     expect(resolveChatErrorMessage).toHaveBeenCalledWith(expect.any(Error));
     expect(safe).toBe('SAFE_MESSAGE');
+  });
+});
+
+describe('post-message handler — usage metering (Req 2.1, 2.6, 2.7)', () => {
+  const MODEL_KEY = 'openai/gpt-4o';
+
+  // A stream that yields the given chunks, then either ends or fails.
+  const readableOf = (
+    chunks: readonly unknown[],
+    failure?: Error,
+  ): ReadableStream<unknown> =>
+    new ReadableStream({
+      start(controller) {
+        for (const chunk of chunks) {
+          controller.enqueue(chunk);
+        }
+        if (failure != null) {
+          controller.error(failure);
+          return;
+        }
+        controller.close();
+      },
+    });
+
+  const agentOutput = (finishReason: string) => ({
+    usage: Promise.resolve({}),
+    finishReason: Promise.resolve(finishReason),
+    steps: Promise.resolve([]),
+  });
+
+  // Run the UI stream's execute the way createUIMessageStream would.
+  const runExecute = async (): Promise<void> => {
+    const { execute } = createUIMessageStream.mock.calls[0][0];
+    await execute({ writer: { write: vi.fn() } });
+  };
+
+  let meter: UsageMeter;
+
+  beforeEach(() => {
+    resolveEffectiveModelKey.mockReturnValue(MODEL_KEY);
+    getProviderOptionsForModel.mockReturnValue({});
+    meter = mock<UsageMeter>();
+    createUsageMeter.mockReturnValue(meter);
+  });
+
+  it('creates a chat meter for the user and the resolved model key and hands it to the agent', async () => {
+    const { req, res } = buildReqRes('openai/o3');
+    await invoke(req, res);
+
+    expect(createUsageMeter).toHaveBeenCalledTimes(1);
+    expect(createUsageMeter).toHaveBeenCalledWith({
+      userId: 'user-1',
+      feature: 'chat',
+      modelKey: MODEL_KEY,
+    });
+    const streamOptions = stream.mock.calls[0][1];
+    expect(streamOptions.requestContext.get('usageMeter')).toBe(meter);
+  });
+
+  it('closes the meter as completed once the stream has been read to the end', async () => {
+    stream.mockResolvedValue(agentOutput('stop'));
+    toAISdkStream.mockReturnValue(readableOf([{ type: 'text-delta' }]));
+
+    const { req, res } = buildReqRes(MODEL_KEY);
+    await invoke(req, res);
+    expect(meter.close).not.toHaveBeenCalled();
+
+    await runExecute();
+
+    expect(meter.close).toHaveBeenCalledTimes(1);
+    expect(meter.close).toHaveBeenCalledWith({ outcome: 'completed' });
+  });
+
+  it('closes the meter as failed when the stream ends with an error finish reason', async () => {
+    stream.mockResolvedValue(agentOutput('error'));
+    toAISdkStream.mockReturnValue(readableOf([{ type: 'error' }]));
+
+    const { req, res } = buildReqRes(MODEL_KEY);
+    await invoke(req, res);
+    await runExecute();
+
+    expect(meter.close).toHaveBeenCalledTimes(1);
+    expect(meter.close).toHaveBeenCalledWith({ outcome: 'failed' });
+  });
+
+  it('closes the meter as failed when reading the stream throws mid-way', async () => {
+    stream.mockResolvedValue(agentOutput('stop'));
+    toAISdkStream.mockReturnValue(
+      readableOf([{ type: 'text-delta' }], new Error('connection lost')),
+    );
+
+    const { req, res } = buildReqRes(MODEL_KEY);
+    await invoke(req, res);
+    await expect(runExecute()).rejects.toThrow('connection lost');
+
+    expect(meter.close).toHaveBeenCalledTimes(1);
+    expect(meter.close).toHaveBeenCalledWith({ outcome: 'failed' });
+  });
+
+  it('closes the meter as failed when the agent stream call itself fails, keeping the error response', async () => {
+    stream.mockRejectedValue(new Error('model misconfigured'));
+
+    const { req, res } = buildReqRes(MODEL_KEY);
+    res.headersSent = false;
+    await invoke(req, res);
+
+    expect(meter.close).toHaveBeenCalledTimes(1);
+    expect(meter.close).toHaveBeenCalledWith({ outcome: 'failed' });
+    expect(res.apiv3Err).toHaveBeenCalledTimes(1);
   });
 });

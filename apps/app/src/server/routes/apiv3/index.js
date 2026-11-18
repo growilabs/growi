@@ -2,7 +2,12 @@ import { ErrorV3 } from '@growi/core/dist/models';
 import express from 'express';
 
 import { factory as aiToolsRouteFactory } from '~/features/ai-tools/server/routes/apiv3';
+import { createAiUsageRouter } from '~/features/ai-usage/server';
 import { factory as auditLogBulkExportRouteFactory } from '~/features/audit-log-bulk-export/server/routes/apiv3';
+import {
+  createChangeProposalAdminRouter,
+  createChangeProposalRouter,
+} from '~/features/change-proposal/server';
 import { listCommentsRouteHandlersFactory } from '~/features/comment/server/routes/list';
 import { setup as setupExternalUserGroup } from '~/features/external-user-group/server/routes/apiv3/external-user-group';
 import { setup as setupExternalUserGroupRelation } from '~/features/external-user-group/server/routes/apiv3/external-user-group-relation';
@@ -99,6 +104,8 @@ export const setup = (crowi, app) => {
   addCustomFunctionToResponse(express, crowi);
 
   routerForAdmin.use('/healthcheck', setupHealthcheck(crowi));
+  // Must stay outside the maintenance check and aiReadyGuard (see ai-usage-metering design.md, AiUsageRoute).
+  routerForAdmin.use('/ai-usage', createAiUsageRouter());
 
   // admin
   routerForAdmin.use('/admin-home', setupAdminHome(crowi));
@@ -108,6 +115,10 @@ export const setup = (crowi, app) => {
     setupContentDispositionSettings(crowi),
   );
   routerForAdmin.use('/ai-settings', adminAiSettingsRouteFactory(crowi));
+  routerForAdmin.use(
+    '/change-proposal-settings',
+    createChangeProposalAdminRouter(crowi),
+  );
   routerForAdmin.use('/app-settings', setupAppSettings(crowi));
   routerForAdmin.use('/customize-setting', setupCustomizeSetting(crowi));
   routerForAdmin.use('/notification-setting', setupNotificationSetting(crowi));
@@ -257,6 +268,8 @@ export const setup = (crowi, app) => {
     commentsRouter.get('/', listCommentsRouteHandlersFactory(crowi));
     router.use('/comments', commentsRouter);
   }
+
+  router.use('/change-proposals', createChangeProposalRouter(crowi));
 
   router.use('/page-listing', pageListing(crowi));
 
