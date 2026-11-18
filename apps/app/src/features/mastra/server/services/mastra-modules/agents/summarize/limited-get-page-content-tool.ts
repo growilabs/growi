@@ -16,6 +16,9 @@ const logger = loggerFactory(
 // ctx.get('pageReadBudget') is statically inferred.
 type TypedRequestContext = RequestContext<SummarizeRequestContextShape>;
 
+// MAX_STEPS is sized for reads of this many lines (design.md SummarizeAgent).
+const READ_LIMIT_LINES = 500;
+
 // The wrapped tool's discriminated union, restated here because the
 // original tool keeps its schema module-private, extended with
 // limit_exceeded — the budget wrap-up signal. The INPUT schema, by
@@ -104,7 +107,10 @@ export const limitedGetPageContentTool = createTool({
     }
 
     // biome-ignore lint/style/noNonNullAssertion: createTool always wires execute
-    const result = await getPageContentTool.execute!(inputData, context);
+    const result = await getPageContentTool.execute!(
+      { ...inputData, limit: READ_LIMIT_LINES },
+      context,
+    );
     const typedResult = result as LimitedGetPageContentToolOutput;
 
     if (typedResult.result !== 'ok') {

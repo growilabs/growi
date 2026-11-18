@@ -67,7 +67,12 @@ type GetPageContentToolResult =
     };
 
 const invokeExecute = async (
-  inputData: { pageId?: string; pagePath?: string; offset?: number },
+  inputData: {
+    pageId?: string;
+    pagePath?: string;
+    offset?: number;
+    limit?: number;
+  },
   requestContext: RequestContext<SummarizeRequestContextShape>,
 ): Promise<GetPageContentToolResult> => {
   // biome-ignore lint/style/noNonNullAssertion: createTool always wires execute
@@ -325,20 +330,30 @@ describe('limitedGetPageContentTool', () => {
   });
 
   describe('never modifies getPageContentTool', () => {
-    it('forwards the validated input (zod defaults applied) and the same requestContext to the delegate', async () => {
+    it('forwards the input with a 500-line limit and the same requestContext to the delegate', async () => {
       const requestContext = buildRequestContext();
       requestContext.set('pageReadBudget', buildBudget(1500));
 
       await invokeExecute({ pageId: 'p1', offset: 5 }, requestContext);
 
-      // The wrapper's input schema is the SAME instance as the original
-      // tool's (limit defaults to 200), so the validated payload carries it.
       expect(delegateSpy.mock.calls[0][0]).toEqual({
         pageId: 'p1',
         offset: 5,
-        limit: 200,
+        limit: 500,
       });
       expect(delegateSpy.mock.calls[0][1].requestContext).toBe(requestContext);
+    });
+
+    it('reads 500 lines even when the model asks for fewer', async () => {
+      const requestContext = buildRequestContext();
+      requestContext.set('pageReadBudget', buildBudget(1500));
+
+      await invokeExecute(
+        { pageId: 'p1', offset: 5, limit: 100 },
+        requestContext,
+      );
+
+      expect(delegateSpy.mock.calls[0][0]).toMatchObject({ limit: 500 });
     });
 
     it('shares the exact same input schema instance as the wrapped tool', () => {
