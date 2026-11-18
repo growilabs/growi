@@ -42,6 +42,7 @@
   "Update": "Update",
   "Update Page": "Update Page",
   "Error": "Error",
+  "Retry": "Retry",
   "Warning": "Warning",
   "Sign in": "Sign in",
   "Sign in with External auth": "Sign in with {{signin}}",
@@ -709,11 +710,14 @@
     "delete_all_selected_page": "Delete All",
     "select_all": "Select all",
     "delete_selected_pages": "Delete selected pages",
+    "selected_count": "{{selectedCount}} selected",
+    "selected_count_of_loaded": "{{selectedCount}} selected ({{loadedCount}} loaded)",
     "currently_not_implemented": "This is not currently implemented",
     "search_again": "Search again",
     "number_of_list_to_display": "Display",
     "page_number_unit": "pages",
     "hit_number_unit": "hit",
+    "failed_to_load_more": "Failed to load more results",
     "filter": "Filters",
     "search_option": "Search Options",
     "filter_remove": "Remove",
@@ -1289,5 +1293,10 @@
     "achievement": {
       "settled_with_percent": "Completed ({{percent}}% achieved)"
     }
+  },
+  "plantuml": {
+    "url-too-long": "The diagram is too large and probably exceeds the URL length limit of the PlantUML server. Split or simplify the diagram.",
+    "post-unavailable": "The PlantUML server may not support POST, or the browser cannot reach it. The administrator can switch back to GET by setting PLANTUML_HTTP_METHOD=get.",
+    "render-failed": "The diagram could not be rendered. The PlantUML server could not be reached, or it returned an error."
   }
 }

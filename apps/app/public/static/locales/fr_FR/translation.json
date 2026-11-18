@@ -41,6 +41,7 @@
   "Update": "Enregistrer",
   "Update Page": "Mettre à jour la page",
   "Error": "Erreur",
+  "Retry": "Réessayer",
   "Warning": "Avertissement",
   "Sign in": "Connexion",
   "Sign in with External auth": "Se connecter avec {{signin}}",
@@ -694,11 +695,14 @@
     "delete_all_selected_page": "Tout supprimer",
     "select_all": "Tout sélectionner",
     "delete_selected_pages": "Supprimer les pages sélectionnées",
+    "selected_count": "{{selectedCount}} sélectionnée(s)",
+    "selected_count_of_loaded": "{{selectedCount}} sélectionnée(s) ({{loadedCount}} chargée(s))",
     "currently_not_implemented": "Non implémenté",
     "search_again": "Rechercher",
     "number_of_list_to_display": "Afficher",
     "page_number_unit": "pages",
     "hit_number_unit": "trouvé",
+    "failed_to_load_more": "Échec du chargement de résultats supplémentaires",
     "filter": "Filtres",
     "search_option": "Options de recherche",
     "filter_remove": "Supprimer",
@@ -1237,5 +1241,10 @@
     "achievement": {
       "settled_with_percent": "Terminé ({{percent}} % réalisé)"
     }
+  },
+  "plantuml": {
+    "url-too-long": "Le diagramme est trop volumineux et dépasse probablement la longueur d'URL maximale du serveur PlantUML. Divisez ou simplifiez le diagramme.",
+    "post-unavailable": "Le serveur PlantUML ne prend peut-être pas en charge POST, ou le navigateur ne parvient pas à le joindre. L'administrateur peut revenir à GET en définissant PLANTUML_HTTP_METHOD=get.",
+    "render-failed": "Le diagramme n'a pas pu être affiché. Le serveur PlantUML est injoignable ou a renvoyé une erreur."
   }
 }

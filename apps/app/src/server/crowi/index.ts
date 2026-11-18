@@ -941,7 +941,7 @@ class Crowi {
     await growiPluginService.downloadNotExistPluginRepositories();
   }
 
-  setupPageService(): void {
+  async setupPageService(): Promise<void> {
     if (this.pageGrantService == null) {
       this.pageGrantService = new PageGrantService(this);
     }
@@ -950,6 +950,8 @@ class Crowi {
       this.pageService = new PageService(this);
     }
     this.pageOperationService = instanciatePageOperationService(this);
+    // canOperate() ignores expiry, so a record left by an interrupted operation blocks its paths until removed
+    await this.pageOperationService.init();
   }
 
   setupInAppNotificationService(): void {

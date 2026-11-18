@@ -9,7 +9,7 @@ skipped this check and flaked in CI.
 ## Why
 
 The `ci-app-test` job (`test:unit test:components`, see `.github/workflows/`)
-already starts a real MongoDB replica set via `supercharge/mongodb-github-action`
+already starts a real MongoDB replica set via `.github/scripts/start-mongodb-replica-set.sh`
 and exports `MONGO_URI` for that job — even plain `.spec.ts` unit tests can see
 it. A `beforeAll` that ignores this and calls `MongoMemoryServer.create()`
 anyway spawns a second, redundant `mongod`, downloaded from `mongodb-memory-server`'s
