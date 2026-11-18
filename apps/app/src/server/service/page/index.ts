@@ -93,6 +93,10 @@ import { BULK_REINDEX_SIZE, LIMIT_FOR_MULTIPLE_PAGE_OP } from './consts';
 import { deleteCompletelyOperation as deleteCompletelyOperationImpl } from './delete-completely-operation';
 import { onSeen } from './events/seen';
 import { isGrantImmutablePath } from './grant-immutable-path';
+import {
+  PageOperationRefusalReason,
+  PageOperationRefusedError,
+} from './page-operation-refusal';
 import type {
   DeletionOptions,
   DeletionVerdict,
@@ -670,7 +674,10 @@ class PageService implements IPageService {
       newPagePath,
     );
     if (!canOperate) {
-      throw Error(`Cannot operate rename to path "${newPagePath}" right now.`);
+      throw new PageOperationRefusedError(
+        PageOperationRefusalReason.OPERATION_IN_PROGRESS,
+        `Cannot operate rename to path "${newPagePath}" right now.`,
+      );
     }
 
     /*
@@ -771,7 +778,8 @@ class PageService implements IPageService {
         throw err;
       }
       if (!isGrantNormalized) {
-        throw Error(
+        throw new PageOperationRefusedError(
+          PageOperationRefusalReason.GRANT_NOT_ASSIGNABLE,
           `This page cannot be renamed to "${newPagePathSanitized}" since the selected grant or grantedGroup is not assignable to this page.`,
         );
       }
@@ -1585,7 +1593,8 @@ class PageService implements IPageService {
       newPagePathSanitized,
     );
     if (!canOperate) {
-      throw Error(
+      throw new PageOperationRefusedError(
+        PageOperationRefusalReason.OPERATION_IN_PROGRESS,
         `Cannot operate duplicate to path "${newPagePathSanitized}" right now.`,
       );
     }
@@ -1633,7 +1642,8 @@ class PageService implements IPageService {
         throw err;
       }
       if (!isGrantNormalized) {
-        throw Error(
+        throw new PageOperationRefusedError(
+          PageOperationRefusalReason.GRANT_NOT_ASSIGNABLE,
           `This page cannot be duplicated to "${newPagePathSanitized}" since the selected grant or grantedGroup is not assignable to this page.`,
         );
       }
@@ -5020,7 +5030,8 @@ class PageService implements IPageService {
         throw err;
       }
       if (!isGrantNormalized) {
-        throw Error(
+        throw new PageOperationRefusedError(
+          PageOperationRefusalReason.GRANT_NOT_ASSIGNABLE,
           'The selected grant or grantedGroup is not assignable to this page.',
         );
       }

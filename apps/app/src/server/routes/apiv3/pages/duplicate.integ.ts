@@ -17,6 +17,7 @@ import request from 'supertest';
 import { getInstance } from '^/test/setup/crowi';
 
 import type { IOptionsForCreate } from '~/interfaces/page';
+import { PageActionStage, PageActionType } from '~/interfaces/page-operation';
 import type Crowi from '~/server/crowi';
 import type { PageDocument } from '~/server/models/page';
 import PageOperation from '~/server/models/page-operation';
@@ -63,6 +64,8 @@ const MISSING_DESTINATION = `${FIXTURE_ROOT}/missing-destination`;
 const FORBIDDEN_DESTINATION = `${FIXTURE_ROOT}/forbidden-destination`;
 const SUCCESS_DESTINATION = `${FIXTURE_ROOT}/success-destination`;
 const EMPTY_DESTINATION = `${FIXTURE_ROOT}/empty-destination`;
+const NARROWER_PARENT = `${FIXTURE_ROOT}/narrower-parent`;
+const DESTINATION_UNDER_NARROWER_PARENT = `${NARROWER_PARENT}/destination`;
 const SOURCE_BODY = 'Duplicate route integration source body';
 const REQUESTER_USERNAME = 'duplicate-route-integ-requester';
 const OWNER_USERNAME = 'duplicate-route-integ-owner';
@@ -386,5 +389,83 @@ describe('POST /duplicate', () => {
     expect(
       await crowi.models.Page.exists({ path: EMPTY_DESTINATION }),
     ).toBeNull();
+  });
+
+  it('returns 409 without creating a destination when the source grant is not assignable there', async () => {
+    const sourcePage = await createPage(
+      ACCESSIBLE_SOURCE,
+      SOURCE_BODY,
+      requester,
+    );
+    await createPage(NARROWER_PARENT, SOURCE_BODY, requester, {
+      grant: PageGrant.GRANT_OWNER,
+    });
+
+    const response = await postDuplicate(
+      sourcePage._id.toString(),
+      DESTINATION_UNDER_NARROWER_PARENT,
+    );
+
+    expect(response.status).toBe(409);
+    expect(response.body.errors).toEqual([
+      expect.objectContaining({ code: 'grant_not_assignable' }),
+    ]);
+    expect(
+      await crowi.models.Page.exists({
+        path: DESTINATION_UNDER_NARROWER_PARENT,
+      }),
+    ).toBeNull();
+  });
+
+  it('returns 409 without creating a destination while another operation holds the source path', async () => {
+    const sourcePage = await createPage(
+      ACCESSIBLE_SOURCE,
+      SOURCE_BODY,
+      requester,
+    );
+    await PageOperation.create({
+      actionType: PageActionType.Rename,
+      actionStage: PageActionStage.Sub,
+      fromPath: ACCESSIBLE_SOURCE,
+      toPath: `${FIXTURE_ROOT}/held-by-another-operation`,
+      page: { _id: sourcePage._id, path: ACCESSIBLE_SOURCE },
+      user: { _id: requester._id },
+    });
+
+    const response = await postDuplicate(
+      sourcePage._id.toString(),
+      SUCCESS_DESTINATION,
+    );
+
+    expect(response.status).toBe(409);
+    expect(response.body.errors).toEqual([
+      expect.objectContaining({ code: 'operation_in_progress' }),
+    ]);
+    expect(
+      await crowi.models.Page.exists({ path: SUCCESS_DESTINATION }),
+    ).toBeNull();
+  });
+
+  it('returns 500 when duplicating fails for an unexpected reason', async () => {
+    const sourcePage = await createPage(
+      ACCESSIBLE_SOURCE,
+      SOURCE_BODY,
+      requester,
+    );
+    const duplicateSpy = vi
+      .spyOn(crowi.pageService, 'duplicate')
+      .mockRejectedValue(new Error('unexpected failure with internal detail'));
+
+    try {
+      const response = await postDuplicate(
+        sourcePage._id.toString(),
+        SUCCESS_DESTINATION,
+      );
+
+      expect(response.status).toBe(500);
+      expect(JSON.stringify(response.body)).not.toContain('internal detail');
+    } finally {
+      duplicateSpy.mockRestore();
+    }
   });
 });
