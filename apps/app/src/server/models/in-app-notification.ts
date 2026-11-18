@@ -172,9 +172,19 @@ export const extension = Prisma.defineExtension((client) => {
          * Mongoose used to `populate`.
          */
         async paginateAndIncludeTarget<
-          const A extends Prisma.inappnotificationsFindManyArgs,
+          const A extends Pick<
+            Prisma.inappnotificationsFindManyArgs,
+            'where' | 'orderBy' | 'include'
+          >,
         >(
-          options: A & { offset?: number; limit?: number },
+          // `Pick` alone does not reject extra keys on an inferred `A`, so
+          // `select` / `omit` are closed off explicitly
+          options: A & {
+            offset?: number;
+            limit?: number;
+            select?: never;
+            omit?: never;
+          },
         ): Promise<
           PaginateResult<
             WithHydratedTarget<Prisma.inappnotificationsGetPayload<A>>
@@ -184,7 +194,8 @@ export const extension = Prisma.defineExtension((client) => {
             Prisma.getExtensionContext<typeof prisma.inappnotifications>(this);
           const result = await context.paginate(options);
           // `A` is generic here, so the payload cannot be narrowed to the base
-          // row type without an assertion; the base fields are always present
+          // row type without an assertion; `A` has no `select`/`omit`, so the
+          // base fields are always present
           const rows = result.docs as unknown as inappnotifications[];
           // `client` at this chain position has every delegate read below, but
           // its parameter type cannot express them
