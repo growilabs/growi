@@ -1,12 +1,12 @@
 {
   "feature_name": "activity-access-token-redaction",
   "created_at": "2026-11-18T08:45:42Z",
-  "updated_at": "2026-11-18T08:45:42Z",
+  "updated_at": "2026-11-18T08:55:37Z",
   "language": "ja",
-  "phase": "initialized",
+  "phase": "requirements-generated",
   "approvals": {
     "requirements": {
-      "generated": false,
+      "generated": true,
       "approved": false
     },
     "design": {
