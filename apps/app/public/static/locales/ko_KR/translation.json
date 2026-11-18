@@ -801,6 +801,7 @@
     "successfully_created": "사용자 {{username}}이 성공적으로 생성되었습니다.",
     "can_not_activate_maximum_number_of_users": "최대 사용자 수 이상을 활성화할 수 없습니다.",
     "failed_to_activate": "활성화 실패.",
+    "only_invited_user_can_activate": "초대된 사용자만 계정을 활성화할 수 있습니다.",
     "unable_to_use_this_user": "이 사용자를 사용할 수 없습니다.",
     "complete_to_install1": "GROWI 설치 완료! 관리자 계정으로 로그인하십시오.",
     "complete_to_install2": "GROWI 설치 완료! 먼저 이 페이지의 각 설정을 확인하십시오.",

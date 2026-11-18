@@ -820,6 +820,7 @@
     "successfully_created": "已成功创建用户{{username}。",
     "can_not_activate_maximum_number_of_users": "无法激活超过最大用户数的用户。",
     "failed_to_activate": "无法激活。",
+    "only_invited_user_can_activate": "只有受邀用户才能激活账户。",
     "unable_to_use_this_user": "无法使用此用户。",
     "complete_to_install1": "完成安装GROWI！请以管理员帐户登录。",
     "complete_to_install2": "完成安装GROWI！请先检查此页上的每个设置。",
