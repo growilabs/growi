@@ -120,6 +120,9 @@ const CHAT_INTEGRATION_AI_ENTRY_ROOTS = [
   'features/chat-integration/server/agent/run-agent-request.ts',
   'features/chat-integration/server/agent/agent-answer.ts',
   'features/chat-integration/server/agent/agent-request-runner-for.ts',
+  'features/chat-integration/server/agent/record-agent-answer.ts',
+  'features/chat-integration/server/agent/sweep-stale-agent-requests.ts',
+  'features/chat-integration/server/outbox/outbox-dispatch-cron.ts',
 ] as const;
 
 describe('import boundary for the chat integration AI entry', () => {

@@ -4,6 +4,7 @@ import { type MockProxy, mock } from 'vitest-mock-extended';
 
 import CronService from '~/server/service/cron';
 
+import type { StaleAgentRequestSweep } from '../agent/sweep-stale-agent-requests';
 import {
   createIntegrationPresence,
   PRESENCE_ANSWER_TTL_MS,
@@ -25,6 +26,13 @@ const idleDispatcher = (): MockProxy<OutboxDispatcher> => {
   return dispatcher;
 };
 
+const idleSweep = () => vi.fn<StaleAgentRequestSweep>(async () => {});
+
+const present = () => ({
+  hasAnyIntegration: vi.fn(async () => true),
+  markPresent: vi.fn(),
+});
+
 describe('OutboxDispatchCronService', () => {
   it('is one of GROWI’s CronService jobs rather than a scheduling mechanism of its own', () => {
     expect(outboxDispatchCronService).toBeInstanceOf(CronService);
@@ -42,6 +50,7 @@ describe('OutboxDispatchCronService', () => {
       const hasAnyIntegration = vi.fn().mockResolvedValue(false);
 
       await new OutboxDispatchCronService({
+        sweep: idleSweep(),
         dispatcher,
         presence: { hasAnyIntegration, markPresent: vi.fn() },
         clock: () => NOW,
@@ -58,6 +67,7 @@ describe('OutboxDispatchCronService', () => {
       const hasAnyIntegration = vi.fn().mockResolvedValue(true);
 
       await new OutboxDispatchCronService({
+        sweep: idleSweep(),
         dispatcher,
         presence: { hasAnyIntegration, markPresent: vi.fn() },
         clock: () => NOW,
@@ -75,6 +85,7 @@ describe('OutboxDispatchCronService', () => {
       });
 
       await new OutboxDispatchCronService({
+        sweep: idleSweep(),
         dispatcher,
         presence,
         clock: () => NOW,
@@ -84,8 +95,88 @@ describe('OutboxDispatchCronService', () => {
     });
   });
 
+  // design.md 定期処理: after the presence check, the tick also sweeps agent
+  // requests whose run stopped (Requirement 15.10).
+  describe('when sweeping stale agent requests', () => {
+    const NOW = new Date('2026-01-01T00:00:00.000Z');
+
+    it('sweeps at the clock’s instant and requests a drain on each tick', async () => {
+      const dispatcher = idleDispatcher();
+      const sweep = idleSweep();
+
+      await new OutboxDispatchCronService({
+        sweep,
+        dispatcher,
+        presence: present(),
+        clock: () => NOW,
+      }).executeJob();
+
+      expect(sweep).toHaveBeenCalledTimes(1);
+      expect(sweep).toHaveBeenCalledWith(NOW);
+      expect(dispatcher.requestDrain).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not sweep when no integration exists', async () => {
+      const sweep = idleSweep();
+
+      await new OutboxDispatchCronService({
+        sweep,
+        dispatcher: idleDispatcher(),
+        presence: {
+          hasAnyIntegration: vi.fn(async () => false),
+          markPresent: vi.fn(),
+        },
+        clock: () => NOW,
+      }).executeJob();
+
+      expect(sweep).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['rejects', () => Promise.reject(new Error('db down'))],
+      [
+        'throws',
+        () => {
+          throw new Error('db down');
+        },
+      ],
+    ])('still requests the drain when the sweep %s', async (_label, fails) => {
+      const dispatcher = idleDispatcher();
+      const sweep = vi.fn<StaleAgentRequestSweep>(fails);
+
+      await expect(
+        new OutboxDispatchCronService({
+          sweep,
+          dispatcher,
+          presence: present(),
+          clock: () => NOW,
+        }).executeJob(),
+      ).resolves.toBeUndefined();
+
+      expect(dispatcher.requestDrain).toHaveBeenCalledTimes(1);
+    });
+
+    it('still sweeps when the drain cannot be requested', async () => {
+      const dispatcher = mock<OutboxDispatcher>();
+      dispatcher.requestDrain.mockRejectedValue(new Error('db down'));
+      const sweep = idleSweep();
+
+      await expect(
+        new OutboxDispatchCronService({
+          sweep,
+          dispatcher,
+          presence: present(),
+          clock: () => NOW,
+        }).executeJob(),
+      ).resolves.toBeUndefined();
+
+      expect(sweep).toHaveBeenCalledWith(NOW);
+    });
+  });
+
   it('never sweeps relations itself', async () => {
     await new OutboxDispatchCronService({
+      sweep: idleSweep(),
       dispatcher: idleDispatcher(),
       presence: {
         hasAnyIntegration: vi.fn().mockResolvedValue(true),
@@ -115,6 +206,7 @@ describe('OutboxDispatchCronService', () => {
         .mockResolvedValue(true);
       const dispatcher = idleDispatcher();
       const cron = new OutboxDispatchCronService({
+        sweep: idleSweep(),
         dispatcher,
         presence: createIntegrationPresence({ anyRelationExists }),
         clock: () => new Date(currentTime),
