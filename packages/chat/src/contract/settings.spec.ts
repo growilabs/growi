@@ -30,7 +30,7 @@ describe('RelationSettings', () => {
           commandName: 'create-page',
           allowedChannels: [toNativeChannelId('C1'), toNativeChannelId('C2')],
         },
-        { commandName: 'keep', allowedChannels: 'none' },
+        { commandName: 'link-preview', allowedChannels: 'none' },
       ],
     };
     expect(settings.channelPermissions).toHaveLength(3);

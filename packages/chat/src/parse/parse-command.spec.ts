@@ -105,6 +105,26 @@ describe('parseCommandRequest', () => {
     it('returns unknown-kind when kind is missing', () => {
       expect(parseCommandRequest(envelope)).toEqual({ error: 'unknown-kind' });
     });
+
+    // Requirement 15.13: `keep` is withdrawn, so it is not in the vocabulary
+    // and its old, otherwise well-formed request is refused by its kind.
+    it('treats keep as an unknown kind, not a command', () => {
+      expect(Object.values(COMMAND_NAMES)).not.toContain('keep');
+      expect(
+        parseCommandRequest({
+          ...envelope,
+          kind: 'keep',
+          path: '/foo',
+          messages: [
+            {
+              postedAt: '2026-01-01T00:00:00.000Z',
+              author: actor,
+              markdown: 'kept text',
+            },
+          ],
+        }),
+      ).toEqual({ error: 'unknown-kind' });
+    });
   });
 
   describe('kind: search', () => {
@@ -194,86 +214,6 @@ describe('parseCommandRequest', () => {
       expect(
         parseCommandRequest({ ...base, body: 'x'.repeat(200_001) }),
       ).toEqual({ error: 'malformed' });
-    });
-  });
-
-  describe('kind: keep', () => {
-    const message = {
-      postedAt: '2026-01-01T00:00:00.000Z',
-      author: actor,
-      markdown: 'kept text',
-    };
-    const base = {
-      ...envelope,
-      kind: 'keep',
-      path: '/foo',
-      messages: [message],
-    };
-
-    it('accepts a valid keep command', () => {
-      expect(parseCommandRequest(base)).toEqual(base);
-    });
-
-    it('accepts an empty messages array', () => {
-      expect(parseCommandRequest({ ...base, messages: [] })).toEqual({
-        ...base,
-        messages: [],
-      });
-    });
-
-    it('rejects when path is missing', () => {
-      const { path: _omit, ...rest } = base;
-      expect(parseCommandRequest(rest)).toEqual({ error: 'malformed' });
-    });
-
-    it('rejects when messages is missing', () => {
-      const { messages: _omit, ...rest } = base;
-      expect(parseCommandRequest(rest)).toEqual({ error: 'malformed' });
-    });
-
-    it('rejects a message missing a required sub-field', () => {
-      const { postedAt: _omit, ...restMessage } = message;
-      expect(parseCommandRequest({ ...base, messages: [restMessage] })).toEqual(
-        { error: 'malformed' },
-      );
-    });
-
-    it('rejects a message with a wrong-typed author', () => {
-      expect(
-        parseCommandRequest({
-          ...base,
-          messages: [{ ...message, author: 'not-an-account-ref' }],
-        }),
-      ).toEqual({ error: 'malformed' });
-    });
-
-    it('rejects a message with a wrong-typed markdown', () => {
-      expect(
-        parseCommandRequest({
-          ...base,
-          messages: [{ ...message, markdown: 123 }],
-        }),
-      ).toEqual({ error: 'malformed' });
-    });
-
-    it('rejects an oversized messages array', () => {
-      const many = Array.from({ length: 201 }, () => message);
-      expect(parseCommandRequest({ ...base, messages: many })).toEqual({
-        error: 'malformed',
-      });
-    });
-
-    it('rejects a messages array containing a non-object element', () => {
-      expect(parseCommandRequest({ ...base, messages: [null] })).toEqual({
-        error: 'malformed',
-      });
-    });
-
-    it('accepts an empty markdown for a kept message (attachment-only)', () => {
-      const blankMessage = { ...message, markdown: '' };
-      expect(
-        parseCommandRequest({ ...base, messages: [blankMessage] }),
-      ).toEqual({ ...base, messages: [blankMessage] });
     });
   });
 
@@ -484,20 +424,9 @@ describe('parseCommandResponse', () => {
       expect(parseCommandResponse(base)).toEqual(base);
     });
 
-    it('accepts a valid created response with importedMessageCount', () => {
-      const withCount = { ...base, importedMessageCount: 5 };
-      expect(parseCommandResponse(withCount)).toEqual(withCount);
-    });
-
     it('rejects when pageUrl is missing', () => {
       const { pageUrl: _omit, ...rest } = base;
       expect(parseCommandResponse(rest)).toEqual({ error: 'malformed' });
-    });
-
-    it('rejects a negative importedMessageCount', () => {
-      expect(
-        parseCommandResponse({ ...base, importedMessageCount: -1 }),
-      ).toEqual({ error: 'malformed' });
     });
 
     it('rejects an oversized pageUrl', () => {

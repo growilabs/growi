@@ -49,7 +49,6 @@ export type {
   ConversationRange,
   ConversationRequest,
   ConversationResult,
-  KeepMessage,
   KeyOperationResult,
   KeyRegistrationRequest,
   KeyRevocationRequest,

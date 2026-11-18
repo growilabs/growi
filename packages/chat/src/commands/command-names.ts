@@ -9,7 +9,6 @@
 export const COMMAND_NAMES = {
   search: 'search',
   createPage: 'create-page',
-  keep: 'keep',
   agent: 'agent',
   linkPreview: 'link-preview',
   help: 'help',
@@ -67,12 +66,6 @@ export const COMMAND_TRAITS: Readonly<Record<CommandName, CommandTraits>> = {
     mayCreatePages: false,
   },
   [COMMAND_NAMES.createPage]: {
-    writes: true,
-    targeting: 'single',
-    directMessagePolicy: 'follows-all-channels',
-    mayCreatePages: false,
-  },
-  [COMMAND_NAMES.keep]: {
     writes: true,
     targeting: 'single',
     directMessagePolicy: 'follows-all-channels',

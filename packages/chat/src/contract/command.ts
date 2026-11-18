@@ -51,11 +51,6 @@ export type CommandRequest = CommandEnvelope &
         readonly body: string;
       }
     | {
-        readonly kind: typeof COMMAND_NAMES.keep;
-        readonly path: string;
-        readonly messages: ReadonlyArray<KeepMessage>;
-      }
-    | {
         readonly kind: typeof COMMAND_NAMES.agent;
         /** The request with only the mention of the bot itself removed (Requirement 15.17). */
         readonly text: string;
@@ -68,16 +63,6 @@ export type CommandRequest = CommandEnvelope &
       }
     | { readonly kind: typeof COMMAND_NAMES.help }
   );
-
-/**
- * Requirement 5.2 / 5.3: the speaker stays a chat-side identifier here;
- * GROWI resolves it to a GROWI user (if linked) when the page is created.
- */
-export interface KeepMessage {
-  readonly postedAt: string;
-  readonly author: ChatAccountRef;
-  readonly markdown: string;
-}
 
 /** Requirement 3.9: structured data, not a pre-rendered display string. */
 export interface SearchResultItem {
@@ -113,11 +98,10 @@ export type CommandResponse =
       readonly items: ReadonlyArray<SearchResultItem>;
       readonly appliedAs: 'linked-user' | 'anonymous';
     }
-  /** create-page and keep both return this. */
+  /** create-page returns this. */
   | {
       readonly kind: typeof RESPONSE_KINDS.created;
       readonly pageUrl: string;
-      readonly importedMessageCount?: number;
     }
   | {
       readonly kind: typeof RESPONSE_KINDS.linkPreview;

@@ -7,7 +7,6 @@ import type {
   CommandEnvelope,
   CommandRequest,
   CommandResponse,
-  KeepMessage,
   ResponseKind,
   SearchResultItem,
 } from './command.js';
@@ -77,30 +76,6 @@ describe('CommandRequest', () => {
       body: '# Notes',
     };
     expect(request.kind).toBe('create-page');
-  });
-
-  it('builds a keep request whose messages keep the chat-side speaker (Requirement 5.2, 5.3)', () => {
-    const message: KeepMessage = {
-      postedAt: '2026-09-01T00:00:00.000Z',
-      author: { platform: 'slack', accountId: 'U2', displayName: 'Bob' },
-      markdown: 'hello',
-    };
-    const request: CommandRequest = {
-      relationId: 'rel-1',
-      op: OP_NAMES.command,
-      requestId: 'req-1',
-      actor: { platform: 'slack', accountId: 'U1', displayName: 'Alice' },
-      channel: {
-        platform: 'slack',
-        channelId: toNativeChannelId('C1'),
-        channelName: 'general',
-        isPrivate: false,
-      },
-      kind: COMMAND_NAMES.keep,
-      path: '/team/thread',
-      messages: [message],
-    };
-    expect(request.messages[0]).toEqual(message);
   });
 
   it('builds an agent request carrying the request text and the conversation key (Requirement 15.1)', () => {
@@ -239,21 +214,12 @@ describe('CommandResponse', () => {
     expect(response.kind).toBe('search');
   });
 
-  it('builds a created response shared by create-page and keep (Requirement 4.2, 5.2)', () => {
+  it('builds a created response for create-page (Requirement 4.2)', () => {
     const response: CommandResponse = {
       kind: RESPONSE_KINDS.created,
       pageUrl: 'https://growi.example.com/team/notes',
-      importedMessageCount: 5,
     };
     expect(response.kind).toBe('created');
-  });
-
-  it('builds a created response with importedMessageCount omitted for create-page (Requirement 4.2)', () => {
-    const response: CommandResponse = {
-      kind: RESPONSE_KINDS.created,
-      pageUrl: 'https://growi.example.com/team/notes',
-    };
-    expect(response.importedMessageCount).toBeUndefined();
   });
 
   it('builds a link-preview response that omits detail fields for a restricted page (Requirement 6.2, 6.3)', () => {

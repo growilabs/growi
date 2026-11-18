@@ -11,7 +11,6 @@ export type {
   CommandEnvelope,
   CommandRequest,
   CommandResponse,
-  KeepMessage,
   ResponseKind,
   SearchResultItem,
 } from './command.js';

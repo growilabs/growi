@@ -12,7 +12,6 @@ import { COMMAND_NAMES, type CommandName } from '../commands/command-names.js';
 import {
   type CommandRequest,
   type CommandResponse,
-  type KeepMessage,
   RESPONSE_KINDS,
   type SearchResultItem,
 } from '../contract/command.js';
@@ -39,14 +38,6 @@ const PATH_MAX = 4000;
  * strings unconditionally).
  */
 const BODY_MAX = 200_000;
-const MESSAGES_MAX = 200;
-const POSTED_AT_MAX = 64;
-/**
- * A single kept chat message's markdown -- smaller than a page body. An
- * empty value is legitimate (an attachment/image-only chat message has no
- * text body), so this is checked by hand, not via `str` (see `body` below).
- */
-const KEEP_MARKDOWN_MAX = 20_000;
 const PAGE_URL_MAX = 2000;
 /** `agent`'s request text and conversation key bounds (design.md CommandVocabulary). */
 const AGENT_TEXT_MAX = 8000;
@@ -64,29 +55,6 @@ const parseSearchLimit = (v: unknown): number | undefined =>
   v <= SEARCH_LIMIT_MAX
     ? v
     : undefined;
-
-const parseKeepMessage = (v: unknown): KeepMessage | undefined => {
-  if (!isRecord(v)) {
-    return undefined;
-  }
-
-  const postedAt = str(v.postedAt, POSTED_AT_MAX);
-  const author = parseChatAccountRef(v.author);
-  const markdown =
-    typeof v.markdown === 'string' && v.markdown.length <= KEEP_MARKDOWN_MAX
-      ? v.markdown
-      : undefined;
-
-  if (
-    postedAt === undefined ||
-    author === undefined ||
-    markdown === undefined
-  ) {
-    return undefined;
-  }
-
-  return { postedAt, author, markdown };
-};
 
 export const parseCommandRequest = (
   raw: unknown,
@@ -141,14 +109,6 @@ export const parseCommandRequest = (
       }
       return { ...envelope, kind, path, body };
     }
-    case COMMAND_NAMES.keep: {
-      const path = str(raw.path, PATH_MAX);
-      const messages = arr(raw.messages, MESSAGES_MAX, parseKeepMessage);
-      if (path === undefined || messages === undefined) {
-        return { error: 'malformed' };
-      }
-      return { ...envelope, kind, path, messages };
-    }
     case COMMAND_NAMES.agent: {
       const text = str(raw.text, AGENT_TEXT_MAX);
       const conversationKey = str(raw.conversationKey, CONVERSATION_KEY_MAX);
@@ -198,11 +158,6 @@ const TITLE_MAX = 500;
 const RANK_MAX = 1_000_000;
 const RESULT_UPDATED_AT_MAX = 64;
 const COMMENT_COUNT_MAX = 1_000_000;
-/**
- * `importedMessageCount` counts kept chat messages, so it can never exceed
- * `CommandRequest`'s own `keep.messages` array bound.
- */
-const IMPORTED_MESSAGE_COUNT_MAX = MESSAGES_MAX;
 const EXCERPT_MAX = 2000;
 /** The command vocabulary is small; generous headroom for growth. */
 const COMMANDS_MAX = 50;
@@ -311,17 +266,7 @@ export const parseCommandResponse = (
       if (pageUrl === undefined) {
         return { error: 'malformed' };
       }
-      if (raw.importedMessageCount === undefined) {
-        return { kind, pageUrl };
-      }
-      const importedMessageCount = parseNonNegativeInt(
-        raw.importedMessageCount,
-        IMPORTED_MESSAGE_COUNT_MAX,
-      );
-      if (importedMessageCount === undefined) {
-        return { error: 'malformed' };
-      }
-      return { kind, pageUrl, importedMessageCount };
+      return { kind, pageUrl };
     }
     case RESPONSE_KINDS.linkPreview: {
       const path = str(raw.path, PATH_MAX);

@@ -101,7 +101,7 @@ describe('parseCommandAnswerRequest', () => {
   });
 
   it('rejects an answer of an unknown kind', () => {
-    rejects(requestWith({ kind: 'keep', markdown: 'x', sources: [] }));
+    rejects(requestWith({ kind: 'summary', markdown: 'x', sources: [] }));
   });
 
   it('rejects an unknown failure reason', () => {

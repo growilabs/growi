@@ -18,7 +18,6 @@ describe('command name vocabulary', () => {
     expect(COMMAND_NAMES).toEqual({
       search: 'search',
       createPage: 'create-page',
-      keep: 'keep',
       agent: 'agent',
       linkPreview: 'link-preview',
       help: 'help',
@@ -51,7 +50,6 @@ describe('command traits', () => {
     // Requirement 8.2: a single-target write makes the user pick when the
     // channel has several GROWIs linked. Requirement 11.1: it writes.
     [COMMAND_NAMES.createPage, true, 'single', 'follows-all-channels'],
-    [COMMAND_NAMES.keep, true, 'single', 'follows-all-channels'],
     // Requirement 11.6 / 15.13: agent writes (it can create a page), so it is
     // denied until an admin allows it, and it targets exactly one GROWI.
     // Requirement 11.7: whether it runs in a DM is its own setting, not the

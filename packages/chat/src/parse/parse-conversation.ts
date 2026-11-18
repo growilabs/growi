@@ -19,7 +19,7 @@ import { arr, isRecord, oneOf, str } from './shape.js';
 const RELATION_ID_MAX = 128;
 const REQUEST_ID_MAX = 128;
 // Limits from design.md's ConversationContract: at most 200 messages, and a
-// message of at most 20,000 characters (the same as a `keep` message).
+// message of at most 20,000 characters.
 const MESSAGES_MAX = 200;
 const MESSAGE_MARKDOWN_MAX = 20_000;
 // Not in design.md; same bound as `ConversationRange`'s timestamps.
@@ -34,8 +34,8 @@ const parseMessage = (v: unknown): ConversationMessage | undefined => {
 
   const postedAt = str(v.postedAt, POSTED_AT_MAX);
   const author = parseChatAccountRef(v.author);
-  // Checked by hand, not via `str`: an attachment-only post has an empty body
-  // (see KEEP_MARKDOWN_MAX in parse-command.ts).
+  // Checked by hand, not via `str` (which rejects an empty string): an
+  // attachment-only post has an empty body.
   const { markdown } = v;
 
   return postedAt === undefined ||
