@@ -114,7 +114,8 @@ const validator = {
  *                     description: >-
  *                       Model name of the activity target. For attachment
  *                       activities (ATTACHMENT_ADD / ATTACHMENT_REMOVE /
- *                       ATTACHMENT_DOWNLOAD) this is "Attachment".
+ *                       ATTACHMENT_DOWNLOAD / ATTACHMENT_REEXTRACT) this is
+ *                       "Attachment".
  *                     example: "Page"
  *                   target:
  *                     type: string
@@ -123,7 +124,8 @@ const validator = {
  *                       this is the attachment ID; combined with the snapshot
  *                       fields it lets consumers build a download link for
  *                       attachments that still exist (ATTACHMENT_ADD /
- *                       ATTACHMENT_DOWNLOAD, distinguished by `action`).
+ *                       ATTACHMENT_DOWNLOAD / ATTACHMENT_REEXTRACT,
+ *                       distinguished by `action`).
  *                     example: "675547e97f208f8050a361d4"
  *                   action:
  *                     type: string
@@ -146,14 +148,16 @@ const validator = {
  *                         description: >-
  *                           Original file name of the attachment.
  *                           Present on attachment activities (ATTACHMENT_ADD /
- *                           ATTACHMENT_REMOVE / ATTACHMENT_DOWNLOAD).
+ *                           ATTACHMENT_REMOVE / ATTACHMENT_DOWNLOAD /
+ *                           ATTACHMENT_REEXTRACT).
  *                         example: "design-v2.pdf"
  *                       pagePath:
  *                         type: string
  *                         description: >-
  *                           Path of the page the attachment belongs or belonged
  *                           to. Present on attachment activities (ATTACHMENT_ADD /
- *                           ATTACHMENT_REMOVE / ATTACHMENT_DOWNLOAD) when it
+ *                           ATTACHMENT_REMOVE / ATTACHMENT_DOWNLOAD /
+ *                           ATTACHMENT_REEXTRACT) when it
  *                           could be resolved at capture time.
  *                         example: "/Sandbox/attachments"
  *                       pageId:
@@ -161,14 +165,16 @@ const validator = {
  *                         description: >-
  *                           ID of the page the attachment belongs or belonged
  *                           to. Present on attachment activities (ATTACHMENT_ADD /
- *                           ATTACHMENT_REMOVE / ATTACHMENT_DOWNLOAD).
+ *                           ATTACHMENT_REMOVE / ATTACHMENT_DOWNLOAD /
+ *                           ATTACHMENT_REEXTRACT).
  *                         example: "675547e97f208f8050a361d4"
  *                       fileSize:
  *                         type: integer
  *                         description: >-
  *                           File size in bytes of the attachment.
  *                           Present on attachment activities (ATTACHMENT_ADD /
- *                           ATTACHMENT_REMOVE / ATTACHMENT_DOWNLOAD).
+ *                           ATTACHMENT_REMOVE / ATTACHMENT_DOWNLOAD /
+ *                           ATTACHMENT_REEXTRACT).
  *                         example: 12345
  *                   createdAt:
  *                     type: string

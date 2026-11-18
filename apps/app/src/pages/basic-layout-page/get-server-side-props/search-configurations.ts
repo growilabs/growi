@@ -1,5 +1,6 @@
 import type { GetServerSideProps, GetServerSidePropsContext } from 'next';
 
+import { isAttachmentFullTextSearchEnabled } from '~/features/search-attachments/server/services/is-attachment-full-text-search-enabled';
 import type { CrowiRequest } from '~/interfaces/crowi-request';
 
 import type { SearchConfigurationProps } from '../types';
@@ -18,6 +19,9 @@ export const getServerSideSearchConfigurationProps: GetServerSideProps<
         isSearchServiceReachable: searchService.isReachable,
         isSearchScopeChildrenAsDefault: configManager.getConfig(
           'customize:isSearchScopeChildrenAsDefault',
+        ),
+        isAttachmentFullTextSearchEnabled: isAttachmentFullTextSearchEnabled(
+          searchService.isConfigured,
         ),
       },
     },

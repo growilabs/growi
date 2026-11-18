@@ -153,4 +153,31 @@ describe('middlewareFactory', () => {
       canonical[0]?.config?.maxRequests,
     );
   });
+
+  describe('attachment re-extraction', () => {
+    const ID = '0123456789abcdef01234567';
+
+    it.each([
+      `/_api/v3/attachments/${ID}/reextract`,
+      `/_API/v3/attachments/${ID.toUpperCase()}/reextract/`,
+      `/_api/v3//attachments/${ID}/reextract`,
+    ])('limits POST %s to the tier-1 limit', async (path) => {
+      const configs = await configsUsedFor(path, 'POST');
+
+      for (const config of configs) {
+        expect(config?.maxRequests).toBe(5);
+      }
+    });
+
+    it('leaves other attachment routes on the global default', async () => {
+      const configs = await configsUsedFor(
+        `/_api/v3/attachments/${ID}`,
+        'POST',
+      );
+
+      for (const config of configs) {
+        expect(config).toBeUndefined();
+      }
+    });
+  });
 });
