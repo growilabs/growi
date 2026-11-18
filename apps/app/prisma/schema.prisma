@@ -30,13 +30,15 @@ datasource db {
 }
 
 type ActivitiesSnapshot {
-  id           String  @map("_id") @db.ObjectId
+  id            String  @map("_id") @db.ObjectId
   // username is optional as a safeguard for deletion paths without a user
-  username     String?
-  originalName String?
-  pagePath     String?
-  pageId       String? @db.ObjectId
-  fileSize     Int?
+  username      String?
+  originalName  String?
+  pagePath      String?
+  pageId        String? @db.ObjectId
+  fileSize      Int?
+  // ui | api | ai-tool; written only by change-proposal review activities
+  reviewChannel String?
 }
 
 type ChangeproposalsOperationsRevertTarget {
@@ -66,6 +68,30 @@ type ChangeproposalsOperations {
   revertTarget         ChangeproposalsOperationsRevertTarget?
   revertedByProposalId String?                                @db.ObjectId
   revertedAt           DateTime?
+  // Set together with approvedAt only when an approval request wrote it
+  approvedBy           String?                                @db.ObjectId
+  approvedChannel      String?
+  decisionToken        String?
+}
+
+// A removed reviewer stays as a record; a set removedAt means "not a reviewer"
+type ChangeproposalsReviewers {
+  kind      String
+  id        String    @db.ObjectId
+  addedBy   String    @db.ObjectId
+  addedAt   DateTime
+  removedBy String?   @db.ObjectId
+  removedAt DateTime?
+}
+
+// A missing operationKey is a rejection of the whole proposal
+type ChangeproposalsReviews {
+  kind         String
+  operationKey String?
+  by           String   @db.ObjectId
+  at           DateTime
+  comment      String?
+  channel      String
 }
 
 type ChangeproposalsBasedOn {
@@ -272,6 +298,9 @@ model changeproposals {
   applyLease           ChangeproposalsApplyLease?
   expiresAt            DateTime?
   perPageNotifications Boolean                     @default(true)
+  purpose              String?
+  reviewers            ChangeproposalsReviewers[]
+  reviews              ChangeproposalsReviews[]
   createdAt            DateTime                    @default(now())
   updatedAt            DateTime                    @updatedAt
 
@@ -283,6 +312,7 @@ model changeproposals {
   @@index([lastAppliedAt(sort: Desc)], map: "lastAppliedAt_-1")
   @@index([revertOf], map: "revertOf_1")
   @@index([basedOn.proposalId], map: "basedOn.proposalId_1")
+  @@index([lifecycle, reviewers.id, id], map: "lifecycle_1_reviewers.id_1__id_1")
 }
 
 model changestream_resume_tokens {

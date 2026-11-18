@@ -4,14 +4,19 @@ import type { RequestHandler } from 'express';
 import { body, type ValidationChain } from 'express-validator';
 
 import type Crowi from '~/server/crowi';
-import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import {
+  type AccessTokenParserReq,
+  accessTokenParser,
+} from '~/server/middlewares/access-token-parser';
+import { extractAccessToken } from '~/server/middlewares/access-token-parser/extract-access-token';
 import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
 import { excludeReadOnlyUser } from '~/server/middlewares/exclude-read-only-user';
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 
-import type { ApplyTrigger } from '../../interfaces';
+import type { ApplyTrigger, ReviewChannel } from '../../interfaces';
 import type { ServiceError } from '../services/change-proposal-service-types';
+import type { ReviewerActionError } from '../services/reviewer-actions';
 import { proposalNotFound } from './get-proposal';
 
 // Bounds the request body; a proposal with more operations is approved or reverted as a whole.
@@ -45,10 +50,9 @@ export const operationKeysValidator = (
 };
 
 /**
- * The service records CHANGE_PROPOSAL_APPLY / _REVERT on this request's activity
- * only when the run applied something. Otherwise the activity stays unsettled and
- * the finalizer drops it: the run that applies the approved operations later
- * records the action itself, and an approval alone has no action to record.
+ * The service records CHANGE_PROPOSAL_APPROVE on this request's activity when the
+ * request approved something, and CHANGE_PROPOSAL_REVERT when a revert applied
+ * something. Otherwise the activity stays unsettled and the finalizer drops it.
  */
 export const requestTrigger = (res: ApiV3Response): ApplyTrigger => {
   const activityId: unknown = res.locals.activity?._id;
@@ -58,9 +62,42 @@ export const requestTrigger = (res: ApiV3Response): ApplyTrigger => {
     : { kind: 'background' };
 };
 
+// An access token marks a call from outside the UI.
+export const detectChannel = (req: AccessTokenParserReq): ReviewChannel =>
+  extractAccessToken(req) == null ? 'ui' : 'api';
+
+// Every refusal a reviewer action words for its caller; the satisfies clause
+// fails the type check when a new ReviewerActionError has no answer here.
+const BAD_REQUEST_OF = {
+  'comment-too-long': {
+    message: 'The comment is too long',
+    code: 'comment_too_long',
+  },
+  'requester-cannot-review': {
+    message:
+      'The requester cannot reject or abstain from their own change proposal',
+    code: 'requester_cannot_review',
+  },
+  'reviewer-not-found': {
+    message: 'A reviewer does not exist',
+    code: 'reviewer_not_found',
+  },
+  'too-many-reviewers': {
+    message: 'The change proposal would have too many reviewers',
+    code: 'too_many_reviewers',
+  },
+  'reviewers-disabled': {
+    message: 'Reviewers cannot be added on this wiki',
+    code: 'reviewers_disabled',
+  },
+} as const satisfies Record<
+  Exclude<ReviewerActionError, 'not-found' | 'not-open' | 'user-not-allowed'>,
+  { message: string; code: string }
+>;
+
 export const respondWithServiceError = (
   res: ApiV3Response,
-  error: ServiceError,
+  error: { readonly code: ServiceError['code'] | ReviewerActionError },
 ): unknown => {
   switch (error.code) {
     case 'not-found':
@@ -75,8 +112,20 @@ export const respondWithServiceError = (
         new ErrorV3('This user may not change proposals', 'user_not_allowed'),
         403,
       );
+    case 'comment-too-long':
+    case 'requester-cannot-review':
+    case 'reviewer-not-found':
+    case 'too-many-reviewers':
+    case 'reviewers-disabled':
+      return res.apiv3Err(
+        new ErrorV3(
+          BAD_REQUEST_OF[error.code].message,
+          BAD_REQUEST_OF[error.code].code,
+        ),
+        400,
+      );
     default:
-      // Codes only createProposal returns; no write route here can produce them.
+      // Codes only createProposal returns; no route here creates a proposal.
       return res.apiv3Err(
         new ErrorV3('Unexpected change proposal error', 'unexpected_error'),
         500,

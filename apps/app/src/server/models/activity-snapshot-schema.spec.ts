@@ -52,4 +52,19 @@ describe('ActivitiesSnapshot composite type (generated from schema.prisma)', () 
     };
     expect(attachmentSnapshot.originalName).toBe('design.pdf');
   });
+
+  it('Req 20.8 — types reviewChannel as a nullable string on the read model', () => {
+    expectTypeOf<ActivitiesSnapshot['reviewChannel']>().toEqualTypeOf<
+      string | null
+    >();
+  });
+
+  it('Req 20.8 — accepts a create input carrying reviewChannel alongside username', () => {
+    const reviewSnapshot: Prisma.ActivitiesSnapshotCreateInput = {
+      id: '675547e97f208f8050a361d4',
+      username: 'alice',
+      reviewChannel: 'api',
+    };
+    expect(reviewSnapshot.reviewChannel).toBe('api');
+  });
 });

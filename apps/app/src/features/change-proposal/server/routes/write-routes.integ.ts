@@ -88,6 +88,14 @@ describe('change-proposal write routes', () => {
       { timeout: 5000, interval: 50 },
     );
 
+  const applyActivitiesOf = (proposalId: string) =>
+    prisma.activities.findMany({
+      where: {
+        target: proposalId,
+        action: SupportedAction.ACTION_CHANGE_PROPOSAL_APPLY,
+      },
+    });
+
   const expectNoActivityAt = async (endpoint: string) => {
     await sleep(ABSENCE_WAIT_MS);
     expect(await activitiesAt(endpoint)).toEqual([]);
@@ -195,7 +203,7 @@ describe('change-proposal write routes', () => {
   }, 60_000);
 
   describe('POST /:id/approve', () => {
-    it('applies every pending operation and records one APPLY activity for the request', async () => {
+    it('applies every pending operation, records the approval on the request and the apply on its own activity (Req 20.8, 20.9)', async () => {
       asUser(users.requester);
       const proposal = await newPendingProposal();
 
@@ -211,10 +219,46 @@ describe('change-proposal write routes', () => {
       await sleep(ABSENCE_WAIT_MS);
       expect(await activitiesAt(endpoint)).toHaveLength(1);
       expect(row).toMatchObject({
-        action: SupportedAction.ACTION_CHANGE_PROPOSAL_APPLY,
+        action: SupportedAction.ACTION_CHANGE_PROPOSAL_APPROVE,
         target: proposal._id,
         userId: users.requester._id.toString(),
       });
+      expect(row.snapshot).toMatchObject({ reviewChannel: 'ui' });
+      expect(await applyActivitiesOf(proposal._id)).toEqual([
+        expect.objectContaining({ userId: users.requester._id.toString() }),
+      ]);
+    });
+
+    it("lets a reviewer approve, keeping the reviewer's ip on the approval and off the requester's apply (Req 16.1, 20.9)", async () => {
+      const page = await kit.createPage('by-reviewer');
+      const proposal = await kit.storeProposal([kit.editInput(page)], {
+        approve: false,
+        reviewers: [
+          {
+            kind: 'user',
+            id: users.subscriber._id.toString(),
+            addedBy: users.requester._id.toString(),
+            addedAt: new Date(),
+          },
+        ],
+      });
+      asUser(users.subscriber);
+
+      const res = await post(proposal._id, 'approve');
+
+      expect(res.status).toBe(200);
+      expect(res.body.result.results).toEqual([
+        expect.objectContaining({ status: 'applied' }),
+      ]);
+      const endpoint = endpointOf(proposal._id, 'approve');
+      const [row] = await waitForActivitiesAt(endpoint, 1);
+      expect(row).toMatchObject({
+        action: SupportedAction.ACTION_CHANGE_PROPOSAL_APPROVE,
+        userId: users.subscriber._id.toString(),
+      });
+      const [apply] = await applyActivitiesOf(proposal._id);
+      expect(apply.userId).toBe(users.requester._id.toString());
+      expect([apply.ip || null, apply.endpoint || null]).toEqual([null, null]);
     });
 
     it('applies only the chosen page', async () => {
@@ -235,7 +279,7 @@ describe('change-proposal write routes', () => {
       expect(kit.operationOf(reloaded, left.key).status).toBe('pending');
     });
 
-    it('records no activity when nothing could be applied (someone is editing the page)', async () => {
+    it('records the approval but no apply when nothing could be applied (someone is editing the page)', async () => {
       asUser(users.requester);
       const page = await kit.createPage('being-edited');
       const proposal = await pendingProposal([page]);
@@ -251,7 +295,13 @@ describe('change-proposal write routes', () => {
           reason: 'page-being-edited',
         }),
       ]);
-      await expectNoActivityAt(endpointOf(proposal._id, 'approve'));
+      const [row] = await waitForActivitiesAt(
+        endpointOf(proposal._id, 'approve'),
+        1,
+      );
+      expect(row.action).toBe(SupportedAction.ACTION_CHANGE_PROPOSAL_APPROVE);
+      await sleep(ABSENCE_WAIT_MS);
+      expect(await applyActivitiesOf(proposal._id)).toEqual([]);
     });
 
     it('leaves the APPLY activity to the run holding the lease', async () => {
@@ -269,8 +319,18 @@ describe('change-proposal write routes', () => {
       const res = await post(proposal._id, 'approve');
 
       expect(res.status).toBe(200);
-      expect(res.body.result).toEqual({ type: 'in-progress' });
-      await expectNoActivityAt(endpointOf(proposal._id, 'approve'));
+      expect(res.body.result).toEqual({
+        type: 'in-progress',
+        results: [{ key: proposal.operations[0].key, status: 'pending' }],
+      });
+      const [approval] = await waitForActivitiesAt(
+        endpointOf(proposal._id, 'approve'),
+        1,
+      );
+      expect(approval.action).toBe(
+        SupportedAction.ACTION_CHANGE_PROPOSAL_APPROVE,
+      );
+      expect(await applyActivitiesOf(proposal._id)).toEqual([]);
 
       await prisma.changeproposals.releaseApplyLease(
         proposal._id,
@@ -279,9 +339,7 @@ describe('change-proposal write routes', () => {
       await kit.newApplier().apply(proposal._id, BACKGROUND, { ip: TEST_IP });
       const rows = await vi.waitFor(
         async () => {
-          const found = await prisma.activities.findMany({
-            where: { ip: TEST_IP, target: proposal._id },
-          });
+          const found = await applyActivitiesOf(proposal._id);
           if (found.length === 0) {
             throw new Error('no apply activity yet');
           }
@@ -386,6 +444,9 @@ describe('change-proposal write routes', () => {
       );
       expect(writeScope.status).toBe(200);
       expect(writeScope.body.result.type).toBe('done');
+      expect(
+        (await kit.reload(proposal._id)).operations[0].approvedChannel,
+      ).toBe('api');
     });
   });
 
