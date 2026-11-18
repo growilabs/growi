@@ -51,12 +51,32 @@ export type ReviewRecordActionsDeps = {
   readonly now: () => Date;
 };
 
-// Omit on each member keeps the kind tied to its keys.
-type ReviewRequest = ReviewEntry extends infer E
-  ? E extends unknown
-    ? Omit<E, 'channel'>
-    : never
-  : never;
+// The whole-proposal case is its own variant, so a caller's keys can never be read as it.
+type OperationsTarget = {
+  readonly scope: 'operations';
+  readonly operationKeys: readonly string[];
+};
+
+type ReviewRequest = { readonly comment?: string } & (
+  | { readonly kind: ReviewKind; readonly target: OperationsTarget }
+  | { readonly kind: 'reject'; readonly target: { readonly scope: 'whole' } }
+);
+
+// The stored shape marks a whole rejection with a keys marker; only this builds it.
+const toEntry = (
+  request: ReviewRequest,
+  channel: ReviewEntry['channel'],
+): ReviewEntry => {
+  const { comment, target } = request;
+  return target.scope === 'whole'
+    ? { kind: 'reject', operationKeys: 'whole-proposal', comment, channel }
+    : {
+        kind: request.kind,
+        operationKeys: target.operationKeys,
+        comment,
+        channel,
+      };
+};
 
 const ACTIVITY_OF = {
   reject: SupportedAction.ACTION_CHANGE_PROPOSAL_REJECT,
@@ -69,23 +89,19 @@ const NOTICE_RESULT_OF = {
 } as const satisfies Record<ReviewKind, string>;
 
 // An AI tool calls the service without the route's validators, so the shape is checked here too.
-// 'whole-proposal' is the service's own marker: only rejectAll may carry it, so a caller's
-// value for the keys is never mistaken for it.
-const findInvalidInput = (
-  action: ReviewerActionName,
-  request: ReviewRequest,
-): ReviewerActionError | null => {
-  const { comment, operationKeys } = request;
+const findInvalidInput = ({
+  comment,
+  target,
+}: ReviewRequest): ReviewerActionError | null => {
   if (comment != null && typeof comment !== 'string') {
     return 'invalid-request';
   }
-  const keysAreValid =
-    action === 'rejectAll'
-      ? operationKeys === 'whole-proposal'
-      : Array.isArray(operationKeys) &&
-        operationKeys.length > 0 &&
-        operationKeys.every((key) => typeof key === 'string');
-  if (!keysAreValid) {
+  if (
+    target.scope === 'operations' &&
+    (!Array.isArray(target.operationKeys) ||
+      target.operationKeys.length === 0 ||
+      !target.operationKeys.every((key) => typeof key === 'string'))
+  ) {
     return 'invalid-request';
   }
   return comment != null &&
@@ -96,12 +112,12 @@ const findInvalidInput = (
 
 const toNotice = (entry: ReviewRequest): ReviewDecisionNotice => {
   const comment = entry.comment == null ? {} : { comment: entry.comment };
-  return entry.operationKeys === 'whole-proposal'
+  return entry.target.scope === 'whole'
     ? { kind: 'whole-rejection', ...comment }
     : {
         kind: 'operations',
         result: NOTICE_RESULT_OF[entry.kind],
-        operationKeys: entry.operationKeys,
+        operationKeys: entry.target.operationKeys,
         ...comment,
       };
 };
@@ -115,16 +131,20 @@ const chooseRecorded = (
   readonly entry: ReviewRequest;
   readonly reported: ReadonlySet<string>;
 } => {
-  if (request.operationKeys === 'whole-proposal') {
+  const { target } = request;
+  if (target.scope === 'whole') {
     return { entry: request, reported: new Set() };
   }
   const { requestedKeys, targetKeys } = selectDecisionTargets(
     proposal.operations,
     scope,
-    request.operationKeys,
+    target.operationKeys,
   );
   return {
-    entry: { ...request, operationKeys: targetKeys },
+    entry: {
+      ...request,
+      target: { scope: 'operations', operationKeys: targetKeys },
+    },
     reported: new Set([...requestedKeys, ...targetKeys]),
   };
 };
@@ -138,12 +158,13 @@ export const createReviewRecordActions = (
   // every operation as it was, so answering it with the current state would read as recorded.
   const writeRecord = async (
     { proposal, identity }: ReviewerActionContext,
-    entry: ReviewEntry,
+    actor: ReviewActor,
+    entry: ReviewRequest,
   ): Promise<ReviewerActionResult<void>> => {
     const result = await prisma.changeproposals.addReviews(
       proposal._id,
       identity,
-      entry,
+      toEntry(entry, actor.channel),
       now(),
     );
     return result.ok ? { ok: true, value: undefined } : fail(result.code);
@@ -180,7 +201,7 @@ export const createReviewRecordActions = (
     action: ReviewerActionName,
     given: ReviewRequest,
   ): Promise<ReviewerActionResult<DecisionResponse>> => {
-    const invalid = findInvalidInput(action, given);
+    const invalid = findInvalidInput(given);
     // An empty comment means no comment, whichever way the action was reached.
     const request: ReviewRequest =
       given.comment === '' ? { ...given, comment: undefined } : given;
@@ -196,18 +217,15 @@ export const createReviewRecordActions = (
     const { entry, reported } = chooseRecorded(context, request);
     // Nothing it named is still pending, so there is nothing to record (Reviewers Req 2.11).
     if (
-      entry.operationKeys !== 'whole-proposal' &&
-      entry.operationKeys.length === 0
+      entry.target.scope === 'operations' &&
+      entry.target.operationKeys.length === 0
     ) {
       return {
         ok: true,
         value: buildDecisionResponse(proposal.operations, reported),
       };
     }
-    const written = await writeRecord(context, {
-      ...entry,
-      channel: actor.channel,
-    });
+    const written = await writeRecord(context, actor, entry);
     if (!written.ok) {
       return written;
     }
@@ -220,19 +238,19 @@ export const createReviewRecordActions = (
     rejectOperations: (proposalId, actor, operationKeys, comment) =>
       decide(proposalId, actor, 'rejectOperations', {
         kind: 'reject',
-        operationKeys,
+        target: { scope: 'operations', operationKeys },
         comment,
       }),
     rejectAll: (proposalId, actor, comment) =>
       decide(proposalId, actor, 'rejectAll', {
         kind: 'reject',
-        operationKeys: 'whole-proposal',
+        target: { scope: 'whole' },
         comment,
       }),
     abstain: (proposalId, actor, operationKeys, comment) =>
       decide(proposalId, actor, 'abstain', {
         kind: 'abstain',
-        operationKeys,
+        target: { scope: 'operations', operationKeys },
         comment,
       }),
   };
