@@ -42,8 +42,8 @@ import type {
 import NamedQuery from '../models/named-query';
 import type { PageModel } from '../models/page';
 import { SearchError } from '../models/vo/search-error';
-import { hasIntersection } from '../util/compare-objectId';
 import { configManager } from './config-manager';
+import { canShowSnippetOfPage } from './search/can-show-snippet';
 import ElasticsearchDelegator from './search-delegator/elasticsearch';
 import PrivateLegacyPagesDelegator from './search-delegator/private-legacy-pages';
 
@@ -865,32 +865,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
   }
 
   canShowSnippet(pageData, user, userGroups): boolean {
-    const Page = mongoose.model('Page') as unknown as PageModel;
-
-    const testGrant = pageData.grant;
-    const testGrantedUser = pageData.grantedUsers?.[0];
-    const testGrantedGroups = pageData.grantedGroups;
-
-    if (testGrant === Page.GRANT_RESTRICTED) {
-      return false;
-    }
-
-    if (testGrant === Page.GRANT_OWNER) {
-      if (user == null) return false;
-
-      return user._id.toString() === testGrantedUser.toString();
-    }
-
-    if (testGrant === Page.GRANT_USER_GROUP) {
-      if (userGroups == null) return false;
-
-      return hasIntersection(
-        userGroups.map((id) => id.toString()),
-        testGrantedGroups,
-      );
-    }
-
-    return true;
+    return canShowSnippetOfPage(pageData, user, userGroups);
   }
 }
 
