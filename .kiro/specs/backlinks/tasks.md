@@ -569,6 +569,11 @@ Independent of B4/B5.
     per-app duration across a realistic page-count spread, estimate how many apps may
     overlap (the cloud control has no other bound, design.md), and decide whether the fixed limits suffice or the app needs to back
     off when its own database round trips slow down (design.md's fallback). Agree the success numbers before running
+  - Memory: the in-memory resolver (`backfill-link-resolver.ts`) holds every page's path and id for
+    the whole run, so the app's memory grows with the page count. In the same performance run,
+    measure the heap and RSS peak with and without the job, and extrapolate to the largest known
+    customer size. Decide whether the growth is negligible against the app's memory limit; if it is
+    not, revisit the in-memory resolution (design.md)
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.7, 4.9_
   - _Depends: B3.2_
 
