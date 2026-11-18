@@ -65,7 +65,7 @@ describe('toProposalHeaderView', () => {
     expect(view.status).toBe('discarded');
   });
 
-  it('keeps the requester-only state and the stored lastAppliedAt from a reviewer (Req 19.6, 19.8)', () => {
+  it('keeps the requester-only state and the stored lastAppliedAt from a reviewer (Req 9.10, 19.6, 19.8)', () => {
     const appliedAt = new Date('2026-01-02T00:00:00Z');
     const view = toProposalHeaderView({
       ...baseArgs,
