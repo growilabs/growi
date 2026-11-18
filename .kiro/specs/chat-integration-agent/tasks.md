@@ -196,7 +196,7 @@
   - 完了の条件: 確かめた結果が能力表・導入ドキュメント・research.md に反映され、否だった項目の扱いが能力表と試験に表れている
   - _Requirements: 1.20, 1.22, 15.8, 15.16_
   - _Depends: 3.7, 5.7, 5.8_
-- [ ] 6.4 lint・試験・build を通す
+- [x] 6.4 lint・試験・build を通す
   - `@growi/chat`・`@growi/chat-integration-proxy`・`@growi/app` の lint・型検査・試験・本番の build を通す。app の chat-integration の試験は 1 ファイルずつ回す
   - 完了の条件: 3 つのパッケージで、lint・型検査・試験・build がすべて成功する（既存の失敗は記録する）
   - _Requirements: 15.20_
