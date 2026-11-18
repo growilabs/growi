@@ -443,7 +443,9 @@
     "user_not_admin": "Only admin user can delete",
     "single_deletion_empty_pages": "Empty pages cannot be single deleted",
     "complete_deletion_not_allowed_for_user": "You are not allowed to delete this page completely",
-    "deletion_not_allowed_for_user": "You are not allowed to delete this page"
+    "deletion_not_allowed_for_user": "You are not allowed to delete this page",
+    "grant_not_assignable": "The page cannot be placed at this path with its current permission, because the parent page is open to fewer users.",
+    "operation_in_progress": "Another operation on this page or a nearby page is still in progress. Please try again later."
   },
   "page_history": {
     "revision_list": "Revision list",

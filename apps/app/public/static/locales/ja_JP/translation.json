@@ -429,7 +429,9 @@
     "user_not_admin": "権限のあるユーザーのみが削除できます",
     "single_deletion_empty_pages": "空ページの単体削除はできません",
     "complete_deletion_not_allowed_for_user": "ページを完全に削除する権限がありません",
-    "deletion_not_allowed_for_user": "ページを削除する権限がありません"
+    "deletion_not_allowed_for_user": "ページを削除する権限がありません",
+    "grant_not_assignable": "親ページの公開範囲のほうが狭いため、現在の公開範囲のままではこのパスにページを置けません。",
+    "operation_in_progress": "このページまたは近くのページに対する別の操作がまだ実行中です。しばらくしてからもう一度お試しください。"
   },
   "page_history": {
     "revision_list": "更新履歴",

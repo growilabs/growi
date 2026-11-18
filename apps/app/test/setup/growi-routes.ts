@@ -16,7 +16,17 @@ const nextRequestHandlerStub: RequestHandler = () => {
   );
 };
 
-const registerAllRoutes = async (crowi: Crowi): Promise<void> => {
+export type GrowiAppHooks = {
+  /** Runs before the global middlewares are built (e.g. to provide a session config). */
+  readonly beforeServer?: (crowi: Crowi) => void | Promise<void>;
+  /** Runs after the global middlewares (session, passport) and before any route. */
+  readonly beforeRoutes?: (crowi: Crowi) => void | Promise<void>;
+};
+
+const registerAllRoutes = async (
+  crowi: Crowi,
+  hooks: GrowiAppHooks,
+): Promise<void> => {
   // Services that route factories dereference at registration time but that
   // getInstance() does not set up.
   crowi.setupExport();
@@ -24,11 +34,13 @@ const registerAllRoutes = async (crowi: Crowi): Promise<void> => {
   crowi.setUpGrowiBridge();
   crowi.setupG2GTransferService();
 
+  await hooks.beforeServer?.(crowi);
   await crowi.buildServer();
   // routes/next.ts takes the handler reference at registration time only.
   crowi.nextApp = mock<Crowi['nextApp']>({
     getRequestHandler: () => nextRequestHandlerStub,
   });
+  await hooks.beforeRoutes?.(crowi);
   crowi.setupRoutesForPlugins();
   await crowi.setupRoutesAtLast();
 };
@@ -56,9 +68,22 @@ const withAppInstalled = async <T>(
   }
 };
 
-const bootAndList = async (): Promise<readonly RegisteredRoute[]> => {
+/**
+ * Register every GROWI route on the integration-test Crowi instance and return it,
+ * so requests can go through `crowi.express` with the production middleware order.
+ * Call it once per test file (the apiv3 routers are module-level singletons), and not
+ * together with listGrowiRoutes in the same file.
+ */
+export const bootGrowiApp = async (
+  hooks: GrowiAppHooks = {},
+): Promise<Crowi> => {
   const crowi = await getInstance();
-  await withAppInstalled(crowi, () => registerAllRoutes(crowi));
+  await withAppInstalled(crowi, () => registerAllRoutes(crowi, hooks));
+  return crowi;
+};
+
+const bootAndList = async (): Promise<readonly RegisteredRoute[]> => {
+  const crowi = await bootGrowiApp();
   return listRegisteredRoutes(crowi.express);
 };
 
