@@ -180,7 +180,7 @@
 ## Risks & Mitigations
 - Prisma のバージョンアップで `startsWith` がエスケープするようになり、二重エスケープで一致しなくなる — 正規表現の記号を含むパスと `/_api/v3/pages` の除外を確かめる integ テストで検知する。
 - 一覧のクエリが全件走査のまま — 今の username・action の絞り込みと同じ水準。activities は既定で 30 日で消える。改善は本 spec の範囲外。
-- `react-bootstrap-typeahead` 6.3.2 は、候補一覧を開くかを `isShown`（`open` / `minLength` / `showMenu` / `text`）だけで決め、結果の件数は見ない。フィルタ後の結果が 0 件でも `renderMenu` は呼ばれる — `renderMenu` が結果が空のときに早期 return すると、失敗表示だけの場合（要件 4.2）が消える。早期 return せず、コンポーネントテストで固定する。
+- `react-bootstrap-typeahead` 6.3.2 は、候補一覧を開くかを `isShown`（`open` / `minLength` / `showMenu` / `text`）だけで決め、結果の件数は見ない。フィルタ後の結果が 0 件でも `renderMenu` は呼ばれる — `renderMenu` が結果が空のときに早期 return すると、失敗表示だけの場合（要件 4.2）が消える。一方で、空の `Menu` を描くと、`Menu` が `emptyLabel` を描き（`es/components/Menu/Menu.js`）、`AsyncTypeahead` がそれを状況に応じて "Type to search..." / "Searching..." / "No matches found." に差し替える（`es/behaviors/async.js` の `getEmptyLabel`）。そのため、空を返すかどうかは `buildSuggestionGroups` の戻り値で決める（失敗のグループがあれば描き、何もなければ空のフラグメントを返す）。`emptyLabel` などに空文字を渡すと中身のない無効な項目が残るので使わない。コンポーネントテストで固定する。
 
 ---
 

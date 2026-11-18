@@ -383,7 +383,11 @@ export type AuditLogSearchTypeaheadProps = {
 **Implementation Notes**
 - Risks:
   - `AsyncTypeahead` は同じ keyword の再検索で `onSearch` を呼ばないため、既存と同じく `useCache={false}` にする。
-  - `renderMenu` は、`filterBy` を通した結果が 0 件でも呼ばれる。既存の `UsernameTypeahead` のように結果が空なら空を返すと、失敗のグループだけの表示（4.2）が消えるので、結果が空でも早期 return しない。
+  - `renderMenu` は、`filterBy` を通した結果が 0 件でも呼ばれる。空を返す（`Menu` を描かない）かどうかは、`filterBy` を通した結果ではなく `buildSuggestionGroups` の戻り値で決める。
+    - 戻り値が空なら、空のフラグメントを返す。空の `Menu` を描くと、ライブラリが既定の英語の文言（入力が空なら "Type to search..."、読み込み中なら "Searching..."、それ以外は "No matches found."）を出し、6.1 に反するうえ、取得待ちや 1.7 の場面が「該当なし」に見える。候補が 0 件のときは、既存の `UsernameTypeahead` と同じく何も表示しない（「該当なし」の文言は出さない）。
+    - 戻り値に失敗のグループだけがある場合は空ではないので、`Menu` を描いて失敗の表示を出す（4.2）。
+    - 読み込み中は、`AsyncTypeahead` が入力欄のスピナーを出し続ける。
+    - `emptyLabel` / `promptText` / `searchText` に空文字を渡す方法は使わない。中身のない無効な項目が一覧に残るため。
 
 #### AuditLogManagement（変更）
 - `AuditLogUsernameTypeahead` を `AuditLogSearchTypeahead` に置き換える。`onChange` で `selectedUsernames` と `selectedEndpoints` を更新し、1 ページ目に戻す（5.1）。
@@ -435,6 +439,7 @@ export type AuditLogSearchTypeaheadProps = {
   - 検索対象を「URL」に絞った状態で取得に失敗し、候補が 1 件もないときにも、失敗表示が出ること（4.2）
   - 入力を続けて、表示中の候補が古い keyword のものになったときは、その候補を出さないこと（1.1）
   - 候補を取得したあと入力を短くして候補が古くなった状態で、Tab・→・Enter を押しても、古い候補が選択されないこと（1.1, 1.5）
+  - 入力を止めた直後（取得を待っている間）、空の入力欄にフォーカスしたとき、101 文字の入力のときに、候補一覧（`listbox`）も、ライブラリの既定の英語の文言（"Type to search..." / "Searching..." / "No matches found."）も出ないこと（1.6, 1.7, 6.1）
   - `clear()` でトークンが消え、scope が「すべて」に戻ること（5.3）
 - locale drift: `audit_log_management.search.*` の全キーが 5 ロケールの `admin.json` にあること（6.1）
 
