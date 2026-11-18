@@ -32,6 +32,7 @@ import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
 import { excludeReadOnlyUser } from '../../../middlewares/exclude-read-only-user';
 import { serializePageSecurely } from '../../../models/serializers/page-serializer';
 import { isV5ConversionError } from '../../../models/vo/v5-conversion-error';
+import { toPageOperationRefusalResponse } from './page-operation-refusal-response';
 
 const logger = loggerFactory('growi:routes:apiv3:pages');
 const router = express.Router();
@@ -320,7 +321,7 @@ export const setup = (crowi) => {
    *          404:
    *            description: Page is not found or forbidden.
    *          409:
-   *            description: The destination path is already taken, cannot be used, or revisionId is not the latest revision.
+   *            description: The destination path is already taken, cannot be used, revisionId is not the latest revision, the grant of the page is not assignable at the destination, or another page operation is in progress.
    *          500:
    *            description: Failed to rename page.
    */
@@ -440,6 +441,10 @@ export const setup = (crowi) => {
         res.apiv3(result);
       } catch (err) {
         logger.error(err);
+        const refusal = toPageOperationRefusalResponse(err);
+        if (refusal != null) {
+          return res.apiv3Err(refusal.error, refusal.status);
+        }
         return res.apiv3Err(
           new ErrorV3('Failed to update page.', 'unknown'),
           500,
@@ -752,6 +757,8 @@ export const setup = (crowi) => {
    *            description: Forbidden to duplicate page.
    *          404:
    *            description: Page is not found.
+   *          409:
+   *            description: The destination path is already taken, the grant of the page is not assignable there, or another page operation is in progress.
    *          500:
    *            description: Internal server error.
    */
@@ -843,13 +850,26 @@ export const setup = (crowi) => {
         );
       }
 
-      const newParentPage = await crowi.pageService.duplicate(
-        page,
-        newPagePath,
-        req.user,
-        isRecursively,
-        onlyDuplicateUserRelatedResources,
-      );
+      let newParentPage;
+      try {
+        newParentPage = await crowi.pageService.duplicate(
+          page,
+          newPagePath,
+          req.user,
+          isRecursively,
+          onlyDuplicateUserRelatedResources,
+        );
+      } catch (err) {
+        logger.error(err);
+        const refusal = toPageOperationRefusalResponse(err);
+        if (refusal != null) {
+          return res.apiv3Err(refusal.error, refusal.status);
+        }
+        return res.apiv3Err(
+          new ErrorV3('Failed to duplicate page.', 'unknown'),
+          500,
+        );
+      }
       const result = { page: serializePageSecurely(newParentPage) };
 
       // copy the page since it's used and updated in crowi.pageService.duplicate
