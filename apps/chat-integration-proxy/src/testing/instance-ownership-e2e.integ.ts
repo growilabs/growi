@@ -84,9 +84,9 @@ import type {
 } from '../platform/index.js';
 import { createPlatformFacade } from '../platform/index.js';
 import type { ProxyConfig, StartProxyOverrides } from '../runtime/index.js';
-import { SWEEP_LOCK_KEY } from '../runtime/sweeper.js';
+import { createSweeper, SWEEP_LOCK_KEY } from '../runtime/sweeper.js';
 import { LOOPBACK, listenOnFreePort } from './free-port.js';
-import { openWorkspace, passthroughCipher } from './paired-workspace.js';
+import { createdWorkspaces, passthroughCipher } from './paired-workspace.js';
 import {
   type ProxyCluster,
   type ProxyInstance,
@@ -152,14 +152,24 @@ const proxyConfig = (): ProxyConfig => ({
 
 let cluster: ProxyCluster | null = null;
 const closers: Array<() => Promise<void>> = [];
+const workspaces = createdWorkspaces();
 
 const gateway = standInForDiscordGateway();
 
+// The instances first, so nothing they hold touches rows being removed; the
+// rows before `closers` disconnects the client they are removed through.
 afterEach(async () => {
-  await cluster?.stopAll();
-  cluster = null;
-  await Promise.all(closers.splice(0).map((close) => close()));
-  gateway.reset();
+  try {
+    await cluster?.stopAll();
+  } finally {
+    cluster = null;
+    try {
+      await workspaces.removeAll();
+    } finally {
+      await Promise.all(closers.splice(0).map((close) => close()));
+      gateway.reset();
+    }
+  }
 });
 
 const openDb = (): PrismaClient => {
@@ -217,6 +227,25 @@ const realFacadeServing =
       onlyInstallations(installations, installationIds),
       sink,
     );
+
+/**
+ * The real sweeper, re-taking the channel inventories of only the
+ * installations this case declared -- what `onlyInstallations` is for the
+ * facade. A cycle over every installation earlier runs left in the shared
+ * database outlives the case and leaves `proxy:sweep` held behind it.
+ */
+const sweeperServing =
+  (
+    installationIds: ReadonlyArray<string>,
+  ): NonNullable<StartProxyOverrides['createSweeper']> =>
+  (deps) =>
+    createSweeper({
+      ...deps,
+      listInstallationIds: async () =>
+        (await deps.listInstallationIds()).filter((installationId) =>
+          installationIds.includes(installationId),
+        ),
+    });
 
 interface ConnectionLog {
   readonly opened: string[];
@@ -292,6 +321,7 @@ const startInstances = async (
     name: string,
   ) => NonNullable<StartProxyOverrides['createFacade']>,
   failures: FailureLog,
+  createSweeperOverride?: StartProxyOverrides['createSweeper'],
 ): Promise<ProxyCluster> => {
   const started = await startProxyCluster(
     NAMES.map((name) => ({
@@ -300,6 +330,7 @@ const startInstances = async (
       overrides: {
         listen: listenOnFreePort().listen,
         createFacade: createFacadeFor(name),
+        createSweeper: createSweeperOverride,
         reporters: reportersInto(failures),
       },
     })),
@@ -426,13 +457,11 @@ describe('what two running proxy instances each own (task 11.4)', () => {
 
   it('gives each installation of a per-installation service to exactly one instance', async () => {
     const db = openDb();
-    const workspaces = await Promise.all([
-      openWorkspace(db, 'mattermost'),
-      openWorkspace(db, 'mattermost'),
+    const opened = await Promise.all([
+      workspaces.open(db, 'mattermost'),
+      workspaces.open(db, 'mattermost'),
     ]);
-    const installationIds = workspaces.map(
-      (workspace) => workspace.installationId,
-    );
+    const installationIds = opened.map((workspace) => workspace.installationId);
     const logOf = connectionLogs();
     const failures: FailureLog = [];
 
@@ -479,7 +508,7 @@ describe('what two running proxy instances each own (task 11.4)', () => {
   // timeout, hence the explicit 15_000 below.
   it('keeps an installation while its owner renews, and only lets go once it stops renewing', async () => {
     const db = openDb();
-    const workspace = await openWorkspace(db, 'mattermost');
+    const workspace = await workspaces.open(db, 'mattermost');
     const lockKey = mattermostLockKey(workspace.installationId);
     const logOf = connectionLogs();
     const failures: FailureLog = [];
@@ -535,7 +564,7 @@ describe('what two running proxy instances each own (task 11.4)', () => {
 
   it('runs the periodic sweep on one instance at a time', async () => {
     const db = openDb();
-    const workspace = await openWorkspace(db, 'discord');
+    const workspace = await workspaces.open(db, 'discord');
     const relation = await createRelationRepository(db).create({
       installationId: workspace.installationId,
       growiUri: `http://${LOOPBACK}:1/`,
@@ -556,7 +585,11 @@ describe('what two running proxy instances each own (task 11.4)', () => {
       db.requestNonce.count({ where: { relationId: relation.relationId } });
 
     const failures: FailureLog = [];
-    const running = await startInstances(() => realFacadeServing([]), failures);
+    const running = await startInstances(
+      () => realFacadeServing([]),
+      failures,
+      sweeperServing([workspace.installationId]),
+    );
 
     const [firstName, secondName] = NAMES;
     const holder = running.get(firstName);
@@ -585,6 +618,8 @@ describe('what two running proxy instances each own (task 11.4)', () => {
 
     expect(await other.proxy.dependencies.sweeper.sweepOnce()).toBe(true);
     expect(await noncesLeft()).toBe(0);
-    expect(failures.length).toBeGreaterThan(0);
+    expect(failures).toEqual([
+      expect.stringContaining(workspace.installationId),
+    ]);
   }, 30_000);
 });
