@@ -350,7 +350,7 @@ interface DecisionOutcome {
 
 type ReviewerActionError =
   | 'not-found' | 'not-open' | 'comment-too-long' | 'reviewer-not-found'
-  | 'too-many-reviewers' | 'requester-cannot-review' | 'reviewers-disabled' | 'invalid-request';
+  | 'too-many-reviewers' | 'requester-cannot-review' | 'reviewers-disabled';
 
 interface ReviewerActions {
   // 承認の唯一の入口。依頼した人も、承認者も、ここを通る（`requester-actions.ts` の承認はここへ移す）
@@ -363,7 +363,7 @@ interface ReviewerActions {
 }
 ```
 
-- 事前条件: 呼び出し側は、読み取り専用ユーザーとゲストを `writeAccessChain` で断っている（要件 7.5）。
+- 事前条件: 呼び出し側は、読み取り専用ユーザーとゲストを `writeAccessChain` で断っている（要件 7.5）。引数は、型のとおりの値で渡す（配列は文字列の配列、コメントは文字列、承認者は `kind` と `id` を持つ値）。サービスは、引数の型が示すことを実行時に検査し直さない。HTTP の本文の形は route が検査する（下の route の節）。route を通らない入口（AI の道具など）は、自分の入口で形を検査してから呼ぶ。サービスが検査するのは、業務の規則（コメントの長さ、空のコメントを「コメントなし」とする扱い、承認者の上限、存在と有効の確認、重複のまとめ、機能の切り替え）だけ。
 - 共通の手順（6 つの操作すべてに、この順で適用する）:
   1. Change Proposal を読む。存在しなければ `not-found`。
   2. 所属グループを取得し、依頼した人または承認者かを判定する。どちらでもなければ `not-found`（要件 2.7）。
@@ -461,13 +461,14 @@ type DecisionResponse = { readonly type: 'done'; readonly results: readonly { ke
 | Method | Path | Middleware | Request | Response | Errors |
 |---|---|---|---|---|---|
 | POST | `/:id/approve`（既存を拡張。応答の形は変えない） | `writeAccessChain` | `{ operationKeys? }` | `{ result: ApplyResult }`（`type: 'done'` の `results` は、求めたキーのうち、その人に見える操作のすべて。`in-progress` には、見える操作の読み直した状態の `results`（省略できる項目）を足す） | 404、409（`not-open`） |
-| POST | `/:id/reviews` | `writeAccessChain` | `{ kind: 'reject' \| 'abstain', operationKeys?, comment? }`。`reject` で `operationKeys` を省くと、Change Proposal 全体の却下。`operationKeys` が空の配列なら 400 `invalid-request`。`abstain` は `operationKeys` が必須 | `{ result: { type: 'done', results } }`（承認と同じ形。全体の却下では、操作に何も書かないので、`results` は空） | 400（`comment-too-long`、`requester-cannot-review`、`invalid-request`）、404、409 |
-| PATCH | `/:id/reviewers` | `writeAccessChain` | `{ add: [{kind, id}] }` または `{ remove: [{kind, id}] }`。**どちらか 1 つだけ**（両方、またはどちらも無ければ 400 `invalid-request`） | 204 | 400（`reviewer-not-found`、`too-many-reviewers`、`reviewers-disabled`、`invalid-request`）、404、409（`not-open`） |
+| POST | `/:id/reviews` | `writeAccessChain`、本文の検証、`apiV3FormValidator` | `{ kind: 'reject' \| 'abstain', operationKeys?, comment? }`。`reject` で `operationKeys` を省くと、Change Proposal 全体の却下。`abstain` は `operationKeys` が必須。`operationKeys` は 1〜1000 件の空でない文字列の配列（承認の route と同じ検証）、`comment` は文字列 | `{ result: { type: 'done', results } }`（承認と同じ形。全体の却下では、操作に何も書かないので、`results` は空） | 400（`validation_failed`、`comment-too-long`、`requester-cannot-review`）、404、409 |
+| PATCH | `/:id/reviewers` | `writeAccessChain`、本文の検証、`apiV3FormValidator` | `{ add: [{kind, id}] }` または `{ remove: [{kind, id}] }`。**どちらか 1 つだけ**。配列は 1 件以上で、各要素の `kind` は承認者の種類のどれか、`id` は文字列 | 204 | 400（`validation_failed`、`reviewer-not-found`、`too-many-reviewers`、`reviewers-disabled`）、404、409（`not-open`） |
 | GET | `/review-queue` | `readAccessChain` | `?cursor=` | `{ items, nextCursor }` | — |
 
 - すべてのルートの `@swagger` の tag は `ChangeProposals`。`openapi.spec.ts` の操作の一覧とテスト名を更新する。`/review-queue` は `/:id` より前に登録する。
 - 存在しない場合と、見る人に関係のない場合は、同じ `404 notfound`（既存の `proposalNotFound()`）。新しいエラーコードは `respondWithServiceError` の switch に足す（足さないと既定の 500 になる）。
 - 経路は `detectChannel(req)`（アクセストークン認証なら `'api'`、そうでなければ `'ui'`）で決める。AI の道具は service を直接呼び、`'ai-tool'` を渡す。
+- 本文の形（値の型、配列の件数、`kind` の値、`add` と `remove` のどちらか 1 つ）は、route の express-validator の検証で確かめ、誤りは承認の route と同じ 400 `validation_failed` で断る。`null` は「省略」と同じに扱わず、誤りとする。`req.body` の型は、検証が保証する形で書き、型の変換（cast）なしでサービスに渡す。承認者の `id` が ObjectId の形でない文字列のときは、形の誤りではなく、サービスが `reviewer-not-found` で断る。
 
 ## Data Models
 
@@ -525,7 +526,7 @@ interface OperationView {
 | 機能の切り替え `app:changeProposalReviewersEnabled` が無効で、承認者を指定して作成、または承認者の追加を求めた | 400 `reviewers-disabled` | 公開の順序 |
 | 閉じた提案への判断・承認者の追加・削除 | 409 `not-open` | 要件 2.9、4.8 |
 | コメントが長い | 400 `comment-too-long` | 要件 3.6 |
-| `PATCH /:id/reviewers` で `add` と `remove` が両方ある、どちらも無い、または空の配列。`POST /:id/reviews` で `operationKeys` が空の配列、または `abstain` に `operationKeys` が無い | 400 `invalid-request` | route の仕様 |
+| 本文の形の誤り。`PATCH /:id/reviewers` で `add` と `remove` が両方ある、どちらも無い、空の配列、要素の `kind` や `id` の型や値が違う。`POST /:id/reviews` で `kind` が無いか違う、`operationKeys` が配列でない・空の配列・文字列でない要素を持つ・`null`、`abstain` に `operationKeys` が無い、`comment` が文字列でない | 400 `validation_failed` | route の検証 |
 | 依頼した人が却下・放棄を求めた | 400 `requester-cannot-review` | 要件 3.10 |
 | 承認者の追加：存在しない／上限超過 | 400 `reviewer-not-found`／`too-many-reviewers` | 要件 4.5、4.9 |
 | 読み取り専用ユーザー・ゲスト | `writeAccessChain` が断る | 要件 7.5 |
@@ -548,7 +549,7 @@ interface OperationView {
 - 却下と放棄が、操作の status・段階・達成度を変えず、承認を止めないこと。却下された操作を、ほかの承認者または依頼した人が承認すると、通常どおり反映されること。全体の却下の記録のあとも、承認できること（要件 3.1、3.2、3.9）。全体の却下で、閲覧できないページの操作に何も書かれないこと。
 - 却下・放棄の記録と、同じ人の後の判断による置き換え（要件 3.3、3.4）。コメントの見える範囲（要件 3.8）。全体の却下の記録を依頼した人にだけ返すこと。
 - 同じ人が全体を却下したあとに全体を承認すると、全体の却下の記録（`wholeRejections[]`）が消えること。キーを指定した承認では消えないこと（要件 3.4）。
-- `PATCH /:id/reviewers` が、`add` と `remove` の両方、どちらも無い、空の配列のとき 400 `invalid-request` を返すこと。`POST /:id/reviews` が、`operationKeys` が空の配列のとき 400 を返すこと。
+- `PATCH /:id/reviewers` と `POST /:id/reviews` が、本文の形の誤り（上の Error Handling の表）に 400 `validation_failed` を返し、何も記録せず、前の記録を残すこと。`operationKeys` に文字列 `whole-proposal` や `{ $ne: null }` のような演算子のオブジェクトを送っても、全体の却下にならないこと。
 - 承認者の追加・削除、全員が外れたら依頼した人だけに戻ること（要件 4.4）。閉じた提案での `not-open`。
 - 承認者としての一覧のページ送り（カーソル、上限、見えない操作のみの提案を返さない）。
 - 「見つからない」の同一性: 存在しない提案、関係のない人、見える操作が 0 件の承認者の 3 つで応答が同じ。
