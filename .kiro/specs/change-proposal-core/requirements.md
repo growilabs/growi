@@ -130,9 +130,9 @@ Proposal を取得するユーザーに、どの Change オペレーションを
   - Proposal 作成者と Proposal 承認者によるページ単位の承認と、管理者の設定による自動適用
   - 作成のときとその後に、Proposal 承認者（ユーザー・グループ・混在・Proposal 作成者自身）を指定すること。Proposal 承認者の追加と削除。指定が無いときの既定。作成のときの Proposal の目的
   - Proposal 承認者による、Change オペレーションごとの却下と放棄、Proposal 全体の却下。コメントを添えること。却下と放棄は、Change オペレーションの状態・承認・適用を変えない
-  - `open` (進行中) の Proposal を、Proposal 作成者と Proposal 承認者にだけ返すこと。Proposal 承認者が `open` の Proposal を一覧で取得すること
+  - `pending` (適用待ち) の Change オペレーションを、Proposal 作成者と Proposal 承認者にだけ返すこと。Proposal 承認者が `open` の Proposal を一覧で取得すること
   - Proposal 承認者への通知と、Proposal 作成者へのレビューの結果の通知。レビューと Proposal 承認者の追加・削除の activity
-  - Proposal 承認者を指定した Proposal を、作成の直後に自動適用しないこと。`follow-up` (後続) Proposal・`rework` (見直し) Proposal が Proposal 承認者を引き継ぐこと
+  - Proposal 承認者を指定した Proposal を、作成の直後に自動適用しないこと。`follow-up` (後続) Proposal・`rework` (見直し) Proposal が Proposal 承認者の指定を引き継ぐこと
   - 取り消しと、戻してよい条件の判定。`move` (移動) を戻すときに逆向きのリダイレクトを消すこと
   - リビジョンへの、作った Proposal の記録（`create` (新規作成) で作ったページは、その最初のリビジョンの記録で表す）
   - Proposal ごとに 1 つのアプリ内通知にまとめること。ページごとの通知を出すかを、管理者の通知設定とページごとの通知設定で決めること。activity への記録
@@ -140,7 +140,7 @@ Proposal を取得するユーザーに、どの Change オペレーションを
   - Proposal を作り、取得し、承認し、取り消す API。却下・放棄を記録し、Proposal 承認者を追加・削除する API。Proposal を取得するユーザーに返す Change オペレーションの分だけを返すこと
   - 兄弟の spec の画面で共通に使う部品: Change オペレーションの種類・Change オペレーションの状態・全体の状態・理由・戻せない理由の表示名（5 言語）と、本文の差分を表示するときの diff2html の設定と見た目
   - Proposal のライフサイクル `settled` (完了) への自動の移り変わりと、Proposal 作成者にだけ返す Proposal のライフサイクルと適用率
-  - `follow-up` (後続) Proposal・`rework` (見直し) Proposal とオリジナルの Proposal のつながりの保存と検査、つながりを Proposal を取得するユーザーごとに絞って返すこと。Proposal のライフサイクル・つながりの関係・適用率の表示名（5 言語）
+  - `follow-up` (後続) Proposal・`rework` (見直し) Proposal とオリジナルの Proposal のつながりの保存と検査、つながりを、Proposal を取得するユーザーごとに絞って返すこと。Proposal のライフサイクル・つながりの関係・適用率の表示名（5 言語）
 - **Out of scope**:
   - AI に Proposal を作らせる道具、置き換えの指示から本文を組み立てる処理、内容が大きく消える Change オペレーションの拒否、チャット画面（`change-proposal-ai-agent`）
   - Change オペレーションを適用した Proposal の詳細ページ・一覧画面、ページ履歴・Recent Changes・ページの見出しの印、取り消しボタン、「本人に戻すよう頼む」通知、まとめたアプリ内通知の画面での表示と文言（`change-proposal-viewer`）
@@ -163,7 +163,7 @@ Proposal を取得するユーザーに、どの Change オペレーションを
   - `change-proposal-viewer` は、本 spec の API が返す「戻せるかどうか」の判定結果と、リビジョンに残した記録を表示に使う。判定そのものはしない。
   - `change-proposal-viewer` と `change-proposal-ai-agent` は、Change オペレーションの種類・状態・理由の表示名と差分の表示の設定を、本 spec が用意した共通の部品から使い、自分では持たない。それぞれの画面だけで使う文言は、それぞれの spec が持つ。
   - 閲覧できるかどうかの判定には、GROWI の既存の閲覧の判定を使う。新しい判定の規則は作らない。グループの所属の判定と、読み取り専用ユーザーとゲストの扱いも、既存の規則を使う。`create` (新規作成) と `move` (移動) で承認権限チェックが確かめるページは、3.6（適用のときの権限の確認先）と 3.9（新しいページの閲覧範囲は親のページと同じ）を Proposal 承認者に当てはめたもので、新しい判定の規則ではない。
-  - **公開の順序**: 承認の画面と Proposal 承認者としての一覧（`change-proposal-viewer`）、Proposal 承認者を指定する、Proposal を作る側の画面（`change-proposal-ai-agent`）ができるまでは、Proposal 作成者以外を Proposal 承認者に指定することと、追加することを受け付けない。通知を受け取っても操作できない状態を作らないため。この切り替えは、管理者の設定画面には出さない設定で行う。
+  - **公開の順序**: `change-proposal-viewer` の承認の画面と Proposal 承認者としての一覧、`change-proposal-ai-agent` で Proposal 承認者を指定する画面と道具ができるまでは、Proposal 作成者以外のユーザーを Proposal 承認者に指定することも、追加することも受け付けない。通知を受け取っても操作できない状態を作らないため。この切り替えは、管理者の設定画面には出さない設定で行う。
 
 ## Requirements
 
@@ -256,7 +256,7 @@ Proposal を取得するユーザーに、どの Change オペレーションを
 **Objective:** Proposal 作成者と、適用された変更に気付いた他のユーザーとして、適用された Change オペレーションを Proposal 単位で取り消したい。AI などによる望まない変更を、手作業で 1 ページずつ直さずに戻すため。
 
 #### Acceptance Criteria
-1. When ユーザーが `applied` (適用済み) の Change オペレーションの取り消しを求めた場合, the Change Proposal System shall Proposal 作成元が `revert` (取り消し) の Proposal を作り、その Change オペレーションを、通常の Change オペレーションと同じ仕組みで適用する。
+1. When ユーザーが `applied` (適用済み) の Change オペレーションの取り消しを求めた場合, the Change Proposal System shall Proposal 作成元が `revert` (取り消し) の Proposal を作り、その取り消しの Proposal の Change オペレーションを、通常の Change オペレーションと同じ仕組みで適用する。
 2. The Change Proposal System shall Proposal 作成者には、Proposal の中で Proposal 作成者が閲覧できるページに対する `applied` (適用済み) の Change オペレーションをすべて取り消すことを許す。
 3. The Change Proposal System shall Proposal 作成者以外のユーザー（管理者を含む）には、そのユーザーが閲覧できるページに対する `applied` (適用済み) の Change オペレーションだけを取り消すことを許す。
 4. If 取り消しを求めたユーザーが閲覧できない Change オペレーションが Proposal に含まれている場合, then the Change Proposal System shall それを理由に取り消しを断らず、閲覧できる Change オペレーションだけを取り消し、閲覧できない Change オペレーションがあることを応答で示さない。
@@ -304,7 +304,7 @@ Proposal を取得するユーザーに、どの Change オペレーションを
 5. When Proposal の Change オペレーションを適用した場合、または取り消した場合, the Change Proposal System shall 監査ログの設定にかかわらず、それを新しい種類の activity として、Proposal 作成者または取り消した人を操作者として記録する。
 6. The Change Proposal System shall 人の保存のときに出る通知と activity の振る舞いを変えない。
 7. When Proposal を作成した場合, the Change Proposal System shall 監査ログの設定で記録の対象になっているときに、それを新しい種類の activity として、Proposal 作成者を操作者として記録する。
-8. When 取り消しの Proposal の Change オペレーションを適用する処理が終わり、1 つ以上の Change オペレーションが `applied` (適用済み) になった場合, the Change Proposal System shall 完全に削除したページも通知の対象のページに含め、オリジナルの Proposal の Proposal 作成者にも（取り消した人と同じでなければ）まとめたアプリ内通知を送る。中身は 7.3・7.4 と同じく、受け取る人が閲覧できるページの分だけで作る。ただし完全に削除したページは、誰も閲覧できないので、オリジナルの Proposal の Proposal 作成者にだけ、その人が `create` (新規作成) を求めたときのパスで含める。オリジナルの Proposal の Proposal 作成者への通知は、取り消しの Proposal ではなくオリジナルの Proposal を指す（取り消しの Proposal は、完全に削除したページの Change オペレーションを取り消した人にしか見せないので、開けないことがある）。
+8. When 取り消しの Proposal の Change オペレーションを適用する処理が終わり、1 つ以上の Change オペレーションが `applied` (適用済み) になった場合, the Change Proposal System shall 完全に削除したページも通知の対象のページに含め、オリジナルの Proposal の作成者にも（取り消した人と同じでなければ）まとめたアプリ内通知を送る。中身は 7.3・7.4 と同じく、受け取る人が閲覧できるページの分だけで作る。ただし完全に削除したページは、誰も閲覧できないので、オリジナルの Proposal の作成者にだけ、その人が `create` (新規作成) を求めたときのパスで含める。オリジナルの Proposal の作成者への通知は、取り消しの Proposal ではなくオリジナルの Proposal を指す（取り消しの Proposal は、完全に削除したページの Change オペレーションを取り消した人にしか見せないので、開けないことがある）。
 9. When Proposal を作る側が、利用者の request を受けた処理の中で Proposal を作った場合, the Change Proposal System shall 作成の activity をその request の activity として記録し、作成のための activity を別に残さない。
 10. When Change オペレーションを適用するときに、管理者の通知設定でページごとの通知が有効になっていて、かつ Proposal のページごとの通知設定が「出す」である場合, the Change Proposal System shall その Change オペレーションについて、人が画面から同じ操作をしたときと同じページごとの通知を出す。アプリ内通知の受け取る人は人の操作と同じ決め方で決め、グローバル通知は人の操作と同じく、ページの閲覧範囲によって送るかどうかを決める。
 11. The Change Proposal System shall 人が保存のたびに Slack のチャンネルを選んで送る通知を、Change オペレーションの適用では出さない。
@@ -392,12 +392,12 @@ Proposal を取得するユーザーに、どの Change オペレーションを
 
 #### Acceptance Criteria
 1. Where Proposal を作る側が作成の求めに、オリジナルの Proposal の ID・関係（`follow-up` (後続) または `rework` (見直し)）・オリジナルの Change オペレーションの一覧を指定した場合, the Change Proposal System shall それを Proposal とともに保存する。Proposal 作成元にかかわらず保存する。
-2. If 指定されたオリジナルの Proposal が存在しない場合、作成を求めた Proposal 作成者がオリジナルの Proposal の Proposal 作成者でない場合、またはオリジナルの Proposal が取り消しの Proposal である場合, then the Change Proposal System shall その Proposal を保存せず、どの場合も同じ「オリジナルの Proposal を使えない」結果を返す。
+2. If 指定されたオリジナルの Proposal が存在しない場合、作成を求めたユーザーが、オリジナルの Proposal の作成者と違う場合、またはオリジナルの Proposal が取り消しの Proposal である場合, then the Change Proposal System shall その Proposal を保存せず、どの場合も同じ「オリジナルの Proposal を使えない」結果を返す。
 3. If オリジナルの Change オペレーションが 1 つも指定されていない場合、指定されたオリジナルの Change オペレーションがオリジナルの Proposal に無い場合、またはオリジナルの Change オペレーションの状態が関係に合わない場合, then the Change Proposal System shall その Proposal を保存せず、合わない Change オペレーションを示す結果を返す。関係に合う状態は、`follow-up` (後続) では `stale` (見送り)・`failed` (適用失敗)・`skipped` (スキップ)、`rework` (見直し) では `applied` (適用済み)・`revert-refused` (取り消し不可) とする。
 4. Where 関係が `rework` (見直し) である場合, the Change Proposal System shall 自動適用の方針にかかわらず、作成の直後にどの Change オペレーションも適用せず、すべてを `pending` (適用待ち) のまま、Proposal 作成者または Proposal 承認者の承認を待たせる。
 5. The Change Proposal System shall `follow-up` (後続) Proposal・`rework` (見直し) Proposal を作ったときも、その Change オペレーションを適用したときも、オリジナルの Change オペレーションの状態を変えない。
 6. The Change Proposal System shall オリジナルの Change オペレーションを `reverted` (取り消し済み) にするのを、取り消しの Proposal の Change オペレーションの適用（Requirement 5）だけにする。`rework` (見直し) Proposal の Change オペレーションの適用では `reverted` にしない。
-7. Where 関係が `follow-up` (後続) である場合, the Change Proposal System shall 自動適用と承認を、通常の Proposal と同じに扱う。`follow-up` Proposal・`rework` (見直し) Proposal がオリジナルの Proposal の Proposal 承認者を引き継ぐことと、Proposal 作成者以外の Proposal 承認者がいるときに作成の直後に適用しないことは、Requirement 22.4・22.5 による。
+7. Where 関係が `follow-up` (後続) である場合, the Change Proposal System shall 自動適用と承認を、通常の Proposal と同じに扱う。`follow-up` (後続) Proposal・`rework` (見直し) Proposal がオリジナルの Proposal の Proposal 承認者の指定を引き継ぐことと、Proposal 作成者以外の Proposal 承認者がいるときに作成の直後に適用しないことは、Requirement 22.4・22.5 による。
 
 ### Requirement 14: つながりの取得と、取得するユーザーごとの絞り込み
 
@@ -451,7 +451,7 @@ Proposal を取得するユーザーに、どの Change オペレーションを
 #### Acceptance Criteria
 1. When Proposal 承認者が、承認権限チェックを通った `pending` (適用待ち) の Change オペレーションの却下を求めた場合, the Change Proposal System shall 却下した人・日時・コメントを、その Change オペレーションについての却下の記録として残す。Change オペレーションの状態は変えない。
 2. When Proposal 承認者が、`open` (進行中) の Proposal 全体の却下を求めた場合, the Change Proposal System shall 却下した人・日時・コメントを、Proposal 全体についての却下の記録として残す。各 Change オペレーションの状態は変えない。
-3. When Proposal 承認者が、承認権限チェックを通った `pending` (適用待ち) の Change オペレーションの放棄を求めた場合, the Change Proposal System shall 放棄した人・日時・コメントを、その Change オペレーションについての放棄の記録として残す。Change オペレーションの状態は変えない。放棄した Change オペレーションも、その Proposal 承認者は引き続き承認できる。
+3. When Proposal 承認者が、承認権限チェックを通った `pending` (適用待ち) の Change オペレーションの放棄を求めた場合, the Change Proposal System shall 放棄した人・日時・コメントを、その Change オペレーションについての放棄の記録として残す。Change オペレーションの状態は変えない。放棄した Change オペレーションも、承認権限チェックを通った `pending` (適用待ち) のままなので、その Proposal 承認者は引き続きレビューできる。
 4. When 同じ人が、同じ Change オペレーション（または Proposal 全体）について、却下・放棄の記録を残したあと、あとから承認または別のレビューを求めた場合, the Change Proposal System shall 前の記録を、あとのレビューで置き換える。
 5. When 却下または放棄を求めるときにコメントが添えられた場合, the Change Proposal System shall そのコメントを、レビューの記録とともに残す。
 6. If コメントが決まった文字数を超える場合, then the Change Proposal System shall レビューを記録せず、文字数を超えたことを返す。
@@ -486,7 +486,7 @@ Proposal を取得するユーザーに、どの Change オペレーションを
 #### Acceptance Criteria
 1. When Proposal 作成者または Proposal 承認者が、`open` (進行中) の Proposal の取得を求めた場合, the Change Proposal System shall Proposal 作成者・Proposal 作成元・モデル名・作成日時・全体の状態・Proposal の目的と、そのユーザーが閲覧できるページに対する Change オペレーションだけを、Change オペレーションごとの状態とともに返す。
 2. When Proposal 承認者が、`open` (進行中) の Proposal の取得を求めた場合, the Change Proposal System shall 承認権限チェックを通った `pending` (適用待ち) の Change オペレーションについて、変更後の本文（差分を作るための内容）、元のリビジョン、その元のリビジョンが今も最新かどうか、並び順を返す。
-3. The Change Proposal System shall Proposal 作成者でも Proposal 承認者でもないユーザーには、`open` (進行中) の Proposal を返さない。
+3. The Change Proposal System shall Proposal 作成者でも Proposal 承認者でもないユーザーには、`pending` (適用待ち) の Change オペレーションを返さない。
 4. If Proposal 承認者が、`open` (進行中) の Proposal を取得しようとしたときに、そのユーザーに返す Change オペレーションが 1 つも無い場合, then the Change Proposal System shall Proposal が存在しない場合と同じ「見つからない」応答を返す。
 5. When ユーザーが、自分が Proposal 承認者である `open` (進行中) の Proposal の一覧を求めた場合, the Change Proposal System shall 承認権限チェックを通った `pending` (適用待ち) の Change オペレーションを 1 つ以上含む `open` の Proposal を、作成が古い順（期限は作成時に決まるので、期限が近い順と同じになる）に、ページ送りできる形で返す。
 6. The Change Proposal System shall Proposal 承認者に返す Change オペレーションを、そのユーザーが閲覧できるページ（リンクを知る人だけが見られるページを除く）に対する Change オペレーションだけにする。閲覧できない Change オペレーションの件数や、閲覧できない Change オペレーションがあることを示す情報を含めない。
@@ -507,7 +507,7 @@ Proposal を取得するユーザーに、どの Change オペレーションを
 5. When Proposal 承認者が、承認・却下・放棄を求め、その求めが受け付けられた場合, the Change Proposal System shall 1 回の求めにつき 1 件のアプリ内通知を、Proposal 作成者に送る。中身は、レビューした人、各 Change オペレーションの結果、添えられたコメント、Proposal の詳細ページへのリンクにする。
 6. The Change Proposal System shall Proposal 作成者自身が行った承認については、Proposal 作成者に通知を送らない。
 7. The Change Proposal System shall Change オペレーションの適用のあとのまとめたアプリ内通知（7.2・7.8）の宛先と中身を、Proposal 承認者がいるかどうかにかかわらず同じ決め方で作る。
-8. When 承認・却下・放棄が行われた場合, the Change Proposal System shall それを新しい種類の activity として、レビューした人を操作者として、経路（画面・API・AI の道具のどこから求めたか）とともに、監査ログの設定にかかわらず記録する。
+8. When 承認・却下・放棄が行われた場合, the Change Proposal System shall それを新しい種類の activity として、承認・却下・放棄をした人を操作者として、経路（画面・API・AI の道具のどこから求めたか）とともに、監査ログの設定にかかわらず記録する。
 9. When 承認によって Change オペレーションが適用された場合, the Change Proposal System shall 承認した人を、承認の activity（20.8）と、Change オペレーションに残る記録（承認した人・経路・日時）に残す。適用の activity の記録は変えない（1 回の適用の処理が、複数の人の承認をまとめて書くことがあるため）。
 10. When Proposal 承認者の指定が追加または削除された場合, the Change Proposal System shall それを新しい種類の activity として、追加または削除した人を操作者として、経路とともに、監査ログの設定にかかわらず記録する。誰を追加・削除したかは、Proposal の中の記録（18.10）で分かる。作成のときの Proposal 承認者の指定は、作成の activity（7.7）に含まれ、別には記録しない。
 
@@ -529,7 +529,7 @@ Proposal を取得するユーザーに、どの Change オペレーションを
 **Objective:** 管理者と Proposal 作成者として、Proposal 承認者を指定しない Proposal が、Proposal 作成者だけで承認する形のまま動いてほしい。また、Proposal 承認者がいる Proposal を直して出し直しても、Proposal 承認者が外れないでほしい。
 
 #### Acceptance Criteria
-1. The Change Proposal System shall Proposal 承認者を指定していない Proposal（作成のときに指定されなかったものと、Proposal 承認者の指定の記録を持たないもの）では、Proposal 作成者だけが承認・スキップ・破棄でき、`open` (進行中) の Proposal は Proposal 作成者にだけ返す。
+1. The Change Proposal System shall Proposal 承認者を指定していない Proposal（作成のときに指定されなかったものと、Proposal 承認者の指定の記録を持たないもの）では、Proposal 作成者だけが承認・スキップ・破棄でき、`pending` (適用待ち) の Change オペレーションは Proposal 作成者にだけ返す。
 2. The Change Proposal System shall 自動適用の方針（「しない」「自分が作ったページだけ」「すべて」）の意味を、Proposal 承認者がいるかどうかで変えない。「自分が作ったページだけ」の「自分」は、Proposal 作成者を指す。
 3. The Change Proposal System shall ページごとの通知設定の変更を、Proposal 作成者だけに許す（7.14・7.15）。
 4. When Proposal 作成者が、Proposal 承認者の指定がある Proposal をオリジナルの Proposal にして `follow-up` (後続) Proposal または `rework` (見直し) Proposal を作った場合, the Change Proposal System shall オリジナルの Proposal の、その時点の Proposal 承認者の指定を引き継いで保存する。Proposal 作成者は、作成のときに Proposal 承認者を指定し直すこともできる。

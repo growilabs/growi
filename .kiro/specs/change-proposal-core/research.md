@@ -44,7 +44,7 @@ umbrella の判断（決定 1〜6）とコード上の事実は [../change-propo
   - `getYDocStatus(pageId)` が `draft` なら、共同編集の文書に、最新のリビジョンより新しい入力がある（未保存の入力）。
   - 文書が誰にも開かれていないときにサーバーが `origin` 空のリビジョンを書くと、文書の状態は `outdated` になる。次に誰かが開いたとき、`bindState` が最新のリビジョンの本文で文書を置き換える。ただし、書く前に `draft` だった場合、その未保存の入力は次に開いたときに置き換えで消える。
   - `origin` が `editor` のリビジョンをサーバーが書くと、次に開いたときに文書が置き換えられず、古い文書が残る。
-  - エディタは、最新のリビジョンの `origin` が空のときだけ `revisionId` を送る。サーバーは、送られてきた `origin` が `editor` で、最新のリビジョンの `origin` が `editor` か `view` のときだけ確認を飛ばす。
+  - エディタは、最新のリビジョンの `origin` が空のときだけ `revisionId` を送る。サーバーは、送られてきた `origin` が `editor` で、最新のリビジョンの `origin` が `editor` か `view` のときだけ確認を省く。
   - エディタを開いている人には、`origin` が空のリビジョンが作られたことが Socket.IO で伝わり、エディタに衝突の知らせが出る（`useConflictEffect`）。
 - **Implications**:
   - Change オペレーションを適用する前に、そのページの接続数（このプロセスで見える分）と `draft` を確かめる。どちらかがあれば適用しない。
@@ -114,7 +114,7 @@ umbrella の判断（決定 1〜6）とコード上の事実は [../change-propo
   2. `Page` の `revision` を条件にした `findOneAndUpdate` で書く（採用）。
   3. MongoDB の transaction で囲む。`updatePage` の中は多くの書き込みと event を含み、全部を transaction に入れる変更が大きすぎる。
 - **Selected Approach**: `pushRevision` に任意の `expectedRevisionId` を足す。渡されたときは条件付きの更新で書き、一致しなければ作ったリビジョンを消して `RevisionConflictError` を投げる。適用では元のリビジョンの ID を渡す。人の保存では、ページを読んだ時点の `page.revision` を渡す。
-- **Rationale**: 人の保存は、エディタ（`origin: editor`）では `revisionId` を送らないことがある。そこで人の保存は「確認を飛ばすかどうか」は今の `isUpdatable` で決め、書き込みは「読んだ時点の最新のままなら」を条件にする。一致しなかったときは、ページを読み直して `isUpdatable` をもう一度通し、通れば決めた回数まで書き直す。通らなければ今と同じ 409 `conflict` を返す。こうすると、エディタどうしの保存は今までどおり確認を飛ばして通り、適用（`origin` 空）が間に入ったときだけ人の保存が 409 になる。
+- **Rationale**: 人の保存は、エディタ（`origin: editor`）では `revisionId` を送らないことがある。そこで人の保存は「確認を省くかどうか」は今の `isUpdatable` で決め、書き込みは「読んだ時点の最新のままなら」を条件にする。一致しなかったときは、ページを読み直して `isUpdatable` をもう一度通し、通れば決めた回数まで書き直す。通らなければ今と同じ 409 `conflict` を返す。こうすると、エディタどうしの保存は今までどおり確認を飛ばして通り、適用（`origin` 空）が間に入ったときだけ人の保存が 409 になる。
 - **Trade-offs**: `updatePage` は `pushRevision` の前に `save()` で閲覧範囲や WIP の値を書くので、書き込みで負けたときに、その値だけが先に保存される。適用では閲覧範囲を変えないので影響しない。人の保存では書き直しで同じ値が書かれる。
 ### Decision: 共同編集の文書を適用の側では置き換えない
 - **Context**: 要件 3.5・3.11・3.12。
@@ -172,7 +172,7 @@ umbrella の判断（決定 1〜6）とコード上の事実は [../change-propo
 
 ### Decision: Proposal 作成者でも Proposal 承認者でもない人に返す Change オペレーションは、適用に関わった Change オペレーションだけにする
 - **Context**: 要件 9.2・9.7・9.8・9.10。`open` (進行中) の Proposal でも、一部の Change オペレーションがすでに適用されていることがある。
-- **Selected Approach**: Proposal 作成者でも Proposal 承認者でもないユーザーには、閲覧できるページに対する `applied` (適用済み)・`reverted` (取り消し済み)・`revert-refused` (取り消し不可) の Change オペレーションだけを返す。Proposal が `open` (進行中) かどうかは判断に使わない。1 件の取得・適用済みの一覧・リビジョンの印の 3 つが、同じ純関数（`selectVisibleOperations`）でこの Change オペレーションを選ぶ。Proposal 承認者には、1 件の取得と `open` の一覧で、承認権限チェックを通った Change オペレーションも返す（要件 19.6。`decideReviewScope` が決める。決定「承認権限チェックは、確かめるページの集合の閲覧で決める」）。全体の状態と `lastAppliedAt` は、どのユーザーに対しても、返す Change オペレーションだけから決める。
+- **Selected Approach**: Proposal 作成者でも Proposal 承認者でもないユーザーには、閲覧できるページに対する `applied` (適用済み)・`reverted` (取り消し済み)・`revert-refused` (取り消し不可) の Change オペレーションだけを返す。Proposal が `open` (進行中) かどうかは判断に使わない。1 件の取得・適用済みの一覧・リビジョンの印の 3 つが、同じ純関数（`selectVisibleOperations`）でこの Change オペレーションを選ぶ。Proposal 承認者には、1 件の取得と Proposal 承認者としての一覧で、承認権限チェックを通った Change オペレーションも返す（要件 19.6。`decideReviewScope` が決める。決定「承認権限チェックは、確かめるページの集合の閲覧で決める」）。全体の状態と `lastAppliedAt` は、どのユーザーに対しても、返す Change オペレーションだけから決める。
 - **Rationale**: Change オペレーションが適用されたページを見た人が、それを作った Proposal にたどれる必要がある（ページ履歴の印から詳細へ）。一方で、まだ適用されていない Change オペレーションや、適用されなかった Change オペレーションは、Proposal 作成者と Proposal 承認者が扱っている途中のものなので、それ以外のユーザーに見せる理由が無い。Proposal のライフサイクル（`lifecycle`）で判断すると、一部の Change オペレーションが適用された `open` (進行中) の Proposal を、他のユーザーが見られなくなる。
 - **Trade-offs**: 適用済みの一覧は、文書に保存した `lastAppliedAt`（見えない Change オペレーションを適用した日時を含む）の順に読む。そのため、表示する日時と並び順が食い違うことがある。分かるのは「見えない何かが、より新しく適用された」ことだけなので、一覧を取得するユーザーごとの並べ直しはしない。
 
@@ -379,7 +379,7 @@ umbrella の判断（決定 1〜6）とコード上の事実は [../change-propo
   3. Proposal 承認者を保存する 2 か所（作成で Proposal 承認者を渡すとき、Proposal 承認者の追加）だけで確かめる（採用。人が決めた）。
 - **Selected Approach**: 3。設定キー `app:changeProposalReviewersEnabled`（初期値は無効、環境変数 `CHANGE_PROPOSAL_REVIEWERS_ENABLED`、管理者の設定画面には出さない）。無効のとき、Proposal 作成者以外を含む Proposal 承認者の保存を `reviewers-disabled` で断る。
 - **Rationale**: Proposal 承認者が保存されなければ、ほかの経路は Proposal 承認者がいないので自然に働かない。確かめる場所が少ないので、確かめ忘れの穴も少ない。
-- **Trade-offs**: 無効にしても、すでに指定された Proposal 承認者の動きは止まらない。`follow-up` (後続) Proposal と `rework` (見直し) Proposal が引き継ぐ Proposal 承認者は、すでに保存されたものなので確かめない。viewer の承認の画面と Proposal 承認者としての一覧、ai-agent の Proposal 承認者の指定の入口が入ってから有効にする。
+- **Trade-offs**: 無効にしても、すでに指定された Proposal 承認者の動きは止まらない。`follow-up` (後続) Proposal と `rework` (見直し) Proposal が引き継ぐ Proposal 承認者は、すでに保存されたものなので確かめない。viewer の承認の画面と Proposal 承認者としての一覧、ai-agent で Proposal 承認者を指定する仕組みが入ってから有効にする。
 
 ### Decision: Proposal 承認者に指名できるユーザーは、有効な状態の人だけにする
 - **Context**: 要件 15.5・18.5。実在の確認が「ユーザーの文書があるか」だけだと、停止中や削除済みの人も指名できる。停止中の人は承認の操作ができず（`user-not-allowed`）、削除済みの人には通知が届かないので、Proposal がその人を待っているように見える。
@@ -397,11 +397,11 @@ umbrella の判断（決定 1〜6）とコード上の事実は [../change-propo
   1. 期限が近い順に読む。期限の無い文書のための 2 段階の読み取りと、暗号化した続きの位置が要る。
   2. `_id` の順（作成が古い順）に読み、続きの位置を平文にする（採用。人が決めた）。
 - **Selected Approach**: 2。期限は作成のときに「作成時刻 + 設定値」で書かれ、ほかで書き換えないので、作成が古い順は期限が近い順と同じになる（設定値を途中で変えると、その前後で少しずれる）。続きの位置は、一覧に出した最後の Proposal の ID にする（人が決めた）。
-- **Rationale**: 続きの位置は平文である。そのため、調べた最後の Proposal の ID を返すと、その Proposal に、一覧を取得するユーザーが承認権限チェックを通る `pending` (適用待ち) の Change オペレーションが無いとき、それが実際に開いていると分かる。そして、取得で見えるライフサイクルが閉じている Proposal については、見えない `pending` の存在を推測できてしまう。
+- **Rationale**: 続きの位置は平文である。そのため、調べた最後の Proposal の ID を返すと、その Proposal に、一覧を取得するユーザーについて承認権限チェックを通る `pending` (適用待ち) の Change オペレーションが無いとき、それが実際に開いていると分かる。そして、取得で見えるライフサイクルが閉じている Proposal については、見えない `pending` の存在を推測できてしまう。
 - **Trade-offs**: 1 回に調べる上限に達して 1 件も出していなければ `null` を返し、その回の一覧はそこで終わる（データの終わりと区別できない）。Proposal 承認者として指定された開いている Proposal が、承認権限チェックを通った `pending` (適用待ち) の Change オペレーションを持たないまま、上限の件数以上続く場合だけの制限として受け入れる。1 件以上出していれば、次の呼び出しはその次から調べ直すので、読む量は増えるが、1 回に調べる上限は変わらない。
 
 ### Decision: Proposal 承認者としての一覧の cursor は署名せず、細工した cursor で 1 件の Change Proposal が開いているかどうかが分かることを受け入れる
-- **Context**: cursor は 24 桁の 16 進数なら受け付ける。細工した cursor の値を変えながら何度も呼ぶと、「cursor が `null` でなく、返った件数が `limit` 未満」になる境目から、「その cursor の後ろから 500 件目（1 回に調べる上限）の、自分が Proposal 承認者に指定された開いている Proposal」の ID が分かる。その Proposal で、自分が承認権限チェックを通る `pending` (適用待ち) の Change オペレーションが 0 件でも、開いていることが分かる。
+- **Context**: cursor は 24 桁の 16 進数なら受け付ける。細工した cursor の値を変えながら何度も呼ぶと、「cursor が `null` でなく、返った件数が `limit` 未満」になる境目から、「その cursor の後ろから 500 件目（1 回に調べる上限）の、自分が Proposal 承認者に指定された開いている Proposal」の ID が分かる。その Proposal に、自分について承認権限チェックを通る `pending` (適用待ち) の Change オペレーションが 0 件でも、開いていることが分かる。
 - **Alternatives Considered**: (1) cursor に署名し、サービスが返した値以外を断る。(2) `limit` の上限を下げる。
 - **Selected Approach**: どちらも入れず、既知の小さな例外として受け入れる（人が決めた）。
 - **Rationale**: 分かるのは、自分が Proposal 承認者に指名された Proposal 1 件が開いているかどうかだけで、中身・ページ・Proposal 作成者は分からない。成り立つには、500 件以上の開いている Proposal で Proposal 承認者に指名されていることなどが要る。署名は、鍵の管理と、鍵を変えたときに cursor が無効になる扱いが増え、費用に見合わない。(2) は、`limit` が 2 以上なら境目が残るので、塞げない。
