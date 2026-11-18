@@ -54,8 +54,8 @@ import { LOOPBACK, listenOnFreePort } from './free-port.js';
 import type { Workspace } from './paired-workspace.js';
 import {
   addChannel,
+  createdWorkspaces,
   markInventoryReady,
-  openWorkspace,
   pairGrowi,
   passthroughCipher,
   permitWrite,
@@ -87,11 +87,21 @@ const proxyConfig = (): ProxyConfig => ({
 
 let cluster: ProxyCluster | null = null;
 const closers: Array<() => Promise<void>> = [];
+const workspaces = createdWorkspaces();
 
+// The proxy first, so nothing it holds touches rows being removed; the rows
+// before `closers` disconnects the client they are removed through.
 afterEach(async () => {
-  await cluster?.stopAll();
-  cluster = null;
-  await Promise.all(closers.splice(0).map((close) => close()));
+  try {
+    await cluster?.stopAll();
+  } finally {
+    cluster = null;
+    try {
+      await workspaces.removeAll();
+    } finally {
+      await Promise.all(closers.splice(0).map((close) => close()));
+    }
+  }
 });
 
 const openDb = (): PrismaClient => {
@@ -182,7 +192,7 @@ describe('a notification from GROWI, end to end', () => {
     const chat = createFakeChatService();
 
     const db = openDb();
-    const workspace = await openWorkspace(db, 'slack');
+    const workspace = await workspaces.open(db, 'slack');
     const second = await addChannel(db, workspace.installationId, 'slack');
     // Without this every destination is answered `inventory-not-ready`,
     // whatever the inventory holds.
@@ -270,7 +280,7 @@ describe('a notification from GROWI, end to end', () => {
     });
 
     const db = openDb();
-    const workspace = await openWorkspace(db, 'slack');
+    const workspace = await workspaces.open(db, 'slack');
     const second = await addChannel(db, workspace.installationId, 'slack');
     failingChannelId = second.channelId;
     await markInventoryReady(db, workspace.installationId);
@@ -429,7 +439,7 @@ describe('the account-linking flow, end to end', () => {
     const chat = createFakeChatService();
 
     const db = openDb();
-    const workspace = await openWorkspace(db, 'slack');
+    const workspace = await workspaces.open(db, 'slack');
     const relationId = await pairGrowi(
       db,
       workspace.installationId,
@@ -474,7 +484,7 @@ describe('the account-linking flow, end to end', () => {
     const chat = createFakeChatService();
 
     const db = openDb();
-    const workspace = await openWorkspace(db, 'slack');
+    const workspace = await workspaces.open(db, 'slack');
     // The label is the fixture's, and `refusesUntilLinked` answers with the
     // same one: the refusal carries GROWI's own wording while `link` reads the
     // stored relation, so the two only compare as equal when the stored label

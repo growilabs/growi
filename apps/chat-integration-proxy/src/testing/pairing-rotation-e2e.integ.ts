@@ -66,7 +66,7 @@ import { startFakeGrowi } from './fake-growi.js';
 import type { FreePortListener } from './free-port.js';
 import { LOOPBACK, listenOnFreePort } from './free-port.js';
 import {
-  openWorkspace,
+  createdWorkspaces,
   pairGrowi,
   passthroughCipher,
 } from './paired-workspace.js';
@@ -103,11 +103,21 @@ const proxyConfig = (): ProxyConfig => ({
 
 let cluster: ProxyCluster | null = null;
 const closers: Array<() => Promise<void>> = [];
+const workspaces = createdWorkspaces();
 
+// The proxy first, so nothing it holds touches rows being removed; the rows
+// before `closers` disconnects the client they are removed through.
 afterEach(async () => {
-  await cluster?.stopAll();
-  cluster = null;
-  await Promise.all(closers.splice(0).map((close) => close()));
+  try {
+    await cluster?.stopAll();
+  } finally {
+    cluster = null;
+    try {
+      await workspaces.removeAll();
+    } finally {
+      await Promise.all(closers.splice(0).map((close) => close()));
+    }
+  }
 });
 
 const openDb = (): PrismaClient => {
@@ -195,7 +205,7 @@ describe('pairing, from an issued code through to a working relation', () => {
     const growi = await openGrowi();
     const chat = createFakeChatService();
     const db = openDb();
-    const workspace = await openWorkspace(db, 'slack');
+    const workspace = await workspaces.open(db, 'slack');
 
     const { code, expiresAt } = await pairingServiceOn(db).issueCode(
       workspace.installationId,
@@ -270,7 +280,7 @@ describe('pairing, from an issued code through to a working relation', () => {
       observeActorRoles: () => ({ grantedFields: ['is_admin'] }),
     });
     const db = openDb();
-    const workspace = await openWorkspace(db, 'slack');
+    const workspace = await workspaces.open(db, 'slack');
 
     const listener = await startOneProxy(chat);
     const proxyBaseUrl = await listener.baseUrl();
@@ -337,7 +347,7 @@ describe('the URL a GROWI declares about itself', () => {
     const growi = await openGrowi();
     const chat = createFakeChatService();
     const db = openDb();
-    const workspace = await openWorkspace(db, 'slack');
+    const workspace = await workspaces.open(db, 'slack');
 
     const { code } = await pairingServiceOn(db).issueCode(
       workspace.installationId,
@@ -448,7 +458,7 @@ describe('a key rotation with one GROWI that cannot take the new key', () => {
     });
 
     const db = openDb();
-    const workspace = await openWorkspace(db, 'slack');
+    const workspace = await workspaces.open(db, 'slack');
     const relationA = await pairGrowi(
       db,
       workspace.installationId,
@@ -596,7 +606,7 @@ describe('what this proxy stores about who is who', () => {
     const growi = await openGrowi();
     const chat = createFakeChatService();
     const db = openDb();
-    const workspace = await openWorkspace(db, 'slack');
+    const workspace = await workspaces.open(db, 'slack');
 
     // A pairing carried out by an identifiable person, so the search below is
     // looking for something that really passed through the proxy: `issueCode`

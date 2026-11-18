@@ -286,3 +286,48 @@ export const removeWorkspace = (
     refreshChannels: () => Promise.resolve(),
     onChannelRefreshFailed: () => {},
   }).remove(installationId);
+
+/**
+ * The installations a test file made, so its `afterEach` removes exactly those
+ * rows and nothing another run left behind. Call `removeAll` after the proxy
+ * has stopped and before the clients are disconnected.
+ */
+export const createdWorkspaces = () => {
+  const made: Array<{
+    readonly db: PrismaClient;
+    readonly installationId: string;
+  }> = [];
+
+  return {
+    /** `openWorkspace`, remembered for `removeAll`. */
+    open: async (
+      db: PrismaClient,
+      platform: PlatformName,
+    ): Promise<Workspace> => {
+      const workspace = await openWorkspace(db, platform);
+      made.push({ db, installationId: workspace.installationId });
+      return workspace;
+    },
+    /** An installation the test saved without `openWorkspace`. */
+    remember: (db: PrismaClient, installationId: string): void => {
+      made.push({ db, installationId });
+    },
+    /**
+     * Removes every remembered installation, one at a time. Each removal is
+     * attempted even when an earlier one failed; the first failure is
+     * rethrown at the end.
+     */
+    removeAll: async (): Promise<void> => {
+      let firstFailure: unknown = null;
+      for (const { db, installationId } of made.splice(0)) {
+        try {
+          // biome-ignore lint/performance/noAwaitInLoops: removals share one client and must finish before it is disconnected
+          await removeWorkspace(db, installationId);
+        } catch (error) {
+          firstFailure ??= error;
+        }
+      }
+      if (firstFailure != null) throw firstFailure;
+    },
+  };
+};

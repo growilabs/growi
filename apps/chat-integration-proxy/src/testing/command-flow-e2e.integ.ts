@@ -52,7 +52,7 @@ import { startFakeGrowi } from './fake-growi.js';
 import type { FreePortListener } from './free-port.js';
 import { LOOPBACK, listenOnFreePort } from './free-port.js';
 import {
-  openWorkspace,
+  createdWorkspaces,
   pairGrowi,
   passthroughCipher,
   permitWrite,
@@ -90,11 +90,21 @@ const proxyConfig = (): ProxyConfig => ({
 
 let cluster: ProxyCluster | null = null;
 const closers: Array<() => Promise<void>> = [];
+const workspaces = createdWorkspaces();
 
+// The proxy first, so nothing it holds touches rows being removed; the rows
+// before `closers` disconnects the client they are removed through.
 afterEach(async () => {
-  await cluster?.stopAll();
-  cluster = null;
-  await Promise.all(closers.splice(0).map((close) => close()));
+  try {
+    await cluster?.stopAll();
+  } finally {
+    cluster = null;
+    try {
+      await workspaces.removeAll();
+    } finally {
+      await Promise.all(closers.splice(0).map((close) => close()));
+    }
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -214,7 +224,7 @@ describe('a command run end to end', () => {
     closers.push(growiA.close, growiB.close);
 
     const db = openDb();
-    const workspace = await openWorkspace(db, 'slack');
+    const workspace = await workspaces.open(db, 'slack');
     const relationA = await pairGrowi(
       db,
       workspace.installationId,
@@ -327,7 +337,7 @@ describe('a command run end to end', () => {
     closers.push(growiA.close, growiB.close);
 
     const db = openDb();
-    const workspace = await openWorkspace(db, 'mattermost');
+    const workspace = await workspaces.open(db, 'mattermost');
     const relationA = await pairGrowi(
       db,
       workspace.installationId,
@@ -434,7 +444,7 @@ describe('a command run end to end', () => {
     closers.push(growiA.close, growiB.close, growiC.close);
 
     const db = openDb();
-    const workspace = await openWorkspace(db, platform);
+    const workspace = await workspaces.open(db, platform);
     await pairGrowi(db, workspace.installationId, growiA, 'GROWI A');
     await pairGrowi(db, workspace.installationId, growiB, 'GROWI B');
     await pairGrowi(db, workspace.installationId, growiC, 'GROWI C');
@@ -563,7 +573,7 @@ describe('a command run end to end', () => {
     closers.push(growi.close);
 
     const db = openDb();
-    const workspace = await openWorkspace(db, 'teams');
+    const workspace = await workspaces.open(db, 'teams');
     const relationId = await pairGrowi(
       db,
       workspace.installationId,

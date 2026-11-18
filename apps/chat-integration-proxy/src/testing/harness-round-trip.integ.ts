@@ -36,6 +36,7 @@ import { mentionOn } from './chat-events.js';
 import { createFakeChatService } from './fake-chat-service.js';
 import { startFakeGrowi } from './fake-growi.js';
 import { listenOnFreePort } from './free-port.js';
+import { createdWorkspaces } from './paired-workspace.js';
 import { type ProxyCluster, startProxyCluster } from './proxy-cluster.js';
 
 const DATABASE_URL =
@@ -68,11 +69,21 @@ const proxyConfig = (growiHostname: string): ProxyConfig => ({
 
 let cluster: ProxyCluster | null = null;
 const closers: Array<() => Promise<void>> = [];
+const workspaces = createdWorkspaces();
 
+// The proxy first, so nothing it holds touches rows being removed; the rows
+// before `closers` disconnects the client they are removed through.
 afterEach(async () => {
-  await cluster?.stopAll();
-  cluster = null;
-  await Promise.all(closers.splice(0).map((close) => close()));
+  try {
+    await cluster?.stopAll();
+  } finally {
+    cluster = null;
+    try {
+      await workspaces.removeAll();
+    } finally {
+      await Promise.all(closers.splice(0).map((close) => close()));
+    }
+  }
 });
 
 describe('the harness end to end', () => {
@@ -119,6 +130,7 @@ describe('the harness end to end', () => {
       'harness workspace',
       { slack: { botToken: 'xoxb-harness' } },
     );
+    workspaces.remember(db, installationId);
     const relations = createRelationRepository(db);
     const relation = await relations.create({
       installationId,
