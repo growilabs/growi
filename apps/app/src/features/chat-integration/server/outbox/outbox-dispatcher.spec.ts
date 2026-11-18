@@ -439,12 +439,18 @@ describe('createOutboxDispatcher timing', () => {
     });
 
     it('leaves rows written during the run to the follow-up run their writer requests', async () => {
-      await seedBacklog(1, new Date());
+      // The run starts at T. The late row is due at T + 1 ms, strictly after
+      // the start, and the clock has moved past it when it is written -- so
+      // it is left only because it was not due when the run began, not
+      // because it is not due yet.
+      let current = T;
+      await seedBacklog(1, new Date(T));
       const deliverer = vi.fn<Deliverer>(async (row) => {
         if (row.requestId === 'req-0') {
+          current = T + MINUTE;
           // Written, but nobody asks for a drain for it.
           await seedPendingNotification('req-late', {
-            nextAttemptAt: new Date(),
+            nextAttemptAt: new Date(T + 1),
           });
         }
         return { outcome: 'sent' };
@@ -452,6 +458,7 @@ describe('createOutboxDispatcher timing', () => {
 
       await createOutboxDispatcher({
         deliverers: { notification: deliverer, 'command-answer': deliverer },
+        clock: () => new Date(current),
       }).requestDrain();
 
       expect(deliverer.mock.calls.map(([row]) => row.requestId)).toEqual([
