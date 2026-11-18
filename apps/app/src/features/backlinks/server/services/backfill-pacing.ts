@@ -1,5 +1,5 @@
 import { MAX_CHARGED_WORK_MS, restMsFor } from './duty-cycle-rest';
-import { percentOrDefault, positiveIntOrDefault } from './upsert-queue-pacing';
+import { percentOrDefault, positiveIntOrDefault } from './pacing-config';
 
 // Checkpoint cadence, attempt budget and lease margin are provisional values; design.md
 // (PageLinkBackfillCron) records the reasoning and the inequality the lease must satisfy.

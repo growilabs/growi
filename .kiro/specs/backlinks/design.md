@@ -212,6 +212,7 @@ apps/app/src/features/backlinks/
 │   │   ├── page-link-service-handlers.ts   # Crowi-free lifecycle handlers: drain-time upsert by id (re-read page + body -> extract -> resolve -> sync + re-resolve inbound), chunked delete reconcile with retry
 │   │   ├── page-link-upsert-queue.ts   # coalescing queue (Set<pageId> + duty-cycle paced drain) — requirement 3.5
 │   │   ├── upsert-queue-pacing.ts      # validates the configured pacing budget, per-value fallback to CONFIG_DEFINITIONS
+│   │   ├── pacing-config.ts            # per-value validators of the configured pacing numbers, shared by the drain and the backfill
 │   │   ├── find-user-group-ids-for-viewer.ts  # viewer's internal + external group ids, resolved once per request
 │   │   ├── is-page-readable-by-viewer.ts      # viewed-page gate: Page.isAccessiblePageByViewer(..., true)
 │   │   ├── find-backlinks.ts           # read query: backlink sources filtered by viewer grant
