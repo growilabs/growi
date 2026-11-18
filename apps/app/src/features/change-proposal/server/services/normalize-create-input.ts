@@ -110,7 +110,7 @@ const normalizeOperations = (
   return { ok: true, value: operations };
 };
 
-const normalizeReviewer = (raw: unknown): ReviewerInput | 'invalid' =>
+export const normalizeReviewer = (raw: unknown): ReviewerInput | 'invalid' =>
   isRecord(raw) &&
   isString(raw.kind) &&
   REVIEWER_KINDS.includes(raw.kind) &&

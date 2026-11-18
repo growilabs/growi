@@ -22,7 +22,7 @@ const COUNT_BY_KIND: Record<
 };
 
 // Expects distinct inputs (dedupeReviewerInputs), so a count below the id count means one is missing.
-const allReviewersExist = async (
+export const allReviewersExist = async (
   inputs: readonly ReviewerInput[],
 ): Promise<boolean> => {
   if (inputs.some((input) => !isValidObjectId(input.id))) {

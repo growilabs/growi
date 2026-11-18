@@ -27,6 +27,10 @@ import {
   type ReviewerActionContext,
   type ReviewerActionResult,
 } from './reviewer-action-auth';
+import {
+  createReviewerMembershipActions,
+  type ReviewerMembershipActions,
+} from './reviewer-membership-actions';
 
 export {
   authorizeReviewerAction,
@@ -40,15 +44,16 @@ const logger = loggerFactory(
   'growi:features:change-proposal:services:reviewer-actions',
 );
 
-export type ReviewerActions = ReviewRecordActions & {
-  // The one way to approve, for the requester and the reviewers alike; omitted
-  // keys approve everything the caller may decide.
-  approve(
-    proposalId: string,
-    actor: ReviewActor,
-    operationKeys?: readonly string[],
-  ): Promise<ReviewerActionResult<ApproveResponse>>;
-};
+export type ReviewerActions = ReviewRecordActions &
+  ReviewerMembershipActions & {
+    // The one way to approve, for the requester and the reviewers alike; omitted
+    // keys approve everything the caller may decide.
+    approve(
+      proposalId: string,
+      actor: ReviewActor,
+      operationKeys?: readonly string[],
+    ): Promise<ReviewerActionResult<ApproveResponse>>;
+  };
 
 export type ReviewerActionsDeps = {
   readonly crowi: Crowi;
@@ -171,6 +176,7 @@ export const createReviewerActions = (
 
   return {
     ...createReviewRecordActions({ crowi, reviewNotifier, now }),
+    ...createReviewerMembershipActions({ crowi, reviewNotifier, now }),
     async approve(proposalId, actor, operationKeys) {
       const authorized = await authorizeReviewerAction(
         proposalId,
