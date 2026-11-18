@@ -17,7 +17,7 @@
 - IP アドレスの検索（後続のタスク）
 - エクスポートのモーダルの絞り込みの変更
 - URL を貼り付けたときの正規化、自由入力による絞り込み
-- 候補 API とサーバー側の候補の検索の変更（PR #12119 の範囲）
+- 候補 API とサーバー側の候補の検索の変更
 - 一覧のクエリの性能改善（インデックスを効かせる書き換え）
 
 ## Boundary Commitments
@@ -30,14 +30,14 @@
 - `.kiro/specs/activity-log-snapshot/design.md` の `findSnapshotUsernamesByUsernameRegex` の段落の書き直し（Amend target）。古くなった記述を今のコードに合わせるだけで、`activity-log-snapshot` の契約は変えない。本 spec は新機能の spec であり、`.claude/rules/spec-lifecycle.md` の amend spec ではないので、対象の spec に書き戻して本 spec を削除するタスクは作らない
 
 ### Out of Boundary
-- 候補 API（`GET /_api/v3/activity/suggestions`）の契約とサーバー側の検索（PR #12119 が所有）
+- 候補 API（`GET /_api/v3/activity/suggestions`）の契約とサーバー側の検索（`search-auditlog-suggestions.ts`）
 - 共有の `UsernameTypeahead` と、それを使う全文検索ページ・エクスポートのモーダル
 - 監査ログのエクスポート（`features/audit-log-bulk-export`）
 - activity の記録内容（`activity-log` / `activity-log-snapshot` が所有）。access_token の伏せ字処理は別チケット
 - IP アドレスの検索
 
 ### Allowed Dependencies
-- 候補 API の `field=username` / `field=endpoint`（PR #12119 のマージ後の契約）。画面からは既存の `useSWRxAuditlogSuggestions` を通してのみ呼ぶ
+- 候補 API の `field=username` / `field=endpoint`。画面からは既存の `useSWRxAuditlogSuggestions` を通してのみ呼ぶ
 - `react-bootstrap-typeahead`（既存の依存、6.3 系）
 - `@growi/core` の `escapeStringForMongoRegex`
 - 既存の一覧の取得の仕組み（`buildActivitySearchFilter` → `POST /activity/list` / `GET /activity` → `resolveActivityListWhere` → `buildActivityListWhere` → Prisma `findMany`）
@@ -116,7 +116,7 @@ apps/app/src/client/components/Admin/AuditLog/AuditLogSearchTypeahead/
 - `apps/app/src/client/components/Admin/AuditLog/build-search-filter.ts` / `.spec.ts` — `endpoints` を受け取る
 - `apps/app/src/client/components/Admin/AuditLogManagement.tsx` — `AuditLogUsernameTypeahead` を `AuditLogSearchTypeahead` に置き換え、選択済みの endpoint を状態に持ち、リセットで検索欄を初期状態に戻す
 - `apps/app/public/static/locales/{en_US,fr_FR,ja_JP,ko_KR,zh_CN}/admin.json` — `audit_log_management.search.*` の文言を足す
-- `.kiro/specs/activity-log-snapshot/design.md` — `findSnapshotUsernamesByUsernameRegex` の段落を、呼び出し元（`search-auditlog-suggestions.ts`）と最小文字数の判定の位置（呼び出し側）に合わせて書き直す。`spec.json` の `updated_at` を更新する。書き直した後の段落は `search-auditlog-suggestions.ts` を呼び出し元として書くので、このファイルが入る PR #12119 のマージ後に着手する
+- `.kiro/specs/activity-log-snapshot/design.md` — `findSnapshotUsernamesByUsernameRegex` の段落を、呼び出し元（`search-auditlog-suggestions.ts`）と最小文字数の判定の位置（呼び出し側）に合わせて書き直す。`spec.json` の `updated_at` を更新する
 
 `AuditLogUsernameTypeahead` と `UsernameTypeahead` は変更しない（エクスポートのモーダルと全文検索ページが使い続ける）。
 
@@ -375,7 +375,6 @@ export type AuditLogSearchTypeaheadProps = {
 - 候補の取得に失敗しても、`selected` と `onChange` は呼ばない（4.3）。
 
 **Implementation Notes**
-- Integration: 候補 API の `endpoint` の field は PR #12119 で入る。マージ前は `AuditlogSuggestionField` に `endpoint` がないので、このコンポーネントとフックの実装は PR #12119 のマージ後に着手する。
 - Risks:
   - `AsyncTypeahead` は同じ keyword の再検索で `onSearch` を呼ばないため、既存と同じく `useCache={false}` にする。
   - `renderMenu` は、`filterBy` を通した結果が 0 件でも呼ばれる。既存の `UsernameTypeahead` のように結果が空なら空を返すと、失敗のグループだけの表示（4.2）が消えるので、結果が空でも早期 return しない。
@@ -398,12 +397,12 @@ export type AuditLogSearchTypeaheadProps = {
 - 一致の仕方: 保存値が要素のいずれかと等しい、または要素の後ろに `?` が続く値で始まる。大文字小文字を区別する。
 - 既存の項目（`usernames` / `dates` / `actions`）の意味は変えない。項目を足すだけなので、既存の呼び出し元に影響しない。
 
-**候補 API（PR #12119 の契約、変更しない）**: `GET /_api/v3/activity/suggestions?field=<username|endpoint>&q=<q>&limit=5`。レスポンスは `{ username?: { activeUsernames, inactiveUsernames }, endpoint?: { endpoints } }`。
+**候補 API（既存の契約、変更しない）**: `GET /_api/v3/activity/suggestions?field=<username|endpoint>&q=<q>&limit=5`。レスポンスは `{ username?: { activeUsernames, inactiveUsernames }, endpoint?: { endpoints } }`。
 
 ## Error Handling
 
 - **候補の取得要求の失敗**: field ごとの SWR の `error` を、候補一覧の中の「取得できませんでした」の表示にする。他の field の候補、選択済みの値、一覧には影響させない（4.1–4.3）。
-- **候補 API が空の候補を返す場合**: 全文検索サーバーが使えずデータベースでの検索も失敗したとき、候補 API は warn ログを出して空の候補を 200 で返す（PR #12119 の契約）。画面からは区別できないため「該当なし」と同じ表示になる。要件の Boundary Context に既知の制約として書いており、サーバーのログで追う。
+- **候補 API が空の候補を返す場合**: 全文検索サーバーが使えずデータベースでの検索も失敗したとき、候補 API は warn ログを出して空の候補を 200 で返す（候補 API の契約）。画面からは区別できないため「該当なし」と同じ表示になる。要件の Boundary Context に既知の制約として書いており、サーバーのログで追う。
 - **一覧の取得失敗**: 既存のまま（`toastError('Failed to get Audit Log')`）。
 - **不正な `usernames` / `endpoints`**: 配列でない、または文字列でない要素を含む場合は、その条件を付けずに無視する。例外は投げない。
 

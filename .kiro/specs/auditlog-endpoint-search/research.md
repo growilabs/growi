@@ -4,7 +4,7 @@
 
 ### 前提の状態
 
-- 候補 API の endpoint 対応（`field=endpoint`、`AUDITLOG_SUGGESTION_FIELDS` への追加、MongoDB フォールバック、`endpoint_1` インデックスの migration）は PR #12119 で入る。spec のブランチ（ベース: `feat/179911-url-fuzzy-search`）にはまだ含まれていない。実装は PR #12119 のマージ後になる。
+- 候補 API は `field=endpoint` に対応している（`AUDITLOG_SUGGESTION_FIELDS`、`search-auditlog-suggestions.ts` の MongoDB フォールバック、`endpoint_1` インデックスの migration）。本 spec はこれを前提とし、変更しない。
 - ES の監査ログのインデックスには `username` と `endpoint` が入っている（`mappings-auditlog-properties.ts`）。`ip` は入っておらず、本 spec の範囲外。
 
 ### 現状の資産
@@ -26,10 +26,10 @@
 
 | 要件 | 必要なもの | ギャップ |
 |---|---|---|
-| 1. URL を候補から選んで絞り込む | URL の候補の取得、選択済みの値の表示、一覧への反映 | 候補の取得は `useSWRxAuditlogSuggestions('endpoint', q)` で足りる（PR #12119 後）。**Missing**: URL を選ぶ入力欄、`ISearchFilter` の endpoint 条件 |
+| 1. URL を候補から選んで絞り込む | URL の候補の取得、選択済みの値の表示、一覧への反映 | 候補の取得は `useSWRxAuditlogSuggestions('endpoint', q)` で足りる。**Missing**: URL を選ぶ入力欄、`ISearchFilter` の endpoint 条件 |
 | 2. URL の一致の仕方 | パス部分の完全一致（`?` 以降は無視）、大文字小文字の区別 | **Missing**: `buildActivityListWhere` の endpoint 条件。保存値は `?` 以降を含むので、「値が一致」または「値が `<パス>?` で始まる」の OR になる。`endpoint_1` インデックスで前方一致を絞れる見込み（**Research Needed**: Prisma の `startsWith` が MongoDB でどんな `$regex` になり、インデックスが効くか） |
 | 3. 1 つの検索欄 | 「絞り込みを選択」、種類ごとの見出し付きの候補、種類の違う値を選択済みとして並べる | **Missing**: 種類の違う候補を混ぜて扱う入力欄。今の `UsernameTypeahead` はユーザー名専用で、全文検索ページとも共有している |
-| 4. 取得失敗の表示 | 種類ごとの失敗の検知と表示 | **Missing**: 失敗の表示。今は失敗を画面に出していない。候補 API は field を複数指定すると 1 つの失敗で全体が 500 になる（PR #12119 で `Promise.all` に戻した） |
+| 4. 取得失敗の表示 | 種類ごとの失敗の検知と表示 | **Missing**: 失敗の表示。今は失敗を画面に出していない。候補 API は field を複数指定すると 1 つの失敗で全体が 500 になる（`search-auditlog-suggestions.ts` の `Promise.all`） |
 | 5. 既存の操作との整合 | 1 ページ目に戻す、AND 条件、リセット | 既存の仕組み（`setActivePageNumber(1)`、`clearButtonPushedHandler`、`where` の各条件の AND）を延ばせば足りる |
 | 6. 多言語 | 5 ロケールの文言 | 既存の `admin.json` に追加する |
 | Amend target | `activity-log-snapshot/design.md` の段落の書き直し | 文書のみ。コードの変更なし |
@@ -82,7 +82,6 @@
   - 部分失敗を種類ごとのリクエストで扱うか（候補 API の契約を変えないか）
   - 「すべて」のときの種類ごとの件数
   - 一覧の API の `ISearchFilter` に足す項目名
-- 依存: PR #12119 のマージ。
 
 ---
 
@@ -135,10 +134,10 @@
 - **Trade-offs**: 「すべて」のときはキー入力ごとのリクエストが 2 本になる（入力欄の `delay` で間引かれる）。
 
 ### Decision: 「取得できなかった」の表示は、候補のリクエスト自体の失敗に限る
-- **Context**: 要件 4。候補 API は、全文検索サーバーが使えずデータベースでの検索も失敗したとき（時間切れなど）、warn ログを出して空の候補を 200 で返す（PR #12119 の契約）。画面からは「該当なし」と区別できない。
+- **Context**: 要件 4。候補 API は、全文検索サーバーが使えずデータベースでの検索も失敗したとき（時間切れなど）、warn ログを出して空の候補を 200 で返す（候補 API の契約）。画面からは「該当なし」と区別できない。
 - **Alternatives Considered**:
   1. 要件 4 の対象をリクエスト自体の失敗に限り、データベースでの検索の失敗は既知の制約とする。
-  2. 候補 API が field ごとに失敗を示す印を返すようにする — 要件 4 の目的を完全に満たすが、PR #12119 の契約を変え、本 spec の範囲を越える。
+  2. 候補 API が field ごとに失敗を示す印を返すようにする — 要件 4 の目的を完全に満たすが、候補 API の契約を変え、本 spec の範囲を越える。
 - **Selected Approach**: 1。要件 4 を「候補の取得要求が失敗した」場合に限る形に書き換え、データベースでの検索の失敗は Boundary Context に既知の制約として書く。
 - **Rationale**: 候補 API の失敗時の振る舞いは、失敗と 0 件を区別しないことを受け入れたうえで決まっている。画面側だけで区別する手段はない。
 
@@ -181,5 +180,4 @@
 ## Risks & Mitigations
 - Prisma のバージョンアップで `startsWith` がエスケープするようになり、二重エスケープで一致しなくなる — 正規表現の記号を含むパスと `/_api/v3/pages` の除外を確かめる integ テストで検知する。
 - 一覧のクエリが全件走査のまま — 今の username・action の絞り込みと同じ水準。activities は既定で 30 日で消える。改善は本 spec の範囲外。
-- PR #12119 が未マージ — 候補 API の `endpoint` に依存するタスクは、PR #12119 のマージ後に着手する。
 - `react-bootstrap-typeahead` 6.3.2 は、候補一覧を開くかを `isShown`（`open` / `minLength` / `showMenu` / `text`）だけで決め、結果の件数は見ない。フィルタ後の結果が 0 件でも `renderMenu` は呼ばれる — `renderMenu` が結果が空のときに早期 return すると、失敗表示だけの場合（要件 4.2）が消える。早期 return せず、コンポーネントテストで固定する。
