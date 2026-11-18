@@ -165,20 +165,34 @@ export const agentE2eScope = () => {
   };
 
   const close = async (): Promise<void> => {
+    const client = db;
+    const created = installationId;
     // The proxy first, so nothing it still holds touches rows being removed.
-    try {
-      await cluster?.stopAll();
-      await growi?.close();
-      if (db != null && installationId != null) {
-        await removeWorkspace(db, installationId);
+    // Each step runs even when an earlier one failed: the rows must not be
+    // left behind because a socket would not close.
+    const steps: ReadonlyArray<() => Promise<void> | undefined> = [
+      () => cluster?.stopAll(),
+      () => growi?.close(),
+      () =>
+        client == null || created == null
+          ? undefined
+          : removeWorkspace(client, created),
+      () => client?.$disconnect(),
+    ];
+    cluster = null;
+    growi = null;
+    db = null;
+    installationId = null;
+    let firstFailure: unknown = null;
+    for (const step of steps) {
+      try {
+        // biome-ignore lint/performance/noAwaitInLoops: the rows must be gone before the client is disconnected
+        await step();
+      } catch (error) {
+        firstFailure ??= error;
       }
-    } finally {
-      await db?.$disconnect();
-      cluster = null;
-      growi = null;
-      db = null;
-      installationId = null;
     }
+    if (firstFailure != null) throw firstFailure;
   };
 
   return { start, close };
