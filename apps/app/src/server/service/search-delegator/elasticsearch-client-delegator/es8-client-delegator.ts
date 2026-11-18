@@ -68,6 +68,10 @@ export class ES8ClientDelegator {
       params: estypes.IndicesStatsRequest,
     ): Promise<estypes.IndicesStatsResponse> =>
       this.client.indices.stats(params),
+    refresh: (
+      params: estypes.IndicesRefreshRequest,
+    ): Promise<estypes.IndicesRefreshResponse> =>
+      this.client.indices.refresh(params),
   };
 
   nodes = {
@@ -91,5 +95,11 @@ export class ES8ClientDelegator {
 
   search(params: estypes.SearchRequest): Promise<estypes.SearchResponse> {
     return this.client.search(params);
+  }
+
+  deleteByQuery(
+    params: estypes.DeleteByQueryRequest,
+  ): Promise<estypes.DeleteByQueryResponse> {
+    return this.client.deleteByQuery(params);
   }
 }

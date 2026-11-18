@@ -11,11 +11,12 @@ type LiveAttachmentSnapshotDetailProps = {
 
 /**
  * Formatted viewer for an attachment activity whose file still exists
- * (ACTION_ATTACHMENT_ADD / ACTION_ATTACHMENT_DOWNLOAD). Shares the file name /
- * size / page fields with the REMOVE renderer via AttachmentSnapshotFields, and
- * additionally links to the live file.
+ * (ACTION_ATTACHMENT_ADD / ACTION_ATTACHMENT_DOWNLOAD /
+ * ACTION_ATTACHMENT_REEXTRACT). Shares the file name / size / page fields with
+ * the REMOVE renderer via AttachmentSnapshotFields, and additionally links to
+ * the live file.
  *
- * Registered for both ADD and DOWNLOAD (see snapshot-detail-renderers), so
+ * Registered for ADD, DOWNLOAD and REEXTRACT (see snapshot-detail-renderers), so
  * `activity` arrives already narrowed and is not re-narrowed here. The download
  * link is built from the activity's `target` (the attachment id, exposed by the
  * audit-log API) to match the attachment's `downloadPathProxied`

@@ -15,9 +15,11 @@ import {
   AllSmallGroupActions,
   AllSupportedActions,
   AllSupportedTargetModels,
+  AttachmentActions,
   ChangeProposalActions,
   isAttachmentAddActivity,
   isAttachmentDownloadActivity,
+  isAttachmentReextractActivity,
   isAttachmentRemoveActivity,
   isAuditlogSuggestionField,
   MODEL_ATTACHMENT,
@@ -429,6 +431,27 @@ describe('isAttachmentDownloadActivity', () => {
   });
 });
 
+describe('isAttachmentReextractActivity', () => {
+  it('accepts only ATTACHMENT_REEXTRACT, which is an attachment action in the medium group', () => {
+    const of = (action: IActivity['action']) => ({ action });
+
+    expect(
+      isAttachmentReextractActivity(
+        of(SupportedAction.ACTION_ATTACHMENT_REEXTRACT),
+      ),
+    ).toBe(true);
+    for (const action of [
+      SupportedAction.ACTION_ATTACHMENT_ADD,
+      SupportedAction.ACTION_ATTACHMENT_REMOVE,
+      SupportedAction.ACTION_ATTACHMENT_DOWNLOAD,
+    ]) {
+      expect(isAttachmentReextractActivity(of(action))).toBe(false);
+    }
+    expect(AttachmentActions).toContain('ATTACHMENT_REEXTRACT');
+    expect(AllMediumGroupActions).toContain('ATTACHMENT_REEXTRACT');
+  });
+});
+
 describe('attachment guards coexistence', () => {
   it('matches each attachment action with exactly its own guard', () => {
     const add: Pick<IActivity, 'action' | 'snapshot'> = {
@@ -586,5 +609,20 @@ describe('Change Proposal activity declarations', () => {
 
   it('keeps the admin settings action in the Admin category', () => {
     expect(AdminActions).toContain('ADMIN_CHANGE_PROPOSAL_SETTINGS_UPDATE');
+  });
+});
+
+describe('attachment search settings activity declaration', () => {
+  it('records the admin update only in the Large group, in the Admin category', () => {
+    expect(SupportedAction.ACTION_ADMIN_ATTACHMENT_SEARCH_SETTINGS_UPDATE).toBe(
+      'ADMIN_ATTACHMENT_SEARCH_SETTINGS_UPDATE',
+    );
+    expect(AllMediumGroupActions).not.toContain(
+      'ADMIN_ATTACHMENT_SEARCH_SETTINGS_UPDATE',
+    );
+    expect(AllLargeGroupActions).toContain(
+      'ADMIN_ATTACHMENT_SEARCH_SETTINGS_UPDATE',
+    );
+    expect(AdminActions).toContain('ADMIN_ATTACHMENT_SEARCH_SETTINGS_UPDATE');
   });
 });
