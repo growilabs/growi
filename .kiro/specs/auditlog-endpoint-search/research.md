@@ -29,17 +29,17 @@
 | 1. URL を候補から選んで絞り込む | URL の候補の取得、選択済みの値の表示、一覧への反映 | 候補の取得は `useSWRxAuditlogSuggestions('endpoint', q)` で足りる。**Missing**: URL を選ぶ入力欄、`ISearchFilter` の endpoint 条件 |
 | 2. URL の一致の仕方 | パス部分の完全一致（`?` 以降は無視）、大文字小文字の区別 | **Missing**: `buildActivityListWhere` の endpoint 条件。保存値は `?` 以降を含むので、「値が一致」または「値が `<パス>?` で始まる」の OR になる。`endpoint_1` インデックスで前方一致を絞れる見込み（**Research Needed**: Prisma の `startsWith` が MongoDB でどんな `$regex` になり、インデックスが効くか） |
 | 3. 1 つの検索欄 | 「絞り込みを選択」、種類ごとの見出し付きの候補、種類の違う値を選択済みとして並べる | **Missing**: 種類の違う候補を混ぜて扱う入力欄。今の `UsernameTypeahead` はユーザー名専用で、全文検索ページとも共有している |
-| 4. 取得失敗の表示 | 種類ごとの失敗の検知と表示 | **Missing**: 失敗の表示。今は失敗を画面に出していない。候補 API は field を複数指定すると 1 つの失敗で全体が 500 になる（`search-auditlog-suggestions.ts` の `Promise.all`） |
+| 4. 取得失敗の表示 | 失敗の検知と表示 | **Missing**: 失敗の表示。今は失敗を画面に出していない。候補 API は field を複数指定すると 1 つの失敗で全体が 500 になる（`search-auditlog-suggestions.ts` の `Promise.all`） |
 | 5. 既存の操作との整合 | 1 ページ目に戻す、AND 条件、リセット | 既存の仕組み（`setActivePageNumber(1)`、`clearButtonPushedHandler`、`where` の各条件の AND）を延ばせば足りる |
 | 6. 多言語 | 5 ロケールの文言 | 既存の `admin.json` に追加する |
-| Amend target | `activity-log-snapshot/design.md` の段落の書き直し | 文書のみ。コードの変更なし |
+| 関連文書の修正 | `activity-log-snapshot/design.md` の依存先の説明の修正 | 文書のみ。コードの変更なし |
 
 ### 制約
 
 - **共有コンポーネント**: `UsernameTypeahead` は全文検索ページ（`SearchUsernameTypeahead`）も使う。監査ログ用に作り直す変更が、全文検索ページの動きを変えてはいけない。
 - **エクスポートのモーダル**: `AuditLogUsernameTypeahead` を使い続ける（範囲外）。監査ログ画面から `AuditLogUsernameTypeahead` を外しても、モーダル側では残す。
 - **一覧の API の 2 経路**: `GET /activity` と `POST /activity/list` の両方で、endpoint 条件が文字列の配列であることを検証する必要がある（NoSQL injection の対策）。検証の置き場所は設計で決める。
-- **部分失敗**: 候補 API は複数 field の部分失敗を扱わない（1 つでも失敗したら 500）。種類ごとに失敗を見分けるには、この契約との関係を設計で決める必要がある。
+- **失敗の扱い**: 候補 API は複数 field を 1 回で受け付け、1 つでも例外になれば 500 を返す。ただし field ごとの検索は、全文検索サーバーとデータベースのどちらでも失敗したときに空の候補を返すので、例外になるのはデータベース自体が止まっている場合などに限られる。失敗をどの単位で表示するかは設計で決める。
 
 ### 実装の選択肢
 
@@ -59,10 +59,10 @@
 #### 選択肢 C: 組み合わせ（推奨候補）
 
 - 画面: B と同じく、監査ログ用の検索欄を新しく作る。`UsernameTypeahead` から純粋なロジック（見出しの分類、古い応答の判定）だけを切り出して共有する。
-- 候補の取得: 種類ごとに `useSWRxAuditlogSuggestions` を別々に呼ぶ（「すべて」ならユーザー名と URL の 2 リクエスト）。種類ごとの失敗を SWR の `error` で個別に見分けられ、候補 API の契約（1 つでも失敗したら 500）を変えずに済む。種類ごとの件数の上限も、`limit` の指定で自然に決まる。
+- 候補の取得: 検索対象の field をまとめて、候補 API を 1 回呼ぶ。`limit` は field ごとに効くので、種類ごとの件数の上限もそのまま決まる。
 - 一覧の絞り込み: `ISearchFilter` に endpoint の配列を足し、`build-search-filter.ts` → validator → `resolveActivityListWhere` → `buildActivityListWhere` の順に延ばす。
-- ✅ 部分失敗の扱いを、サーバーの変更なしで満たせる。既存の純粋関数の形にそろう。
-- ❌ 「すべて」のときのリクエストが 2 倍になる（キー入力ごと。`delay=400` で間引かれる）。
+- ✅ 候補 API を変えずに済む。既存の純粋関数の形にそろう。
+- ❌ `useSWRxAuditlogSuggestions` が field を 1 つしか受け取らないので、配列を受け取れるようにする必要がある。
 
 ### 調べる必要があること（Research Needed）
 
@@ -79,7 +79,7 @@
 
 - 選択肢 C を軸に検討する。
 - 決めること:
-  - 部分失敗を種類ごとのリクエストで扱うか（候補 API の契約を変えないか）
+  - 候補の取得の失敗を、種類ごとに表示するか、1 つの表示にするか
   - 「すべて」のときの種類ごとの件数
   - 一覧の API の `ISearchFilter` に足す項目名
 
@@ -93,7 +93,7 @@
 - **Key Findings**:
   - Prisma 6.19 の MongoDB コネクタは `findMany` の条件を `$expr` の集約に変換する。`startsWith` は `$regexMatch` になり、**値の正規表現記号をエスケープしない**。
   - 今の一覧の絞り込み（username・action）も含め、Prisma 経由の一覧クエリは `COLLSCAN` で実行されている。endpoint の条件を足しても、走査の種類は変わらない。
-  - 候補の取得を field ごとに別リクエストにすれば、候補 API の契約（1 つでも失敗したら 500）を変えずに、種類ごとの失敗を見分けられる。
+  - 候補 API の field ごとの検索は失敗しても空の候補を返すので、片方の種類だけがリクエストの失敗になる場面はほぼない。候補は 1 回のリクエストで取得し、失敗は 1 つの表示にできる。
 
 ## Research Log
 
@@ -125,13 +125,14 @@
 
 ## Design Decisions
 
-### Decision: 候補は field ごとに別リクエストで取得する
-- **Context**: 要件 4.1（一部の種類だけ失敗したとき、取れた種類は出す）。
+### Decision: 候補は 1 回のリクエストで取得し、失敗は種類ごとに分けない
+- **Context**: 要件 3.3〜3.5 と 4.1。「すべて」ではユーザーと URL の候補を同時に出す。
 - **Alternatives Considered**:
-  1. 1 リクエストで `field=username&field=endpoint` を送り、サーバーで部分失敗を返す — 候補 API の契約（1 つでも失敗したら 500）を変えることになる。
-  2. field ごとに `useSWRxAuditlogSuggestions` を呼ぶ — 失敗を SWR の `error` で種類ごとに見分けられる。
-- **Selected Approach**: 2。
-- **Trade-offs**: 「すべて」のときはキー入力ごとのリクエストが 2 本になる（入力欄の `delay` で間引かれる）。
+  1. field ごとに `useSWRxAuditlogSuggestions` を呼び、失敗を種類ごとに表示する — 片方の種類だけが失敗する場面のための仕組みになる。
+  2. 対象の field をまとめて 1 回のリクエストで取得し、失敗は 1 つの表示にする。
+- **Selected Approach**: 2。`useSWRxAuditlogSuggestions` に field の配列を受け取る形を足す。
+- **Rationale**: 候補 API の field ごとの検索は、全文検索サーバーとデータベースのどちらでも失敗したときに空の候補を返す（`search-auditlog-suggestions.ts`）。リクエストが失敗するのは、通信の失敗・ログイン切れ・`q` の上限超え（400）・データベース自体の停止など、どの種類にも同じように起きる場合に限られる。種類ごとに失敗を見分けても、表示が変わる場面がほぼない。
+- **Trade-offs**: field ごとの検索が将来、失敗時に例外を投げるようになると、「すべて」では片方の失敗で両方の候補が出なくなる（design.md の Revalidation Triggers に記載）。
 
 ### Decision: 「取得できなかった」の表示は、候補のリクエスト自体の失敗に限る
 - **Context**: 要件 4。候補 API は、全文検索サーバーが使えずデータベースでの検索も失敗したとき（時間切れなど）、warn ログを出して空の候補を 200 で返す（候補 API の契約）。画面からは「該当なし」と区別できない。
@@ -157,11 +158,11 @@
 
 ### Decision: 「すべて」のときの候補は種類ごとに 5 件まで
 - **Context**: 要件 3.5。
-- **Selected Approach**: field ごとのリクエストの `limit` を 5 にする（`useSWRxAuditlogSuggestions` の既定値と同じ）。種類を 1 つに絞ったときも同じ 5 件にして、定数を 1 つにする。
-- **Rationale**: field ごとにリクエストを分けるので、件数の上限がそのまま種類ごとの上限になる。一方の種類が他方を押し出すことはない。
+- **Selected Approach**: リクエストの `limit` を 5 にする（`useSWRxAuditlogSuggestions` の既定値と同じ）。種類を 1 つに絞ったときも同じ 5 件にして、定数を 1 つにする。
+- **Rationale**: 候補 API は `limit` を field ごとに適用するので、1 回のリクエストでも件数の上限がそのまま種類ごとの上限になる。一方の種類が他方を押し出すことはない。
 
 ### Decision: 古い候補は `filterBy` で除き、失敗のグループは `renderMenu` で出し分ける
-- **Context**: 要件 1.1, 1.5, 4.2。`react-bootstrap-typeahead` 6.3.2 は、キーボード操作をメニューに描いた内容ではなく `filterBy` を通した結果で処理する。
+- **Context**: 要件 1.1, 1.5, 4.1。`react-bootstrap-typeahead` 6.3.2 は、キーボード操作をメニューに描いた内容ではなく `filterBy` を通した結果で処理する。
   - Tab や → で確定する候補（`initialItem`）を更新するのは、実際に描かれた先頭（`position === 0`）の `MenuItem` だけ（`es/behaviors/item.js`）。
   - `initialItem` が消えるのは、`filterBy` を通した結果が 0 件のときだけ（`es/core/TypeaheadManager.js`）。
   - 入力補完のヒントは `initialItem` から作られ、`multiple` でも出る。ヒントがあれば Tab か →（カーソルが入力の末尾にあるとき）で `onAdd(initialItem)` が呼ばれる（`es/utils/defaultSelectHint.js`）。
@@ -172,6 +173,30 @@
 - **Selected Approach**: 2。既存の `UsernameTypeahead`（`filterBy` で `shouldShowUsernameSuggestion` を使う）と同じ形。
 - **Rationale**: 失敗は候補ではないので `filterBy` を通らず、`renderMenu` で出し分けるしかない。判定を 1 つの純粋関数にまとめれば、2 か所で判定がずれない。
 
+### Decision: 前後の空白を除いて 100 文字を超える入力では候補を取得しない
+- **Context**: 要件 1.7 と 4。候補 API の validator は `q` を `isLength({ max: 100 })` で検証し、超えると 400 を返す。SWR の `error` をそのまま失敗の表示にすると、入力が長いだけで「取得できませんでした」が出る。
+- **Alternatives Considered**:
+  1. 101 文字以上ではリクエストせず、候補なしとして扱う（上限 100 を、validator と画面で同じ定数として持つ）
+  2. 400 を失敗として扱わず、候補なしとして扱う
+  3. 長い入力でも失敗の表示を出す
+- **Selected Approach**: 1。上限を `interfaces/activity.ts` の `AUDITLOG_SUGGESTION_QUERY_MAX_LENGTH` として持ち、候補 API の validator と `useAuditLogSearchSuggestions` の両方が使う。画面は前後の空白を除いた長さで比べる（`useSWRxAuditlogSuggestions` が trim した q を送るため）。
+- **Rationale**: 2 は 400 の理由を画面側で推し量ることになり、別の理由の 400 まで候補なしに見えてしまう。1 は送る前に判定するので、サーバーの応答の解釈に依存しない。
+- **Trade-offs**: クエリ文字列を含めて 100 文字を超える値は、パス部分が短くても候補が出ない（要件の Boundary Context に記載）。
+
+### Decision: デコード済みの形の入力は変換しない
+- **Context**: 記録された endpoint は `req.originalUrl` で、パーセントエンコードされた形。デコード済みの形（`/日本語ページ` など）で入力すると前方一致しない。
+- **Alternatives Considered**:
+  1. 変換せず、既知の制約とする
+  2. 送る前に ASCII 以外の文字だけをパーセントエンコードする
+- **Selected Approach**: 1。
+- **Rationale**: ページの URL を endpoint として記録するのは、ページの表示の記録（`pages/utils/activity.ts`。アクションは `PAGE_VIEW` / `PAGE_USER_HOME_VIEW` / `PAGE_NOT_FOUND` / `PAGE_FORBIDDEN` / `PAGE_NOT_CREATABLE`）で、これらは Small / Medium / Large のどの記録グループにも入っておらず、`AUDIT_LOG_ADDITIONAL_ACTIONS` で足したときだけ記録される。既定で記録される API のパスで日本語が入るのは主にクエリ文字列で、候補はクエリ文字列を除いて検索する。一覧の URL 列のコピーボタンは記録された形をそのままコピーする。
+- **Follow-up**: ページの表示を記録する運用での要望が出たら、2 を要件として足す。2 では 100 文字の上限をエンコードした後の長さで数える（日本語 1 文字が 9 文字になる）。
+
+### Decision: `activity-log-snapshot` の design.md は本 spec で直し、amend spec にしない
+- **Context**: `activity-log-snapshot/design.md` の Allowed Dependencies にある `findSnapshotUsernamesByUsernameRegex` の説明が、候補の検索の変更（呼び出し元と最小文字数の判定の位置）に追随していない。
+- **Selected Approach**: 本 spec のタスクとして、その段落を依存先として今成り立っている事実だけに縮める。
+- **Rationale**: この関数は `activity-log-snapshot` が所有するものではなく、依存先として記述しているだけなので、直しても同 spec の契約は変わらない。`.claude/rules/spec-lifecycle.md` の amend spec は、完了済み spec の契約を変える変更が対象。段落にある変更の経緯の記述は、同ルールの「本文に経緯を残さない」に合わせて削る。
+
 ### Synthesis
 - **Generalization**: 「検索対象の種類」をデータ（`AUDITLOG_SEARCH_SCOPES` の表）で持ち、種類ごとの取得・見出し・トークンの表示をその表から引く。IP を後で足すときは、表に 1 行足して候補の取得を足すだけで済む。ただし、実装するのは今回の要件のユーザーと URL だけにする。
 - **Build vs. Adopt**: 入力欄は既存の `react-bootstrap-typeahead` を使う。新しい依存はない。
@@ -180,42 +205,4 @@
 ## Risks & Mitigations
 - Prisma のバージョンアップで `startsWith` がエスケープするようになり、二重エスケープで一致しなくなる — 正規表現の記号を含むパスと `/_api/v3/pages` の除外を確かめる integ テストで検知する。
 - 一覧のクエリが全件走査のまま — 今の username・action の絞り込みと同じ水準。activities は既定で 30 日で消える。改善は本 spec の範囲外。
-- `react-bootstrap-typeahead` 6.3.2 は、候補一覧を開くかを `isShown`（`open` / `minLength` / `showMenu` / `text`）だけで決め、結果の件数は見ない。フィルタ後の結果が 0 件でも `renderMenu` は呼ばれる — `renderMenu` が結果が空のときに早期 return すると、失敗表示だけの場合（要件 4.2）が消える。一方で、空の `Menu` を描くと、`Menu` が `emptyLabel` を描き（`es/components/Menu/Menu.js`）、`AsyncTypeahead` がそれを状況に応じて "Type to search..." / "Searching..." / "No matches found." に差し替える（`es/behaviors/async.js` の `getEmptyLabel`）。そのため、空を返すかどうかは `buildSuggestionGroups` の戻り値で決める（失敗のグループがあれば描き、何もなければ空のフラグメントを返す）。`emptyLabel` などに空文字を渡すと中身のない無効な項目が残るので使わない。コンポーネントテストで固定する。
-
----
-
-## Gap Analysis: 候補 API の契約の再確認（2026-11-18）
-
-候補 API の `endpoint` 対応がベースブランチ（`feat/179911-url-fuzzy-search`）に入ったため、そのコードで設計の前提を確かめ直した。spec のブランチにはまだ取り込んでいない（タスク 3.1 で取り込む）ので、`git show origin/feat/179911-url-fuzzy-search:<path>` で読んだ。
-
-### 前提どおりだったこと
-
-| 設計の前提 | ベースブランチのコード |
-|---|---|
-| `AUDITLOG_SUGGESTION_FIELDS` に `endpoint` がある | `['username', 'endpoint']`（`interfaces/activity.ts`） |
-| レスポンスは `endpoint?: { endpoints: string[] }` | 同じ（`AuditlogSuggestionsResponse`） |
-| `useSWRxAuditlogSuggestions(field, q, limit = 5)` は空の q でキーを `null` にする | 変更なし（`stores/activity.ts`） |
-| 複数 field は `Promise.all` で、1 つでも失敗したら 500 | `searchAuditlogSuggestions` が `Promise.all` |
-| データベースでの検索の失敗は warn ログを出して空の候補を返す | `searchAuditlogFieldValues` が `catch` して `[]` |
-| endpoint の検索語は `?` 以降を捨て、空なら空の候補を返す | `pathQ === ''` で `{ endpoint: { endpoints: [] } }` |
-| データベースでの検索の最小文字数は username 2、endpoint 1 | `auditlog-suggestion-field-specs.ts` のとおり |
-| 一覧の絞り込み・画面・入力欄・翻訳・`activity-log-snapshot` の spec は変わっていない | spec のブランチとの差分は `interfaces/activity.ts` と `routes/apiv3/activity.ts`（候補 API の OpenAPI）だけ |
-| `activity-log-snapshot/design.md` の段落は古いまま | 「`search.ts` の ES フォールバック専用」の記述が残っている（タスク 5 の対象） |
-
-### 新しく見つかったこと
-
-- **101 文字以上の入力が「取得できませんでした」になる（Research Needed）**
-  - 候補 API の validator は `q` を `isLength({ max: 100 })` で検証し、超えると 400 を返す。`useSWRxAuditlogSuggestions` は長さを見ずにリクエストする。
-  - 設計は SWR の `error` をそのまま「取得できませんでした」の表示にするので、101 文字以上を入力すると、「すべて」なら両方の種類に失敗の表示が出る。要件 4 の「サーバーのエラー応答」には当たるが、入力が長すぎるだけで、取得に失敗したわけではない。
-  - 選択肢:
-    1. 101 文字以上ではリクエストせず、候補なしとして扱う（上限 100 を、validator と画面で同じ定数として持つ）
-    2. 400 を失敗として扱わず、候補なしとして扱う
-    3. 今の設計のまま（長い入力でも失敗の表示を出す）
-  - **決定: 1**。上限 100 を `interfaces/activity.ts` の `AUDITLOG_SUGGESTION_QUERY_MAX_LENGTH` として持ち、候補 API の validator と画面の `useAuditLogSearchSuggestions` の両方が使う。画面は前後の空白を除いた長さで比べる（`useSWRxAuditlogSuggestions` が trim した q を送るため）。要件に 1.7 を足し、要件 4 の対象から外した。
-  - 理由: 2 は 400 の理由を画面側で推し量ることになり、別の理由の 400（validator の他の項目）まで候補なしに見えてしまう。1 は送る前に判定するので、サーバーの応答の解釈に依存しない。
-  - 残る制約: クエリ文字列を含めて 100 文字を超える値は、パス部分が短くても候補が出ない（候補 API の上限による。要件の Boundary Context に記載）。
-
-### 影響
-
-- 上の 1 点（要件 1.7、設計の共有定数とフックの判定、タスク 3.1・3.2）を除き、設計とタスクの変更は不要。
-- タスク 3.1（ベースブランチの取り込み）で、spec のブランチとの差分は小さく、競合が起きそうなファイル（spec が変更する予定のファイル）は含まれていない。
+- `react-bootstrap-typeahead` 6.3.2 は、候補一覧を開くかを `isShown`（`open` / `minLength` / `showMenu` / `text`）だけで決め、結果の件数は見ない。フィルタ後の結果が 0 件でも `renderMenu` は呼ばれる — `renderMenu` が結果が空のときに早期 return すると、失敗表示（要件 4.1）が消える。一方で、空の `Menu` を描くと、`Menu` が `emptyLabel` を描き（`es/components/Menu/Menu.js`）、`AsyncTypeahead` がそれを状況に応じて "Type to search..." / "Searching..." / "No matches found." に差し替える（`es/behaviors/async.js` の `getEmptyLabel`）。そのため、空を返すかどうかは `buildSuggestionGroups` の戻り値で決める（失敗のグループがあれば描き、何もなければ空のフラグメントを返す）。`emptyLabel` などに空文字を渡すと中身のない無効な項目が残るので使わない。コンポーネントテストで固定する。
