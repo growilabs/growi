@@ -1,3 +1,5 @@
+import { getInstance } from '^/test/setup/crowi';
+
 import { createReviewerRoutesTestKit } from './reviewer-routes.test-kit';
 
 describe('change-proposal reviewer routes', () => {
@@ -13,6 +15,7 @@ describe('change-proposal reviewer routes', () => {
     reviewedProposal,
     requesterOnlyPage,
   } = createReviewerRoutesTestKit({
+    loadCrowi: getInstance,
     prefix: '/cp-review-queue-route-integ',
     ip: '10.0.0.194',
     usernameBase: 'cpReviewQueueRoute',

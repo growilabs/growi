@@ -10,6 +10,7 @@ import { createReviewerRoutesTestKit } from './reviewer-routes.test-kit';
 
 describe('reviewer routes leave the existing behaviour alone', () => {
   const t = createReviewerRoutesTestKit({
+    loadCrowi: getInstance,
     prefix: '/cp-reviewer-existing-routes-integ',
     ip: '10.0.0.197',
     usernameBase: 'cpReviewerExisting',

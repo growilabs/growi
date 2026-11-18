@@ -5,8 +5,6 @@ import express from 'express';
 import mongoose, { type HydratedDocument } from 'mongoose';
 import request from 'supertest';
 
-import { getInstance } from '^/test/setup/crowi';
-
 import { SupportedAction } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
 import { AccessToken } from '~/server/models/access-token';
@@ -43,11 +41,13 @@ const sleep = (ms: number): Promise<void> =>
 // and returns the helpers the reviewer route suites drive it with. Every suite
 // needs its own prefix, ip and username base so parallel workers never share rows.
 export const createReviewerRoutesTestKit = (args: {
+  // Passed in: this file is part of the server build, which cannot reach test/setup.
+  readonly loadCrowi: () => Promise<Crowi>;
   readonly prefix: string;
   readonly ip: string;
   readonly usernameBase: string;
 }) => {
-  const { prefix, ip, usernameBase } = args;
+  const { loadCrowi, prefix, ip, usernameBase } = args;
   let crowi: Crowi;
   let app: express.Application;
   let service: ChangeProposalService;
@@ -208,7 +208,7 @@ export const createReviewerRoutesTestKit = (args: {
     });
 
   beforeAll(async () => {
-    crowi = await getInstance();
+    crowi = await loadCrowi();
     await kit.setUp();
     vi.spyOn(crowi.pageService.pageEvent, 'emit').mockReturnValue(true);
 

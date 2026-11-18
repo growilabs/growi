@@ -50,6 +50,7 @@ const shapeOf = (value: unknown): unknown => {
 
 describe('reviewer routes never disclose operations a viewer cannot see', () => {
   const t = createReviewerRoutesTestKit({
+    loadCrowi: getInstance,
     prefix: PREFIX,
     ip: '10.0.0.195',
     usernameBase: 'cpNdReviewerRoutes',

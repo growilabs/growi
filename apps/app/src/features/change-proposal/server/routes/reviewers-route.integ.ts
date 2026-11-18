@@ -1,5 +1,7 @@
 import { Types } from 'mongoose';
 
+import { getInstance } from '^/test/setup/crowi';
+
 import { SupportedAction } from '~/interfaces/activity';
 
 import { MAX_REVIEWERS } from '../../interfaces';
@@ -27,6 +29,7 @@ describe('change-proposal reviewer routes', () => {
     activeReviewerIdsOf,
     setReviewersEnabled,
   } = createReviewerRoutesTestKit({
+    loadCrowi: getInstance,
     prefix: '/cp-reviewers-route-integ',
     ip: '10.0.0.193',
     usernameBase: 'cpReviewersRoute',

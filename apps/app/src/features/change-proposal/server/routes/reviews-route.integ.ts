@@ -1,5 +1,7 @@
 import { Types } from 'mongoose';
 
+import { getInstance } from '^/test/setup/crowi';
+
 import { SupportedAction } from '~/interfaces/activity';
 
 import { MAX_REVIEW_COMMENT_LENGTH } from '../../interfaces';
@@ -25,6 +27,7 @@ describe('change-proposal reviewer routes', () => {
     requesterOnlyPage,
     settledReviewedProposal,
   } = createReviewerRoutesTestKit({
+    loadCrowi: getInstance,
     prefix: '/cp-reviews-route-integ',
     ip: '10.0.0.192',
     usernameBase: 'cpReviewsRoute',

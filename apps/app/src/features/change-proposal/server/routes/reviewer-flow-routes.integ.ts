@@ -2,6 +2,8 @@ import type { IUserHasId } from '@growi/core';
 import { getIdStringForRef } from '@growi/core';
 import mongoose, { type HydratedDocument, type Types } from 'mongoose';
 
+import { getInstance } from '^/test/setup/crowi';
+
 import { SupportedAction } from '~/interfaces/activity';
 import { InAppNotification } from '~/server/models/in-app-notification';
 import type { PageDocument } from '~/server/models/page';
@@ -20,6 +22,7 @@ const COMMENT = 'please keep the old heading';
 
 describe('the reviewer flow through the routes', () => {
   const t = createReviewerRoutesTestKit({
+    loadCrowi: getInstance,
     prefix: '/cp-reviewer-flow-routes-integ',
     ip: TEST_IP,
     usernameBase: 'cpReviewerFlowRoutes',
