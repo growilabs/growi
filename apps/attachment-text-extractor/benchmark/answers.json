@@ -1,0 +1,907 @@
+{
+  "version": 1,
+  "documents": [
+    {
+      "fileName": "pdf-ja-horizontal.pdf",
+      "format": "pdf",
+      "mimeType": "application/pdf",
+      "source": "benchmark/pdf-documents.ts: HTML printed by Chromium (playwright-core) with BIZ UDGothic, via benchmark/render-pdf.ts",
+      "features": [
+        "horizontal-writing"
+      ],
+      "expectedPages": [
+        {
+          "pageNumber": 1,
+          "label": "1"
+        },
+        {
+          "pageNumber": 2,
+          "label": "2"
+        },
+        {
+          "pageNumber": 3,
+          "label": "3"
+        }
+      ],
+      "phrases": [
+        {
+          "text": "情報セキュリティ基本方針",
+          "page": 1
+        },
+        {
+          "text": "ISO/IEC 27001",
+          "page": 1
+        },
+        {
+          "text": "機密情報",
+          "page": 1
+        },
+        {
+          "text": "個人情報保護",
+          "page": 2
+        },
+        {
+          "text": "利用目的",
+          "page": 2
+        },
+        {
+          "text": "委託先の監督",
+          "page": 2
+        },
+        {
+          "text": "インシデント対応手順",
+          "page": 3
+        },
+        {
+          "text": "不正アクセス",
+          "page": 3
+        },
+        {
+          "text": "CSIRT",
+          "page": 3
+        }
+      ],
+      "sourceCharacters": "。うきけしすたちづでにのはへらりるをアィイキクシスセテデトュリン不人保個先内切利取受告員回囲基報委実客密対年当影従応情手扱担方施本査検業機正理用的監目直督知社策管範者託調護運適針響順顧"
+    },
+    {
+      "fileName": "pdf-ja-vertical.pdf",
+      "format": "pdf",
+      "mimeType": "application/pdf",
+      "source": "benchmark/pdf-documents.ts: HTML printed by Chromium (playwright-core) with BIZ UDGothic, via benchmark/render-pdf.ts",
+      "features": [
+        "vertical-writing"
+      ],
+      "expectedPages": [
+        {
+          "pageNumber": 1,
+          "label": "1"
+        },
+        {
+          "pageNumber": 2,
+          "label": "2"
+        }
+      ],
+      "phrases": [
+        {
+          "text": "社長挨拶",
+          "page": 1
+        },
+        {
+          "text": "創業五十周年",
+          "page": 1
+        },
+        {
+          "text": "地域社会",
+          "page": 1
+        },
+        {
+          "text": "横浜市",
+          "page": 2
+        },
+        {
+          "text": "株式会社に改組",
+          "page": 2
+        },
+        {
+          "text": "本社を川崎市へ移転",
+          "page": 2
+        }
+      ],
+      "sourceCharacters": "。いえげごしすたてでとにのはへまもよりをん上二五令会創十周和地域崎川市平年式当心感成拶挨援支改昭本株業様横歩沿浜申皆社移組謝転迎長革"
+    },
+    {
+      "fileName": "pdf-ja-line-break.pdf",
+      "format": "pdf",
+      "mimeType": "application/pdf",
+      "source": "benchmark/pdf-documents.ts: HTML printed by Chromium (playwright-core) with BIZ UDGothic, via benchmark/render-pdf.ts",
+      "features": [
+        "horizontal-writing",
+        "line-break-inside-word"
+      ],
+      "expectedPages": [
+        {
+          "pageNumber": 1,
+          "label": "1"
+        }
+      ],
+      "phrases": [
+        {
+          "text": "基幹システム",
+          "page": 1,
+          "lineBreakAfter": 4
+        },
+        {
+          "text": "本格稼働",
+          "page": 1,
+          "lineBreakAfter": 2
+        },
+        {
+          "text": "顧客管理データベース",
+          "page": 1,
+          "lineBreakAfter": 4
+        },
+        {
+          "text": "整合性",
+          "page": 1
+        },
+        {
+          "text": "情報システム部",
+          "page": 1,
+          "lineBreakAfter": 4
+        },
+        {
+          "text": "窓口",
+          "page": 1
+        }
+      ],
+      "sourceCharacters": "。あいかけしすせでにのはらるわをシスタテデベムー予付作働受口合問基報定客年幹度当性情慎整新本来格業理確社移稼窓管行認部重顧"
+    },
+    {
+      "fileName": "txt-shift-jis.txt",
+      "format": "txt",
+      "mimeType": "text/plain",
+      "source": "benchmark/text-documents.ts: the text encoded with encodeText (test/fixtures/text-encoding.ts)",
+      "encoding": "shift_jis",
+      "features": [],
+      "expectedPages": [
+        {
+          "pageNumber": null,
+          "label": null
+        }
+      ],
+      "phrases": [
+        {
+          "text": "経営企画会議",
+          "page": 1
+        },
+        {
+          "text": "山田太郎",
+          "page": 1
+        },
+        {
+          "text": "ソラリス",
+          "page": 1
+        },
+        {
+          "text": "販売戦略",
+          "page": 1
+        },
+        {
+          "text": "大阪支店",
+          "page": 1
+        },
+        {
+          "text": "先行販売",
+          "page": 1
+        },
+        {
+          "text": "販売促進キャンペーン",
+          "page": 1
+        }
+      ],
+      "sourceCharacters": "、。「」いかすつてでとにのまらるをキスソペャラリンー一中予事京令企会佐作促先出和品営回売大太子定実宿山席年店成戦支新施日時月木本東案次決田画略社第算経者花藤行製議販進郎録阪項題（）："
+    },
+    {
+      "fileName": "txt-euc-jp.txt",
+      "format": "txt",
+      "mimeType": "text/plain",
+      "source": "benchmark/text-documents.ts: the text encoded with encodeText (test/fixtures/text-encoding.ts)",
+      "encoding": "euc-jp",
+      "features": [],
+      "expectedPages": [
+        {
+          "pageNumber": null,
+          "label": null
+        }
+      ],
+      "phrases": [
+        {
+          "text": "障害報告書",
+          "page": 1
+        },
+        {
+          "text": "社内ポータルサイト",
+          "page": 1
+        },
+        {
+          "text": "ファイルサーバー",
+          "page": 1
+        },
+        {
+          "text": "データベース",
+          "page": 1
+        },
+        {
+          "text": "アプリケーションサーバー",
+          "page": 1
+        },
+        {
+          "text": "接続プール",
+          "page": 1
+        },
+        {
+          "text": "再発防止策",
+          "page": 1
+        }
+      ],
+      "sourceCharacters": "、。がしすたとにのめるをァアイケサシスタデトバフプベポョリルンー上停内再分加動原告因囲報定害対年影応接数日時暫書月止生発監目直社答策範続見視設起追達防限障響項："
+    },
+    {
+      "fileName": "txt-iso-2022-jp.txt",
+      "format": "txt",
+      "mimeType": "text/plain",
+      "source": "benchmark/text-documents.ts: the text encoded with encodeText (test/fixtures/text-encoding.ts)",
+      "encoding": "iso-2022-jp",
+      "features": [],
+      "expectedPages": [
+        {
+          "pageNumber": null,
+          "label": null
+        }
+      ],
+      "phrases": [
+        {
+          "text": "年末年始休業",
+          "page": 1
+        },
+        {
+          "text": "関係者各位",
+          "page": 1
+        },
+        {
+          "text": "緊急連絡先",
+          "page": 1
+        },
+        {
+          "text": "情報システム部",
+          "page": 1
+        },
+        {
+          "text": "営業開始",
+          "page": 1
+        }
+      ],
+      "sourceCharacters": "、。いおかがしすせたでなにのはまらシステム中件休位係先勝各名営報始年急情手日月期木末業知絡緊者誠連部鈴開間関願（）："
+    },
+    {
+      "fileName": "txt-utf-8-bom.txt",
+      "format": "txt",
+      "mimeType": "text/plain",
+      "source": "benchmark/text-documents.ts: the text encoded with encodeText (test/fixtures/text-encoding.ts)",
+      "encoding": "utf-8-bom",
+      "features": [],
+      "expectedPages": [
+        {
+          "pageNumber": null,
+          "label": null
+        }
+      ],
+      "phrases": [
+        {
+          "text": "新入社員研修",
+          "page": 1
+        },
+        {
+          "text": "研修期間",
+          "page": 1
+        },
+        {
+          "text": "9時〜18時",
+          "page": 1
+        },
+        {
+          "text": "ノートパソコン",
+          "page": 1
+        },
+        {
+          "text": "社員証",
+          "page": 1
+        },
+        {
+          "text": "小林由美子",
+          "page": 1
+        }
+      ],
+      "sourceCharacters": "、〜おしちのりコソトノパンー事人修入具務勤員子小師持新日時月期林物用由研社筆美記証講部間："
+    },
+    {
+      "fileName": "txt-utf-16le-bom.txt",
+      "format": "txt",
+      "mimeType": "text/plain",
+      "source": "benchmark/text-documents.ts: the text encoded with encodeText (test/fixtures/text-encoding.ts)",
+      "encoding": "utf-16le-bom",
+      "features": [],
+      "expectedPages": [
+        {
+          "pageNumber": null,
+          "label": null
+        }
+      ],
+      "phrases": [
+        {
+          "text": "品質管理マニュアル",
+          "page": 1
+        },
+        {
+          "text": "受入検査",
+          "page": 1
+        },
+        {
+          "text": "抜き取り検査",
+          "page": 1
+        },
+        {
+          "text": "不適合品",
+          "page": 1
+        },
+        {
+          "text": "品質保証課",
+          "page": 1
+        }
+      ],
+      "sourceCharacters": "、。きこしすちとにのはへりるをアニマュル不保入処取受合告品報実抜施時査検版理直第管置良証課買質購適隔離"
+    },
+    {
+      "fileName": "txt-utf-16be-bom.txt",
+      "format": "txt",
+      "mimeType": "text/plain",
+      "source": "benchmark/text-documents.ts: the text encoded with encodeText (test/fixtures/text-encoding.ts)",
+      "encoding": "utf-16be-bom",
+      "features": [],
+      "expectedPages": [
+        {
+          "pageNumber": null,
+          "label": null
+        }
+      ],
+      "phrases": [
+        {
+          "text": "プロジェクト計画書",
+          "page": 1
+        },
+        {
+          "text": "基幹システム刷新",
+          "page": 1
+        },
+        {
+          "text": "結合テスト",
+          "page": 1
+        },
+        {
+          "text": "本番移行",
+          "page": 1
+        },
+        {
+          "text": "高橋一郎",
+          "page": 1
+        },
+        {
+          "text": "プロジェクトマネージャー",
+          "page": 1
+        }
+      ],
+      "sourceCharacters": "、イェクシジステトネプマムャルロンー一件任刷合名基定幹新書本橋画番移結義者行要計設責郎高（）："
+    },
+    {
+      "fileName": "txt-utf-8.txt",
+      "format": "txt",
+      "mimeType": "text/plain",
+      "source": "benchmark/text-documents.ts: the text encoded with Buffer.from",
+      "encoding": "utf-8",
+      "features": [],
+      "expectedPages": [
+        {
+          "pageNumber": null,
+          "label": null
+        }
+      ],
+      "phrases": [
+        {
+          "text": "運用手順書",
+          "page": 1
+        },
+        {
+          "text": "バックアップ",
+          "page": 1
+        },
+        {
+          "text": "全文検索",
+          "page": 1
+        },
+        {
+          "text": "Elasticsearch",
+          "page": 1
+        },
+        {
+          "text": "オンコール担当者",
+          "page": 1
+        }
+      ],
+      "sourceCharacters": "。すでにはへるをアオクコッバプルンー使全前午取害当得手担文日時書検毎用索絡者連運障順"
+    },
+    {
+      "fileName": "csv-utf-8.csv",
+      "format": "csv",
+      "mimeType": "text/csv",
+      "source": "benchmark/text-documents.ts: the text encoded with Buffer.from",
+      "encoding": "utf-8",
+      "features": [],
+      "expectedPages": [
+        {
+          "pageNumber": null,
+          "label": null
+        }
+      ],
+      "phrases": [
+        {
+          "text": "社員番号",
+          "page": 1
+        },
+        {
+          "text": "所属部署",
+          "page": 1
+        },
+        {
+          "text": "渡辺美咲",
+          "page": 1
+        },
+        {
+          "text": "経理部",
+          "page": 1
+        },
+        {
+          "text": "松本さくら",
+          "page": 1
+        },
+        {
+          "text": "営業企画部",
+          "page": 1
+        }
+      ],
+      "sourceCharacters": "くさら事二人企伊健内号名咲員営属所本松業氏渡理画番社経線署美藤辺部"
+    },
+    {
+      "fileName": "csv-cp932.csv",
+      "format": "csv",
+      "mimeType": "text/csv",
+      "source": "benchmark/text-documents.ts: the text encoded with encodeText (test/fixtures/text-encoding.ts)",
+      "encoding": "cp932",
+      "features": [],
+      "expectedPages": [
+        {
+          "pageNumber": null,
+          "label": null
+        }
+      ],
+      "phrases": [
+        {
+          "text": "商品コード",
+          "page": 1
+        },
+        {
+          "text": "ボールペン",
+          "page": 1
+        },
+        {
+          "text": "㈱文具センター",
+          "page": 1
+        },
+        {
+          "text": "クリアファイル",
+          "page": 1
+        },
+        {
+          "text": "髙田商店",
+          "page": 1
+        },
+        {
+          "text": "東都紙業",
+          "page": 1
+        }
+      ],
+      "sourceCharacters": "ァアイクコセタドピフペボリルンー㈱仕先入具名品商在店庫数文東業用田紙都髙黒（）"
+    },
+    {
+      "fileName": "html-shift-jis-script-style.html",
+      "format": "html",
+      "mimeType": "text/html",
+      "source": "benchmark/text-documents.ts: the text encoded with encodeText (test/fixtures/text-encoding.ts)",
+      "encoding": "shift_jis",
+      "features": [
+        "meta-charset",
+        "script-style"
+      ],
+      "expectedPages": [
+        {
+          "pageNumber": null,
+          "label": null
+        }
+      ],
+      "phrases": [
+        {
+          "text": "価格改定",
+          "page": 1
+        },
+        {
+          "text": "お客様各位",
+          "page": 1
+        },
+        {
+          "text": "標準プラン",
+          "page": 1
+        },
+        {
+          "text": "月額料金",
+          "page": 1
+        },
+        {
+          "text": "営業担当者",
+          "page": 1
+        }
+      ],
+      "absentPhrases": [
+        "スタイル定義",
+        "スクリプト内部の文字列"
+      ],
+      "sourceCharacters": "、。いおくさしすせただでのはまよらりわをイクスタトプラリルン位価内出列各合問営字定客年当担改文料日月格業様標準知細義者装見詳部金額飾："
+    },
+    {
+      "fileName": "html-euc-jp-http-equiv.html",
+      "format": "html",
+      "mimeType": "text/html",
+      "source": "benchmark/text-documents.ts: the text encoded with encodeText (test/fixtures/text-encoding.ts)",
+      "encoding": "euc-jp",
+      "features": [
+        "meta-charset"
+      ],
+      "expectedPages": [
+        {
+          "pageNumber": null,
+          "label": null
+        }
+      ],
+      "phrases": [
+        {
+          "text": "秋季運動会",
+          "page": 1
+        },
+        {
+          "text": "多摩川河川敷グラウンド",
+          "page": 1
+        },
+        {
+          "text": "申込方法",
+          "page": 1
+        },
+        {
+          "text": "総務部",
+          "page": 1
+        }
+      ],
+      "sourceCharacters": "ごしでのへむイウグトドベメラルンー会内動務土場多季川摩敷方日月案河法申社秋程総込運部（）"
+    },
+    {
+      "fileName": "docx-ja.docx",
+      "format": "docx",
+      "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "source": "benchmark/office-documents.ts: buildDocx (test/fixtures/docx.ts)",
+      "features": [
+        "paragraph-line-break"
+      ],
+      "expectedPages": [
+        {
+          "pageNumber": null,
+          "label": null
+        }
+      ],
+      "phrases": [
+        {
+          "text": "就業規則",
+          "page": 1
+        },
+        {
+          "text": "労働条件",
+          "page": 1
+        },
+        {
+          "text": "服務規律",
+          "page": 1
+        },
+        {
+          "text": "テレワーク勤務制度",
+          "page": 1
+        },
+        {
+          "text": "在宅勤務手当",
+          "page": 1
+        },
+        {
+          "text": "施行",
+          "page": 1
+        }
+      ],
+      "sourceCharacters": "、。いおかこしすつてにのはびめよらるをクテレワー件働円制則労務勤員在宅定就年度当律従手支改新施日月服条業的目第給行規設附額（）"
+    },
+    {
+      "fileName": "xlsx-ja-multi-sheet.xlsx",
+      "format": "xlsx",
+      "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "source": "benchmark/office-documents.ts: buildXlsx (test/fixtures/xlsx.ts)",
+      "features": [],
+      "expectedPages": [
+        {
+          "pageNumber": 1,
+          "label": "売上実績",
+          "sheetName": "売上実績"
+        },
+        {
+          "pageNumber": 2,
+          "label": "顧客一覧",
+          "sheetName": "顧客一覧"
+        },
+        {
+          "pageNumber": 3,
+          "label": "備考",
+          "sheetName": "備考"
+        }
+      ],
+      "phrases": [
+        {
+          "text": "売上高",
+          "page": 1
+        },
+        {
+          "text": "前年比",
+          "page": 1
+        },
+        {
+          "text": "株式会社サンプル商事",
+          "page": 2
+        },
+        {
+          "text": "中村健太",
+          "page": 2
+        },
+        {
+          "text": "みどり農園",
+          "page": 2
+        },
+        {
+          "text": "北海道エリア",
+          "page": 3
+        }
+      ],
+      "sourceCharacters": "。いしてどのはへみりるをアエサプリルン一上中九予事会健備前北吉名商園地域売太定実客展州年式当担月有期村来東株比海田社績美考者覧農道里開関限顧高"
+    },
+    {
+      "fileName": "pptx-ja-multi-slide.pptx",
+      "format": "pptx",
+      "mimeType": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      "source": "benchmark/office-documents.ts: buildPptx (test/fixtures/pptx.ts)",
+      "features": [],
+      "expectedPages": [
+        {
+          "pageNumber": 1,
+          "label": "1"
+        },
+        {
+          "pageNumber": 2,
+          "label": "2"
+        },
+        {
+          "pageNumber": 3,
+          "label": "3"
+        }
+      ],
+      "phrases": [
+        {
+          "text": "事業計画説明会",
+          "page": 1
+        },
+        {
+          "text": "中期経営計画",
+          "page": 1
+        },
+        {
+          "text": "加藤誠",
+          "page": 1
+        },
+        {
+          "text": "クラウドサービス市場",
+          "page": 2
+        },
+        {
+          "text": "差別化",
+          "page": 2
+        },
+        {
+          "text": "人材育成",
+          "page": 3
+        },
+        {
+          "text": "デジタルトランスフォーメーション",
+          "page": 3
+        }
+      ],
+      "sourceCharacters": "いがけてとのはみりるをウォクサシジスタデトドビフメョラルンー中事人今他代会内分別加化取合営国場大差市年度強役後成拡推明期材析業画社競組経続締育藤表計誠説課進題"
+    },
+    {
+      "fileName": "xls-ja.xls",
+      "format": "xls",
+      "mimeType": "application/vnd.ms-excel",
+      "source": "benchmark/office-documents.ts: buildXls (test/fixtures/xls.ts)",
+      "features": [],
+      "expectedPages": [
+        {
+          "pageNumber": null,
+          "label": null
+        }
+      ],
+      "phrases": [
+        {
+          "text": "名古屋営業所",
+          "page": 1
+        },
+        {
+          "text": "交通費",
+          "page": 1
+        },
+        {
+          "text": "宿泊費",
+          "page": 1
+        },
+        {
+          "text": "承認者",
+          "page": 1
+        }
+      ],
+      "sourceCharacters": "き交伊先出古名営宿屋張所承旅業泊者藤行認費通部長"
+    },
+    {
+      "fileName": "odt-ja.odt",
+      "format": "odt",
+      "mimeType": "application/vnd.oasis.opendocument.text",
+      "source": "benchmark/office-documents.ts: buildOpenDocument (test/fixtures/opendocument.ts)",
+      "features": [],
+      "expectedPages": [
+        {
+          "pageNumber": null,
+          "label": null
+        }
+      ],
+      "phrases": [
+        {
+          "text": "社内報",
+          "page": 1
+        },
+        {
+          "text": "福利厚生制度",
+          "page": 1
+        },
+        {
+          "text": "育児休業",
+          "page": 1
+        }
+      ],
+      "sourceCharacters": "。いがごしたのま上介休児内利制厚取号向報度得新業率生社福第紹育"
+    },
+    {
+      "fileName": "ods-ja.ods",
+      "format": "ods",
+      "mimeType": "application/vnd.oasis.opendocument.spreadsheet",
+      "source": "benchmark/office-documents.ts: buildOpenDocument (test/fixtures/opendocument.ts)",
+      "features": [],
+      "expectedPages": [
+        {
+          "pageNumber": null,
+          "label": null
+        }
+      ],
+      "phrases": [
+        {
+          "text": "出勤日数",
+          "page": 1
+        },
+        {
+          "text": "有給休暇",
+          "page": 1
+        }
+      ],
+      "sourceCharacters": "の休出勤怠数日暇有残給"
+    },
+    {
+      "fileName": "odp-ja.odp",
+      "format": "odp",
+      "mimeType": "application/vnd.oasis.opendocument.presentation",
+      "source": "benchmark/office-documents.ts: buildOpenDocument (test/fixtures/opendocument.ts)",
+      "features": [],
+      "expectedPages": [
+        {
+          "pageNumber": null,
+          "label": null
+        }
+      ],
+      "phrases": [
+        {
+          "text": "新製品発表会",
+          "page": 1
+        },
+        {
+          "text": "記者会見",
+          "page": 1
+        }
+      ],
+      "sourceCharacters": "と会品新発者表製見記"
+    },
+    {
+      "fileName": "doc-legacy.doc",
+      "format": "doc",
+      "mimeType": "application/msword",
+      "source": "copied from test/fixtures/legacy/simple-table.doc (Apache POI, Apache-2.0; see PROVENANCE.md there)",
+      "features": [],
+      "expectedPages": [
+        {
+          "pageNumber": null,
+          "label": null
+        }
+      ],
+      "phrases": [
+        {
+          "text": "Cell 2,3",
+          "page": 1
+        },
+        {
+          "text": "This text is below the table.",
+          "page": 1
+        }
+      ]
+    },
+    {
+      "fileName": "ppt-legacy.ppt",
+      "format": "ppt",
+      "mimeType": "application/vnd.ms-powerpoint",
+      "source": "copied from test/fixtures/legacy/text_shapes.ppt (Apache POI, Apache-2.0; see PROVENANCE.md there)",
+      "features": [],
+      "expectedPages": [
+        {
+          "pageNumber": null,
+          "label": null
+        }
+      ],
+      "phrases": [
+        {
+          "text": "Title Placeholder",
+          "page": 1
+        },
+        {
+          "text": "Text in a TextBox",
+          "page": 1
+        },
+        {
+          "text": "Octagon",
+          "page": 1
+        }
+      ]
+    }
+  ]
+}

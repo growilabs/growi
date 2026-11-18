@@ -1,0 +1,534 @@
+/**
+ * AttachmentSearchIndexer
+ *
+ * Orchestrates attachment text extraction and Elasticsearch indexing.
+ * Responsibilities:
+ * - Guard behind isFeatureEnabled() check
+ * - On extraction success: bulk-upsert all extracted pages to ES (NO permission fields)
+ * - On extraction failure: record in ExtractionFailureLogService; on upload also
+ *   upsert a metadata-only doc (a re-extraction keeps what is indexed instead)
+ * - On re-extraction success: replace every doc the attachment had
+ * - Dual-write support: when reindexBatch is rebuilding, write to both live and tmp indexes
+ * - onDetach: delete all ES docs for a given attachmentId
+ * - reindex: synchronous re-extraction + indexing for a single attachment
+ *
+ * Design guarantee: all public methods are catch-all — they never throw.
+ */
+
+import type {
+  ExtractionFailureEntry,
+  ExtractionOutcome,
+  IAttachmentEsDoc,
+} from '~/features/search-attachments/interfaces/attachment-search';
+import type { AttachmentWithComputed } from '~/server/models/attachment';
+import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
+
+import type { AttachmentIndexOperations } from './attachment-search-delegator-extension';
+import type { AttachmentTextExtractorService } from './attachment-text-extractor';
+import type { ExtractionFailureLogServiceInterface } from './extraction-failure-log-service';
+import { isAttachmentFullTextSearchEnabled } from './is-attachment-full-text-search-enabled';
+
+const logger = loggerFactory('growi:service:search-attachments:indexer');
+
+/** Minimal interface for querying reindex batch state. */
+export interface ReindexBatchRef {
+  isRebuilding(): boolean;
+  getTmpIndexName(): string | null;
+  recordDetached(attachmentId: string): void;
+}
+
+/** Public contract for AttachmentSearchIndexer. */
+export interface AttachmentSearchIndexerInterface {
+  onAttach(
+    pageId: string | null,
+    attachment: AttachmentWithComputed,
+    file: Express.Multer.File,
+  ): Promise<void>;
+  onDetach(attachmentId: string): Promise<void>;
+  reindex(
+    attachmentId: string,
+    options?: { signal?: AbortSignal },
+  ): Promise<{ ok: boolean; outcome: ExtractionOutcome }>;
+}
+
+// ----------------------------------------------------------------
+// Helpers — outcome mapping
+// ----------------------------------------------------------------
+
+/**
+ * Maps an ExtractionOutcome kind to the reasonCode required by ExtractionFailureEntry.
+ */
+function outcomeKindToReasonCode(
+  outcome: Exclude<ExtractionOutcome, { kind: 'success' }>,
+): ExtractionFailureEntry['reasonCode'] {
+  switch (outcome.kind) {
+    case 'unsupported':
+      return 'unsupportedFormat';
+    case 'tooLarge':
+      return 'fileTooLarge';
+    case 'timeout':
+      return 'extractionTimeout';
+    case 'serviceBusy':
+      return 'serviceBusy';
+    case 'serviceUnreachable':
+      return 'serviceUnreachable';
+    case 'encrypted':
+      return 'fileEncrypted';
+    case 'resourceLimit':
+      return 'resourceLimitExceeded';
+    case 'failed':
+      return 'extractionFailed';
+  }
+}
+
+/**
+ * Extracts an optional message string from a failure outcome.
+ */
+function outcomeToMessage(
+  outcome: Exclude<ExtractionOutcome, { kind: 'success' }>,
+): string | null {
+  if (outcome.kind === 'failed' || outcome.kind === 'resourceLimit') {
+    return outcome.message ?? null;
+  }
+  return null;
+}
+
+// ----------------------------------------------------------------
+// Doc builders
+// ----------------------------------------------------------------
+
+/**
+ * Builds the IAttachmentEsDoc array from a successful extraction outcome.
+ * NO permission fields (grant/granted_users/granted_groups/creator) are included.
+ */
+function buildSuccessDocs(
+  attachment: AttachmentWithComputed,
+  pageId: string,
+  outcome: Extract<ExtractionOutcome, { kind: 'success' }>,
+): IAttachmentEsDoc[] {
+  const now = new Date().toISOString();
+  return outcome.pages.map((p) => ({
+    attachmentId: attachment._id.toString(),
+    pageId,
+    pageNumber: p.pageNumber,
+    label: p.label,
+    fileName: attachment.fileName,
+    originalName: attachment.originalName ?? attachment.fileName,
+    fileFormat: attachment.fileFormat,
+    fileSize: attachment.fileSize,
+    attachmentType: attachment.attachmentType ?? 'attachment',
+    content: p.content,
+    created_at: attachment.createdAt?.toISOString() ?? now,
+    updated_at:
+      (
+        attachment as unknown as { updatedAt?: Date }
+      ).updatedAt?.toISOString() ?? now,
+  }));
+}
+
+/**
+ * Builds a single metadata-only IAttachmentEsDoc (content='') for a failure outcome.
+ * NO permission fields are included.
+ */
+function buildFailureDoc(
+  attachment: AttachmentWithComputed,
+  pageId: string,
+): IAttachmentEsDoc {
+  const now = new Date().toISOString();
+  return {
+    attachmentId: attachment._id.toString(),
+    pageId,
+    pageNumber: null,
+    label: null,
+    fileName: attachment.fileName,
+    originalName: attachment.originalName ?? attachment.fileName,
+    fileFormat: attachment.fileFormat,
+    fileSize: attachment.fileSize,
+    attachmentType: attachment.attachmentType ?? 'attachment',
+    content: '',
+    created_at: attachment.createdAt?.toISOString() ?? now,
+    updated_at:
+      (
+        attachment as unknown as { updatedAt?: Date }
+      ).updatedAt?.toISOString() ?? now,
+  };
+}
+
+// ----------------------------------------------------------------
+// AttachmentSearchIndexer
+// ----------------------------------------------------------------
+
+/** Constructor options for AttachmentSearchIndexer. */
+export type AttachmentSearchIndexerOptions = {
+  extractor: AttachmentTextExtractorService;
+  delegatorExt: AttachmentIndexOperations;
+  failureLog: ExtractionFailureLogServiceInterface;
+  reindexBatch: ReindexBatchRef;
+  searchService: { isConfigured: boolean };
+};
+
+export class AttachmentSearchIndexer
+  implements AttachmentSearchIndexerInterface
+{
+  private readonly extractor: AttachmentTextExtractorService;
+  private readonly delegatorExt: AttachmentIndexOperations;
+  private readonly failureLog: ExtractionFailureLogServiceInterface;
+  private readonly reindexBatch: ReindexBatchRef;
+  private readonly searchService: { isConfigured: boolean };
+
+  constructor(opts: AttachmentSearchIndexerOptions) {
+    this.extractor = opts.extractor;
+    this.delegatorExt = opts.delegatorExt;
+    this.failureLog = opts.failureLog;
+    this.reindexBatch = opts.reindexBatch;
+    this.searchService = opts.searchService;
+  }
+
+  // ----------------------------------------------------------------
+  // Feature gate
+  // ----------------------------------------------------------------
+
+  private isFeatureEnabled(): boolean {
+    return isAttachmentFullTextSearchEnabled(this.searchService.isConfigured);
+  }
+
+  // ----------------------------------------------------------------
+  // Target index resolution (dual-write)
+  // ----------------------------------------------------------------
+
+  /**
+   * Returns the list of ES index names to write to.
+   * When the reindex batch is rebuilding, both the live index and tmp index are included.
+   */
+  private getTargetIndexes(): string[] {
+    const live = this.delegatorExt.aliasName;
+    if (this.reindexBatch.isRebuilding()) {
+      const tmp = this.reindexBatch.getTmpIndexName();
+      if (tmp != null) {
+        return [live, tmp];
+      }
+    }
+    return [live];
+  }
+
+  // ----------------------------------------------------------------
+  // Core write helper (dual-write aware)
+  // ----------------------------------------------------------------
+
+  /**
+   * Writes attachment ES docs with dual-write semantics.
+   *
+   * When multiple indexes are targeted (rebuilding mode):
+   * 1. Write to live index first.
+   * 2. Attempt write to tmp index — failure is logged as WARN and does not throw.
+   *
+   * `replace` then deletes the other docs the attachment has in that index
+   * (another page count, a failure doc). Doc ids are deterministic, so the
+   * docs just written stay, and a failed write leaves the old ones.
+   */
+  private async writeToIndexes(
+    targetIndexes: string[],
+    {
+      attachmentId,
+      pageId,
+      docs,
+      replace,
+    }: {
+      attachmentId: string;
+      pageId: string;
+      docs: IAttachmentEsDoc[];
+      replace: boolean;
+    },
+  ): Promise<void> {
+    const liveIndex = this.delegatorExt.aliasName;
+    const tmpIndexes = targetIndexes.filter((idx) => idx !== liveIndex);
+    const hasLive = targetIndexes.includes(liveIndex);
+
+    const writeTo = async (index: string): Promise<void> => {
+      await this.delegatorExt.syncAttachmentIndexed(
+        attachmentId,
+        pageId,
+        docs,
+        index,
+      );
+      if (replace) {
+        await this.delegatorExt.removeStaleAttachmentDocs(
+          attachmentId,
+          docs,
+          index,
+        );
+      }
+    };
+
+    // Always write to live first (if present)
+    if (hasLive) {
+      await writeTo(liveIndex);
+    }
+
+    // Write to each tmp index (non-blocking on failure).
+    // In practice tmpIndexes has at most one element (one tmp index during rebuild),
+    // so we use Promise.allSettled to satisfy the no-await-in-loops rule while still
+    // isolating per-index failures.
+    if (tmpIndexes.length > 0) {
+      const tmpResults = await Promise.allSettled(tmpIndexes.map(writeTo));
+      for (let i = 0; i < tmpResults.length; i++) {
+        const result = tmpResults[i];
+        if (result.status === 'rejected') {
+          logger.warn(
+            { err: result.reason, attachmentId, tmpIndex: tmpIndexes[i] },
+            'tmp-side write failed, live-side succeeded',
+          );
+        }
+      }
+    }
+  }
+
+  // ----------------------------------------------------------------
+  // Core extraction + indexing logic (shared by onAttach and reindex)
+  // ----------------------------------------------------------------
+
+  /**
+   * Runs extraction for the attachment and indexes results.
+   * Returns the ExtractionOutcome for the caller to surface.
+   *
+   * `reextract`: the attachment may already be indexed. A success replaces
+   * its docs; a failure leaves them as they are (a failure doc would share
+   * the id of a single-doc format's text doc and blank it).
+   */
+  private async extractAndIndex(
+    attachment: AttachmentWithComputed,
+    pageId: string,
+    mode: 'upload' | 'reextract',
+    signal?: AbortSignal,
+  ): Promise<ExtractionOutcome> {
+    const attachmentId = attachment._id.toString();
+
+    const outcome = await this.extractor.extractAttachment(attachmentId, {
+      signal,
+    });
+    // No one waits for this run any more; a failure here is mostly the
+    // extraction skipped for that reason, not a fact about the file
+    if (signal?.aborted && outcome.kind !== 'success') {
+      return outcome;
+    }
+    // Resolved after the extraction: a rebuild may have started meanwhile
+    const targetIndexes = this.getTargetIndexes();
+
+    try {
+      if (outcome.kind === 'success') {
+        const docs = buildSuccessDocs(attachment, pageId, outcome);
+        await this.writeToIndexes(targetIndexes, {
+          attachmentId,
+          pageId,
+          docs,
+          replace: mode === 'reextract',
+        });
+
+        logger.info(
+          { attachmentId, pageId, docCount: docs.length },
+          'Attachment indexed successfully',
+        );
+      } else {
+        const failureEntry: ExtractionFailureEntry = {
+          attachmentId,
+          pageId,
+          fileName: attachment.fileName,
+          fileFormat: attachment.fileFormat,
+          fileSize: attachment.fileSize,
+          reasonCode: outcomeKindToReasonCode(outcome),
+          message: outcomeToMessage(outcome),
+          occurredAt: new Date(),
+        };
+
+        // Recorded before the write so an Elasticsearch failure cannot hide
+        // the extraction outcome
+        await this.failureLog.record(failureEntry);
+
+        if (mode === 'upload') {
+          try {
+            await this.writeToIndexes(targetIndexes, {
+              attachmentId,
+              pageId,
+              docs: [buildFailureDoc(attachment, pageId)],
+              replace: false,
+            });
+          } catch (err) {
+            logger.warn(
+              { err, attachmentId, pageId },
+              'Failed to index the metadata-only doc for a failed extraction',
+            );
+          }
+        }
+
+        logger.info(
+          { attachmentId, pageId, kind: outcome.kind },
+          'Attachment indexing recorded with failure outcome',
+        );
+      }
+    } finally {
+      // Also after a failed write: part of it may have landed
+      await this.removeIfDeletedMeanwhile(attachmentId).catch((err) =>
+        logger.error(
+          { err, attachmentId },
+          'Failed to remove the docs of an attachment deleted while being indexed',
+        ),
+      );
+    }
+
+    return outcome;
+  }
+
+  /**
+   * A delete during the extraction finds nothing to remove, and the write
+   * then lands afterwards. MongoDB drops the row before the detach handler
+   * runs, so checking after the write catches every such delete.
+   */
+  private async removeIfDeletedMeanwhile(attachmentId: string): Promise<void> {
+    const row = await prisma.attachments.findUnique({
+      where: { id: attachmentId },
+      select: { id: true },
+    });
+    if (row != null) {
+      return;
+    }
+    logger.info(
+      { attachmentId },
+      'Attachment was deleted while being indexed; removing its docs',
+    );
+    await this.delegatorExt.syncAttachmentRemoved(
+      attachmentId,
+      this.getTargetIndexes(),
+    );
+  }
+
+  // ----------------------------------------------------------------
+  // Public API
+  // ----------------------------------------------------------------
+
+  /**
+   * Called when an attachment is created. Attachments without a page (profile
+   * pictures, brand logos) are not indexed: search results are scoped by the
+   * page's permissions.
+   * Fire-and-forget safe — never throws.
+   */
+  async onAttach(
+    pageId: string | null,
+    attachment: AttachmentWithComputed,
+    _file: Express.Multer.File,
+  ): Promise<void> {
+    try {
+      if (pageId == null || !this.isFeatureEnabled()) {
+        return;
+      }
+
+      await this.extractAndIndex(attachment, pageId, 'upload');
+    } catch (err) {
+      logger.error(
+        { err, attachmentId: attachment._id?.toString(), pageId },
+        'onAttach: unexpected error during attachment indexing',
+      );
+    }
+  }
+
+  /**
+   * Called when an attachment is detached/deleted.
+   * Removes all ES documents for the attachment from all target indexes,
+   * also while the feature is disabled: the docs would otherwise reappear
+   * once it is enabled again.
+   * Never throws.
+   */
+  async onDetach(attachmentId: string): Promise<void> {
+    try {
+      this.reindexBatch.recordDetached(attachmentId);
+      const targetIndexes = this.getTargetIndexes();
+
+      // Attempt live first, then tmp (best-effort for each)
+      const liveIndex = this.delegatorExt.aliasName;
+      const tmpIndexes = targetIndexes.filter((idx) => idx !== liveIndex);
+
+      if (targetIndexes.includes(liveIndex)) {
+        try {
+          await this.delegatorExt.syncAttachmentRemoved(attachmentId, [
+            liveIndex,
+          ]);
+        } catch (err) {
+          logger.error(
+            { err, attachmentId, index: liveIndex },
+            'onDetach: failed to remove from live index',
+          );
+        }
+      }
+
+      // Remove from tmp indexes (non-blocking per index).
+      // In practice at most one tmp index exists during rebuild.
+      if (tmpIndexes.length > 0) {
+        const tmpResults = await Promise.allSettled(
+          tmpIndexes.map((tmpIndex) =>
+            this.delegatorExt.syncAttachmentRemoved(attachmentId, [tmpIndex]),
+          ),
+        );
+        for (let i = 0; i < tmpResults.length; i++) {
+          const result = tmpResults[i];
+          if (result.status === 'rejected') {
+            logger.warn(
+              { err: result.reason, attachmentId, index: tmpIndexes[i] },
+              'onDetach: failed to remove from tmp index (non-blocking)',
+            );
+          }
+        }
+      }
+    } catch (err) {
+      logger.error(
+        { err, attachmentId },
+        'onDetach: unexpected error during attachment removal',
+      );
+    }
+  }
+
+  /**
+   * Synchronously re-extracts and re-indexes a single attachment.
+   * Returns `{ ok: false }` if the attachment is not found in MongoDB.
+   * Never throws — all errors are caught and returned as `{ ok: false }`.
+   */
+  async reindex(
+    attachmentId: string,
+    { signal }: { signal?: AbortSignal } = {},
+  ): Promise<{ ok: boolean; outcome: ExtractionOutcome }> {
+    try {
+      if (!this.isFeatureEnabled()) {
+        logger.debug({ attachmentId }, 'reindex: feature disabled, skipping');
+        return { ok: false, outcome: { kind: 'serviceUnreachable' } };
+      }
+
+      const attachment = await prisma.attachments.findUnique({
+        where: { id: attachmentId },
+      });
+      if (attachment == null) {
+        logger.warn(
+          { attachmentId },
+          'reindex: attachment not found in MongoDB',
+        );
+        return { ok: false, outcome: { kind: 'serviceUnreachable' } };
+      }
+
+      const { pageId } = attachment;
+      if (pageId == null) {
+        logger.warn({ attachmentId }, 'reindex: attachment has no page');
+        return { ok: false, outcome: { kind: 'serviceUnreachable' } };
+      }
+
+      const outcome = await this.extractAndIndex(
+        attachment,
+        pageId,
+        'reextract',
+        signal,
+      );
+
+      return { ok: true, outcome };
+    } catch (err) {
+      logger.error({ err, attachmentId }, 'reindex: unexpected error');
+      return { ok: false, outcome: { kind: 'serviceUnreachable' } };
+    }
+  }
+}

@@ -6,6 +6,7 @@
 growi/
 ├── apps/
 │   ├── app/           # Main GROWI application (Next.js + Express + MongoDB)
+│   ├── attachment-text-extractor/ # Attachment text extraction microservice (Hono)
 │   ├── pdf-converter/ # PDF conversion microservice (Ts.ED + Puppeteer)
 │   └── slackbot-proxy/# Slack integration proxy (Ts.ED + TypeORM + MySQL)
 ├── packages/          # Shared libraries

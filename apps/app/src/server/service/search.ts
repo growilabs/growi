@@ -10,6 +10,14 @@ import {
   FILTER_FIELDS,
   SEARCH_FILTER_PREFIXES,
 } from '~/features/search/utils/filter-fields';
+import { DEFAULT_PAGE_SIZE as MAX_SECONDARY_PAGE_IDS } from '~/features/search-attachments/server/queries';
+import type {
+  AttachmentSearchInput,
+  AttachmentSearchResultAggregator,
+  IPrimarySearchResult,
+  IResolvedSecondaryResult,
+} from '~/features/search-attachments/server/services/attachment-search-result-aggregator';
+import type { AttachmentSearchViewer } from '~/features/search-attachments/server/services/search-accessible-pages';
 import type {
   AuditlogSuggestionField,
   AuditlogSuggestionsResponse,
@@ -128,6 +136,9 @@ class SearchService implements SearchQueryParser, SearchResolver {
   fullTextSearchDelegator: ElasticsearchDelegator;
 
   nqDelegators: { [key in SearchDelegatorName]: SearchDelegator };
+
+  private attachmentSearchResultAggregator: AttachmentSearchResultAggregator | null =
+    null;
 
   static async create(crowi: Crowi) {
     const instance = new SearchService();
@@ -519,13 +530,15 @@ class SearchService implements SearchQueryParser, SearchResolver {
     );
   }
 
-  async searchKeyword(
+  /**
+   * Parses and resolves a query string once: the delegator to run it with and
+   * the searchable data (terms, resolved filter data) to run.
+   */
+  private async prepareSearch(
     keyword: string,
     nqName: string | null,
-    user,
     userGroups: ObjectIdLike[] | null,
-    searchOpts,
-  ): Promise<[ISearchResult<unknown>, SearchDelegatorName | null]> {
+  ): Promise<[SearchDelegator, SearchableData]> {
     let parsedQuery: ParsedQuery;
     // parse
     try {
@@ -552,10 +565,175 @@ class SearchService implements SearchQueryParser, SearchResolver {
       userGroups,
     );
 
+    return [delegator, data];
+  }
+
+  async searchKeyword(
+    keyword: string,
+    nqName: string | null,
+    user,
+    userGroups: ObjectIdLike[] | null,
+    searchOpts,
+  ): Promise<[ISearchResult<unknown>, SearchDelegatorName | null]> {
+    const [delegator, data] = await this.prepareSearch(
+      keyword,
+      nqName,
+      userGroups,
+    );
+
     return [
       await delegator.search(data, user, userGroups, searchOpts),
       delegator.name ?? null,
     ];
+  }
+
+  /**
+   * Parses a query for the full-text search delegator, once, into what both
+   * the page side and the attachment side of a faceted search run with.
+   */
+  async createAttachmentSearchInput(
+    keyword: string,
+    viewer: AttachmentSearchViewer,
+  ): Promise<AttachmentSearchInput> {
+    const [, data] = await this.prepareSearch(keyword, null, viewer.userGroups);
+    return {
+      queryString: data.queryString,
+      terms: data.terms as QueryTerms,
+      resolvedFilterData: data.resolvedFilterData ?? {
+        groupIds: [],
+        notGroupIds: [],
+      },
+      viewer,
+    };
+  }
+
+  /**
+   * Page search for a parsed query, formatted exactly as `/_api/search`
+   * formats it (snippet rule, XSS filtering, page data from MongoDB).
+   */
+  async searchFormattedPages(
+    input: AttachmentSearchInput,
+    { from, size }: { from: number; size: number },
+  ): Promise<IFormattedSearchResult> {
+    const { queryString, terms, resolvedFilterData, viewer } = input;
+    const delegator = this.fullTextSearchDelegator;
+    const result = await delegator.search(
+      { queryString, terms, resolvedFilterData },
+      viewer.user,
+      viewer.userGroups,
+      { offset: from, limit: size },
+    );
+    return this.formatSearchResult(
+      result,
+      delegator.name ?? null,
+      viewer.user,
+      viewer.userGroups,
+    );
+  }
+
+  /**
+   * Register an AttachmentSearchResultAggregator for faceted search routing.
+   * Called by initAttachmentFullTextSearch.
+   */
+  setAttachmentSearchResultAggregator(
+    agg: AttachmentSearchResultAggregator,
+  ): void {
+    this.attachmentSearchResultAggregator = agg;
+  }
+
+  /**
+   * Facet-aware search entry point, routed through the
+   * AttachmentSearchResultAggregator. Callers check
+   * isAttachmentFullTextSearchEnabled first.
+   *
+   * `viewer` is resolved the same way the page search route resolves it; a
+   * null user means guest.
+   *
+   * resolve=full (facet=all): pages that came back without attachment hits
+   * (every page after the first result page) are enriched in the same call,
+   * as the secondary endpoint would.
+   */
+  async searchByFacet(
+    keyword: string,
+    viewer: AttachmentSearchViewer,
+    options: {
+      facet: 'all' | 'attachments';
+      from?: number;
+      size?: number;
+      resolve?: 'primary' | 'full';
+    },
+  ): Promise<IPrimarySearchResult> {
+    const { facet } = options;
+    const from = options.from ?? 0;
+    const size = options.size ?? 20;
+
+    const aggregator = this.attachmentSearchResultAggregator;
+    if (aggregator == null) {
+      throw new Error('Attachment search is not initialized');
+    }
+
+    const input = await this.createAttachmentSearchInput(keyword, viewer);
+    const primary = await aggregator.searchPrimary(input, {
+      facet,
+      from,
+      size,
+    });
+    if (facet !== 'all' || options.resolve !== 'full') {
+      return primary;
+    }
+    return {
+      ...primary,
+      items: await this.attachSecondaryHits(aggregator, input, primary.items),
+    };
+  }
+
+  private async attachSecondaryHits(
+    aggregator: AttachmentSearchResultAggregator,
+    input: AttachmentSearchInput,
+    items: IPrimarySearchResult['items'],
+  ): Promise<IPrimarySearchResult['items']> {
+    const missing = items
+      .filter((item) => item.meta?.attachmentHits == null)
+      .map((item) => item.data._id.toString());
+    const chunks: string[][] = [];
+    for (let i = 0; i < missing.length; i += MAX_SECONDARY_PAGE_IDS) {
+      chunks.push(missing.slice(i, i + MAX_SECONDARY_PAGE_IDS));
+    }
+    const results = await Promise.all(
+      chunks.map((primaryIds) =>
+        aggregator.resolveSecondary(input, { facet: 'all', primaryIds }),
+      ),
+    );
+    const enrichments = Object.assign(
+      {},
+      ...results.map((r) => r.enrichments),
+    ) as IResolvedSecondaryResult['enrichments'];
+
+    return items.map((item) => {
+      const hits = enrichments[item.data._id.toString()]?.attachmentHits;
+      return hits == null || item.meta?.attachmentHits != null
+        ? item
+        : { ...item, meta: { ...item.meta, attachmentHits: hits } };
+    });
+  }
+
+  /**
+   * Attachment hits for page ids the client got from a facet=all primary
+   * result. Empty when the attachment search is not initialized.
+   *
+   * @throws {RangeError} when more than 20 distinct ids are given
+   */
+  async resolveAttachmentSecondary(
+    keyword: string,
+    viewer: AttachmentSearchViewer,
+    { primaryIds }: { primaryIds: string[] },
+  ): Promise<IResolvedSecondaryResult> {
+    const aggregator = this.attachmentSearchResultAggregator;
+    if (aggregator == null) {
+      return { facet: 'all', enrichments: {} };
+    }
+    const input = await this.createAttachmentSearchInput(keyword, viewer);
+    return aggregator.resolveSecondary(input, { facet: 'all', primaryIds });
   }
 
   async resolveFilterData(
