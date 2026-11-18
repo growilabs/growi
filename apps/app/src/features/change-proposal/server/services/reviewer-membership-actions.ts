@@ -13,7 +13,6 @@ import {
   hasForeignReviewer,
 } from '../domain';
 import { allReviewersExist } from './create-reviewers';
-import { normalizeReviewer } from './normalize-create-input';
 import { recordProposalActivity } from './proposal-activity';
 import type { ReviewNotifier } from './review-notifier';
 import {
@@ -45,19 +44,6 @@ export type ReviewerMembershipActionsDeps = {
 };
 
 const DONE: ReviewerActionResult<void> = { ok: true, value: undefined };
-
-// An AI tool calls the service without the route's validators, so the shape is checked here too.
-const normalizeInputs = (inputs: unknown): readonly ReviewerInput[] | null => {
-  if (!Array.isArray(inputs) || inputs.length === 0) {
-    return null;
-  }
-  const normalized = inputs.map(normalizeReviewer);
-  return normalized.every(
-    (input): input is ReviewerInput => input !== 'invalid',
-  )
-    ? dedupeReviewerInputs(normalized)
-    : null;
-};
 
 const isNamedIn = (
   reviewers: readonly ReviewerRef[],
@@ -126,10 +112,7 @@ export const createReviewerMembershipActions = (
     // A write that gives up partway throws like a reject does, so the reviewers
     // stored before it get neither the activity nor the notice.
     async addReviewers(proposalId, actor, inputs) {
-      const given = normalizeInputs(inputs);
-      if (given == null) {
-        return fail('invalid-request');
-      }
+      const given = dedupeReviewerInputs(inputs);
       const authorized = await authorizeReviewerAction(
         proposalId,
         actor,
@@ -160,10 +143,7 @@ export const createReviewerMembershipActions = (
     },
 
     async removeReviewers(proposalId, actor, inputs) {
-      const given = normalizeInputs(inputs);
-      if (given == null) {
-        return fail('invalid-request');
-      }
+      const given = dedupeReviewerInputs(inputs);
       const authorized = await authorizeReviewerAction(
         proposalId,
         actor,

@@ -16,7 +16,7 @@ const CREATABLE_ENTRIES: readonly string[] = [
   'mcp',
 ] satisfies readonly CreatableEntry[];
 
-const REVIEWER_KINDS: readonly string[] = [
+export const REVIEWER_KINDS: readonly string[] = [
   'user',
   'user-group',
   'external-user-group',
@@ -110,7 +110,7 @@ const normalizeOperations = (
   return { ok: true, value: operations };
 };
 
-export const normalizeReviewer = (raw: unknown): ReviewerInput | 'invalid' =>
+const normalizeReviewer = (raw: unknown): ReviewerInput | 'invalid' =>
   isRecord(raw) &&
   isString(raw.kind) &&
   REVIEWER_KINDS.includes(raw.kind) &&

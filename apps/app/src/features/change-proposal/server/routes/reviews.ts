@@ -1,12 +1,15 @@
 import assert from 'node:assert';
 import { ErrorV3 } from '@growi/core/dist/models';
 import type { RequestHandler } from 'express';
+import { body, type ValidationChain } from 'express-validator';
 
 import type Crowi from '~/server/crowi';
 import type { AccessTokenParserReq } from '~/server/middlewares/access-token-parser';
+import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import loggerFactory from '~/utils/logger';
 
+import type { ReviewKind } from '../../interfaces';
 import type { ChangeProposalService } from '../services/change-proposal-service';
 import type { ReviewActor } from '../services/reviewer-actions';
 import type {
@@ -15,7 +18,7 @@ import type {
 } from './read-access';
 import {
   detectChannel,
-  MAX_OPERATION_KEYS,
+  operationKeysValidator,
   requestTrigger,
   respondWithServiceError,
   writeAccessChain,
@@ -23,13 +26,11 @@ import {
 
 const logger = loggerFactory('growi:features:change-proposal:routes:reviews');
 
-// What a well-formed body holds. The service checks the shape itself (an AI tool
-// calls it without this route), so the route only chooses the action.
-type ReviewBody = {
-  readonly kind?: string;
-  readonly operationKeys?: string[];
-  readonly comment?: string;
-};
+// What reviewValidator guarantees.
+type ReviewBody = { readonly comment?: string } & (
+  | { readonly kind: 'reject'; readonly operationKeys?: string[] }
+  | { readonly kind: 'abstain'; readonly operationKeys: string[] }
+);
 
 type Req = AuthenticatedRequest<
   Record<string, string>,
@@ -39,32 +40,46 @@ type Req = AuthenticatedRequest<
 
 type ReviewOutcome = ReturnType<ChangeProposalService['rejectAll']>;
 
-// Bounds the work one request can ask for, as the other write routes do.
-const hasTooManyKeys = (operationKeys: unknown): boolean =>
-  Array.isArray(operationKeys) && operationKeys.length > MAX_OPERATION_KEYS;
+const REVIEW_KINDS = ['reject', 'abstain'] satisfies readonly ReviewKind[];
 
-/**
- * A rejection without keys rejects the whole proposal; an abstention is always
- * about operations. Returns null for a body no action fits.
- */
+// isString() before isIn(): isIn() alone accepts ['reject'] by checking each element.
+const reviewValidator: ValidationChain[] = [
+  body('kind')
+    .isString()
+    .bail()
+    .isIn(REVIEW_KINDS)
+    .withMessage(`kind must be one of ${REVIEW_KINDS.join(', ')}`),
+  body('operationKeys')
+    .if(body('kind').equals('abstain'))
+    .exists()
+    .withMessage('abstain needs operationKeys'),
+  ...operationKeysValidator('optional'),
+  body('comment').optional().isString().withMessage('comment must be a string'),
+];
+
+// A rejection without keys rejects the whole proposal; an abstention is always about operations.
 const dispatchReview = (
   service: ChangeProposalService,
   proposalId: string,
   actor: ReviewActor,
-  { kind, operationKeys, comment }: ReviewBody,
-): ReviewOutcome | null => {
-  if (hasTooManyKeys(operationKeys)) {
-    return null;
+  review: ReviewBody,
+): ReviewOutcome => {
+  if (review.kind === 'abstain') {
+    return service.abstain(
+      proposalId,
+      actor,
+      review.operationKeys,
+      review.comment,
+    );
   }
-  if (kind === 'reject') {
-    return operationKeys === undefined
-      ? service.rejectAll(proposalId, actor, comment)
-      : service.rejectOperations(proposalId, actor, operationKeys, comment);
-  }
-  if (kind === 'abstain' && operationKeys !== undefined) {
-    return service.abstain(proposalId, actor, operationKeys, comment);
-  }
-  return null;
+  return review.operationKeys === undefined
+    ? service.rejectAll(proposalId, actor, review.comment)
+    : service.rejectOperations(
+        proposalId,
+        actor,
+        review.operationKeys,
+        review.comment,
+      );
 };
 
 /**
@@ -78,8 +93,7 @@ const dispatchReview = (
  *          Records a rejection or an abstention. A rejection without operationKeys rejects
  *          the whole proposal (results is then empty); an abstention always needs
  *          operationKeys. Only pending operations on pages the caller may view are affected.
- *          The requester cannot review their own proposal. A body of the wrong shape gets
- *          code invalid_request (the approve route answers validation_failed instead).
+ *          The requester cannot review their own proposal.
  *          Requires the `write:features:page` scope.
  *        parameters:
  *          - name: id
@@ -134,7 +148,7 @@ const dispatchReview = (
  *                                type: string
  *                                nullable: true
  *          400:
- *            description: Malformed body (code invalid_request), a comment over 500 characters (code comment_too_long), or the caller is the requester (code requester_cannot_review)
+ *            description: Invalid request body (code validation_failed), a comment over 500 characters (code comment_too_long), or the caller is the requester (code requester_cannot_review)
  *          403:
  *            description: Not authenticated, insufficient scope, or a user who may not change proposals (code user_not_allowed)
  *          404:
@@ -147,6 +161,8 @@ export const reviewsRouteHandlersFactory = (
   getService: GetChangeProposalService,
 ): RequestHandler[] => [
   ...writeAccessChain(crowi),
+  ...reviewValidator,
+  apiV3FormValidator,
   async (req: Req, res: ApiV3Response) => {
     const { user } = req;
     assert(user != null, 'ensured by loginRequired');
@@ -158,9 +174,6 @@ export const reviewsRouteHandlersFactory = (
         { user, channel: detectChannel(req), trigger: requestTrigger(res) },
         req.body,
       );
-      if (result == null) {
-        return respondWithServiceError(res, { code: 'invalid-request' });
-      }
       if (!result.ok) {
         return respondWithServiceError(res, result.error);
       }

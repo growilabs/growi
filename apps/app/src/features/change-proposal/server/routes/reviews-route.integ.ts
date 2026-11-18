@@ -171,17 +171,25 @@ describe('change-proposal reviewer routes', () => {
           ),
         },
       ],
+      [
+        'an operator object as the key list',
+        { kind: 'abstain', operationKeys: { $ne: null } },
+      ],
+      ['an empty key', { kind: 'reject', operationKeys: [''] }],
       ['a non-string comment', { kind: 'reject', comment: { $ne: null } }],
+      ['a null comment', { kind: 'reject', comment: null }],
       ['an unknown kind', { kind: 'approve' }],
+      ['a kind wrapped in an array', { kind: ['reject'] }],
+      ['an operator object as the kind', { kind: { $ne: null } }],
       ['no kind', {}],
-    ])('answers %s with 400 invalid_request and records nothing but the attempt', async (_label, body) => {
+    ])('answers %s with 400 validation_failed and records nothing but the attempt', async (_label, body) => {
       const proposal = await reviewedProposal();
       asUser(users.subscriber);
 
       const res = await postReview(proposal._id, body);
 
       expect(res.status).toBe(400);
-      expect(res.body.errors[0].code).toBe('invalid_request');
+      expect(res.body.errors[0].code).toBe('validation_failed');
       expect((await kit.reload(proposal._id)).reviews).toEqual([]);
       await expectOneUnsettledAttempt(endpointOf(proposal._id, 'reviews'));
     });
@@ -212,7 +220,7 @@ describe('change-proposal reviewer routes', () => {
         }),
       ]);
       expect(res.status).toBe(400);
-      expect(res.body.errors[0].code).toBe('invalid_request');
+      expect(res.body.errors[0].code).toBe('validation_failed');
       expect((await kit.reload(proposal._id)).reviews).toEqual(before);
     });
 

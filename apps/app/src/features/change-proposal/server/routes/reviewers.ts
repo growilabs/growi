@@ -1,13 +1,16 @@
 import assert from 'node:assert';
 import { ErrorV3 } from '@growi/core/dist/models';
 import type { RequestHandler } from 'express';
+import { body, type ValidationChain } from 'express-validator';
 
 import type Crowi from '~/server/crowi';
 import type { AccessTokenParserReq } from '~/server/middlewares/access-token-parser';
+import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import loggerFactory from '~/utils/logger';
 
 import type { ReviewerInput } from '../../interfaces';
+import { REVIEWER_KINDS } from '../services/normalize-create-input';
 import type {
   AuthenticatedRequest,
   GetChangeProposalService,
@@ -21,13 +24,41 @@ import {
 
 const logger = loggerFactory('growi:features:change-proposal:routes:reviewers');
 
-// What a well-formed body holds. The service checks the shape of the lists itself
-// (an AI tool calls it without this route), so the route only chooses the action.
+// What reviewersValidator guarantees: one request is one activity, so it either adds or removes.
+type ReviewersBody =
+  | { readonly add: ReviewerInput[]; readonly remove?: undefined }
+  | { readonly add?: undefined; readonly remove: ReviewerInput[] };
+
 type Req = AuthenticatedRequest<
   Record<string, string>,
-  { readonly add?: ReviewerInput[]; readonly remove?: ReviewerInput[] },
+  ReviewersBody,
   AccessTokenParserReq['query']
 >;
+
+// isString() before isIn(): isIn() alone accepts ['user'] by checking each element.
+const reviewerListValidator = (field: 'add' | 'remove'): ValidationChain[] => [
+  body(field)
+    .optional()
+    .isArray({ min: 1 })
+    .withMessage(`${field} must be a non-empty array of reviewers`),
+  body(`${field}.*.kind`)
+    .isString()
+    .bail()
+    .isIn(REVIEWER_KINDS)
+    .withMessage(`kind must be one of ${REVIEWER_KINDS.join(', ')}`),
+  body(`${field}.*.id`).isString().withMessage('id must be a string'),
+];
+
+const reviewersValidator: ValidationChain[] = [
+  body('add')
+    .custom(
+      (add: unknown, { req }) =>
+        (add === undefined) !== (req.body.remove === undefined),
+    )
+    .withMessage('Exactly one of add and remove is required'),
+  ...reviewerListValidator('add'),
+  ...reviewerListValidator('remove'),
+];
 
 /**
  * @swagger
@@ -39,8 +70,7 @@ type Req = AuthenticatedRequest<
  *        description: >
  *          One request either adds or removes reviewers, so the body holds exactly one of
  *          add and remove. A user who is not active, or a group that does not exist, is
- *          answered with code reviewer_not_found. A body of the wrong shape gets code
- *          invalid_request. Requires the `write:features:page` scope.
+ *          answered with code reviewer_not_found. Requires the `write:features:page` scope.
  *        parameters:
  *          - name: id
  *            in: path
@@ -56,6 +86,7 @@ type Req = AuthenticatedRequest<
  *                properties:
  *                  add:
  *                    type: array
+ *                    minItems: 1
  *                    items:
  *                      type: object
  *                      required: [kind, id]
@@ -68,6 +99,7 @@ type Req = AuthenticatedRequest<
  *                          description: User ID or group ID
  *                  remove:
  *                    type: array
+ *                    minItems: 1
  *                    items:
  *                      type: object
  *                      required: [kind, id]
@@ -82,7 +114,7 @@ type Req = AuthenticatedRequest<
  *          204:
  *            description: The reviewers were changed
  *          400:
- *            description: Malformed body (code invalid_request), an unknown or inactive reviewer (code reviewer_not_found), too many reviewers (code too_many_reviewers), or reviewers are disabled on this wiki (code reviewers_disabled)
+ *            description: Invalid request body (code validation_failed), an unknown or inactive reviewer (code reviewer_not_found), too many reviewers (code too_many_reviewers), or reviewers are disabled on this wiki (code reviewers_disabled)
  *          403:
  *            description: Not authenticated, insufficient scope, or a user who may not change proposals (code user_not_allowed)
  *          404:
@@ -95,15 +127,12 @@ export const reviewersRouteHandlersFactory = (
   getService: GetChangeProposalService,
 ): RequestHandler[] => [
   ...writeAccessChain(crowi),
+  ...reviewersValidator,
+  apiV3FormValidator,
   async (req: Req, res: ApiV3Response) => {
     const { user } = req;
     assert(user != null, 'ensured by loginRequired');
-    const { add, remove } = req.body;
-    const inputs = add ?? remove;
-    // One request is one activity, so it either adds or removes.
-    if (inputs == null || (add != null && remove != null)) {
-      return respondWithServiceError(res, { code: 'invalid-request' });
-    }
+    const change = req.body;
     try {
       const actor = {
         user,
@@ -112,9 +141,13 @@ export const reviewersRouteHandlersFactory = (
       };
       // The service settles the activity before it returns — see rules/activity-recording.md.
       const result =
-        add != null
-          ? await getService().addReviewers(req.params.id, actor, inputs)
-          : await getService().removeReviewers(req.params.id, actor, inputs);
+        change.add !== undefined
+          ? await getService().addReviewers(req.params.id, actor, change.add)
+          : await getService().removeReviewers(
+              req.params.id,
+              actor,
+              change.remove,
+            );
       if (!result.ok) {
         return respondWithServiceError(res, result.error);
       }

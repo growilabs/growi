@@ -22,7 +22,6 @@ import {
   fail,
   type ReviewActor,
   type ReviewerActionContext,
-  type ReviewerActionError,
   type ReviewerActionName,
   type ReviewerActionResult,
 } from './reviewer-action-auth';
@@ -75,27 +74,8 @@ const NOTICE_RESULT_OF = {
   abstain: 'abstained',
 } as const satisfies Record<ReviewKind, string>;
 
-// An AI tool calls the service without the route's validators, so the shape is checked here too.
-const findInvalidInput = ({
-  comment,
-  target,
-}: ReviewRequest): ReviewerActionError | null => {
-  if (comment != null && typeof comment !== 'string') {
-    return 'invalid-request';
-  }
-  if (
-    target.scope === 'operations' &&
-    (!Array.isArray(target.operationKeys) ||
-      target.operationKeys.length === 0 ||
-      !target.operationKeys.every((key) => typeof key === 'string'))
-  ) {
-    return 'invalid-request';
-  }
-  return comment != null &&
-    !isWithinCodePoints(comment, MAX_REVIEW_COMMENT_LENGTH)
-    ? 'comment-too-long'
-    : null;
-};
+const isCommentTooLong = (comment: string | undefined): boolean =>
+  comment != null && !isWithinCodePoints(comment, MAX_REVIEW_COMMENT_LENGTH);
 
 const toNotice = (entry: ReviewRequest): ReviewDecisionNotice => {
   const comment = entry.comment == null ? {} : { comment: entry.comment };
@@ -188,13 +168,12 @@ export const createReviewRecordActions = (
     action: ReviewerActionName,
     given: ReviewRequest,
   ): Promise<ReviewerActionResult<DecisionResponse>> => {
-    const invalid = findInvalidInput(given);
+    if (isCommentTooLong(given.comment)) {
+      return fail('comment-too-long');
+    }
     // An empty comment means no comment, whichever way the action was reached.
     const request: ReviewRequest =
       given.comment === '' ? { ...given, comment: undefined } : given;
-    if (invalid != null) {
-      return fail(invalid);
-    }
     const authorized = await authorizeReviewerAction(proposalId, actor, action);
     if (!authorized.ok) {
       return authorized;

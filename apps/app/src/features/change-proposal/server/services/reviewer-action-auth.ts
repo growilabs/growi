@@ -29,7 +29,6 @@ export type ReviewerActionError =
   | 'too-many-reviewers'
   | 'requester-cannot-review'
   | 'reviewers-disabled'
-  | 'invalid-request'
   | 'user-not-allowed';
 
 export type ReviewerActionResult<T> =

@@ -118,16 +118,29 @@ describe('change-proposal reviewer routes', () => {
       ['neither add nor remove', {}],
       ['an empty add', { add: [] }],
       ['an empty remove', { remove: [] }],
+      ['a null add', { add: null }],
+      ['a null remove beside an add', { add: [SOMEONE], remove: null }],
       ['a non-array add', { add: SOMEONE }],
       ['a reviewer of an unknown kind', { add: [{ ...SOMEONE, kind: 'all' }] }],
-    ])('answers %s with 400 invalid_request and changes nothing', async (_label, body) => {
+      [
+        'a reviewer kind wrapped in an array',
+        { remove: [{ ...SOMEONE, kind: ['user'] }] },
+      ],
+      ['a reviewer without an id', { add: [{ kind: 'user' }] }],
+      ['a numeric reviewer id', { add: [{ ...SOMEONE, id: 1 }] }],
+      [
+        'an operator object as a reviewer id',
+        { remove: [{ ...SOMEONE, id: { $ne: null } }] },
+      ],
+      ['a null reviewer', { add: [null] }],
+    ])('answers %s with 400 validation_failed and changes nothing', async (_label, body) => {
       const proposal = await reviewedProposal();
       asUser(users.requester);
 
       const res = await patchReviewers(proposal._id, body);
 
       expect(res.status).toBe(400);
-      expect(res.body.errors[0].code).toBe('invalid_request');
+      expect(res.body.errors[0].code).toBe('validation_failed');
       expect(await activeReviewerIdsOf(proposal._id)).toEqual([
         idOf(users.subscriber),
       ]);
@@ -146,6 +159,9 @@ describe('change-proposal reviewer routes', () => {
       const notFound = await patchReviewers(proposal._id, {
         add: [unknownUser],
       });
+      const malformedId = await patchReviewers(proposal._id, {
+        add: [{ kind: 'user', id: 'not-an-object-id' }],
+      });
       const overLimit = await patchReviewers(proposal._id, { add: tooMany });
       await setReviewersEnabled(false);
       const disabled = await patchReviewers(proposal._id, {
@@ -153,11 +169,12 @@ describe('change-proposal reviewer routes', () => {
       });
 
       expect(
-        [notFound, overLimit, disabled].map((res) => [
+        [notFound, malformedId, overLimit, disabled].map((res) => [
           res.status,
           res.body.errors[0].code,
         ]),
       ).toEqual([
+        [400, 'reviewer_not_found'],
         [400, 'reviewer_not_found'],
         [400, 'too_many_reviewers'],
         [400, 'reviewers_disabled'],

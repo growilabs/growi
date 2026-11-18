@@ -634,6 +634,26 @@ describe('ChangeProposalService: rejecting and abstaining', () => {
         before.length,
       );
     });
+
+    it('records nothing for an empty list of operations, and never turns it into a whole rejection', async () => {
+      const proposal = await pendingProposal([
+        kit.editInput(await kit.createPage('empty-keys')),
+      ]);
+
+      const rejected = await service.rejectOperations(
+        proposal._id,
+        actor(users.subscriber),
+        [],
+      );
+      const abstained = await service.abstain(
+        proposal._id,
+        actor(users.subscriber),
+        [],
+      );
+
+      expect([rejected.ok, abstained.ok]).toEqual([true, true]);
+      expect(await recordsOf(proposal._id)).toEqual([]);
+    });
   });
 
   describe('a record the write could not store', () => {
@@ -729,49 +749,6 @@ describe('ChangeProposalService: rejecting and abstaining', () => {
         await service.rejectAll(proposal._id, actor(suspendedUser)),
       ).toEqual({ ok: false, error: { code: 'user-not-allowed' } });
       expect(await recordsOf(proposal._id)).toEqual([]);
-    });
-
-    it('refuses an empty list of operations as an invalid request', async () => {
-      const proposal = await pendingProposal([
-        kit.editInput(await kit.createPage('empty-keys')),
-      ]);
-      const invalid = { ok: false, error: { code: 'invalid-request' } };
-
-      expect(
-        await service.rejectOperations(
-          proposal._id,
-          actor(users.subscriber),
-          [],
-        ),
-      ).toEqual(invalid);
-      expect(
-        await service.abstain(proposal._id, actor(users.subscriber), []),
-      ).toEqual(invalid);
-      expect(await recordsOf(proposal._id)).toEqual([]);
-    });
-
-    it('refuses the whole-proposal marker sent as the operation keys, and keeps an earlier whole rejection', async () => {
-      const proposal = await pendingProposal([
-        kit.editInput(await kit.createPage('marker-keys')),
-      ]);
-      const invalid = { ok: false, error: { code: 'invalid-request' } };
-      await service.rejectAll(proposal._id, actor(users.subscriber));
-      const before = await recordsOf(proposal._id);
-      // A caller outside the route's validators can send any value.
-      const marker: readonly string[] = JSON.parse('"whole-proposal"');
-
-      expect(
-        await service.rejectOperations(
-          proposal._id,
-          actor(users.subscriber),
-          marker,
-        ),
-      ).toEqual(invalid);
-      expect(
-        await service.abstain(proposal._id, actor(users.subscriber), marker),
-      ).toEqual(invalid);
-      expect(await recordsOf(proposal._id)).toEqual(before);
-      expect(before).not.toEqual([]);
     });
 
     it('records an empty comment as no comment', async () => {

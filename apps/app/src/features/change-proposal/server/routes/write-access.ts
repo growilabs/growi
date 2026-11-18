@@ -90,10 +90,6 @@ const BAD_REQUEST_OF = {
     message: 'Reviewers cannot be added on this wiki',
     code: 'reviewers_disabled',
   },
-  'invalid-request': {
-    message: 'The request is malformed',
-    code: 'invalid_request',
-  },
 } as const satisfies Record<
   Exclude<ReviewerActionError, 'not-found' | 'not-open' | 'user-not-allowed'>,
   { message: string; code: string }
@@ -121,7 +117,6 @@ export const respondWithServiceError = (
     case 'reviewer-not-found':
     case 'too-many-reviewers':
     case 'reviewers-disabled':
-    case 'invalid-request':
       return res.apiv3Err(
         new ErrorV3(
           BAD_REQUEST_OF[error.code].message,

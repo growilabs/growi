@@ -657,6 +657,28 @@ describe('ChangeProposalService: adding and removing reviewers', () => {
     });
   });
 
+  it('changes nothing for an empty list', async () => {
+    const proposal = await pendingProposal();
+    const before = await reviewersOf(proposal);
+
+    const added = await service.addReviewers(
+      proposal._id,
+      actor(users.requester),
+      [],
+    );
+    const removed = await service.removeReviewers(
+      proposal._id,
+      actor(users.requester),
+      [],
+    );
+
+    expect([added, removed]).toEqual([
+      { ok: true, value: undefined },
+      { ok: true, value: undefined },
+    ]);
+    expect(await reviewersOf(proposal)).toEqual(before);
+  });
+
   describe('who may not change the reviewers', () => {
     it('refuses both on a proposal that is no longer open, the requester included (Reviewers Req 4.8)', async () => {
       const proposal = await pendingProposal();
@@ -730,40 +752,6 @@ describe('ChangeProposalService: adding and removing reviewers', () => {
           userInput(extra.suspended),
         ]),
       ).toEqual(notAllowed);
-      expect(await reviewersOf(proposal)).toEqual(before);
-    });
-
-    it('refuses an empty or malformed list as an invalid request', async () => {
-      const proposal = await pendingProposal();
-      const before = await reviewersOf(proposal);
-      const invalid = { ok: false, error: { code: 'invalid-request' } };
-      // What an AI tool could pass, as the service is called without the route's validators.
-      const malformed: readonly ReviewerInput[][] = JSON.parse(
-        JSON.stringify([
-          [],
-          [{ kind: 'role', id: idOf(extra.added) }],
-          [{ kind: 'user', id: 1 }],
-          [null],
-        ]),
-      );
-
-      for (const inputs of malformed) {
-        expect(
-          // biome-ignore lint/performance/noAwaitInLoops: each case must leave the proposal as it was
-          await service.addReviewers(
-            proposal._id,
-            actor(users.requester),
-            inputs,
-          ),
-        ).toEqual(invalid);
-        expect(
-          await service.removeReviewers(
-            proposal._id,
-            actor(users.requester),
-            inputs,
-          ),
-        ).toEqual(invalid);
-      }
       expect(await reviewersOf(proposal)).toEqual(before);
     });
   });
