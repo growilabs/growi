@@ -203,9 +203,11 @@ const TITLE_SEPARATOR = ' › ';
 const PROJECT_SEGMENT = /^\[([^\]]+)\]$/;
 const POSITIONED_SPEC_PATH = /^(.+):\d+:\d+$/;
 /**
- * The reporter ends each list line with one space and then `─` up to 100
- * columns — no `─` at all once the line is that wide. The padding holds no
- * other space, so this removes exactly it, even from a title ending in `─`.
+ * The reporter appends one space to each list line, then `─` until the line
+ * is 100 columns (leading indent included, the runner's timestamp prefix
+ * not): a line of 98 columns or fewer gets at least one `─`, a line of 99 or
+ * more gets the space alone. The padding holds no other space, so this
+ * removes exactly it, even from a title ending in `─`.
  */
 const LIST_LINE_PADDING = / ─*$/;
 

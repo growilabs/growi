@@ -77,7 +77,8 @@ first:
    -level checks against data this skill already fetched, with no LLM judgment
    spent getting here. Handed to `investigate-flaky-test`, which spends one
    confirmation measurement (3 independent runs on the flaky-repro workflow)
-   to turn this into empirical proof.
+   to turn this into empirical proof. That workflow runs vitest projects
+   only, so a Playwright one is paused there for a human decision instead.
 3. **`flaky/confirmed`** — either a Playwright in-run retry (the retry already
    IS the empirical proof, no further measurement needed), or a
    `flaky/suspected` issue that `investigate-flaky-test` measured with the
@@ -250,6 +251,44 @@ script failure. `priorFailingRunIds: []` (no other known occurrence this
 scan) always yields `sandwich.hit: false` without needing the run-list
 comparison — that is a fact worth reading as-is, not a reason to skip
 calling the script.
+
+**For a Playwright identity, pass only the cells that ran the same test.**
+The script counts as a sibling every row of `siblingJobs` that shares
+`jobName`'s base name (the part before ` (`), and every `run-playwright`
+cell shares one base name. Another shard runs other spec files, and another
+browser runs the test under a different identity, so their success says
+nothing about this test: passing the whole jobs list makes ③ hit for almost
+every Playwright observation, even one that failed every attempt in every
+cell that ran it. The cells that ran this test under this identity are the
+ones with the same browser and the same shard, which differ only in the
+MongoDB version (`reusable-app-prod.yml`'s matrix order is browser, shard,
+mongodb-version). So for an identity Step 3 rule 3 produced:
+
+- **`jobName`** — any one of the occurrence's source jobs (the jobs whose
+  `failed` list named this test; Step 3's "One occurrence per identity per
+  workflow run" may have merged several). They all
+  concluded `failure`, so which one you pick does not change the result.
+- **`siblingJobs`** — for each source job, the jobs whose name starts with
+  that source job's name cut after the shard value and the `, ` that
+  follows it (the prefix ends with that comma and space), e.g.
+  `test-prod-node24 / run-playwright (firefox, 1/2, ` for
+  `test-prod-node24 / run-playwright (firefox, 1/2, 8.0)`; together, these
+  include the source jobs themselves. Make one call per distinct prefix and
+  collect the printed objects into the `siblingJobs` array:
+
+  ```bash
+  gh api repos/growilabs/growi/actions/runs/{RUN_ID}/jobs --paginate \
+    -q '.jobs[] | select(.name | startswith("{CELL_PREFIX}")) | {name, conclusion}'
+  ```
+
+Take the prefix from the source job's name, never from the identity key:
+for a setup project's test (`playwright:users:…`) the key has no browser,
+but the job that listed it does. ③ then hits only when a cell that ran this
+test concluded `success`. A sibling cell that failed is not counted even if
+this test is absent from its `failed` list: a cell can stop early and list
+its remaining tests only as `did not run`. A sibling that listed this test
+under `flaky` never reaches ③ at all, because Step 3's "One occurrence per
+identity per workflow run" already made the run's occurrence confirmed.
 
 **⑤ Setup-hook timeout with cross-file slowdown.** A failure whose error is
 `Hook timed out in Nms` on a hook registered in a Vitest **project's
@@ -734,11 +773,13 @@ lists.
    as an **observation** under its `identityKey`, not a confirmation: the
    test failed on every attempt, so nothing about it is retry-proven, and it
    may be a real regression. Run it through "Cheap Suspicion Mining" the
-   way a vitest observation goes through it — ①, ② and ③ apply (⑤ does not:
-   it is about a Vitest project's `setupFiles` hook, which a `run-playwright`
-   job has no counterpart for) — a hit makes it a **suspected** occurrence
-   (tier 2), otherwise it is a plain observation (tier 1, the passive
-   `flaky/observing` path). The Vitest section's folding subsections (shared
+   way a vitest observation goes through it — ①, ② and ③ apply, ③ with
+   only the same-browser, same-shard cells as siblings (see "For a
+   Playwright identity, pass only the cells that ran the same test" under
+   ②/③); ⑤ does not: it is about a Vitest project's `setupFiles` hook,
+   which a `run-playwright` job has no counterpart for — a hit makes it a
+   **suspected** occurrence (tier 2), otherwise it is a plain observation
+   (tier 1, the passive `flaky/observing` path). The Vitest section's folding subsections (shared
    setup-hook, collateral, cascade) apply to vitest FAIL blocks only: every
    entry in a `failed` list keeps its own identity, even when two entries
    share a spec file.
@@ -1254,6 +1295,7 @@ List whichever subset actually matched; omit lines for checks that didn't hit.}
 {pick exactly one:
  - confirmed (Playwright, Step 3 rules 1-2): "Confirmed flaky from a single run (Playwright retry evidence)."
  - suspected (observation, mining hit): "Suspected flaky ({every matched check, e.g. "① + ③", ordered strongest-first: ③ > ② > ①}) — handed directly to investigate-flaky-test for a confirmation measurement (3 independent runs on the flaky-repro workflow), no threshold wait needed."
+   For a Playwright identity, end it instead with: "— handed directly to investigate-flaky-test, which cannot measure a Playwright test on the flaky-repro workflow and pauses it for a human decision; no threshold wait needed."
  - observing (observation, no mining hit): "Observation 1/{VITEST_THRESHOLD} — needs {VITEST_THRESHOLD - 1} more independent occurrence(s) before this is handed to investigate-flaky-test."}
 EOF
 
@@ -1364,7 +1406,9 @@ Then check both escalation paths, in this order:
 
 1. **Does this new observation hit any mining check** — evaluate all of
    ① / ② / ③ against the accumulated history now that there are 2+
-   occurrences, not stopping at the first hit. If so, escalate straight to
+   occurrences, not stopping at the first hit (for a Playwright identity,
+   ③ takes the same-browser, same-shard cells of this new run as siblings,
+   as "Cheap Suspicion Mining" ②/③ defines). If so, escalate straight to
    `flaky/suspected`, skipping the threshold wait, and record every check
    that matched in the observation comment:
    ```bash

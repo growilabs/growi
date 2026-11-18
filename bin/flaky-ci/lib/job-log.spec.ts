@@ -475,7 +475,7 @@ describe('job-log.parsePlaywrightTestLine', () => {
     });
   });
 
-  it('strips the ` ─…` padding Playwright adds to a list line shorter than 100 columns', () => {
+  it('strips the ` ─…` padding Playwright adds to a list line of 98 columns or fewer', () => {
     expect(
       parsePlaywrightTestLine(
         `    [users] › playwright/users.setup.ts:54:1 › provision filter test users ${'─'.repeat(25)}`,

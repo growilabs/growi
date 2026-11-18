@@ -164,8 +164,10 @@ Requirement 14〜19 は、`run-playwright` ジョブのログから、失敗が�
     あり、その失敗は flaky として追跡しない
   - テスト基盤そのものの修正（共有 setup フックの負荷除去など）と、個別
     テストの設計不良の修正。これらは通常の PR として別途行う
-  - Playwright（e2e）の再現実行。Playwright は同一 run 内の retry で既に
-    確定済みの証拠が得られるため、再現ワークフローによる確認の対象外
+  - Playwright（e2e）の再現実行。再現ワークフローは vitest だけを動かす。
+    再試行で通ったテストは、同一 run 内の retry で既に確定済みの証拠が
+    得られている。全試行で失敗しただけのテストは確認する手段が無いので、
+    人の判断待ちに回す（Requirement 15.5）
   - routine が使うモデルの選択。判断材料は設計で記録するが、要件では定めない
   - 商用SaaSの導入・比較検討
 - **Adjacent expectations**:
@@ -377,6 +379,8 @@ Elasticsearch 9 のセルでしか出ない非決定性は、この手段では�
 1. When ログ末尾の一覧に、全試行で失敗したテストが載っている, the flaky-ci-routine shall そのテストをテストごとの識別で特定し、確定済みではなく観測として扱う。
 2. When 全試行で失敗したテストを観測として扱う, the flaky-ci-routine shall Requirement 2.1 の安価な証拠シグナルによる判定を、その判定の条件を変えずに適用する。
 3. When 1 つのジョブの一覧に、再実行で通ったテストと全試行で失敗したテストの両方が載っている, the flaky-ci-routine shall 前者を確定済みの発生、後者を観測として、テストごとに分けて扱う。
+4. The flaky-ci-routine shall Requirement 2.1 の「同一runの兄弟variant」を、Playwright のテストについては、そのテストが失敗したセルとブラウザと shard が同じで、MongoDB のバージョンだけが違うセルを指すものとして扱う。
+5. If 追跡 issue が Playwright のテストのもので、最後に再オープンされた後に記録された発生（再オープンされていなければ issue のすべての発生）のどれにも、そのテストが再実行で通った証拠が無い, then the flaky-ci-routine shall 確信度のラベルが確定済みであっても非決定性を実証済みとして扱わず、確認の測定ができないことを理由に原因追及に進まず人の判断待ち（Requirement 9）に回す。
 
 ### Requirement 16: Playwright のテストを一覧から読めないときは、推測で割り当てない
 
