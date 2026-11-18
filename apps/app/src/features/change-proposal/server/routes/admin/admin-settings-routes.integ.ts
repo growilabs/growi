@@ -421,6 +421,37 @@ describe('change-proposal admin settings routes', () => {
       expect(reloaded.operations.map((op) => op.status)).toEqual(['skipped']);
     });
 
+    it('withdraws a pending proposal with reviewers too, which then leaves the reviewer queue (Reviewers Req 7.7)', async () => {
+      const page = await kit.createPage('withdrawn-reviewed');
+      const proposal = await kit.storeProposal([kit.editInput(page)], {
+        approve: false,
+        reviewers: [
+          {
+            kind: 'user',
+            id: users.subscriber._id.toString(),
+            addedBy: users.requester._id.toString(),
+            addedAt: new Date(),
+          },
+        ],
+      });
+      const queuedIds = async () =>
+        (await service.listReviewQueue(users.subscriber, null, 50)).items.map(
+          (item) => item.id,
+        );
+      expect(await queuedIds()).toContain(proposal._id);
+      asUser(admin);
+
+      const res = await put({ isEnabled: false });
+
+      expect(res.status).toBe(200);
+      const reloaded = await kit.reload(proposal._id);
+      expect([
+        reloaded.lifecycle,
+        reloaded.operations.map((op) => op.status),
+      ]).toEqual(['withdrawn', ['skipped']]);
+      expect(await queuedIds()).not.toContain(proposal._id);
+    });
+
     it('still saves the settings and answers 200 when withdrawing the pending proposals fails', async () => {
       vi.spyOn(service, 'withdrawAllPending').mockRejectedValue(
         new Error('withdraw failed'),
