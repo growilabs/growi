@@ -495,7 +495,7 @@ Change オペレーションの状態とは別に、Proposal 全体が動いて�
 3. The Change Proposal System shall Proposal 作成者でも Proposal 承認者でもないユーザーには、`pending` (適用待ち) の Change オペレーションを返さない。
 4. If Proposal 承認者が、`open` (進行中) の Proposal を取得しようとしたときに、そのユーザーに返す Change オペレーションが 1 つも無い場合, then the Change Proposal System shall Proposal が存在しない場合と同じ「見つからない」応答を返す。
 5. When ユーザーが、自分が Proposal 承認者である `open` (進行中) の Proposal の一覧を求めた場合, the Change Proposal System shall 承認権限チェックを通った `pending` (適用待ち) の Change オペレーションを 1 つ以上含む `open` の Proposal を、作成が古い順（期限は作成時に決まるので、期限が近い順と同じになる）に、ページ送りできる形で返す。
-6. The Change Proposal System shall Proposal 承認者に返す Change オペレーションを、そのユーザーが閲覧できるページ（リンクを知る人だけが見られるページを除く）に対する Change オペレーションだけにする。閲覧できない Change オペレーションの件数や、閲覧できない Change オペレーションがあることを示す情報を含めない。
+6. The Change Proposal System shall Proposal 承認者に返す Change オペレーションを、そのユーザーが閲覧できるページ（リンクを知る人だけが見られるページを除く）に対する Change オペレーションだけにする。閲覧できない Change オペレーションの件数や、閲覧できない Change オペレーションがあることを示す情報を含めない。ただし、Proposal 承認者が取り消しの相手でもあるときは、ページがもう無い Change オペレーションを 9.15・9.17 のとおり返す。
 7. The Change Proposal System shall Proposal 承認者への応答に、Proposal 承認者の指定の一覧（ユーザーの名前とグループの名前）、承認・却下・放棄した人、Proposal 承認者を追加・削除した人を含める。ただし、そのユーザーが見られないページの存在を示す情報は含めない。
 8. The Change Proposal System shall Proposal 作成者にだけ返している内容（Proposal のライフサイクルと適用率、ページごとの通知設定、AI が書いた要約や会話、Proposal を作る側が用意する Proposal 作成者向けの内容など）を、Proposal 承認者には返さない。Proposal の目的は、Proposal 承認者にも返す。
 9. While あるユーザーが、Proposal 承認者に指定されたグループに所属していることによって Proposal 承認者である場合, the Change Proposal System shall 所属が外れたあとは、そのユーザーを Proposal 承認者として扱わない。
