@@ -176,7 +176,7 @@
   - _Requirements: 11.6, 11.7, 11.8_
 
 - [ ] 6. 仕上げと通しの確認
-- [ ] 6.1 protocol から `keep` を消す
+- [x] 6.1 protocol から `keep` を消す
   - `keep` の名前・依頼の形・会話の発言の型・作成の応答の取り込み件数を取り除く
   - 完了の条件: protocol の試験で `keep` の依頼が知らない種類として拒まれ、protocol・proxy・app の型検査が通る
   - _Requirements: 15.13_
@@ -357,3 +357,4 @@
 - 6.1（触らなかった `keep`）: 次は今回のコマンドと関係が無いので残した。Gen 1 の Slack 連携（`packages/slack/src/consts`、`apps/app/src/server/service/slack-command-handler/keep.js`・`help.js`、`ManageCommandsProcess.jsx`、2021 年の migration 3 本）、opentelemetry の `kind: 'keep'`、`g2g-transfer*`・`contribution-graph` の変数名、Dockerfile の `.keep`、proxy の `conversation-history.ts`・`slack-conversation.ts` の変数 `keep`（残す件数）、`webhook-options.spec.ts` のモーダルの題名 `'Keep'`（試験用の任意の文字列）。`parse-command-answer.spec.ts` の「知らない種類の答え」の例 `kind: 'keep'` は、消したコマンドと紛らわしいので `'summary'` に替えた。
 - 6.1 → **タスク 7 へ**: 本 spec の design.md（5・18・40・129・154・190〜199・308・338・397・689・690・701・772 行あたり）と requirements.md（8・20・22・61 行あたり）、対象の spec（`chat-integration`・`chat-integration-protocol`・`chat-integration-proxy`・`chat-integration-app`）の `keep` の記述（30 か所ほど）を、書き戻しで「今の事実」に直す。proxy の docs には `keep` の記述は残っていない（3.7 で直し済み）。
 - 6.1 → **6.4 へ**: proxy の全体試験では `instance-ownership-e2e.integ` の「runs the periodic sweep on one instance at a time」が、単独で 6 回回しても毎回落ちた（`holder` が `proxy:sweep` のロックを取れない）。共有の PostgreSQL の `chat_sdk.chat_state_locks` には、`growi-proxy:proxy:sweep` のロックが 5 分の期限付きで入っていた。期限が切れた後に回し直しても、その回の途中で誰かが取り直していて落ちた（同じ DB を使うほかの試験か、この試験の別のインスタンスが取ったのかは切り分けていない）。6.1 は掃除とロックのコードに触れていない。`command-flow-e2e.integ`・`notification-linking-e2e.integ` は全体試験で時間切れになり、単独では通った。app の結合試験（`summary-page`・`command-endpoint`・`create-page-defaults`・`unlinked-to-linked-write` の `.integ.ts`）は、git の管理外の生成物 `bulk-export.generated.ts` が無いと読み込みで落ちる。`node bin/build-bulk-export-css.ts`（`apps/app`）で作ってから回す。
+- 6.1（レビューの申し送り）: **6.3 へ**: 実機で使う GROWI を `pnpm run dev` だけで起動する場合は先に `pnpm run dev:migrate` を流す（開発用 DB では `20261116150000` が未適用。`keep` の行が残っていると proxy の設定の取り込みが全体ごと断られる）。**6.4 へ**: `instance-ownership-e2e.integ` の「runs the periodic sweep on one instance at a time」は 6.1 より前のコミットでも落ちる（共有 PostgreSQL に installation が 4,393 行たまり、掃除が全部を処理して 30 秒を超え、5 分期限の `proxy:sweep` ロックが残る）。facade と同じく掃除の対象（`listInstallationIds`）もその試験で作った installation に絞って直す。共有 DB の行やロックを手で消さない。`AdminChatIntegration.spec.tsx` の「注意書きと DM の欄が出ない行」の手書きの一覧（`[search, create-page, link-preview, help]`）は `COMMAND_TRAITS` の `directMessagePolicy !== "separate-flag"` で絞った `Object.values(COMMAND_NAMES)` から作る。**7 へ**: `@GROWI keep` は他の知らない言葉と同じく何も返さない（proxy の design.md 316 行付近のとおり）。parser は知らない欄を黙って落とす。
