@@ -89,8 +89,10 @@ Change オペレーションの状態とは別に、Proposal 全体が動いて�
 | Change オペレーションの種類 | 確かめるページ |
 |---|---|
 | `edit` (編集) | 対象のページ |
-| `create` (新規作成) | 親のページ。親がまだ無いときは、いちばん近い上のページ |
-| `move` (移動) | 移動元のページと、移動先の親のページの両方 |
+| `create` (新規作成) | 親のページ。親が無いときと、親の中身が空のときは、中身が空でないいちばん近い上のページ |
+| `move` (移動) | 移動元のページと、移動先の親のページの両方。移動先の親は、`create` (新規作成) と同じ決め方で選ぶ |
+
+中身が空でない上のページがルートまで 1 つも無いときは、承認権限チェックを通らない。
 
 **Proposal どうしのつながり**
 
@@ -151,7 +153,7 @@ Proposal を取得するユーザーに、どの Change オペレーションを
   - `pending` (適用待ち)・`failed` (適用失敗)・`stale` (見送り)・`skipped` (スキップ) の Change オペレーションを、Proposal 作成者でも Proposal 承認者でもない人に見せること
   - `follow-up` (後続) Proposal・`rework` (見直し) Proposal の中身（どの Change オペレーションをどう作り直すか）を作ること。Proposal を作る側が作る（AI チャットでは `change-proposal-ai-agent`）
   - `follow-up` (後続) Proposal・`rework` (見直し) Proposal を作るボタンなどの画面（`change-proposal-ai-agent` と `change-proposal-viewer`）
-  - 承認・却下・放棄・Proposal 承認者の追加と削除の画面、Proposal 承認者としての一覧の画面、Proposal 承認者への通知と結果の通知の表示（`change-proposal-viewer`）。AI チャットで Proposal 承認者を選ぶ画面と指定の道具（`change-proposal-ai-agent`）
+  - 承認・却下・放棄・Proposal 承認者の追加と削除の画面、レビュー待ちの一覧の画面、Proposal 承認者への通知と結果の通知の表示（`change-proposal-viewer`）。AI チャットで Proposal 承認者を選ぶ画面と指定の道具（`change-proposal-ai-agent`）
   - ページのパスごとの既定の Proposal 承認者（Proposal 承認者を自動で決める規則）、Proposal 作成者自身の承認を管理者の設定で禁止すること、決めた人数だけを自動で割り当てる仕組み、グループの所属者全員への通知
   - 全員の承認を求める形、承認する人数の下限、承認に付けるコメント（コメントは却下と放棄にだけ付ける）
   - 却下の記録で、ほかの Proposal 承認者の承認を止めること、却下を理由に Change オペレーションの状態を変えること（却下は意見の記録だけにする）
@@ -163,7 +165,7 @@ Proposal を取得するユーザーに、どの Change オペレーションを
   - `change-proposal-viewer` は、本 spec の API が返す「戻せるかどうか」の判定結果と、リビジョンに残した記録を表示に使う。判定そのものはしない。
   - `change-proposal-viewer` と `change-proposal-ai-agent` は、Change オペレーションの種類・状態・理由の表示名と差分の表示の設定を、本 spec が用意した共通の部品から使い、自分では持たない。それぞれの画面だけで使う文言は、それぞれの spec が持つ。
   - 閲覧できるかどうかの判定には、GROWI の既存の閲覧の判定を使う。新しい判定の規則は作らない。グループの所属の判定と、読み取り専用ユーザーとゲストの扱いも、既存の規則を使う。`create` (新規作成) と `move` (移動) で承認権限チェックが確かめるページは、3.6（適用のときの権限の確認先）と 3.9（新しいページの閲覧範囲は親のページと同じ）を Proposal 承認者に当てはめたもので、新しい判定の規則ではない。
-  - **公開の順序**: `change-proposal-viewer` の承認の画面と Proposal 承認者としての一覧、`change-proposal-ai-agent` で Proposal 承認者を指定する画面と道具ができるまでは、Proposal 作成者以外のユーザーを Proposal 承認者に指定することも、追加することも受け付けない。通知を受け取っても操作できない状態を作らないため。この切り替えは、管理者の設定画面には出さない設定で行う。
+  - **公開の順序**: `change-proposal-viewer` の承認の画面とレビュー待ちの一覧、`change-proposal-ai-agent` で Proposal 承認者を指定する画面と道具ができるまでは、Proposal 作成者以外のユーザーを Proposal 承認者に指定することも、追加することも受け付けない。通知を受け取っても操作できない状態を作らないため。この切り替えは、管理者の設定画面には出さない設定で行う。
 
 ## Requirements
 
@@ -501,7 +503,7 @@ Proposal を取得するユーザーに、どの Change オペレーションを
 
 #### Acceptance Criteria
 1. When Proposal 承認者の指定がある Proposal がライフサイクル `open` (進行中) として作られた場合、または Proposal 承認者の指定が追加された場合, the Change Proposal System shall 新しく Proposal 承認者になった個人のユーザーに、アプリ内通知を送る。
-2. The Change Proposal System shall Proposal 承認者に指定されたグループに所属するユーザーには、個別の通知を送らない。グループに所属するユーザーは、Proposal 承認者としての一覧（Requirement 19.5）で見つける。
+2. The Change Proposal System shall Proposal 承認者に指定されたグループに所属するユーザーには、個別の通知を送らない。グループに所属するユーザーは、レビュー待ちの一覧（Requirement 19.5）で見つける。
 3. The Change Proposal System shall Proposal 承認者への通知の中身を、受け取るユーザーが閲覧できるページの分だけで作り、閲覧できないページのパス・タイトル・件数を含めない。
 4. If 通知を受け取るはずのユーザーに、承認権限チェックを通った `pending` (適用待ち) の Change オペレーションが 1 つも無い場合, then the Change Proposal System shall そのユーザーにはその通知を送らない。
 5. When Proposal 承認者が、承認・却下・放棄を求め、その求めが受け付けられた場合, the Change Proposal System shall 1 回の求めにつき 1 件のアプリ内通知を、Proposal 作成者に送る。中身は、レビューした人、各 Change オペレーションの結果、添えられたコメント、Proposal の詳細ページへのリンクにする。

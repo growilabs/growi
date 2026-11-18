@@ -77,13 +77,13 @@ umbrella の判断（決定 1〜6）とコード上の事実は [../change-propo
   - だれが書けるかの判定は、サービスの入口と、書き込みの条件の 2 か所にある。Proposal 承認者を片方でしか認めないと、Proposal 承認者が閉じた Proposal を承認したときに「閉じている」ではなく「見つからない」が返る。そのため、両方で同じ人を認める。
   - `pending` (適用待ち) の新規作成の Change オペレーションはまだページが無いので、対象のページを閲覧できるかでは判定できない。移動先の親のページは、適用のときの権限の確認では確かめない（移動元だけを確かめる）。そのため、Proposal 承認者に見せる Change オペレーションは、適用のときの権限の確認とは別に、承認権限チェックで決める。新規作成の適用は `findNonEmptyClosestAncestor(path)` のあとで Proposal 作成者が閲覧できるかを確かめているので、「親、無ければ最も近い上のページ」の決め方は、承認権限チェックでも同じものを使う。閲覧できるページ・リンクを知る人だけのページ・もう無いページを 1 回で分ける `loadViewablePages` もある。
   - ページの閲覧範囲の判定は、`UserGroupRelation.findAllUserGroupIdsRelatedToUser` と外部認証グループの同名の関数で所属を読む。ユーザーを子グループに足すと、親グループすべてにも所属の記録が作られる（`user-group.js`、`external-user-group-sync.ts`）。`pageGrantService.getUserRelatedGroups` も同じ所属をグループの種類つきで返すが、消えたグループの関連を落とす（そうした関連はグループの削除時と起動時の `removeAllInvalidRelations` で掃除されるので、結果の違いは実際には出ない）。
-  - 自分の一覧は skip と limit でページ送りしている。Proposal 作成者は自分の Change オペレーションを全部見られるので成り立つが、読んだあとに閲覧できるかで絞る Proposal 承認者としての一覧には使えない。適用済みの一覧（`listAppliedVisible`）が、続きの位置と 1 回に調べる件数の上限で作っている。
+  - 自分の一覧は skip と limit でページ送りしている。Proposal 作成者は自分の Change オペレーションを全部見られるので成り立つが、読んだあとに閲覧できるかで絞るレビュー待ちの一覧には使えない。適用済みの一覧（`listAppliedVisible`）が、続きの位置と 1 回に調べる件数の上限で作っている。
   - 適用の処理は、承認が付いた Change オペレーションをそのとき読み直して、まとめて適用する。1 回の適用が、複数の人の承認をまとめて書くことがある。適用の処理は `proposal.requester` から Proposal 作成者を読み、Change オペレーションごとに Proposal 作成者を確かめ直して、書き込みの主体にする。
   - 1 つの activity の ID に記録できる行は 1 つである。HTTP の求めで適用が動くと、その求めの activity の ID を使い、記録されるユーザーは求めた人になる。
   - 監査ログの設定にかかわらず記録するのは、action を `EssentialActionGroup` に入れることで実現している。新しい action の名前は `admin.json` の `audit_log_action.*` に 5 言語で足す（`i18next.config.ts` に登録済みのワイルドカードで足りる）。
   - 通知の一覧の取得では `ChangeProposal` の対象を読み込まず、通知の中身は snapshot だけに頼る。viewer の表示は、読めない通知を一覧に出さない。`upsertByActivity` は 7 日以内の似た通知をまとめるので、受け取る人ごとの中身には使えない。
   - `accessTokenParser` は、どの方法でログインしたかの印を `req` に残さない。アクセストークンが付いているかは `extractAccessToken(req)` で読める。
-- **Implications**: 承認権限チェックと Proposal 承認者の判定は純関数として新しく作り、閲覧の判定は `loadViewablePages` を、所属の読み出しはページの閲覧の判定と同じ関数を再利用する。Proposal 承認者としての一覧は、適用済みの一覧と同じ形（続きの位置と上限）で作る。経路は `extractAccessToken` の有無で `'api'` と `'ui'` に分ける（無効なトークンを付けてセッションでログインしている求めも `'api'` になる）。
+- **Implications**: 承認権限チェックと Proposal 承認者の判定は純関数として新しく作り、閲覧の判定は `loadViewablePages` を、所属の読み出しはページの閲覧の判定と同じ関数を再利用する。レビュー待ちの一覧は、適用済みの一覧と同じ形（続きの位置と上限）で作る。経路は `extractAccessToken` の有無で `'api'` と `'ui'` に分ける（無効なトークンを付けてセッションでログインしている求めも `'api'` になる）。
 
 ### Prisma の MongoDB の落とし穴（Proposal 承認者と記録の書き込みで確かめたこと）
 - 省略できる項目（`reviews.operationKey`）に `in` で条件を付けると、項目の無い要素（全体の却下の記録）にも合う。`isSet: true` を一緒に付ける必要がある。
@@ -92,8 +92,8 @@ umbrella の判断（決定 1〜6）とコード上の事実は [../change-propo
 - 配列の複合型の要素に張る索引（`@@index([lifecycle, reviewers.id, id])`）は、`prisma validate` と生成で受け付けられた（`schema.prisma` には、配列の複合型の要素に張った索引の前例がほかに無い）。schema と migration に同じ名前で書いた。
 - `findMany` の `reviewers: { some: … }` は `$expr` と `$filter` に変換され、どの索引も使われない。配列の要素で探す読み取りは、ID だけを `aggregateRaw` の `$elemMatch` で読み、`findMany` で読み直す形にする（次の項）。書き込みは Proposal の ID で先に絞るので影響しない。
 
-### Proposal 承認者としての一覧の索引の効き方
-- **測ったもの**: Proposal 承認者としての一覧の問い合わせ（ID だけを `aggregateRaw` で読む形。条件は `{ lifecycle: 'open', reviewers: { $elemMatch: { id: { $in: [...] }, removedAt: null } }, _id: { $gt: cursor } }`、並びは `_id: 1`）が、索引 `lifecycle_1_reviewers.id_1__id_1` を使うか、調べる文書の数が総数とともに増えないかを、`explain` で確かめた。
+### レビュー待ちの一覧の索引の効き方
+- **測ったもの**: レビュー待ちの一覧の問い合わせ（ID だけを `aggregateRaw` で読む形。条件は `{ lifecycle: 'open', reviewers: { $elemMatch: { id: { $in: [...] }, removedAt: null } }, _id: { $gt: cursor } }`、並びは `_id: 1`）が、索引 `lifecycle_1_reviewers.id_1__id_1` を使うか、調べる文書の数が総数とともに増えないかを、`explain` で確かめた。
 - **結果**: 本人とグループごとの IXSCAN を SORT_MERGE でまとめる計画になった。使い捨ての DB（2,000 件と 10,000 件。8 割が開いている。4 分の 1 に、ほかの 300 人と 30 のグループが Proposal 承認者として入っている。一覧を取得するユーザーの Proposal は 40 件）で、最初の 20 件は keysExamined 21・docsExamined 20・0〜1 ミリ秒、続きの 50 件は 20・20 だった。比べた Prisma の素直な条件（`some`）は、docsExamined が 976（2,000 件）と 4,876（10,000 件）で総数に比例した（19 ミリ秒）。別の再現（2,000・10,000・50,000 件。本人と 10 のグループ）では、最初の 20 件で keys 67・docs 66、続きの 50 件で keys 176・docs 175 で、どの規模でも同じ値だった。Proposal 承認者として 1 件も付いていない人と、`$in` が空のときは keys 0・docs 0 だった。
 - **注意**: 計測のファイルは CI で走らせないよう消した。ローカルの結合テストは索引の無い DB で動くので、索引が使われることを示すのはこの計測だけである。所属の読み出しは、`usergrouprelations` に `relatedUser` の索引が無いので全件を読む（ページを開くたびにすでに行っている問い合わせと同じ）。こちらは測っていない。
 
@@ -172,7 +172,7 @@ umbrella の判断（決定 1〜6）とコード上の事実は [../change-propo
 
 ### Decision: Proposal 作成者でも Proposal 承認者でもない人に返す Change オペレーションは、適用に関わった Change オペレーションだけにする
 - **Context**: 要件 9.2・9.7・9.8・9.10。`open` (進行中) の Proposal でも、一部の Change オペレーションがすでに適用されていることがある。
-- **Selected Approach**: Proposal 作成者でも Proposal 承認者でもないユーザーには、閲覧できるページに対する `applied` (適用済み)・`reverted` (取り消し済み)・`revert-refused` (取り消し不可) の Change オペレーションだけを返す。Proposal が `open` (進行中) かどうかは判断に使わない。1 件の取得・適用済みの一覧・リビジョンの印の 3 つが、同じ純関数（`selectVisibleOperations`）でこの Change オペレーションを選ぶ。Proposal 承認者には、1 件の取得と Proposal 承認者としての一覧で、承認権限チェックを通った Change オペレーションも返す（要件 19.6。`decideReviewScope` が決める。決定「承認権限チェックは、確かめるページの集合の閲覧で決める」）。全体の状態と `lastAppliedAt` は、どのユーザーに対しても、返す Change オペレーションだけから決める。
+- **Selected Approach**: Proposal 作成者でも Proposal 承認者でもないユーザーには、閲覧できるページに対する `applied` (適用済み)・`reverted` (取り消し済み)・`revert-refused` (取り消し不可) の Change オペレーションだけを返す。Proposal が `open` (進行中) かどうかは判断に使わない。1 件の取得・適用済みの一覧・リビジョンの印の 3 つが、同じ純関数（`selectVisibleOperations`）でこの Change オペレーションを選ぶ。Proposal 承認者には、1 件の取得とレビュー待ちの一覧で、承認権限チェックを通った Change オペレーションも返す（要件 19.6。`decideReviewScope` が決める。決定「承認権限チェックは、確かめるページの集合の閲覧で決める」）。全体の状態と `lastAppliedAt` は、どのユーザーに対しても、返す Change オペレーションだけから決める。
 - **Rationale**: Change オペレーションが適用されたページを見た人が、それを作った Proposal にたどれる必要がある（ページ履歴の印から詳細へ）。一方で、まだ適用されていない Change オペレーションや、適用されなかった Change オペレーションは、Proposal 作成者と Proposal 承認者が扱っている途中のものなので、それ以外のユーザーに見せる理由が無い。Proposal のライフサイクル（`lifecycle`）で判断すると、一部の Change オペレーションが適用された `open` (進行中) の Proposal を、他のユーザーが見られなくなる。
 - **Trade-offs**: 適用済みの一覧は、文書に保存した `lastAppliedAt`（見えない Change オペレーションを適用した日時を含む）の順に読む。そのため、表示する日時と並び順が食い違うことがある。分かるのは「見えない何かが、より新しく適用された」ことだけなので、一覧を取得するユーザーごとの並べ直しはしない。
 
@@ -308,7 +308,7 @@ umbrella の判断（決定 1〜6）とコード上の事実は [../change-propo
 - **Trade-offs**: `judgeRevertability` はこの規則を知らないので、ユーザーページを無効にしたあと、`/user` に触れる編集・移動の取り消しは、画面で「戻せる」と出ても、適用では `target-unavailable` で断られる。`delete-completely` (完全な削除) の Change オペレーションは、人の完全な削除と同じく `disableUserPages` を確かめない。
 
 ### Decision: Proposal 承認者の判定は 1 組の純関数にまとめる
-- **Context**: 要件 15–22。Proposal 承認者かどうかの判定と承認権限チェックは、取得・Proposal 承認者としての一覧・6 つの操作（承認・却下・全体の却下・放棄・Proposal 承認者の追加と削除）・通知のすべてで、同じ答えを出す必要がある。答えが食い違うと、ある応答だけから見えない Change オペレーションの存在が分かってしまう。
+- **Context**: 要件 15–22。Proposal 承認者かどうかの判定と承認権限チェックは、取得・レビュー待ちの一覧・6 つの操作（承認・却下・全体の却下・放棄・Proposal 承認者の追加と削除）・通知のすべてで、同じ答えを出す必要がある。答えが食い違うと、ある応答だけから見えない Change オペレーションの存在が分かってしまう。
 - **Alternatives Considered**:
   1. Proposal 承認者の判定を各 route に書く。手早いが、判定が複数に散り、見える範囲の判定とずれる。
   2. Proposal 承認者の判定と承認権限チェックを 1 組の純関数にし、所属と閲覧の判定を読む薄い層を `services/` に置く（採用）。
@@ -379,7 +379,7 @@ umbrella の判断（決定 1〜6）とコード上の事実は [../change-propo
   3. Proposal 承認者を保存する 2 か所（作成で Proposal 承認者を渡すとき、Proposal 承認者の追加）だけで確かめる（採用。人が決めた）。
 - **Selected Approach**: 3。設定キー `app:changeProposalReviewersEnabled`（初期値は無効、環境変数 `CHANGE_PROPOSAL_REVIEWERS_ENABLED`、管理者の設定画面には出さない）。無効のとき、Proposal 作成者以外を含む Proposal 承認者の保存を `reviewers-disabled` で断る。
 - **Rationale**: Proposal 承認者が保存されなければ、ほかの経路は Proposal 承認者がいないので自然に働かない。確かめる場所が少ないので、確かめ忘れの穴も少ない。
-- **Trade-offs**: 無効にしても、すでに指定された Proposal 承認者の動きは止まらない。`follow-up` (後続) Proposal と `rework` (見直し) Proposal が引き継ぐ Proposal 承認者は、すでに保存されたものなので確かめない。viewer の承認の画面と Proposal 承認者としての一覧、ai-agent で Proposal 承認者を指定する仕組みが入ってから有効にする。
+- **Trade-offs**: 無効にしても、すでに指定された Proposal 承認者の動きは止まらない。`follow-up` (後続) Proposal と `rework` (見直し) Proposal が引き継ぐ Proposal 承認者は、すでに保存されたものなので確かめない。viewer の承認の画面とレビュー待ちの一覧、ai-agent で Proposal 承認者を指定する仕組みが入ってから有効にする。
 
 ### Decision: Proposal 承認者に指名できるユーザーは、有効な状態の人だけにする
 - **Context**: 要件 15.5・18.5。実在の確認が「ユーザーの文書があるか」だけだと、停止中や削除済みの人も指名できる。停止中の人は承認の操作ができず（`user-not-allowed`）、削除済みの人には通知が届かないので、Proposal がその人を待っているように見える。
@@ -391,7 +391,7 @@ umbrella の判断（決定 1〜6）とコード上の事実は [../change-propo
 - **Selected Approach**: 定数（`MAX_REVIEWERS`、`MAX_REVIEW_COMMENT_LENGTH`、`MAX_PURPOSE_LENGTH`）にし、管理者の設定にはしない。文字数は `modelLabel` と同じくコードポイントで数える（`.length` は使わない）。
 - **Trade-offs**: Proposal 承認者の上限は、同時の追加で数件超えることがある。上限は安全のためではなく、通知と一覧の量の目安なので受け入れる。
 
-### Decision: Proposal 承認者としての一覧は作成が古い順に読み、続きの位置は一覧に出した最後の ID にする
+### Decision: レビュー待ちの一覧は作成が古い順に読み、続きの位置は一覧に出した最後の ID にする
 - **Context**: 要件 19.5。
 - **Alternatives Considered**:
   1. 期限が近い順に読む。期限の無い文書のための 2 段階の読み取りと、暗号化した続きの位置が要る。
@@ -400,7 +400,7 @@ umbrella の判断（決定 1〜6）とコード上の事実は [../change-propo
 - **Rationale**: 続きの位置は平文である。そのため、調べた最後の Proposal の ID を返すと、その Proposal に、一覧を取得するユーザーについて承認権限チェックを通る `pending` (適用待ち) の Change オペレーションが無いとき、それが実際に開いていると分かる。そして、取得で見えるライフサイクルが閉じている Proposal については、見えない `pending` の存在を推測できてしまう。
 - **Trade-offs**: 1 回に調べる上限に達して 1 件も出していなければ `null` を返し、その回の一覧はそこで終わる（データの終わりと区別できない）。Proposal 承認者として指定された開いている Proposal が、承認権限チェックを通った `pending` (適用待ち) の Change オペレーションを持たないまま、上限の件数以上続く場合だけの制限として受け入れる。1 件以上出していれば、次の呼び出しはその次から調べ直すので、読む量は増えるが、1 回に調べる上限は変わらない。
 
-### Decision: Proposal 承認者としての一覧の cursor は署名せず、細工した cursor で 1 件の Change Proposal が開いているかどうかが分かることを受け入れる
+### Decision: レビュー待ちの一覧の cursor は署名せず、細工した cursor で 1 件の Change Proposal が開いているかどうかが分かることを受け入れる
 - **Context**: cursor は 24 桁の 16 進数なら受け付ける。細工した cursor の値を変えながら何度も呼ぶと、「cursor が `null` でなく、返った件数が `limit` 未満」になる境目から、「その cursor の後ろから 500 件目（1 回に調べる上限）の、自分が Proposal 承認者に指定された開いている Proposal」の ID が分かる。その Proposal に、自分について承認権限チェックを通る `pending` (適用待ち) の Change オペレーションが 0 件でも、開いていることが分かる。
 - **Alternatives Considered**: (1) cursor に署名し、サービスが返した値以外を断る。(2) `limit` の上限を下げる。
 - **Selected Approach**: どちらも入れず、既知の小さな例外として受け入れる（人が決めた）。
@@ -426,7 +426,7 @@ umbrella の判断（決定 1〜6）とコード上の事実は [../change-propo
 - **Selected Approach**:
   - 承認: `markApproved` は `not-open` を返す。Proposal がまだ開いていれば、「何も書かなかった」として成功の応答で読み直した状態を返す。承認の activity・結果の通知・記録の削除はしない。承認されなかった Change オペレーションは応答の中で `pending` (適用待ち) のまま見えるので、利用者は失敗に気付ける。
   - 却下・放棄: 例外のまま返す（route では 500。利用者はやり直せる）。成功しても Change オペレーションの状態を変えないので、衝突を成功の応答で隠すと、保存できた場合と見分けがつかず、レビューとコメントが黙って失われる。応答に「この求めで書いたか」の印を足す形は、その値を応答に出さないと決めているので採らない。
-  - Proposal 承認者の追加: 例外のまま返す（route では 500）。例外の前に保存された Proposal 承認者には、追加の activity も通知も出ない（足された人は Proposal 承認者としての一覧で見つけられる）。1 回の求めの中で最大 20 回、順に書くだけなので、めったに起きない。
+  - Proposal 承認者の追加: 例外のまま返す（route では 500）。例外の前に保存された Proposal 承認者には、追加の activity も通知も出ない（足された人はレビュー待ちの一覧で見つけられる）。1 回の求めの中で最大 20 回、順に書くだけなので、めったに起きない。
 - **Follow-up**: Proposal 承認者の追加で通知の漏れを無くすなら、サービスの層で 1 件ずつモデルを呼んで足した人を積み、例外のときに通知と activity を出してから投げ直す形にできる。
 
 ## References
