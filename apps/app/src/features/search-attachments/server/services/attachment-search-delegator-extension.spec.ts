@@ -410,6 +410,32 @@ describe('AttachmentSearchDelegatorExtension', () => {
       expect(await listAll('growi-attachments-2')).toEqual(pageIds);
     });
 
+    it('refreshes the index before the first listing, so docs written just before are listed', async () => {
+      const order: string[] = [];
+      client.indices.refresh.mockImplementation(() => {
+        order.push('refresh');
+        return Promise.resolve({
+          _shards: { total: 1, successful: 1, failed: 0 },
+        });
+      });
+      client.search.mockImplementation(() => {
+        order.push('search');
+        return Promise.resolve(
+          mock<estypes.SearchResponse>({
+            aggregations: { page_ids: { buckets: [] } },
+          }),
+        );
+      });
+
+      await ext.listPageIds('growi-attachments-2', undefined);
+
+      expect(order).toEqual(['refresh', 'search']);
+      expect(client.indices.refresh).toHaveBeenCalledWith({
+        index: 'growi-attachments-2',
+        ignore_unavailable: true,
+      });
+    });
+
     it('lists nothing for an empty index', async () => {
       givenDocsOfPages([]);
 

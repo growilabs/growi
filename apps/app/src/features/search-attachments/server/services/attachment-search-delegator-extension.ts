@@ -112,6 +112,19 @@ export interface AttachmentIndexOperations {
 const buildDocId = (attachmentId: string, pageNumber: number | null): string =>
   `${attachmentId}_${pageNumber ?? 0}`;
 
+/** Makes the docs written so far searchable; a missing index is not an error. */
+const refreshIndex = async (
+  client: ElasticsearchClientDelegator,
+  index: string,
+): Promise<void> => {
+  const params = { index, ignore_unavailable: true };
+  if (isES8ClientDelegator(client) || isES9ClientDelegator(client)) {
+    await client.indices.refresh(params);
+    return;
+  }
+  throw new Error('Unsupported Elasticsearch version');
+};
+
 /**
  * Deletes the docs matching `query` from `index`. Rejects when
  * Elasticsearch reports docs it could not delete.
@@ -391,6 +404,11 @@ export class AttachmentSearchDelegatorExtension
     index: string,
     after: string | undefined,
   ): Promise<PageIdListing> {
+    // A search only sees docs made searchable by a refresh; later listings
+    // follow the first, and the sweep's own deletes refresh.
+    if (after == null) {
+      await refreshIndex(this.client, index);
+    }
     // A terms aggregation returns at most its `size` buckets; a composite
     // aggregation walks every value.
     const response = (await searchWithTopLevelParams(this.client, {
