@@ -3,7 +3,7 @@ import { fakeRunner } from './spec-support/fake-runner';
 import { requestHead, sendRaw } from './spec-support/raw-http';
 import { useTestService } from './spec-support/test-service';
 
-// Only the three paths, written exactly so, answer without a
+// Only the open paths, written exactly so, answer without a
 // token. A request target the URL parser resolves to one of them, or to
 // /extract ("/./healthz", "/%68ealthz", "/healthz/../extract"), still needs it.
 
@@ -31,6 +31,11 @@ describe('request targets that resolve to an open path', () => {
     '/readyz/.',
     '/%6Fpenapi.json',
     'http://test/healthz',
+    '/./metrics',
+    '/%6Detrics',
+    '//metrics',
+    '/metrics/.',
+    'http://test/metrics',
   ])('GET %s without a token is 401', async (target) => {
     expect(await tokenless('GET', target)).toBe(401);
   });
@@ -62,6 +67,8 @@ describe('the open paths as written', () => {
     '/readyz',
     '/openapi.json',
     '/openapi.json?any=query',
+    '/metrics',
+    '/metrics?any=query',
   ])('GET %s without a token is 200', async (target) => {
     expect(await tokenless('GET', target)).toBe(200);
   });

@@ -1,6 +1,7 @@
 import { ERROR_CODES } from '../contract/error-code';
 import {
   ERROR_TABLE,
+  EXTRACT_RESULTS,
   extractErrorStatuses,
   UNAUTHORIZED_ANSWER,
 } from './error-table';
@@ -86,5 +87,29 @@ describe('extractErrorStatuses', () => {
       status: 401,
       message: 'Missing or invalid Bearer token',
     });
+  });
+});
+
+describe('EXTRACT_RESULTS', () => {
+  it('is ok, every failure kind and every refusal, each once', () => {
+    expect([...EXTRACT_RESULTS].sort()).toEqual(
+      [
+        'ok',
+        'unsupported',
+        'encrypted',
+        'malformed',
+        'limit_exceeded',
+        'memory_exceeded',
+        'result_too_large',
+        'timeout',
+        'crashed',
+        'internal',
+        'file_too_large',
+        'service_busy',
+        'upload_timeout',
+        'invalid_upload',
+        'client_disconnected',
+      ].sort(),
+    );
   });
 });

@@ -1,6 +1,12 @@
 // Endpoints named in the OpenAPI document or answered by the service. The
 // list grows here only, so the token check and the response counters agree.
-const ENDPOINTS = ['/extract', '/healthz', '/readyz', '/openapi.json'] as const;
+const ENDPOINTS = [
+  '/extract',
+  '/healthz',
+  '/readyz',
+  '/openapi.json',
+  '/metrics',
+] as const;
 
 export type Endpoint = (typeof ENDPOINTS)[number] | 'other';
 
@@ -10,6 +16,7 @@ const OPEN_ENDPOINTS: ReadonlySet<Endpoint> = new Set<Endpoint>([
   '/healthz',
   '/readyz',
   '/openapi.json',
+  '/metrics',
 ]);
 
 // Matched on the request target as sent, not on the path routing sees: the

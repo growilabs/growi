@@ -68,7 +68,7 @@
   - `@prometheus-io/client` とその依存のすべてのライセンス (research.md §1 では Apache-2.0 と MIT)、install のときのスクリプトの有無、この spec が使う API の名前を、`pnpm-lock.yaml` に入った実際の内容で確かめ、research.md §1 に記録する。許容的でないライセンスや、使う API が無いことが分かれば、先に進まず人に諮る
   - 終わった状態: 依存の一覧のテストと層のテストが通り、ライセンスの記録が research.md にある
   - _Requirements: 3.1_
-- [ ] 4.2 指標を集め、`GET /metrics` で答える
+- [x] 4.2 指標を集め、`GET /metrics` で答える
   - 先に次のテストを書き、落ちることを確かめる: トークンなしの `GET /metrics` が 200 で Prometheus のテキスト形式を返す。`/./metrics`・`/%6Detrics` などはトークンなしで 401 (`open-path-targets.integ.ts` に足す)。401・404・`/extract` の成功と失敗の後に、`attachment_extractor_http_responses_total` が経路とステータスごとに増える (存在しないパスは `other`)。偽の runner で変換を止めている間、`attachment_extractor_slots_in_use` が増え、終わると戻る。`attachment_extractor_slots_max` が `MAX_CONCURRENCY` と同じ。`/extract` の結果ごとの件数とヒストグラムが増え、まだ起きていない結果も 0 で出ている。`LOG_LEVEL=ERROR` でも結果の件数が増える。`X-Growi-App-Id` の値がどのラベルにも出ない。`/metrics` の呼び出しでログの行が増えない。プロセスの既定の指標 (CPU、メモリ、イベントループの遅れ) が出ている
   - 応答を数える middleware を `bearerAuth` より前に置く。結果と所要時間は、ログの行を書く関数から渡す。registry はアプリごとに 1 つ作る
   - `/metrics` には `describeRoute` を付けない (OpenAPI の文書に載せない)
@@ -148,3 +148,4 @@
 - (zip-extent.ts と archive-guard.ts の「research.md §3」「§3.2」も同様。)
 - コードのコメントが「research.md §N」「research §N.M」でこの spec の research.md の節を指している箇所 (3.1 の `src/http/app-label.ts`: §2.1・§2.5、3.3 の `src/runner/conversion-runner.ts`・`src/runner/readiness.ts`・`src/http/health-routes.ts`・`src/runner/runner-diagnostics.integ.ts`: §4。以降のタスクで増えうる) は、タスク 9.2 で research.md を対象 spec の新しい節として移すときに、移した先の節番号へ書き換える。この spec のディレクトリは 9.5 で消えるので、そのままにすると参照先が消える (`grep -rn "research" apps/attachment-text-extractor/src` で探す)。
 - この worktree では lefthook の pre-commit が完走しないので、biome・テスト・tsgo を手で通したうえで `git commit --no-verify` を使う。
+- 4.2 の実装は design の「アプリごとに registry を 1 つ」と違う。サービスの 5 つの指標はアプリごとの registry に置き、プロセスの既定の指標 (`collectDefaultMetrics`) はモジュールで 1 回だけ作る registry に置き、`/metrics` は `Registry.merge` で 2 つを合わせて返す。理由: `collectDefaultMetrics` は止められない setInterval・GC の PerformanceObserver・イベントループ遅延の計測を起動し、テストでアプリを数百個作ると溜まる。既定の指標はアプリでなくプロセスの値でもある。本番はアプリ 1 つなので出力は並び順以外変わらない。9.1 で対象 spec の design.md の ServiceMetrics 節を「サービスの 5 つの指標はアプリごとの registry に置き、プロセスの既定の指標はモジュールで 1 回だけ作る registry に置く。`/metrics` は `Registry.merge` で合わせたものを返す」と書き、理由は 9.2 で対象 spec の research.md へ移す。`Registry.merge` は呼んだ時点の指標を写し取るので、後から指標を足しても出力に出ない点も research.md に書く。

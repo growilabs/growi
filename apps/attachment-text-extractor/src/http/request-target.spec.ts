@@ -9,6 +9,7 @@ describe('endpointOf', () => {
     '/healthz',
     '/readyz',
     '/openapi.json',
+    '/metrics',
   ])('the exact path %s is its own label', (path) => {
     expect(endpointOf(path)).toBe(path);
   });
@@ -22,6 +23,10 @@ describe('endpointOf', () => {
     '/readyz/.',
     '/%6Fpenapi.json',
     'http://test/healthz',
+    '/./metrics',
+    '/%6Detrics',
+    '//metrics',
+    'http://test/metrics',
     '/healthz/../extract',
     '/./extract',
     '//extract',
@@ -50,11 +55,15 @@ describe('isOpenEndpoint', () => {
     ['/readyz', true],
     ['/openapi.json', true],
     ['/openapi.json?any=query', true],
+    ['/metrics', true],
+    ['/metrics?x=1', true],
     ['/extract', false],
     ['/extract?x=1', false],
     ['/./healthz', false],
     ['//healthz', false],
     ['http://test/healthz', false],
+    ['/%6Detrics', false],
+    ['//metrics', false],
     ['/unknown', false],
   ])('%s needs no token: %s', (target, open) => {
     expect(isOpenEndpoint(target)).toBe(open);

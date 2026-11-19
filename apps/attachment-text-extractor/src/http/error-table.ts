@@ -75,6 +75,19 @@ export const REFUSAL_TABLE: Readonly<Record<Refusal, ErrorAnswer>> = {
   client_disconnected: { code: 'extraction_failed', status: 422 },
 };
 
+/** The `result` of one POST /extract: the log line's field and the metrics label. */
+export type ExtractResult = 'ok' | FailureKind | Refusal;
+
+// Object.keys widens to string[]; the keys of a Record<K, …> are exactly K.
+const keysOf = <K extends string>(table: Readonly<Record<K, unknown>>): K[] =>
+  Object.keys(table) as K[];
+
+export const EXTRACT_RESULTS: readonly ExtractResult[] = [
+  'ok',
+  ...keysOf(ERROR_TABLE),
+  ...keysOf(REFUSAL_TABLE),
+];
+
 /** The Bearer check's refusal; it answers before any route runs. */
 export const UNAUTHORIZED_ANSWER: ErrorAnswer & { readonly message: string } = {
   code: 'unauthorized',

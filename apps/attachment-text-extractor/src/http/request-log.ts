@@ -1,5 +1,6 @@
 import { createLeveledLog } from '../config/leveled-log';
 import type { LogLevel } from '../config/load-settings';
+import type { ExtractResult } from './error-table';
 
 // One line per POST /extract, in the target spec's form:
 // "extract format=… size=… duration_ms=… result=… child_peak_rss_mb=… app=…".
@@ -14,7 +15,13 @@ export interface RequestFacts {
 }
 
 /** Writes the line of one request, timed from its start. */
-export type RequestLine = (result: string, facts?: RequestFacts) => void;
+export type RequestLine = (result: ExtractResult, facts?: RequestFacts) => void;
+
+/** Takes the result and duration of every line, whatever LOG_LEVEL leaves out. */
+export type RecordResult = (
+  result: ExtractResult,
+  durationSeconds: number,
+) => void;
 
 export interface RequestLog {
   start(appLabel: string): RequestLine;
@@ -36,6 +43,7 @@ export const formatOf = (fileName: string): string => {
 export const createRequestLog = (
   level: LogLevel,
   writeLog: (line: string) => void,
+  recordResult: RecordResult,
 ): RequestLog => {
   const emit = createLeveledLog(level, writeLog);
   return {
@@ -43,6 +51,7 @@ export const createRequestLog = (
       const started = performance.now();
       return (result, { format, size, childPeakRssMb } = {}) => {
         const durationMs = Math.round(performance.now() - started);
+        recordResult(result, durationMs / 1000);
         emit(
           'INFO',
           `extract format=${format ?? 'unknown'} size=${size ?? 0} duration_ms=${durationMs} result=${result} child_peak_rss_mb=${childPeakRssMb ?? 'unknown'} app=${appLabel}`,
