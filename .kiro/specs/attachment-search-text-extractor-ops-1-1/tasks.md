@@ -16,7 +16,7 @@
   - 後のタスクが同じファイル (`bearer-auth.ts`、`request-log.ts`、`create-app.ts`、`child-env.ts` など) を変えるので、最初に行い、ほかと並べない
   - _Requirements: 8.1, 8.2, 8.3_
 
-- [ ] 2. HTTP の層の下ごしらえ
+- [x] 2. HTTP の層の下ごしらえ
 - [x] 2.1 枠の使用中の数と上限を読めるようにし、枠をアプリの組み立てで作る
   - 先に、枠の単体テストで「取ると使用中の数が増え、返すと減る」「上限は設定した値 (0 や負の値もそのまま)」を書き、落ちることを確かめる
   - 枠を `/extract` の route の登録の中ではなく、アプリの組み立て (`createApp`) で 1 つ作り、route に渡す
@@ -28,7 +28,7 @@
   - 終わった状態: ラベルを決める関数の単体テスト (`/./healthz`、`/%68ealthz`、`//healthz`、`http://test/healthz`、`?` の付いた要求が、`open-path-targets.integ.ts` と同じ結論になる) と、既存の `open-path-targets.integ.ts`・`bearer-auth.integ.ts` が通る
   - _Requirements: 3.3, 3.8_
 
-- [ ] 3. 抽出サービスの個別の変更
+- [x] 3. 抽出サービスの個別の変更
 - [x] 3.1 呼び出し元の app をログの行に出す
   - 先に次のテストを書き、落ちることを確かめる: ヘッダーが無い → 行の最後が `app=-`、形に合う値 → `app=<値>`、空・65 文字・形に合わない文字・同じヘッダー 2 つ → `app=(invalid)` で値は行に出ない。本文を読む前に断る 5 つの理由 (`service_busy`、`file_too_large`、`upload_timeout`、`invalid_upload`、`client_disconnected`) の行にも付く。値を変えても、ステータスと本文が同じ
   - 行の形を `$` で固定しているテスト (`request-log.integ.ts`、`diagnostic-log.integ.ts`、`extract-limits.integ.ts`) を、`app=` まで含む形に直す。メモリの計測の道具の見本の行 (`report.spec.ts`) に `app=` の付いた行を足し、読めることを確かめる
@@ -61,7 +61,7 @@
   - _Requirements: 6.1, 6.2, 6.3_
   - _Boundary: ResultBudget_
 
-- [ ] 4. `/metrics`
+- [x] 4. `/metrics`
 - [x] 4.1 `@prometheus-io/client` を本番の依存に加える
   - 先に、本番の依存の一覧のテスト (`production-dependencies.spec.ts`) に `@prometheus-io/client` を足し (11 → 12 個。テスト名とコメントも直す)、層の規則 (`layer-rules.ts` の `PACKAGE_RULES`) で `@prometheus-io/client` を HTTP の層だけに許す。層のテストに、HTTP の層の外で import すると落ちる合成の例を足す
   - `pnpm install` で `apps/attachment-text-extractor/package.json` と `pnpm-lock.yaml` に加える (ほかの pnpm の実行と同時に動かさない)
@@ -149,3 +149,4 @@
 - コードのコメントが「research.md §N」「research §N.M」でこの spec の research.md の節を指している箇所 (3.1 の `src/http/app-label.ts`: §2.1・§2.5、3.3 の `src/runner/conversion-runner.ts`・`src/runner/readiness.ts`・`src/http/health-routes.ts`・`src/runner/runner-diagnostics.integ.ts`: §4。以降のタスクで増えうる) は、タスク 9.2 で research.md を対象 spec の新しい節として移すときに、移した先の節番号へ書き換える。この spec のディレクトリは 9.5 で消えるので、そのままにすると参照先が消える (`grep -rn "research" apps/attachment-text-extractor/src` で探す)。
 - この worktree では lefthook の pre-commit が完走しないので、biome・テスト・tsgo を手で通したうえで `git commit --no-verify` を使う。
 - 4.2 の実装は design の「アプリごとに registry を 1 つ」と違う。サービスの 5 つの指標はアプリごとの registry に置き、プロセスの既定の指標 (`collectDefaultMetrics`) はモジュールで 1 回だけ作る registry に置き、`/metrics` は `Registry.merge` で 2 つを合わせて返す。理由: `collectDefaultMetrics` は止められない setInterval・GC の PerformanceObserver・イベントループ遅延の計測を起動し、テストでアプリを数百個作ると溜まる。既定の指標はアプリでなくプロセスの値でもある。本番はアプリ 1 つなので出力は並び順以外変わらない。9.1 で対象 spec の design.md の ServiceMetrics 節を「サービスの 5 つの指標はアプリごとの registry に置き、プロセスの既定の指標はモジュールで 1 回だけ作る registry に置く。`/metrics` は `Registry.merge` で合わせたものを返す」と書き、理由は 9.2 で対象 spec の research.md へ移す。`Registry.merge` は呼んだ時点の指標を写し取るので、後から指標を足しても出力に出ない点も research.md に書く。
+- 付け替える research の節番号の参照の洗い出し (最終レビュー、2026-11-19)。`§` の形だけでなく `ops-1-1 research.md` の形もあり、`src` 以外 (`test`・`scripts`・`benchmark`・apps/app) にもある。探すときは `grep -rnE "ops-1-1|research(\.md)? §" apps/attachment-text-extractor/{src,scripts,test,benchmark} apps/app/src/features/search-attachments` を使う。2026-11-19 の時点: `src/http/app-label.ts` (§2.1・§2.5)、`src/http/health-routes.ts`・`src/runner/readiness.ts`・`src/runner/conversion-runner.ts`・`src/runner/runner-diagnostics.integ.ts` (§4)、`src/conversion/ooxml/zip-extent.ts`・`src/conversion/ooxml/archive-guard.ts` (§3、§3.2)、`src/conversion/result-budget.ts` (§7)、`test/layers/layer-rules.ts`・`test/deploy/production-dependencies.spec.ts` (ops-1-1 research.md 1)、apps/app の `growi-app-id-header.ts` (§2.3・§2.4)。「design.md §…」と書いた参照は対象 spec を指すので付け替えない。
