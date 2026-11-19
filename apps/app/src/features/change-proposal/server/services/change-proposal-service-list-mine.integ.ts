@@ -184,6 +184,7 @@ describe('ChangeProposalService.listMine', () => {
         lastAppliedAt: stored.lastAppliedAt?.toISOString(),
         status: 'pending',
         isRequester: true,
+        viewerRole: 'requester',
         requesterState: {
           lifecycle: 'open',
           achievement: { applied: 1, attempted: 2 },

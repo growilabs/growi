@@ -94,6 +94,20 @@ const ApiErrorMessage = (props) => {
             </button>
           </>
         );
+      case 'grant_not_assignable':
+        return (
+          <strong>
+            <span className="material-symbols-outlined me-1">cancel</span>
+            {t('page_api_error.grant_not_assignable')}
+          </strong>
+        );
+      case 'operation_in_progress':
+        return (
+          <strong>
+            <span className="material-symbols-outlined me-1">cancel</span>
+            {t('page_api_error.operation_in_progress')}
+          </strong>
+        );
       case 'single_deletion_empty_pages':
         return (
           <strong>

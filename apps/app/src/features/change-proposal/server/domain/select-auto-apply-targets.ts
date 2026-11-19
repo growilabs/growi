@@ -2,7 +2,9 @@ import type {
   AutoApplyPolicy,
   BasedOnRelation,
   OperationRecord,
+  ReviewerRef,
 } from '../../interfaces';
+import { hasForeignReviewer } from './reviewer-model';
 
 export type AutoApplyPageFacts = {
   readonly pageId: string;
@@ -23,8 +25,13 @@ export const selectAutoApplyTargets = (
   pageFacts: ReadonlyMap<string, AutoApplyPageFacts>,
   requesterId: string,
   relation: BasedOnRelation | null,
+  reviewers: readonly ReviewerRef[],
 ): readonly number[] => {
-  if (relation === 'rework' || policy === 'none') {
+  if (
+    relation === 'rework' ||
+    policy === 'none' ||
+    hasForeignReviewer(reviewers, requesterId)
+  ) {
     return [];
   }
   if (policy === 'all') {

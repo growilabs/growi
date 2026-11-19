@@ -53,6 +53,7 @@
   "Update": "Update",
   "Update Page": "Update Page",
   "Error": "Error",
+  "Retry": "Retry",
   "Warning": "Warning",
   "Sign in": "Sign in",
   "Sign in with External auth": "Sign in with {{signin}}",
@@ -453,7 +454,9 @@
     "user_not_admin": "Only admin user can delete",
     "single_deletion_empty_pages": "Empty pages cannot be single deleted",
     "complete_deletion_not_allowed_for_user": "You are not allowed to delete this page completely",
-    "deletion_not_allowed_for_user": "You are not allowed to delete this page"
+    "deletion_not_allowed_for_user": "You are not allowed to delete this page",
+    "grant_not_assignable": "The page cannot be placed at this path with its current permission, because the parent page is open to fewer users.",
+    "operation_in_progress": "Another operation on this page or a nearby page is still in progress. Please try again later."
   },
   "page_history": {
     "revision_list": "Revision list",
@@ -720,11 +723,14 @@
     "delete_all_selected_page": "Delete All",
     "select_all": "Select all",
     "delete_selected_pages": "Delete selected pages",
+    "selected_count": "{{selectedCount}} selected",
+    "selected_count_of_loaded": "{{selectedCount}} selected ({{loadedCount}} loaded)",
     "currently_not_implemented": "This is not currently implemented",
     "search_again": "Search again",
     "number_of_list_to_display": "Display",
     "page_number_unit": "pages",
     "hit_number_unit": "hit",
+    "failed_to_load_more": "Failed to load more results",
     "filter": "Filters",
     "search_option": "Search Options",
     "filter_remove": "Remove",
@@ -1299,6 +1305,20 @@
     },
     "achievement": {
       "settled_with_percent": "Completed ({{percent}}% achieved)"
+    },
+    "review_term": {
+      "reviewer": "Reviewer",
+      "approve": "Approve",
+      "reject": "Reject",
+      "abstain": "Abstain",
+      "comment": "Comment",
+      "purpose": "Purpose of the change",
+      "decision": "Decision"
     }
+  },
+  "plantuml": {
+    "url-too-long": "The diagram is too large and probably exceeds the URL length limit of the PlantUML server. Split or simplify the diagram.",
+    "post-unavailable": "The PlantUML server may not support POST, or the browser cannot reach it. The administrator can switch back to GET by setting PLANTUML_HTTP_METHOD=get.",
+    "render-failed": "The diagram could not be rendered. The PlantUML server could not be reached, or it returned an error."
   }
 }

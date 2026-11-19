@@ -13,18 +13,12 @@ import commonStyles from './carbon-gray-common.puml';
  * inspiration: https://carbondesignsystem.com/elements/color/overview/
  * ---
  */
-const style = `
-!$THEME = "growi-carbon-gray-dark"
-
-'!$BGCOLOR = "#f5f5f5"
-
+const style = `!$THEME = "growi-carbon-gray-dark"
 !if %not(%variable_exists("$BGCOLOR"))
 !$BGCOLOR = "transparent"
 !endif
-
 skinparam backgroundColor $BGCOLOR
 skinparam useBetaStyle false
-
 !$RED_80 = '#750e13'
 !$RED_70 = '#a2191f'
 !$RED_60 = '#da1e28'
@@ -33,7 +27,6 @@ skinparam useBetaStyle false
 !$RED_30 = '#ffb3b8'
 !$RED_20 = '#ffd7d9'
 !$RED_10 =  '#fff1f1'
-
 !$CYAN_10 = '#e5f6ff'
 !$CYAN_20 = '#bae6ff'
 !$CYAN_30 = '#82cfff'
@@ -42,8 +35,6 @@ skinparam useBetaStyle false
 !$CYAN_60 = '#0072c3'
 !$CYAN_70 = '#00539a'
 !$CYAN_80 = '#003a6d'
-
-
 !$PURPLE_80 ='#491d8b'
 !$PURPLE_70 = '#6929c4'
 !$PURPLE_60 = '#8a3ffc'
@@ -52,7 +43,6 @@ skinparam useBetaStyle false
 !$PURPLE_30 = '#d4bbff'
 !$PURPLE_20 = '#e8daff'
 !$PURPLE_10 = '#f6f2ff'
-
 !$TEAL_10 = '#d9fbfb'
 !$TEAL_20 = '#9ef0f0'
 !$TEAL_30 = '#3ddbd9'
@@ -61,7 +51,6 @@ skinparam useBetaStyle false
 !$TEAL_60 = '#007d79'
 !$TEAL_70 = '#005d5d'
 !$TEAL_80 = '#004144'
-
 !$GRAY_10 = '#f4f4f4'
 !$GRAY_20 = '#e0e0e0'
 !$GRAY_30 = '#c6c6c6'
@@ -73,16 +62,9 @@ skinparam useBetaStyle false
 !$GRAY_90 = '#262626'
 !$GRAY_100 = '#161616'
 !$BLACK = '#000000'
-
 !$GRAY = $GRAY_30
 !$LIGHT = $GRAY_30
 !$DARK = $GRAY_90
-
-'' *_LIGHT = tint (lighter) of the main color of 80%
-''          where TINT is calculated by clr + (255-clr) * tint_factor
-'' *_DARK = shade (darker) of the main color of 80%
-''          and SHADE is calculated by clr * (1 - shade_factor)
-''
 !$FGCOLOR = $DARK
 !$PRIMARY = $GRAY_90
 !$PRIMARY_LIGHT = $GRAY_90
@@ -108,12 +90,9 @@ skinparam useBetaStyle false
 !$DANGER_LIGHT = $BLACK
 !$DANGER_DARK = $BLACK
 !$DANGER_TEXT = $LIGHT
-
 !$OTHER_BG = $BLACK
 !$OTHER_TEXT = $BLACK
 !$DB_BG = $GRAY
-
-${commonStyles}
-`;
+${commonStyles}`;
 
 export default style;

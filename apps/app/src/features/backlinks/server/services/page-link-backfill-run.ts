@@ -211,7 +211,7 @@ const runToEnd = async (
   const completed = await jobs.finishComplete(
     owner,
     progress,
-    toCoverageRecord(coverageAfterRun(plan.runCutoff, coverage)),
+    coverageAfterRun(plan.runCutoff, coverage),
   );
   if (!completed) return 'refused';
   emit('complete', progress);
@@ -252,11 +252,6 @@ const progressCounts = (progress: BackfillProgress) => ({
   processed: progress.processed,
   skippedPages: progress.skippedPages,
 });
-
-const toCoverageRecord = (coverage: ReturnType<typeof coverageAfterRun>) =>
-  coverage.coverage === 'partial'
-    ? { coverage: 'partial' as const, coveredSince: coverage.coveredSince }
-    : { coverage: 'all' as const, coveredSince: null };
 
 interface WalkTarget {
   readonly owner: string;

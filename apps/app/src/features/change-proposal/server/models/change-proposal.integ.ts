@@ -3,49 +3,26 @@ import mongoose from 'mongoose';
 
 import { prisma } from '~/utils/prisma';
 
-import type { CreateProposalInput } from './change-proposal-types';
+import type { ReviewChannel } from '../../interfaces';
+import type { ViewerIdentity } from '../domain';
+import {
+  CONCURRENCY,
+  CONCURRENCY_TIMEOUT_MS,
+  createOp,
+  createProposal,
+  deleteProposalsOfMintedRequesters,
+  editOp,
+  identityOf,
+  newObjectId,
+  newRequester,
+  PAGE_A,
+  REVISION_A,
+  ROUNDS,
+  reviewerRef,
+  sleep,
+} from './change-proposal.test-kit';
 
-// Concurrency checks: 2 callers rarely overlap enough to expose a split read/write,
-// so each round fires CONCURRENCY callers and repeats ROUNDS times.
-const CONCURRENCY = 12;
-const ROUNDS = 20;
-const CONCURRENCY_TIMEOUT_MS = 120_000;
-
-const newObjectId = (): string => new mongoose.Types.ObjectId().toString();
-
-// Fixtures are scoped to requesters minted by this file, so cleanup never touches
-// documents another integration file created in the same per-worker database.
-const requesterIds: string[] = [];
-const newRequester = (): string => {
-  const id = newObjectId();
-  requesterIds.push(id);
-  return id;
-};
-
-const PAGE_A = newObjectId();
 const PAGE_B = newObjectId();
-const REVISION_A = newObjectId();
-
-const editOp = (pageId = PAGE_A, body = 'edit body') =>
-  ({
-    type: 'edit',
-    pageId,
-    baseRevisionId: REVISION_A,
-    body,
-  }) as const;
-const createOp = (path: string, body = 'create body') =>
-  ({ type: 'create', path, body }) as const;
-
-const createProposal = (
-  overrides: Partial<CreateProposalInput> = {},
-): ReturnType<typeof prisma.changeproposals.createProposal> =>
-  prisma.changeproposals.createProposal({
-    requester: overrides.requester ?? newRequester(),
-    entry: 'ai-chat',
-    perPageNotifications: true,
-    operations: [editOp(), createOp('/cp-integ/new')],
-    ...overrides,
-  });
 
 const rawDocument = (id: string) =>
   mongoose.connection
@@ -55,16 +32,9 @@ const rawDocument = (id: string) =>
 const countTrue = (results: readonly boolean[]): number =>
   results.filter((r) => r).length;
 
-const sleep = (ms: number) =>
-  new Promise<void>((resolve) => {
-    setTimeout(resolve, ms);
-  });
-
 describe('ChangeProposal model (Prisma extension)', () => {
   afterAll(async () => {
-    await prisma.changeproposals.deleteMany({
-      where: { requester: { in: requesterIds } },
-    });
+    await deleteProposalsOfMintedRequesters();
   });
 
   describe('createProposal / findProposal', () => {
@@ -182,6 +152,148 @@ describe('ChangeProposal model (Prisma extension)', () => {
         await prisma.changeproposals.findProposal(newObjectId()),
       ).toBeNull();
       expect(await prisma.changeproposals.findProposal('not-an-id')).toBeNull();
+    });
+  });
+
+  describe('reviewer fields (Req 15.1, 15.8)', () => {
+    const approveRaw = (id: string, approver: string) =>
+      mongoose.connection.collection('changeproposals').updateOne(
+        { _id: new mongoose.Types.ObjectId(id) },
+        {
+          $set: {
+            'operations.$[].approvedAt': new Date(),
+            'operations.$[].approvedBy': new mongoose.Types.ObjectId(approver),
+            'operations.$[].approvedChannel': 'ui',
+            'operations.$[].decisionToken': 'token-1',
+          },
+        },
+      );
+
+    const expectApprovalCleared = async (id: string) => {
+      const raw = await rawDocument(id);
+      const read = await prisma.changeproposals.findProposal(id);
+      for (const op of raw?.operations ?? []) {
+        for (const field of [
+          'approvedAt',
+          'approvedBy',
+          'approvedChannel',
+          'decisionToken',
+        ]) {
+          expect(op).not.toHaveProperty(field);
+        }
+      }
+      for (const op of read?.operations ?? []) {
+        expect(op.approvedBy).toBeUndefined();
+        expect(op.approvedChannel).toBeUndefined();
+        expect(op.decisionToken).toBeUndefined();
+      }
+    };
+
+    it('reads back the purpose and the reviewers given at creation', async () => {
+      const reviewerId = newObjectId();
+      const addedAt = new Date();
+      const created = await createProposal({
+        purpose: 'why',
+        reviewers: [
+          { kind: 'user', id: reviewerId, addedBy: newObjectId(), addedAt },
+        ],
+      });
+
+      const found = await prisma.changeproposals.findProposal(created._id);
+
+      expect(found?.purpose).toBe('why');
+      expect(found?.reviewers).toMatchObject([
+        { kind: 'user', id: reviewerId, addedAt },
+      ]);
+      expect(found?.reviews).toStrictEqual([]);
+    });
+
+    it('always stores reviewers and reviews as arrays, even when none are given', async () => {
+      const created = await createProposal();
+
+      const raw = await rawDocument(created._id);
+
+      expect(raw?.reviewers).toStrictEqual([]);
+      expect(raw?.reviews).toStrictEqual([]);
+    });
+
+    it('reads a document stored before the fields existed as empty arrays', async () => {
+      const created = await createProposal();
+      await mongoose.connection
+        .collection('changeproposals')
+        .updateOne(
+          { _id: new mongoose.Types.ObjectId(created._id) },
+          { $unset: { reviewers: '', reviews: '', purpose: '' } },
+        );
+
+      const found = await prisma.changeproposals.findProposal(created._id);
+      const [listed] = await prisma.changeproposals.findMany({
+        where: { id: created._id },
+        select: { reviewers: true, reviews: true, purpose: true },
+      });
+
+      expect(found?.reviewers).toStrictEqual([]);
+      expect(found?.reviews).toStrictEqual([]);
+      expect(found).not.toHaveProperty('purpose');
+      expect(listed.reviewers).toStrictEqual([]);
+    });
+
+    it('reads the approval fields of an approved operation', async () => {
+      const created = await createProposal({ operations: [editOp()] });
+      const approver = newObjectId();
+      await approveRaw(created._id, approver);
+
+      const found = await prisma.changeproposals.findProposal(created._id);
+
+      expect(found?.operations[0]).toMatchObject({
+        approvedBy: approver,
+        approvedChannel: 'ui',
+        decisionToken: 'token-1',
+      });
+    });
+
+    it('clears the approval fields when the requester skips an operation', async () => {
+      const created = await createProposal({ operations: [editOp()] });
+      await approveRaw(created._id, newObjectId());
+
+      await prisma.changeproposals.skipPendingOperations(
+        created._id,
+        created.requester,
+        'all-pending',
+      );
+
+      await expectApprovalCleared(created._id);
+    });
+
+    it('clears the approval fields when a proposal is closed', async () => {
+      const created = await createProposal({ operations: [editOp()] });
+      await approveRaw(created._id, newObjectId());
+
+      await prisma.changeproposals.closeIfStillOpen(
+        created._id,
+        'withdrawn',
+        new Date(),
+      );
+
+      await expectApprovalCleared(created._id);
+    });
+
+    it('clears the approval fields when an operation goes back to waiting', async () => {
+      const created = await createProposal({ operations: [editOp()] });
+      await approveRaw(created._id, newObjectId());
+      const token = randomUUID();
+      const now = new Date();
+      await prisma.changeproposals.claimApplyLease(created._id, token, now);
+
+      await prisma.changeproposals.recordOperationOutcome(
+        created._id,
+        token,
+        created.operations[0].key,
+        { status: 'pending', reason: 'page-being-edited' },
+        now,
+      );
+
+      await expectApprovalCleared(created._id);
     });
   });
 
@@ -677,6 +789,329 @@ describe('ChangeProposal model (Prisma extension)', () => {
 
       expect(ids).toContain(created._id);
       expect(ids).not.toContain(notApproved._id);
+    });
+  });
+
+  describe('markApproved by a reviewer', () => {
+    const approveAs = (
+      id: string,
+      approver: ViewerIdentity,
+      keys: readonly string[],
+      options: { channel?: ReviewChannel; token?: string; now?: Date } = {},
+    ) =>
+      prisma.changeproposals.markApproved(
+        id,
+        {
+          approver,
+          channel: options.channel ?? 'ui',
+          decisionToken: options.token ?? randomUUID(),
+        },
+        keys,
+        options.now ?? new Date(),
+      );
+
+    const approvalFieldsOf = async (id: string, key: string) => {
+      const read = await prisma.changeproposals.findProposal(id);
+      const op = read?.operations.find((o) => o.key === key);
+      return {
+        approvedAt: op?.approvedAt,
+        approvedBy: op?.approvedBy,
+        approvedChannel: op?.approvedChannel,
+        decisionToken: op?.decisionToken,
+      };
+    };
+
+    const noApproval = {
+      approvedAt: undefined,
+      approvedBy: undefined,
+      approvedChannel: undefined,
+      decisionToken: undefined,
+    };
+
+    it('writes the approver, channel, time and request token on the chosen pending operation of a user reviewer (Req 16.1, 16.8)', async () => {
+      const reviewerId = newObjectId();
+      const created = await createProposal({
+        reviewers: [reviewerRef('user', reviewerId)],
+      });
+      const [chosen, other] = created.operations.map((op) => op.key);
+      const now = new Date();
+      const token = randomUUID();
+
+      const result = await approveAs(
+        created._id,
+        identityOf(reviewerId),
+        [chosen],
+        { channel: 'api', token, now },
+      );
+
+      expect(result).toStrictEqual({ ok: true });
+      expect(await approvalFieldsOf(created._id, chosen)).toStrictEqual({
+        approvedAt: now,
+        approvedBy: reviewerId,
+        approvedChannel: 'api',
+        decisionToken: token,
+      });
+      expect(await approvalFieldsOf(created._id, other)).toStrictEqual(
+        noApproval,
+      );
+    });
+
+    it('writes the approval of a member of a reviewer user group or external user group (Req 16.4)', async () => {
+      const userGroupId = newObjectId();
+      const externalGroupId = newObjectId();
+      const created = await createProposal({
+        reviewers: [
+          reviewerRef('user-group', userGroupId),
+          reviewerRef('external-user-group', externalGroupId),
+        ],
+      });
+      const [first, second] = created.operations.map((op) => op.key);
+      const userGroupMember = newObjectId();
+      const externalGroupMember = newObjectId();
+
+      const byUserGroup = await approveAs(
+        created._id,
+        identityOf(userGroupMember, { userGroupIds: [userGroupId] }),
+        [first],
+      );
+      const byExternalGroup = await approveAs(
+        created._id,
+        identityOf(externalGroupMember, {
+          externalUserGroupIds: [externalGroupId],
+        }),
+        [second],
+      );
+
+      expect(byUserGroup).toStrictEqual({ ok: true });
+      expect(byExternalGroup).toStrictEqual({ ok: true });
+      expect((await approvalFieldsOf(created._id, first)).approvedBy).toBe(
+        userGroupMember,
+      );
+      expect((await approvalFieldsOf(created._id, second)).approvedBy).toBe(
+        externalGroupMember,
+      );
+    });
+
+    it('writes the approval of the requester even when only other people are reviewers (Req 16.3)', async () => {
+      const requester = newRequester();
+      const created = await createProposal({
+        requester,
+        reviewers: [reviewerRef('user', newObjectId())],
+      });
+      const key = created.operations[0].key;
+
+      const result = await approveAs(created._id, identityOf(requester), [key]);
+
+      expect(result).toStrictEqual({ ok: true });
+      expect((await approvalFieldsOf(created._id, key)).approvedBy).toBe(
+        requester,
+      );
+    });
+
+    it('writes nothing for a user who is neither the requester nor a reviewer, and answers not-found (Req 16.7)', async () => {
+      const groupId = newObjectId();
+      const created = await createProposal({
+        reviewers: [
+          reviewerRef('user', newObjectId()),
+          reviewerRef('user-group', groupId),
+        ],
+      });
+      const key = created.operations[0].key;
+      // The group id is held only as an external group, so the kind does not match.
+      const outsider = identityOf(newObjectId(), {
+        externalUserGroupIds: [groupId],
+      });
+
+      const result = await approveAs(created._id, outsider, [key]);
+
+      expect(result).toStrictEqual({ ok: false, code: 'not-found' });
+      expect(await approvalFieldsOf(created._id, key)).toStrictEqual(
+        noApproval,
+      );
+    });
+
+    it('answers not-found to a reviewer removed just before the write, and writes nothing (Req 16.7)', async () => {
+      const removedReviewer = newObjectId();
+      const created = await createProposal({
+        reviewers: [
+          reviewerRef('user', newObjectId()),
+          reviewerRef('user', removedReviewer, new Date()),
+        ],
+      });
+      const key = created.operations[0].key;
+
+      const result = await approveAs(created._id, identityOf(removedReviewer), [
+        key,
+      ]);
+
+      expect(result).toStrictEqual({ ok: false, code: 'not-found' });
+      expect(await approvalFieldsOf(created._id, key)).toStrictEqual(
+        noApproval,
+      );
+    });
+
+    it('answers not-found for a missing or malformed proposal id', async () => {
+      const approver = identityOf(newObjectId());
+
+      expect(await approveAs(newObjectId(), approver, ['k'])).toStrictEqual({
+        ok: false,
+        code: 'not-found',
+      });
+      expect(await approveAs('not-an-id', approver, ['k'])).toStrictEqual({
+        ok: false,
+        code: 'not-found',
+      });
+    });
+
+    it('answers not-open to a reviewer and to the requester on a closed proposal (Req 16.9)', async () => {
+      const reviewerId = newObjectId();
+      const created = await createProposal({
+        reviewers: [reviewerRef('user', reviewerId)],
+      });
+      const key = created.operations[0].key;
+      await prisma.changeproposals.closeIfStillOpen(
+        created._id,
+        'withdrawn',
+        new Date(),
+      );
+
+      const byReviewer = await approveAs(created._id, identityOf(reviewerId), [
+        key,
+      ]);
+      const byRequester = await approveAs(
+        created._id,
+        identityOf(created.requester),
+        [key],
+      );
+
+      expect(byReviewer).toStrictEqual({ ok: false, code: 'not-open' });
+      expect(byRequester).toStrictEqual({ ok: false, code: 'not-open' });
+      expect(await approvalFieldsOf(created._id, key)).toStrictEqual(
+        noApproval,
+      );
+    });
+
+    it('keeps the first approval when another reviewer approves the same operation later (Req 16.5)', async () => {
+      const first = newObjectId();
+      const second = newObjectId();
+      const created = await createProposal({
+        reviewers: [reviewerRef('user', first), reviewerRef('user', second)],
+      });
+      const key = created.operations[0].key;
+      const firstAt = new Date(Date.now() - 1000);
+      const firstToken = randomUUID();
+      await approveAs(created._id, identityOf(first), [key], {
+        channel: 'ui',
+        token: firstToken,
+        now: firstAt,
+      });
+
+      const later = await approveAs(created._id, identityOf(second), [key], {
+        channel: 'api',
+        token: randomUUID(),
+      });
+
+      expect(later).toStrictEqual({ ok: true });
+      expect(await approvalFieldsOf(created._id, key)).toStrictEqual({
+        approvedAt: firstAt,
+        approvedBy: first,
+        approvedChannel: 'ui',
+        decisionToken: firstToken,
+      });
+    });
+
+    it(
+      'writes the approval of exactly one of many concurrent group members (Req 16.5)',
+      async () => {
+        for (let round = 0; round < ROUNDS; round++) {
+          const groupId = newObjectId();
+          const created = await createProposal({
+            reviewers: [reviewerRef('user-group', groupId)],
+          });
+          const key = created.operations[0].key;
+          const members = Array.from({ length: CONCURRENCY }, () => ({
+            userId: newObjectId(),
+            token: randomUUID(),
+          }));
+
+          await Promise.all(
+            members.map((member) =>
+              approveAs(
+                created._id,
+                identityOf(member.userId, { userGroupIds: [groupId] }),
+                [key],
+                { token: member.token },
+              ),
+            ),
+          );
+
+          const written = await approvalFieldsOf(created._id, key);
+          const winner = members.find((m) => m.token === written.decisionToken);
+          expect(winner).toBeDefined();
+          expect(written.approvedBy).toBe(winner?.userId);
+        }
+      },
+      CONCURRENCY_TIMEOUT_MS,
+    );
+
+    it('lets another reviewer approve again after the operation went back to waiting (Req 16.10)', async () => {
+      const first = newObjectId();
+      const second = newObjectId();
+      const created = await createProposal({
+        operations: [editOp()],
+        reviewers: [reviewerRef('user', first), reviewerRef('user', second)],
+      });
+      const key = created.operations[0].key;
+      await approveAs(created._id, identityOf(first), [key]);
+      const lease = randomUUID();
+      await prisma.changeproposals.claimApplyLease(
+        created._id,
+        lease,
+        new Date(),
+      );
+      await prisma.changeproposals.recordOperationOutcome(
+        created._id,
+        lease,
+        key,
+        { status: 'pending', reason: 'page-being-edited' },
+        new Date(),
+      );
+      await prisma.changeproposals.releaseApplyLease(created._id, lease);
+      const now = new Date();
+      const token = randomUUID();
+
+      const result = await approveAs(created._id, identityOf(second), [key], {
+        channel: 'ai-tool',
+        token,
+        now,
+      });
+
+      expect(result).toStrictEqual({ ok: true });
+      expect(await approvalFieldsOf(created._id, key)).toStrictEqual({
+        approvedAt: now,
+        approvedBy: second,
+        approvedChannel: 'ai-tool',
+        decisionToken: token,
+      });
+    });
+
+    it('writes no approver, channel or token when auto-apply approves for the requester', async () => {
+      const created = await createProposal({ operations: [editOp()] });
+      const key = created.operations[0].key;
+      const now = new Date();
+
+      const result = await prisma.changeproposals.markApproved(
+        created._id,
+        created.requester,
+        [key],
+        now,
+      );
+
+      expect(result).toStrictEqual({ ok: true });
+      expect(await approvalFieldsOf(created._id, key)).toStrictEqual({
+        ...noApproval,
+        approvedAt: now,
+      });
     });
   });
 

@@ -4,6 +4,7 @@ import type { IActivity, IActivityHasId } from '~/interfaces/activity';
 import {
   isAttachmentAddActivity,
   isAttachmentDownloadActivity,
+  isAttachmentReextractActivity,
   isAttachmentRemoveActivity,
 } from '~/interfaces/activity';
 
@@ -63,12 +64,14 @@ export const defineRenderer = <
  * - The dispatcher picks the FIRST match, so array order is precedence order.
  *
  * Adding a formatted renderer for another action is a one-line append here; the
- * dispatcher and table are untouched. ADD and DOWNLOAD share one renderer
- * (LiveAttachmentSnapshotDetail): their snapshots have the same shape and both
- * files still exist, so both get the same formatted view plus a download link.
+ * dispatcher and table are untouched. ADD, DOWNLOAD and REEXTRACT share one
+ * renderer (LiveAttachmentSnapshotDetail): their snapshots have the same shape
+ * and the files still exist, so all get the same formatted view plus a
+ * download link.
  */
 export const snapshotDetailRenderers: SnapshotDetailRenderer[] = [
   defineRenderer(isAttachmentRemoveActivity, AttachmentRemoveSnapshotDetail),
   defineRenderer(isAttachmentAddActivity, LiveAttachmentSnapshotDetail),
   defineRenderer(isAttachmentDownloadActivity, LiveAttachmentSnapshotDetail),
+  defineRenderer(isAttachmentReextractActivity, LiveAttachmentSnapshotDetail),
 ];

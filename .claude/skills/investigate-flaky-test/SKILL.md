@@ -46,7 +46,13 @@ These two accepted labels mean different things and change Step 2:
   retry already IS the proof, or a prior vitest threshold-accumulation
   already reached two independent observations). No confirmation measurement
   is owed here before proceeding to root-cause work — go straight into Step
-  2's existing evidence-gathering.
+  2's existing evidence-gathering. **Except a `playwright:` identity with no
+  retry evidence**: a Playwright test that only ever failed on every attempt
+  can reach `flaky/confirmed` through `detect-flaky-ci` Step 4's escalation
+  (the threshold, or a recurrence after a closed issue's fix), and that
+  proves nothing about non-determinism. Step 2's "A `playwright:` identity"
+  paragraph (in 2-A) says how to tell the two apart and where the second
+  one goes.
 - **`flaky/suspected`** — `detect-flaky-ci`'s cheap mechanical mining (diff/
   PR mismatch, sandwich pattern, or matrix divergence) found this, but
   nothing has actually reproduced it live yet. This skill owes it exactly
@@ -54,7 +60,9 @@ These two accepted labels mean different things and change Step 2:
   which replays the spec 3 times on current `master` (not the deeper tally
   described in Step 2's second tier, which is a separate budget for a
   different purpose) — before treating the flakiness itself as real. See
-  "Step 2, `flaky/suspected` path" below.
+  "Step 2, `flaky/suspected` path" below. (That workflow runs vitest
+  projects only; a `playwright:` identity with no retry evidence takes the
+  pause 2-A describes.)
 
 ---
 
@@ -197,7 +205,7 @@ label, comment (signed, `- Recommendation:` last), stop:
 
 | Stop point | The reading that stops it |
 |---|---|
-| Step 2, 2-A vault path | the spec has no repro project, so no measurement can even be requested |
+| Step 2, 2-A paths with no repro project (a path matching no suffix, a vault spec, a `playwright:` identity with no retry evidence) | no measurement can even be requested |
 | Step 2, 2-E third outcome | confirmation not measured |
 | Step 4, autonomous MEDIUM/LOW | the fix approach is not settled |
 | Step 6-B, MEDIUM/LOW | the PR gate was not passed |
@@ -239,10 +247,13 @@ When that line is present:
    escalate for human review of the product code, close as unable to
    reproduce, or close as a deterministic cause (Step 3's close path).
 
-   The 2-A vault pause is narrower, because no measurement is possible there
-   at all: its answer is either "proceed from the logs alone" — go on to
-   Step 3/4 with the missing tally stated as the reason confidence is capped
-   — or "close / park it".
+   A 2-A pause for a path with no repro project (a vault spec, a path
+   matching no suffix, a `playwright:` identity with no retry evidence) is
+   narrower, because no measurement is possible there at all: its answer is
+   either "proceed from the logs alone" — go on to Step 3/4 with the missing
+   tally stated as the reason confidence is capped — or "close / park it"
+   (closing as a deterministic cause still goes through Step 3's close
+   path).
 
 3. **Record which option the human chose** and that it came from that
    comment. It goes into **whichever comment the resumed path posts first**:
@@ -391,6 +402,9 @@ under investigation and there is nothing to do here. Either way, follow
 If the issue's label is `flaky/suspected` (see Precondition), start its
 one-time confirmation measurement **before** doing anything else in this
 step, so it runs in the background while the static analysis below reads.
+A `playwright:` identity comes through 2-A first whatever its label: its
+Playwright paragraph decides from the issue itself whether this gate applies
+at all.
 
 The measurement is taken by `.github/workflows/flaky-repro.yml`: a push to a
 `flaky-repro/**` branch whose head commit carries a `Flaky-Repro-*` git
@@ -448,11 +462,68 @@ measurement. Do not push a request for such a spec. Record
 that 2-F does not apply here (no branch to clean up on the vault path,
 because nothing was ever pushed).
 
-A `playwright:` identity never enters this gate: Playwright's in-run retry is
-already the proof of non-determinism, so those issues arrive as
-`flaky/confirmed`. If one somehow carries `flaky/suspected`, skip straight to
-the primary tier below and state in Step 4 that no repro measurement applies
-to a Playwright identity.
+**A `playwright:` identity has no repro project either**, whatever its
+tier label: `flaky-repro.yml` accepts the four vitest projects only, runs
+vitest, and installs no browser. What decides the path is whether the issue
+carries **retry evidence** — proof that Playwright retried this test within
+one run and it passed. Only evidence recorded since the issue's latest
+reopen counts (see "Reopened issues" below). Within that, it does when any
+one of these holds:
+
+- the issue body's `### Status` line begins with `Confirmed flaky from a
+  single run (Playwright retry evidence).` (what `detect-flaky-ci` Step 4
+  writes for an issue created from its Step 3 rules 1-2; some bodies
+  continue the same line with a ` Note: …`, which does not change this);
+- an observation block (the body, or an `### Additional observation` /
+  `### Backfilled observation` comment) quotes a Playwright summary in which
+  this test is listed under an `N flaky` heading, not under `N failed`. To
+  check one mechanically, save that block's quoted excerpt to a file and run
+  `node bin/flaky-ci/scripts/parse-job-log.ts < {FILE}`: there is retry
+  evidence when this issue's identity key appears among the
+  `identityKey`s of some `playwright.runs[].flaky.tests[]`. For a
+  `playwright:{BROWSER}` (job-level) issue, which stands for any test of
+  that browser, it is enough that some `runs[]` element has `counts.flaky`
+  above 0;
+- for a `playwright:{BROWSER}` (job-level) issue, an observation block's
+  reason sentence says the job's `flaky` list could not be read.
+
+**Reopened issues.** `detect-flaky-ci` Step 4 reopens a closed issue when its
+identity fails again after the fix, and posts no comment of its own for the
+reopen: it appends the usual `### Additional observation` right after it.
+Retry evidence from before the reopen says nothing about the code as it is
+now, so a reopened issue whose post-fix occurrences all failed every
+attempt has no retry evidence. Read the time of the latest reopen (the last
+line printed; no output means the issue was never reopened):
+
+```bash
+gh api repos/growilabs/growi/issues/{ISSUE_NUMBER}/events --paginate \
+  -q '.[] | select(.event == "reopened") | .created_at'
+```
+
+When there is one, only observation comments created after it count, and
+the body does not. When there is none, the body and every observation
+comment count.
+
+The tier label does not decide this. A retry-pass that `detect-flaky-ci`
+appends to an existing issue as an observation comment changes no label of
+its own (a `flaky/suspected` issue stays suspected), and its Step 4 moves a
+failed-every-attempt test to `flaky/confirmed` once the threshold is reached
+or it recurs after a fix, with no retry behind it.
+
+- **Retry evidence present** → the retry is already the proof of
+  non-determinism, so this gate does not apply. Skip straight to the primary
+  tier below and state in Step 4 that no repro measurement applies to a
+  Playwright identity.
+- **No retry evidence** (the test only ever failed on every attempt, or on a
+  reopened issue every occurrence since the reopen did; this includes a
+  `flaky/confirmed` issue that got its label by escalation) →
+  non-determinism has not been shown, and the repro workflow cannot show it.
+  Do not push a request. Record "confirmation not measured (the repro
+  workflow cannot run a Playwright test, and this issue has no retry
+  evidence)" and pause per **Pausing for a human decision**, exactly as in
+  2-E's third outcome — except that 2-F does not apply here (nothing was
+  pushed). Do not go on to Step 3 and root-cause it as a flake: a test that
+  fails on every attempt may be a deterministic breakage.
 
 #### 2-B: push the request
 
@@ -1221,7 +1292,7 @@ split happened — amend the message rather than pushing.
 question: not "does this spec ever pass" but "does it pass three times out of
 three on the fixed code".
 
-**2-A's two exceptions apply here too**, and they matter more at this step
+**2-A's two vitest exceptions apply here too**, and they matter more at this step
 because an issue that arrives already `flaky/confirmed` reaches Step 5
 without ever passing through 2-A. Apply the table *and* both exceptions: a
 path matching none of the four suffixes (a shared setup-hook identity like

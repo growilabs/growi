@@ -401,7 +401,6 @@ describe('pagelinkbackfilljobs (integration)', () => {
       finishComplete: (owner: string) =>
         prisma.pagelinkbackfilljobs.finishComplete(owner, progress, {
           coverage: 'all',
-          coveredSince: null,
         }),
       finishFailed: (owner: string) =>
         prisma.pagelinkbackfilljobs.finishFailed(owner, 'boom'),

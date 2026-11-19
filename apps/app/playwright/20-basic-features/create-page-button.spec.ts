@@ -38,17 +38,7 @@ test.describe('Create page button dropdown menu', () => {
     // straight to the toggle, which is safe here since it is a real,
     // synchronous state change (dropdown opens immediately on click).
     await toggle.dispatchEvent('click');
-    const menuItem = page.getByRole('menuitem', { name: 'Create today page' });
-    // Wait for the menu item to be visible *before* clicking it, as a
-    // separate step: reactstrap's Dropdown mounts/positions its menu (a
-    // `container="body"` portal) asynchronously after the toggle event, and
-    // queuing `.click()` immediately can catch a node that is still
-    // being replaced mid-mount — the "element was detached from the DOM,
-    // retrying" signature seen in growilabs/growi#11779. Resolving the
-    // locator fresh via `.click()`'s own actionability wait, only after
-    // this settles, avoids racing that mount.
-    await expect(menuItem).toBeVisible();
-    await menuItem.click();
+    await page.getByRole('menuitem', { name: 'Create today page' }).click();
 
     // should not be visible
     await expect(page.getByPlaceholder('Input page name')).not.toBeVisible();

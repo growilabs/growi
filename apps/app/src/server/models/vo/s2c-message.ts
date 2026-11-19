@@ -1,6 +1,10 @@
 import assert from 'node:assert';
 import type { IPage, IUser } from '@growi/core/dist/interfaces';
 import { isPopulated } from '@growi/core/dist/interfaces';
+import {
+  type IUserSerializedSecurely,
+  serializeUserSecurely,
+} from '@growi/core/dist/models/serializers';
 
 import { serializePageSecurely } from '../serializers/page-serializer';
 
@@ -18,7 +22,7 @@ export class S2cMessagePageUpdated {
 
   revisionOrigin: string | undefined;
 
-  remoteLastUpdateUser?: IUser;
+  remoteLastUpdateUser?: IUserSerializedSecurely<IUser>;
 
   lastUpdateUsername?: string;
 
@@ -36,7 +40,7 @@ export class S2cMessagePageUpdated {
     this.revisionOrigin = page.revision.origin;
 
     if (user != null) {
-      this.remoteLastUpdateUser = user;
+      this.remoteLastUpdateUser = serializeUserSecurely(user);
       // TODO remove lastUpdateUsername and refactor parts that lastUpdateUsername is used
       this.lastUpdateUsername = user.name;
     }

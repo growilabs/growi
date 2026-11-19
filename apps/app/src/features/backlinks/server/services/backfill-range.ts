@@ -60,11 +60,16 @@ export const runRangeFor = (
   }
 };
 
+export type CompletedCoverage = Exclude<
+  BackfillCoverage,
+  { readonly coverage: 'none' }
+>;
+
 /** The coverage once a run over `runCutoff` has completed. */
 export const coverageAfterRun = (
   runCutoff: Date | null,
   current: BackfillCoverage,
-): BackfillCoverage => {
+): CompletedCoverage => {
   if (runCutoff == null || current.coverage === 'all') {
     return { coverage: 'all' };
   }

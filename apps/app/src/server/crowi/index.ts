@@ -23,6 +23,10 @@ import { modelConfigSync } from '~/features/mastra/server/services/model-config-
 import { checkPageBulkExportJobInProgressCronService } from '~/features/page-bulk-export/server/service/check-page-bulk-export-job-in-progress-cron';
 import instanciatePageBulkExportJobCleanUpCronService from '~/features/page-bulk-export/server/service/page-bulk-export-job-clean-up-cron';
 import instanciatePageBulkExportJobCronService from '~/features/page-bulk-export/server/service/page-bulk-export-job-cron';
+import { initAttachmentFullTextSearch } from '~/features/search-attachments/server';
+import type { AttachmentReindexBatchInterface } from '~/features/search-attachments/server/services/attachment-reindex-batch';
+import type { AttachmentIndexOperations } from '~/features/search-attachments/server/services/attachment-search-delegator-extension';
+import type { AttachmentSearchIndexerInterface } from '~/features/search-attachments/server/services/attachment-search-indexer';
 import type { SessionConfig } from '~/interfaces/session-config';
 import { startCron as startAccessTokenCron } from '~/server/service/access-token';
 import { projectRoot } from '~/server/util/project-dir-utils';
@@ -157,6 +161,13 @@ class Crowi {
   searchService!: SearchService;
 
   pageLinkService!: PageLinkService;
+
+  /** Set by initAttachmentFullTextSearch when the search service is configured. */
+  attachmentSearchIndexer?: AttachmentSearchIndexerInterface;
+
+  attachmentReindexBatch?: AttachmentReindexBatchInterface;
+
+  attachmentIndexOperations?: AttachmentIndexOperations;
 
   auditlogChangeStreamService: AuditlogChangeStreamService | null = null;
 
@@ -317,6 +328,9 @@ class Crowi {
       this.setupSyncPageStatusService(),
       this.setUpCustomize(), // depends on pluginService
     ]);
+
+    // Wire attachment full-text search after searchService + attachmentService are ready.
+    await initAttachmentFullTextSearch(this);
 
     await Promise.all([
       // globalNotification depends on slack and mailer
@@ -932,7 +946,7 @@ class Crowi {
     await growiPluginService.downloadNotExistPluginRepositories();
   }
 
-  setupPageService(): void {
+  async setupPageService(): Promise<void> {
     if (this.pageGrantService == null) {
       this.pageGrantService = new PageGrantService(this);
     }
@@ -944,6 +958,9 @@ class Crowi {
 
     // create() subscribes to page create/update events (like SearchService).
     this.pageLinkService = PageLinkService.create(this);
+
+    // canOperate() ignores expiry, so a record left by an interrupted operation blocks its paths until removed
+    await this.pageOperationService.init();
   }
 
   setupInAppNotificationService(): void {

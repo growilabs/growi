@@ -180,6 +180,7 @@ describe('ChangeProposalService.listAppliedVisible', () => {
         lastAppliedAt: sharedAppliedAt?.toISOString(),
         status: 'applied',
         isRequester: false,
+        viewerRole: 'other',
         pages: [{ id: shared._id.toString(), path: shared.path }],
       },
     ]);
