@@ -11,7 +11,7 @@ import {
   ExtractResponseSchema,
 } from './api-schemas';
 import type { AppContext, AppEnv } from './app-env';
-import { createConcurrencySlots } from './concurrency-slots';
+import type { ConcurrencySlots } from './concurrency-slots';
 import { errorAnswer } from './early-answer';
 import {
   ERROR_TABLE,
@@ -48,6 +48,7 @@ export interface ExtractRouteDeps {
   readonly settings: Settings;
   readonly runner: ConversionRunner;
   readonly log: RequestLog;
+  readonly slots: ConcurrencySlots;
 }
 
 const MIB = 1024 * 1024;
@@ -244,7 +245,7 @@ export const registerExtractRoute = (
   app: Hono<AppEnv>,
   deps: ExtractRouteDeps,
 ): void => {
-  const slots = createConcurrencySlots(deps.settings.maxConcurrency);
+  const { slots } = deps;
   const intake = intakeOf(deps.settings);
   app.post('/extract', describeExtract, async (c) => {
     const line = deps.log.start();

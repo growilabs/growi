@@ -8,7 +8,7 @@
 - `pnpm install` は、ほかの pnpm・vitest・build の実行と同時に動かさない (`.claude/rules/devcontainer.md`)。抽出サービスの vitest は 1 つずつ動かす (`apps/attachment-text-extractor/AGENTS.md`)
 - `git stash` を名前なしで使わない
 
-- [ ] 1. 古い要件番号を引くコメントを取り除く
+- [x] 1. 古い要件番号を引くコメントを取り除く
   - `apps/attachment-text-extractor/` の `src`・`scripts`・`test`・`benchmark` から、`Req N.M` と `Requirement N.M` の形の参照 (2026-11-19 の時点で 68 ファイル、108 か所。うち約 30 か所はテストの名前 (`describe` / `it` の文字列) の中にある) を消す。テストの名前は番号を外した名前に変える (テストの中身は変えない)。`.github/workflows/ci-attachment-text-extractor.yml` の 122 行目のコメントの「Req 3.14 and 11.2」も消す (`if:` の中ではない、ジョブのステップの上の YAML のコメントである)
   - コードから読み取れない理由を述べているコメントは、番号なしの文として残す。何をしているかを言い直しているだけのコメントは、行ごと消す (`.claude/rules/coding-style.md`)。`research.md N.M` の形の節の番号、`(16.3)` のような番号、`D1`〜`D5` は、このタスクでは触らない
   - コメントとテストの名前以外を変えない。変更は 1 つの commit にまとめる
@@ -17,7 +17,7 @@
   - _Requirements: 8.1, 8.2, 8.3_
 
 - [ ] 2. HTTP の層の下ごしらえ
-- [ ] 2.1 枠の使用中の数と上限を読めるようにし、枠をアプリの組み立てで作る
+- [x] 2.1 枠の使用中の数と上限を読めるようにし、枠をアプリの組み立てで作る
   - 先に、枠の単体テストで「取ると使用中の数が増え、返すと減る」「上限は設定した値 (0 や負の値もそのまま)」を書き、落ちることを確かめる
   - 枠を `/extract` の route の登録の中ではなく、アプリの組み立て (`createApp`) で 1 つ作り、route に渡す
   - 終わった状態: 枠の単体テストが通り、`/extract` の既存のテスト (503 `service_busy`、枠が返ること) が変わらず通る

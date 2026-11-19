@@ -5,6 +5,7 @@ import type { Settings } from '../config/load-settings';
 import type { ConversionRunner } from '../runner';
 import type { AppEnv } from './app-env';
 import { bearerAuth } from './bearer-auth';
+import { createConcurrencySlots } from './concurrency-slots';
 import { registerExtractRoute } from './extract-route';
 import { registerHealthRoutes } from './health-routes';
 import { registerOpenApiRoute } from './openapi-route';
@@ -32,6 +33,7 @@ export const createApp = ({
     settings,
     runner,
     log: createRequestLog(settings.logLevel, writeLog),
+    slots: createConcurrencySlots(settings.maxConcurrency),
   });
   return app;
 };

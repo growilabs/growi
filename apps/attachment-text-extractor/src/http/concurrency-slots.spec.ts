@@ -55,3 +55,50 @@ describe('createConcurrencySlots', () => {
     expect(slots.tryAcquire()).toBeNull();
   });
 });
+
+describe('createConcurrencySlots usage and capacity', () => {
+  it('inUse rises with each slot taken and falls with each release', () => {
+    const slots = createConcurrencySlots(3);
+    expect(slots.inUse()).toBe(0);
+
+    const first = slots.tryAcquire();
+    const second = slots.tryAcquire();
+    expect(slots.inUse()).toBe(2);
+
+    first?.();
+    expect(slots.inUse()).toBe(1);
+    second?.();
+    expect(slots.inUse()).toBe(0);
+  });
+
+  it('a refused caller does not count as in use', () => {
+    const slots = createConcurrencySlots(1);
+    slots.tryAcquire();
+
+    slots.tryAcquire();
+
+    expect(slots.inUse()).toBe(1);
+  });
+
+  it('releasing the same slot twice lowers inUse only once', () => {
+    const slots = createConcurrencySlots(2);
+    const first = slots.tryAcquire();
+    slots.tryAcquire();
+
+    first?.();
+    first?.();
+
+    expect(slots.inUse()).toBe(1);
+  });
+
+  it.each([3, 1, 0, -2])('capacity is the configured value %i as is', (max) => {
+    expect(createConcurrencySlots(max).capacity).toBe(max);
+  });
+
+  it.each([0, -2])('with capacity %i no slot is ever handed out', (max) => {
+    const slots = createConcurrencySlots(max);
+
+    expect(slots.tryAcquire()).toBeNull();
+    expect(slots.inUse()).toBe(0);
+  });
+});
