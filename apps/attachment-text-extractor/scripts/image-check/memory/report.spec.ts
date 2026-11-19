@@ -253,9 +253,9 @@ describe('extractLogLines', () => {
   it('reads the result and the child peak RSS of each POST /extract line, in order', () => {
     const log = [
       '2026-11-11T00:00:00.000Z INFO listening on http://0.0.0.0:8000',
-      '2026-11-11T00:00:01.000Z INFO extract format=xlsx size=400000 duration_ms=900 result=ok child_peak_rss_mb=291',
-      '2026-11-11T00:00:02.000Z INFO extract format=csv size=8388608 duration_ms=700 result=memory_exceeded child_peak_rss_mb=340',
-      '2026-11-11T00:00:03.000Z INFO extract format=txt size=1 duration_ms=1 result=service_busy child_peak_rss_mb=unknown',
+      '2026-11-11T00:00:01.000Z INFO extract format=xlsx size=400000 duration_ms=900 result=ok child_peak_rss_mb=291 app=-',
+      '2026-11-11T00:00:02.000Z INFO extract format=csv size=8388608 duration_ms=700 result=memory_exceeded child_peak_rss_mb=340 app=5f3a9c',
+      '2026-11-11T00:00:03.000Z INFO extract format=txt size=1 duration_ms=1 result=service_busy child_peak_rss_mb=unknown app=(invalid)',
       '',
     ].join('\n');
 

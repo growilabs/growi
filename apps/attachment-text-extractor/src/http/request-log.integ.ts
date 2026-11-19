@@ -12,7 +12,7 @@ import { useTestService } from './spec-support/test-service';
 // One line per POST /extract with the format, size, duration, result
 // and the child's peak RSS, and never the file name, the content or the token.
 // The line keeps the target spec's form:
-// "extract format=… size=… duration_ms=… result=… child_peak_rss_mb=…".
+// "extract format=… size=… duration_ms=… result=… child_peak_rss_mb=… app=…".
 // Python test_extract_router.py TestLogging, test_live_server.py
 // TestProductionLogging, and the log side of test_e2e_http.py TestHygieneOverHttp.
 
@@ -25,13 +25,14 @@ const service = useTestService(() => {
 const CONTENT_MARKER = 'SECRET-CONTENT-MARKER-7f3a';
 const FILE_NAME_MARKER = 'SECRET-FILE-NAME-MARKER-91c2';
 const LINE =
-  /extract format=(\S+) size=(\d+) duration_ms=(\d+) result=(\S+) child_peak_rss_mb=(\d+|unknown)$/;
+  /extract format=(\S+) size=(\d+) duration_ms=(\d+) result=(\S+) child_peak_rss_mb=(\d+|unknown) app=(\S+)$/;
 
 interface RequestLine {
   readonly format: string;
   readonly size: number;
   readonly result: string;
   readonly rss: string;
+  readonly app: string;
 }
 
 const requestLines = (): RequestLine[] =>
@@ -41,8 +42,9 @@ const requestLines = (): RequestLine[] =>
     .map((line) => {
       const match = LINE.exec(line);
       if (match === null) throw new Error(`not a request line: ${line}`);
-      const [, format = '', size = '', , result = '', rss = ''] = match;
-      return { format, size: Number(size), result, rss };
+      const [, format = '', size = '', , result = '', rss = '', app = ''] =
+        match;
+      return { format, size: Number(size), result, rss, app };
     });
 
 /** The request lines once at least `count` are written (a line may follow its answer). */
@@ -78,6 +80,7 @@ describe('the request line', () => {
         size: CONTENT_MARKER.length,
         result: 'ok',
         rss: '42',
+        app: '-',
       },
     ]);
     const everything = service.current().logs.join('\n');
@@ -94,7 +97,7 @@ describe('the request line', () => {
     await post('a.txt', 'x');
 
     expect(await linesAfter(1)).toEqual([
-      { format: 'txt', size: 1, result: 'ok', rss: '42' },
+      { format: 'txt', size: 1, result: 'ok', rss: '42', app: '-' },
     ]);
     expect(service.current().logs.join('\n')).not.toContain('forged');
   });
@@ -105,7 +108,13 @@ describe('the request line', () => {
     await post('a.txt', 'x');
 
     expect(await linesAfter(1)).toEqual([
-      { format: 'txt', size: 1, result: 'memory_exceeded', rss: '7' },
+      {
+        format: 'txt',
+        size: 1,
+        result: 'memory_exceeded',
+        rss: '7',
+        app: '-',
+      },
     ]);
     expect(service.current().logs.join('\n')).not.toContain('internal detail');
   });
@@ -116,7 +125,13 @@ describe('the request line', () => {
     await post('a.csv', 'x');
 
     expect(await linesAfter(1)).toEqual([
-      { format: 'csv', size: 1, result: 'limit_exceeded', rss: 'unknown' },
+      {
+        format: 'csv',
+        size: 1,
+        result: 'limit_exceeded',
+        rss: 'unknown',
+        app: '-',
+      },
     ]);
   });
 

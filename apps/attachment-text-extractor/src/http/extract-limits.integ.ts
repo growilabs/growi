@@ -160,7 +160,7 @@ describe.skipIf(process.platform !== 'linux')(
         );
         await expect
           .poll(() => target.logs.at(-1) ?? '', { timeout: 2_000 })
-          .toMatch(/result=limit_exceeded child_peak_rss_mb=unknown$/);
+          .toMatch(/result=limit_exceeded child_peak_rss_mb=unknown app=-$/);
         const atCap = await post(
           target,
           fileName,

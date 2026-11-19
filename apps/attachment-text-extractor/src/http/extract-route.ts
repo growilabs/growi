@@ -11,6 +11,7 @@ import {
   ExtractResponseSchema,
 } from './api-schemas';
 import type { AppContext, AppEnv } from './app-env';
+import { appLabelOf } from './app-label';
 import type { ConcurrencySlots } from './concurrency-slots';
 import { errorAnswer } from './early-answer';
 import {
@@ -248,7 +249,7 @@ export const registerExtractRoute = (
   const { slots } = deps;
   const intake = intakeOf(deps.settings);
   app.post('/extract', describeExtract, async (c) => {
-    const line = deps.log.start();
+    const line = deps.log.start(appLabelOf(c.env.incoming.headers));
     if (declaredOverCap(c.env.incoming, intake.maxBodyBytes)) {
       line('file_too_large');
       return refusalAnswer(c, {

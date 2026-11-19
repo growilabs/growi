@@ -29,7 +29,7 @@
   - _Requirements: 3.3, 3.8_
 
 - [ ] 3. 抽出サービスの個別の変更
-- [ ] 3.1 呼び出し元の app をログの行に出す
+- [x] 3.1 呼び出し元の app をログの行に出す
   - 先に次のテストを書き、落ちることを確かめる: ヘッダーが無い → 行の最後が `app=-`、形に合う値 → `app=<値>`、空・65 文字・形に合わない文字・同じヘッダー 2 つ → `app=(invalid)` で値は行に出ない。本文を読む前に断る 5 つの理由 (`service_busy`、`file_too_large`、`upload_timeout`、`invalid_upload`、`client_disconnected`) の行にも付く。値を変えても、ステータスと本文が同じ
   - 行の形を `$` で固定しているテスト (`request-log.integ.ts`、`diagnostic-log.integ.ts`、`extract-limits.integ.ts`) を、`app=` まで含む形に直す。メモリの計測の道具の見本の行 (`report.spec.ts`) に `app=` の付いた行を足し、読めることを確かめる
   - 形の正規表現は 1 か所に置く (3.2 が OpenAPI の文書で同じものを使う)。ヘッダーは route の最初、宣言された長さの確かめと枠より前に読む

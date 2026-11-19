@@ -20,7 +20,7 @@ const NO_PRLIMIT = { prlimitPath: '/nonexistent/prlimit' };
 const LINE =
   /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z ((?:INFO|WARNING|ERROR) [ -~]+)$/;
 const REQUEST_LINE =
-  /^INFO extract format=\S+ size=\d+ duration_ms=\d+ result=(\S+) child_peak_rss_mb=(?:\d+|unknown)$/;
+  /^INFO extract format=\S+ size=\d+ duration_ms=\d+ result=(\S+) child_peak_rss_mb=(?:\d+|unknown) app=\S+$/;
 
 let service: TestService | undefined;
 

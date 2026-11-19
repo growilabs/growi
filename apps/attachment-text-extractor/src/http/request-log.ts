@@ -2,7 +2,7 @@ import { createLeveledLog } from '../config/leveled-log';
 import type { LogLevel } from '../config/load-settings';
 
 // One line per POST /extract, in the target spec's form:
-// "extract format=… size=… duration_ms=… result=… child_peak_rss_mb=…".
+// "extract format=… size=… duration_ms=… result=… child_peak_rss_mb=… app=…".
 // Never the file name, the content or the Authorization header: the format
 // is the cleaned extension only.
 
@@ -17,7 +17,7 @@ export interface RequestFacts {
 export type RequestLine = (result: string, facts?: RequestFacts) => void;
 
 export interface RequestLog {
-  start(): RequestLine;
+  start(appLabel: string): RequestLine;
   error(message: string): void;
 }
 
@@ -39,13 +39,13 @@ export const createRequestLog = (
 ): RequestLog => {
   const emit = createLeveledLog(level, writeLog);
   return {
-    start: () => {
+    start: (appLabel) => {
       const started = performance.now();
       return (result, { format, size, childPeakRssMb } = {}) => {
         const durationMs = Math.round(performance.now() - started);
         emit(
           'INFO',
-          `extract format=${format ?? 'unknown'} size=${size ?? 0} duration_ms=${durationMs} result=${result} child_peak_rss_mb=${childPeakRssMb ?? 'unknown'}`,
+          `extract format=${format ?? 'unknown'} size=${size ?? 0} duration_ms=${durationMs} result=${result} child_peak_rss_mb=${childPeakRssMb ?? 'unknown'} app=${appLabel}`,
         );
       };
     },
