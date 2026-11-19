@@ -556,6 +556,7 @@ Key decisions:
 | 1.2 | 構造化ログ | AttachmentSearchIndexer + pino | — | — |
 | 1.3 | 到達不可時も継続 | AttachmentTextExtractorService catch-all | — | Flow 1 |
 | 1.4 | serviceUnreachable 正規化 | AttachmentTextExtractorService | `ExtractionOutcome` | — |
+| 1.5〜1.8 | `X-Growi-App-Id` ヘッダーの付け方 | AttachmentTextExtractorService (`toGrowiAppIdHeaderValue`) | `postExtract` の `headers` | — |
 | 2.1 | 自動インデックス化 | AttachmentSearchIndexer.onAttach | `AttachmentService.addAttachHandler` | Flow 1 |
 | 2.2 | 1 添付 = N 文書 | ES attachments mapping + bulk upsert | Logical Data Model | Flow 1 |
 | 2.3 | URI 未設定時の完全互換 | isFeatureEnabled gate (算出値) | `isAttachmentFullTextSearchEnabled()` (検索サービス設定済み AND `extractorUri` / `extractorToken` が空白以外で設定済み) | — |
@@ -608,7 +609,7 @@ Key decisions:
 | Component | Domain/Layer | Intent | Req Coverage | Key Dependencies (P0/P1) | Contracts |
 |-----------|--------------|--------|--------------|--------------------------|-----------|
 | AttachmentTextExtractorClient (packages) | Package (TS) | 抽出 API の型安全クライアント (orval 生成) | 2.1, 6.1, 7.1, 1.3 | orval (P0), upstream 抽出サービス (P0) | Service |
-| AttachmentTextExtractorService | Server | クライアント wrapper + 失敗正規化 + 到達不可 fallback + 同時実行数の上限 | 1.1, 1.2, 1.3, 1.4, 2.1, 7.6 | AttachmentTextExtractorClient (P0), FileUploader (P0) | Service |
+| AttachmentTextExtractorService | Server | クライアント wrapper + 失敗正規化 + 到達不可 fallback + 同時実行数の上限 | 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 2.1, 7.6 | AttachmentTextExtractorClient (P0), FileUploader (P0) | Service |
 | AttachmentSearchIndexer | Server | attach/detach/reextract の単一窓口、rebuild window 中は live + tmp への dual-write | 2.1–2.6, 3.1, 3.4, 7.1 | TextExtractor (P0), ESDelegator extension (P0), AttachmentReindexBatch (P0, lifecycle 参照), FailureLogService (P1) | Service, Event |
 | AttachmentOrphanSweeper | Server | rebuildIndex 内で親 Page 不在の添付 doc を eventual cleanup | 3.2, 4.4 | Page model (P0), ESDelegator extension (P0) | Batch |
 | AttachmentReindexBatch | Server | ページと添付の一括再インデックスを裏で実行 (`startRebuild`) + progress + orphan sweeper 統合 + 実行中状態 (`isRebuilding/getTmpIndexName`) 公開 | 6.1, 6.2, 6.3, 6.4, 6.5, 6.6 | TextExtractor (P0), ESDelegator extension (P0), AttachmentOrphanSweeper (P0), Socket.io (P1) | Batch |
@@ -643,6 +644,7 @@ Key decisions:
   - フォームの `mimeType` は、使える拡張子が無く、保存してある MIME type (`fileFormat`) が空でないときだけ送る。抽出サービスは、知っている `mimeType` を拡張子より優先するので、ブラウザが申告した MIME type が拡張子と食い違うファイル (Windows の Excel で開ける CSV は `application/vnd.ms-excel` で保存される) を、誤った形式で読ませないためである
 - **503 `service_busy` retry (burst 耐性)**: 上流が 503 `service_busy` を返した場合、exponential backoff + jitter で**最大 1 回だけ retry** (default 500ms + jitter(0-500ms) 待機)。2 回目も 503 なら `serviceBusy` として正規化し ExtractionFailureLog に記録。待ち時間の定数 (`RETRY_BASE_DELAY_MS` / `RETRY_JITTER_MAX_MS`) は export する (テスト容易性)。複雑な queue / BullMQ は初期実装では導入しない (k8s HPA が pod 増設で対応する前提)
 - **Bearer auth**: 呼び出しごとに `configManager.getConfig('app:attachmentFullTextSearch:extractorToken')` を取得し 前後の空白を除いて `Authorization: Bearer <token>` ヘッダに付与 (secret のファイルから読んだ値の末尾の改行を落とす)。token 未設定時は `isFeatureEnabled()` 段階で早期 return するので通常は到達しないが、保険として未設定検出時は `serviceUnreachable` 正規化
+- **`X-Growi-App-Id` ヘッダー**: 呼び出しごとに `configManager.getConfig('app:growiAppIdForCloud')` を、URI やトークンと同じく読み直す。この値は型の宣言 (`number | undefined`) と違い、環境変数の文字列がそのまま入るので、`String(value)` で文字列にしてから扱う。純関数 `toGrowiAppIdHeaderValue` (`growi-app-id-header.ts`) が、値が無い、または文字列が表示できる ASCII 文字 (0x21〜0x7E) だけでできていないときは `undefined` を返し、そうでなければ文字列をそのまま (前後の空白も取り除かずに) 返す。`undefined` のときはヘッダーを付けず、抽出は続ける (Node は改行などを含むヘッダーの値で要求を作らずに例外を投げ、抽出が失敗してしまうため、それを避ける検査である)。`^[A-Za-z0-9]…` の形の検査は抽出サービスだけが行い、apps/app では繰り返さない (形の決まりを 1 か所にするため)。ヘッダーは、生成クライアントの `postExtract` の axios の引数 `headers` に、`Authorization` と並べて入れる。この値は GROWI.cloud の app の ID であり、秘密ではない (抽出サービスのログの `app=` に出る)
 - **extractorUri DNS rebinding 対策 (メタデータの宛先のみ)**: 送信前に URI の host を名前解決し、結果がクラウドのメタデータの宛先 (リンクローカル `169.254.0.0/16` / `fd00:ec2::254` / `100.100.100.200` / `192.0.0.192`) なら request を送らず `serviceUnreachable` 正規化。IPv6 の literal は `URL#hostname` が `[` `]` 付きで返すので、外してから解決する。名前解決そのものが失敗した場合も `serviceUnreachable`。k8s 内部 DNS / loopback / RFC1918 への解決は許可
 - **リダイレクトには従わない** (`maxRedirects: 0`)。リダイレクト先が内部のアドレスを指しうるため
 - **Bearer auth 失敗**: 上流 401 `unauthorized` は `extraction_failed` ではなく**`serviceUnreachable` に正規化** (機能を soft-disable 相当に degrade、admin が token 不整合に気付くよう pino ERROR ログ + ExtractionFailureLog 記録)。token 回転中の一時的な不一致も自動的に failing open せず、新 token が伝搬するまで抽出は停止。**pino ログ出力時は `Authorization` ヘッダ値をログオブジェクトに含めない** (request オブジェクトや headers をそのまま渡さない。token が共有リソースである extractor へのアクセス権そのものであるため、ログ経由の漏洩を防ぐ)
@@ -1386,6 +1388,7 @@ Index は migration `20261117120000-add-indexes-to-extractionfailurelogs.js` が
 
 - `AttachmentTextExtractorService` の失敗正規化: `service_busy` / `timeout` / `unreachable` / upstream 5xx がそれぞれ `ExtractionOutcome` の正しい variant にマップされること。**上流 401 `unauthorized` は `serviceUnreachable` に正規化される**こと
 - `AttachmentTextExtractorService` Bearer auth: 呼び出しごとに最新の `extractorToken` を取得し `Authorization: Bearer <token>` ヘッダが付与されること。token 未設定時は `serviceUnreachable` を返すこと
+- `AttachmentTextExtractorService` の `X-Growi-App-Id`: 設定 `app:growiAppIdForCloud` に値があるとヘッダーが付くこと (数値に見える文字列も、前後の空白を取り除かずに送られること)。値が無い・空・空白や改行や非 ASCII の文字を含むときは、ヘッダーが付かずに抽出が続くこと。送るたびに設定を読み直すこと。判定の純関数 `toGrowiAppIdHeaderValue` は、送る処理とは別にテストする
 - `AttachmentTextExtractorService` DNS rebinding 対策: `extractorUri` の host が metadata IP literal (`169.254.169.254` 等) に解決される場合のみ、request を送信せず `serviceUnreachable` になること。k8s 内部 DNS / loopback / RFC1918 に解決される場合は許可されること
 - extractorUri allowlist (admin PUT): `file://` / `ftp://` / `data:` / `http://169.254.169.254/` / `http://fd00:ec2::254/` / `http://100.100.100.200/` / `http://192.0.0.192/` が 400 `invalid_extractor_uri` で reject されること。`http://127.0.0.1/` / `http://attachment-text-extractor.default.svc.cluster.local/` / `http://10.0.0.1/` は受理されること
 - admin GET `/attachment-search/config` が `extractorToken` の値を返さず、`hasExtractorToken: boolean` だけ返すこと
