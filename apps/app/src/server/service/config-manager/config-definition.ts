@@ -480,6 +480,7 @@ export const CONFIG_DEFINITIONS = {
   }),
   'app:plantumlHttpMethod': defineConfig<PlantumlHttpMethod | undefined>({
     envVarName: 'PLANTUML_HTTP_METHOD',
+    envVarType: 'string',
     defaultValue: undefined,
   }),
   'app:drawioUri': defineConfig<string>({
@@ -554,6 +555,7 @@ export const CONFIG_DEFINITIONS = {
   'app:attachmentFullTextSearch:extractorUri': defineConfig<string | undefined>(
     {
       envVarName: 'GROWI_ATTACHMENT_EXTRACTOR_URI',
+      envVarType: 'string',
       defaultValue: undefined,
     },
   ),
@@ -561,6 +563,7 @@ export const CONFIG_DEFINITIONS = {
     string | undefined
   >({
     envVarName: 'GROWI_ATTACHMENT_EXTRACTOR_SERVICE_TOKEN',
+    envVarType: 'string',
     defaultValue: undefined,
     isSecret: true,
   }),
