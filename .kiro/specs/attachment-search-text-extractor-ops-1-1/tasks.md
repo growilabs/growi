@@ -93,7 +93,7 @@
   - _Depends: 4.2_
   - _Requirements: 7.1, 7.2, 7.3, 9.2_
 
-- [ ] 7. 版 1.1.0 の changeset を書き、全体を確かめる
+- [x] 7. 版 1.1.0 の changeset を書き、全体を確かめる
   - `.changeset/` に `'@growi/attachment-text-extractor': minor` の changeset を 1 つ書く。生成クライアントの package には書かない (research.md §8.2)
   - 確かめること: `turbo run lint test --filter @growi/attachment-text-extractor`、生成クライアントの package の lint と build、`turbo run lint test build --filter @growi/app` (apps/app の CI と同じく、生成クライアントを作り直して commit 済みと同じであること)
   - 終わった状態: 上がすべて通り、changeset が 1 つだけある
