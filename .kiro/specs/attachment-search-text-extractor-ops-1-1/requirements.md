@@ -108,7 +108,7 @@ GROWI.cloud の運用者は、1 つの抽出サービス (`apps/attachment-text-
 
 #### Acceptance Criteria
 
-1. If PPTX または XLSX として渡されたファイルが ZIP ではない (ZIP の終わりの記録が見つからない。暗号化された OOXML と旧形式の PPT / XLS はこれに当たる), the 抽出サービス shall いまと同じくファイル全体を anydoc に渡す
+1. If PPTX または XLSX として渡されたファイルが ZIP ではない (ZIP の終わりの記録がファイルのどこにも見つからない、つまり検証に通る終わりの記録が無い。暗号化された OOXML と旧形式の PPT / XLS はこれに当たる), the 抽出サービス shall いまと同じくファイル全体を anydoc に渡す
 2. If PPTX または XLSX として渡されたファイルが ZIP であるのに、エントリの一覧を最後まで読めない (読めない名前、扱えない版の印を持つエントリ、ZIP の読み手が開けない), the 抽出サービス shall 変換を行わず、`extraction_failed` (422) を返す
 3. If PPTX または XLSX として渡された ZIP に、必要な部品 (`ppt/presentation.xml` または `xl/workbook.xml`) が無いか、同じ名前で 2 つ以上ある, the 抽出サービス shall 変換を行わず、`extraction_failed` (422) を返す
 4. The 抽出サービス shall 5.2 と 5.3 の変更で、`ErrorCode` の値、HTTP ステータスとの対応、OpenAPI の文書を変えない

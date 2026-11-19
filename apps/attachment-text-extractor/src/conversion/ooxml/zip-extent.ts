@@ -1,12 +1,14 @@
-// The archive as CPython's zipfile finds it in the bytes (_EndRecData and
-// _RealGetContents): the last end-of-central-directory record, stray bytes
-// before or after the archive, and a central directory read by its size
-// alone (the entry counts, the disk number and a comment cut short by the
-// end of the file are not checked), and entries flagged "strong encryption",
-// which CPython refuses only when they are read. yauzl refuses all of these.
+// The archive as CPython's zipfile reads it (_RealGetContents): stray bytes
+// before or after the archive, a central directory read by its size alone
+// (the entry counts, the disk number and a comment cut short by the end of
+// the file are not checked), and entries flagged "strong encryption", which
+// CPython refuses only when they are read. yauzl refuses all of these. The
+// end record is looked for in the whole file, not only in the last 64 KiB
+// as CPython's _EndRecData does (research.md §3.2).
 
 const END_SIGNATURE = Buffer.from([0x50, 0x4b, 0x05, 0x06]);
 const CENTRAL_SIGNATURE = 0x02014b50;
+const CENTRAL_SIGNATURE_BYTES = Buffer.from([0x50, 0x4b, 0x01, 0x02]);
 const ZIP64_LOCATOR_SIGNATURE = 0x07064b50;
 const END_RECORD_BYTES = 22;
 const CENTRAL_RECORD_BYTES = 46;
@@ -32,18 +34,54 @@ interface CentralDirectory {
   ])[];
 }
 
+const hasZip64Locator = (data: Buffer, at: number): boolean =>
+  at >= ZIP64_LOCATOR_BYTES &&
+  data.readUInt32LE(at - ZIP64_LOCATOR_BYTES) === ZIP64_LOCATOR_SIGNATURE;
+
+/** Whether the end record at `at` is preceded by its directory, by size, or by a zip64 locator. */
+const leadsToDirectory = (data: Buffer, at: number): boolean => {
+  const start = at - data.readUInt32LE(at + 12);
+  return (
+    hasZip64Locator(data, at) ||
+    (start >= 0 &&
+      start + 4 <= at &&
+      data.readUInt32LE(start) === CENTRAL_SIGNATURE)
+  );
+};
+
+/**
+ * In the last 64 KiB, the last end record as it is. Before them, the last
+ * one that leads to its directory, or else the last one if a central record
+ * signature comes before it anywhere; a lone end record signature there is
+ * not a ZIP (research.md §3.2).
+ */
 const endRecordAt = (data: Buffer): number => {
   const last = data.length - END_RECORD_BYTES;
+  if (last < 0) {
+    return -1;
+  }
   if (
-    last >= 0 &&
     data.subarray(last, last + 4).equals(END_SIGNATURE) &&
     data.readUInt16LE(data.length - 2) === 0
   ) {
     return last;
   }
-  const from = Math.max(data.length - MAX_COMMENT_BYTES - END_RECORD_BYTES, 0);
-  const at = data.lastIndexOf(END_SIGNATURE);
-  return at >= from && at + END_RECORD_BYTES <= data.length ? at : -1;
+  const newest = data.lastIndexOf(END_SIGNATURE, last);
+  if (newest >= Math.max(last - MAX_COMMENT_BYTES, 0)) {
+    return newest;
+  }
+  // lastIndexOf counts a negative start from the end of the buffer.
+  for (
+    let at = newest;
+    at >= 0;
+    at = at > 0 ? data.lastIndexOf(END_SIGNATURE, at - 1) : -1
+  ) {
+    if (leadsToDirectory(data, at)) {
+      return at;
+    }
+  }
+  const firstCentral = data.indexOf(CENTRAL_SIGNATURE_BYTES);
+  return firstCentral >= 0 && firstCentral < newest ? newest : -1;
 };
 
 /** The central directory in `size` bytes from `start`, or null where CPython stops. */
@@ -134,10 +172,7 @@ export const zipExtent = (bytes: Uint8Array): ZipExtent | null => {
     at + END_RECORD_BYTES + data.readUInt16LE(at + 20),
     data.length,
   );
-  if (
-    at >= ZIP64_LOCATOR_BYTES &&
-    data.readUInt32LE(at - ZIP64_LOCATOR_BYTES) === ZIP64_LOCATOR_SIGNATURE
-  ) {
+  if (hasZip64Locator(data, at)) {
     // zip64: only stray bytes after the archive are dropped.
     return unchanged(bytes.subarray(0, commentEnd));
   }

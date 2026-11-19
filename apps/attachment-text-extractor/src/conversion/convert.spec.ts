@@ -4,6 +4,7 @@ import {
   buildCorruptPdf,
   buildDocx,
   buildEncryptedDocx,
+  buildEncryptedWithFarEndRecord,
   buildOwnerPasswordOnlyPdf,
   buildUserPasswordPdf,
   buildZip,
@@ -544,6 +545,139 @@ describe('convert', () => {
       const outcome = await fail(build(), 'a.pptx', null, conversionLimits());
 
       expect(outcome.failure).toBe('malformed');
+    });
+
+    describe('with more stray bytes after the archive than the last 64 KiB', () => {
+      const MIB = 1024 * 1024;
+      const END_SIGNATURE = 0x06054b50;
+      const SEARCH_WINDOW = 0xffff + END_RECORD_SIZE;
+      const TRAILER = 70_000;
+
+      const smallWorkbook = xlsxParts([{ name: 'Small', rows: [['cell']] }]);
+
+      /** End records whose size and offset point at no central directory. */
+      const decoys = (length: number, positions: readonly number[]): Buffer => {
+        const bytes = Buffer.alloc(length);
+        for (const at of positions) {
+          bytes.writeUInt32LE(END_SIGNATURE, at);
+          bytes.writeUInt32LE(0x1234, at + END_RECORD_DIRECTORY_SIZE);
+          bytes.writeUInt32LE(0x5678, at + END_RECORD_DIRECTORY_OFFSET);
+        }
+        return bytes;
+      };
+
+      const understated = (parts: readonly ZipEntry[]): Buffer => {
+        const data = buildZip(parts);
+        const field = data.length - END_RECORD_SIZE + END_RECORD_DIRECTORY_SIZE;
+        data.writeUInt32LE(data.readUInt32LE(field) - 3, field);
+        return data;
+      };
+
+      const around = (archive: Buffer, before: number, after: Buffer): Buffer =>
+        Buffer.concat([Buffer.alloc(before), archive, after]);
+
+      it.each([
+        [
+          '100,000 cells, 70,000 zeros after',
+          () => around(buildZip(overCellLimit), 0, Buffer.alloc(TRAILER)),
+        ],
+        [
+          '100,000 cells, 2 MiB of zeros after',
+          () => around(buildZip(overCellLimit), 0, Buffer.alloc(2 * MIB)),
+        ],
+        [
+          '100,000 cells, 100 bytes before and 70,000 after',
+          () => around(buildZip(overCellLimit), 100, Buffer.alloc(TRAILER)),
+        ],
+        [
+          '12,000 more entries, 70,000 zeros after',
+          () =>
+            around(
+              buildZip([...smallWorkbook, ...filler]),
+              0,
+              Buffer.alloc(TRAILER),
+            ),
+        ],
+        [
+          '12,000 more entries, 100 bytes before and 70,000 after',
+          () =>
+            around(
+              buildZip([...smallWorkbook, ...filler]),
+              100,
+              Buffer.alloc(TRAILER),
+            ),
+        ],
+        [
+          '100,000 cells, 70,000 bytes after holding end records that lead nowhere',
+          () =>
+            around(
+              buildZip(overCellLimit),
+              0,
+              decoys(TRAILER, [0, 1_000, TRAILER - SEARCH_WINDOW - 1]),
+            ),
+        ],
+        [
+          '100,000 cells and 10 bytes after, an end signature cut short by the end of the file',
+          () =>
+            around(
+              buildZip(overCellLimit),
+              0,
+              Buffer.from([0x50, 0x4b, 0x05, 0x06, 0, 0, 0, 0, 0, 0]),
+            ),
+        ],
+      ])('still applies the limits to an XLSX of %s', async (_, build) => {
+        const outcome = await fail(build(), 'a.xlsx', null, conversionLimits());
+
+        expect(outcome.failure).toBe('limit_exceeded');
+      });
+
+      it.each([
+        [
+          'an end record that leads nowhere in the last 64 KiB',
+          () =>
+            around(
+              buildZip(overCellLimit),
+              0,
+              decoys(TRAILER, [TRAILER - 1_000]),
+            ),
+        ],
+        [
+          'an understated directory size',
+          () => around(understated(overCellLimit), 0, Buffer.alloc(TRAILER)),
+        ],
+        [
+          'an understated directory size and 100 bytes before',
+          () => around(understated(overCellLimit), 100, Buffer.alloc(TRAILER)),
+        ],
+      ])('refuses a 100,000-cell XLSX followed by 70,000 bytes with %s', async (_, build) => {
+        const outcome = await fail(build(), 'a.xlsx', null, conversionLimits());
+
+        expect(outcome.failure).toBe('malformed');
+      });
+
+      it.each([
+        ['a.xlsx', smallWorkbook],
+        ['a.pptx', deck],
+      ])('converts a small %s followed by 70,000 zeros as without them', async (fileName, parts) => {
+        const archive = buildZip(parts);
+        const expected = await succeed(archive, fileName);
+
+        const outcome = await succeed(
+          around(archive, 0, Buffer.alloc(TRAILER)),
+          fileName,
+        );
+
+        expect(outcome.pages).toEqual(expected.pages);
+      });
+
+      it('still reports an encrypted XLSX holding an end record far from its end as encrypted', async () => {
+        const outcome = await fail(
+          buildEncryptedWithFarEndRecord(smallWorkbook),
+          'a.xlsx',
+        );
+
+        expect(outcome.failure).toBe('encrypted');
+      });
     });
   });
 
