@@ -253,7 +253,7 @@ describe('CommentReactionBar', () => {
     expect(chip).toHaveAttribute('aria-disabled', 'true');
     await userEvent.click(chip);
     expect(setReaction).not.toHaveBeenCalled();
-    expect(addButton()).toBeDisabled();
+    expect(addButton()).toHaveAttribute('aria-disabled', 'true');
   });
 
   it('removes a chip once an unreact drops it from the chips', () => {

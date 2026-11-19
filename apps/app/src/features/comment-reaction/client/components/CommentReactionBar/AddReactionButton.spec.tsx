@@ -81,7 +81,7 @@ describe('AddReactionButton', () => {
   it('is enabled and keeps the picker closed until pressed', () => {
     render(<AddReactionButton canReact chipCount={0} onAdd={vi.fn()} />);
 
-    expect((addButton() as HTMLButtonElement).disabled).toBe(false);
+    expect(addButton()).not.toHaveAttribute('aria-disabled');
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
@@ -110,7 +110,7 @@ describe('AddReactionButton', () => {
       />,
     );
 
-    expect((addButton() as HTMLButtonElement).disabled).toBe(false);
+    expect(addButton()).not.toHaveAttribute('aria-disabled');
   });
 
   it('is disabled at the kind limit and does not open the picker', async () => {
@@ -122,8 +122,27 @@ describe('AddReactionButton', () => {
       />,
     );
 
-    expect((addButton() as HTMLButtonElement).disabled).toBe(true);
+    expect(addButton()).toHaveAttribute('aria-disabled', 'true');
     await userEvent.click(addButton());
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('stays reachable by keyboard at the kind limit, explaining the limit on focus without opening the picker', async () => {
+    render(
+      <AddReactionButton
+        canReact
+        chipCount={MAX_REACTION_KINDS_PER_COMMENT}
+        onAdd={vi.fn()}
+      />,
+    );
+
+    await userEvent.tab();
+
+    expect(addButton()).toHaveFocus();
+    expect((await screen.findByRole('tooltip')).textContent).toBe(
+      'comment_reaction.kind_limit_reached',
+    );
+    await userEvent.keyboard('{Enter}');
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
@@ -195,12 +214,14 @@ describe('AddReactionButton', () => {
     expect(tooltip.closest('.fade')).toBeNull();
   });
 
-  it('is disabled while a write is in flight', () => {
+  it('is disabled and does not open the picker while a write is in flight', async () => {
     render(
       <AddReactionButton canReact chipCount={0} isUpdating onAdd={vi.fn()} />,
     );
 
-    expect((addButton() as HTMLButtonElement).disabled).toBe(true);
+    expect(addButton()).toHaveAttribute('aria-disabled', 'true');
+    await userEvent.click(addButton());
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
   it('requests adding the selected emoji as a reaction key and closes the picker', async () => {
