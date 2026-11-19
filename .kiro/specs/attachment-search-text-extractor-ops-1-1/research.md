@@ -18,8 +18,8 @@
 
 - **Context**: Req 3 は、gauge・ラベル付きのカウンタ・ヒストグラムと、プロセスの CPU・メモリ・イベントループの遅れを、Prometheus のテキスト形式で出すことを求める。
 - **Alternatives Considered**:
-  1. Prometheus の公式の JavaScript のクライアント `@prometheus-io/client` を使う (リポジトリは prometheus/client_js。旧名の `@prometheus-io/client` の後継)
-  1b. `@prometheus-io/client` を使う (採らない。npm で「`@prometheus-io/client` に置き換えられた」と非推奨の表示が出ている。最新は 15.1.3 で 2024-06 のまま)
+  1. Prometheus の公式の JavaScript のクライアント `@prometheus-io/client` を使う (リポジトリは prometheus/client_js。旧名の `prom-client` の後継)
+  1b. `prom-client` を使う (採らない。npm で「`@prometheus-io/client` に置き換えられた」と非推奨の表示が出ている。最新は 15.1.3 で 2024-06 のまま)
   2. テキスト形式を自分で書く (`process.cpuUsage()`、`process.memoryUsage()`、`perf_hooks.monitorEventLoopDelay()` を読み、形式の決まり (エスケープ、`# HELP`・`# TYPE` の行、ヒストグラムの `_bucket`・`_sum`・`_count` と `le="+Inf"`) を自分で守る)
   3. OpenTelemetry の SDK と Prometheus の exporter (apps/app は `@opentelemetry/exporter-prometheus` を使っている)
 - **Selected Approach**: 1。
@@ -30,7 +30,7 @@
 - **Trade-offs**: 本番の依存が 11 個から 12 個になる。`@prometheus-io/client` は HTTP の層だけで使い、変換の子は読み込まない (`test/layers/layer-rules.ts` に足す)。
 - **npm で確かめたこと (2026-11-19)**:
   - `@prometheus-io/client` 0.16.1 (最初の公開は 2026-08-21)。ライセンスは Apache-2.0。依存は `@opentelemetry/api` (Apache-2.0) と `tdigest` (MIT。さらに `bintrees` MIT)。Node は ^22 || ^24 || >=26 で、このサービスの >=24 に合う。install のときのスクリプトは無い
-  - `@prometheus-io/client` 15.1.3 も Apache-2.0 で、依存は同じ。非推奨で、後継が `@prometheus-io/client` である
+  - `prom-client` 15.1.3 も Apache-2.0 で、依存は同じ。非推奨で、後継が `@prometheus-io/client` である
   - 版は 0.x なので、`^0.16.1` は 0.16.x の範囲に限られる。API が今後変わりうる点を、依存の更新のときに確かめる
 - **Follow-up (実装のタスクで確かめること)**: `@prometheus-io/client` は、いまの `pnpm-lock.yaml` にも、手元の pnpm の store にも無い。入れるときに次を確かめ、対象 spec の research.md §1.4 の形で記録する: この spec が使う API (`Registry`、`Gauge`、`Counter`、`Histogram`、プロセスの既定の指標、`registry.contentType`) が、そのままの名前で在ること。版を固定する範囲 (ほかの依存と同じく `^`)、`pnpm-lock.yaml` に入る依存の木が上の内容と一致すること、install のときにスクリプトを動かさないこと (`pnpm-workspace.yaml` の `allowBuilds` を広げない)、image の大きさ (いまは展開して amd64 で 259,258,880 バイト、arm64 で 277,116,416 バイト。上限 400,000,000 バイト) が大きく変わらないこと。
 
