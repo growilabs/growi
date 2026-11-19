@@ -261,6 +261,35 @@ describe('the extract results', () => {
     ).toBe(1);
   });
 
+  it('counts the 422 made after the caller went away, and the disconnect', async () => {
+    const held = holdingRunner({ endOnAbort: true });
+    const { url, token } = await service.restart(held.runner);
+    const caller = new AbortController();
+    const leaving = postFile(url, 'a.txt', 'slow', {
+      token,
+      signal: caller.signal,
+    }).catch(() => null);
+    await held.started;
+
+    caller.abort();
+    await leaving;
+
+    // The answer is counted once it is built, after the run has ended.
+    await expect
+      .poll(async () =>
+        seriesValue(await scrape(url), RESPONSES, {
+          endpoint: '/extract',
+          status: '422',
+        }),
+      )
+      .toBe(1);
+    expect(
+      seriesValue(await scrape(url), RESULTS, {
+        result: 'client_disconnected',
+      }),
+    ).toBe(1);
+  });
+
   it('counts a runner that raised as internal, once', async () => {
     runner.run.mockRejectedValueOnce(new Error('boom'));
     expect((await post()).status).toBe(500);
