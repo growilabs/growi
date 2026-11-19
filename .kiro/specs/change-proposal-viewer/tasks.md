@@ -257,7 +257,7 @@
   - Recent Changes・ページ履歴・作者の表示・通知の既存のテストが変更なしで通っていることを確かめている
   - _Requirements: 6.4, 10.4_
 
-- [x] 8. core の変更: ページがもう無い操作の見え方とパス（core の要件 6.7・9.15・9.16・9.17。決まりは core の design と、research.md の決定「ページがもう無い Change オペレーションは、取り消し対象 Proposal の作成者と、取り消した人にも見せる」「編集の操作のパスは、反映したときに操作の記録に残す」にある）
+- [x] 8. core の変更: ページがもう無い操作の見え方とパス（core の要件 6.7・9.15・9.16・9.17。決まりは core の design と、research.md の決定「ページがもう無い Change オペレーションは、取り消し対象 Proposal の作成者と、取り消した人にも見せる」「編集の Change オペレーションのパスは、適用したときに Change オペレーションの記録に残す」にある）
 - [x] 8.1 (P) 見え方の純関数に、取り消しの相手の扱いを足す
   - `server/domain/select-visible-operations.ts` の `VisibilityOperationFacts` に `revertedByProposalId` を、`VisibilityContext` に `isOriginalRequester`（見ている取り消しの Change Proposal の元を、見る人が依頼した）と `revertProposalIdsByViewer`（見る人が依頼した取り消しの Change Proposal の ID の集合）を足す
   - 対象のページが `deletedPageIds` に入る操作は、依頼した人に返し、取り消しの相手（`isOriginalRequester` が真、または操作の `revertedByProposalId` が `revertProposalIdsByViewer` に入る）には、状態が反映済み・取り消し済み・取り消しを断られたのときだけ返す。まだページが無い新規作成（ページの ID が無い）は、今のまま依頼した人にだけ返す
