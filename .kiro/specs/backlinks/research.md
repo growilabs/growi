@@ -384,6 +384,20 @@
     it directly, and a copy in config could disagree with it. If the document goes missing, the boot
     upsert recreates it as "not started", and a rerun is harmless because the upsert is idempotent;
     reconstructing "complete" from `pagelinks` is not possible (a page without links has no rows).
+  - *A job document missing at runtime is reported, not repaired (decided 2026-11-19)*: nothing in
+    GROWI deletes it and GROWI-to-GROWI transfers exclude it, so it disappears only by an operator's
+    hand (or a restore into a running server). The admin endpoints could recreate it, but whether a
+    request is then claimed depends on a poll existing in the process, and the poll is scheduled
+    only when coverage was not `all` at boot: otherwise a Start would sit in `requested` with nothing
+    to claim it. Recreating it as `all` would need the boot-time coverage kept in process, and would
+    override an operator who deleted it to force a rebuild, disagreeing with what a restart produces
+    (`none`). A tick-side recreation helps only while the poll runs, and may only write `idle`, since
+    the tick cannot know an admin asked. A restart is right in every case, so the endpoints report
+    that one is needed.
+  - *The poll does not stop itself when a run reaches `all` (decided 2026-11-19)*: stopping it would
+    make Start (and recovery from a missing document) responsible for restarting it, so `PageLinkService`
+    would have to keep the poll for the endpoints. The saving is one primary-key read a minute per
+    instance until the next restart, which an upgrade brings anyway.
   - *Stop and resume are part of the design (decided 2026-10-28)*: now that admins start the job, a
     long run on a large wiki needs a way to be interrupted that is not a restart. It is cheap because
     resume is the crash-recovery path the design already has (marker saved only after a page's rows

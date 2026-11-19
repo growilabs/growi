@@ -944,7 +944,7 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
     `max(5000 ms × restRatio, 1000 / backfillMaxPagesPerSecond)` and the margin (15 s) covers the
     attempts' own page cycles and the checkpoint write. At the defaults that is
     10 + 15 + 20 + 15 = **60 s**: long enough that a healthy loop never loses its claim between
-    checkpoints, short enough that a dead owner's job is taken over within about one minute plus
+    checkpoints, short enough that a dead owner's job is taken over within about the lease plus
     one idle tick (one minute). A lower configured duty lengthens the lease with the rest.
 - **Failing page**: an error on a page (body read, parse or write) is retried in place up to 5
   attempts with a 5 s backoff, the live drain's `MAX_UPSERT_ATTEMPTS` shape, enough to ride out a
@@ -1112,6 +1112,7 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
   | `stopped` | where it stopped (processed of `runTotal`) | Resume, or a new scope + Start |
   | `coverage: partial`, idle | "Backlinks cover pages edited since `<coveredSince>`; about N older pages are not included" | scope picker + Start |
   | `coverage: all` | "Backlinks are indexed for all pages (completed `<completedAt>`)" | none |
+  | no job document | a warning that GROWI must be restarted to recreate the backfill state | none |
 
   The line stays after completion instead of hiding the whole section, so an admin who comes back can
   tell "finished" from "feature missing". The server enforces the same rules (the start endpoint
@@ -1187,7 +1188,12 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
 - **If the document goes missing**, the boot upsert recreates it as `coverage: none`: the admin
   settings read "not started", and a run redoes work already in `pagelinks`, which the idempotent
   upsert makes harmless. A run that finds its document gone at a checkpoint (its fenced write is
-  refused) stops and recreates it, through the boot upsert, instead of continuing. The rows in `pagelinks` stay valid either way.
+  refused) stops and recreates it, through the boot upsert, instead of continuing. Otherwise nothing
+  recreates it while the server is up: the idle tick returns on a missing document, and the admin
+  endpoints do not recreate it either. The state read reports it as missing, and start, stop and
+  resume are rejected without writing, so the admin settings show a restart warning; a restart is
+  the one recovery that is right whether or not a poll was scheduled at boot (research.md). The
+  rows in `pagelinks` stay valid either way.
 - The backlinks panel shows an "index still building / partial" state whenever coverage is not `all`
   or a run is active, so a gated or in-progress backfill is a visible gap and not a silent one; for
   a partial index it says that pages not edited since `coveredSince` are not included (4.4). Whether
