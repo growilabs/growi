@@ -160,6 +160,29 @@ describe('GET /_api/search', () => {
       expect(searchService.searchByFacet).not.toHaveBeenCalled();
     });
 
+    it.each([
+      { name: 'an unknown facet', query: { q: 'word', facet: 'bogus' } },
+      { name: 'an empty facet', query: { q: 'word', facet: '' } },
+      { name: 'a repeated facet', query: 'q=word&facet=all&facet=pages' },
+      { name: 'an object-shaped facet', query: 'q=word&facet[$ne]=pages' },
+      {
+        name: 'facet=all with an unknown resolve mode',
+        query: { q: 'word', facet: 'all', resolve: 'bogus' },
+      },
+      {
+        name: 'facet=all with a page size above the facet search limit',
+        query: { q: 'word', facet: 'all', limit: '201' },
+      },
+    ])('$name while attachment search is disabled', async ({ query }) => {
+      featureEnabled.value = false;
+
+      const res = await request(app).get('/_api/search').query(query);
+
+      expect(res.status).toBe(200);
+      expect(res.text).toBe(legacyResponseText);
+      expect(searchService.searchByFacet).not.toHaveBeenCalled();
+    });
+
     it('facet=all while Elasticsearch is not configured', async () => {
       searchService = mock<SearchService>({
         isConfigured: false,

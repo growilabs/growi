@@ -596,7 +596,7 @@ Key decisions:
 | 8.2 | 監視メトリクス | **未実装** (tasks.md 3.4)。件数と所要時間を数値で取り出す口は無い | — | — |
 | 8.3 | Mongo 永続化 + TTL | `extractionfailurelogs` Prisma モデル + index を作る migration (`occurredAt_1` に 90 日の TTL) | — | — |
 | 8.4 | 失敗取得 API | apiv3 admin failures | `GET /admin/attachment-search/failures` | — |
-| 9.1 | 無効時完全互換 | isFeatureEnabled gate 全経路 (既知のずれ: 無効でも不正な `facet` に 400 を返す。tasks.md 9.4) | — | — |
+| 9.1 | 無効時完全互換 | isFeatureEnabled gate 全経路 (無効時は `facet` / `resolve` を読まない) | — | — |
 | 9.2 | Page index 非劣化 | 添付は別 index、Page mapping 不変 | — | — |
 | 9.3 | API 後方互換 | `IPageWithSearchMeta.meta.attachmentHits` optional | — | — |
 | 9.4 | optional フィールド | `interfaces/search.ts` 差分 (`IPageSearchMeta.attachmentHits`) | — | — |
@@ -994,7 +994,7 @@ resolveAttachmentSecondary(
 
 | Method | Endpoint | Request | Response | Errors |
 |--------|----------|---------|----------|--------|
-| GET | /_api/search (既存 apiv1 の拡張) | `?q=&facet=all\|pages\|attachments&offset=&limit=&resolve=primary\|full` (`facet` 省略時は `pages` = 従来どおり。facet を処理するのは機能が有効で `nq` が無いときだけ。`resolve` は `facet` があるときだけ読む) | `facet` 省略時・`facet=pages`・機能無効・`nq` 付きは既存の `IFormattedSearchResult`。それ以外は `IFacetedSearchResult` (下記) | 既存どおり。`facet` / `resolve` が決まった値でなければ `{ ok: false, code: 400 }` (apiv1 の慣習どおり HTTP 200。機能が無効でも返る)。facet を処理するときは、`limit` が 1〜200 の整数 (既定 50)、`offset` が 0 以上の整数でなければ同じく 400。`limit + offset` が 10,000 を超えると、facet の検査より前に、既存のページ検索と同じ `{ ok: false, error: '(limit + offset) must be less than or equal to 10000' }` を返す (`code` は付かず、HTTP 200) |
+| GET | /_api/search (既存 apiv1 の拡張) | `?q=&facet=all\|pages\|attachments&offset=&limit=&resolve=primary\|full` (`facet` 省略時は `pages` = 従来どおり。facet を処理するのは機能が有効で `nq` が無いときだけ。`resolve` は `facet` があるときだけ読む) | `facet` 省略時・`facet=pages`・機能無効・`nq` 付きは既存の `IFormattedSearchResult`。それ以外は `IFacetedSearchResult` (下記) | 既存どおり。`facet` / `resolve` が決まった値でなければ `{ ok: false, code: 400 }` (apiv1 の慣習どおり HTTP 200。機能が有効なときだけ検査する)。facet を処理するときは、`limit` が 1〜200 の整数 (既定 50)、`offset` が 0 以上の整数でなければ同じく 400。`limit + offset` が 10,000 を超えると、facet の検査より前に、既存のページ検索と同じ `{ ok: false, error: '(limit + offset) must be less than or equal to 10000' }` を返す (`code` は付かず、HTTP 200) |
 | GET | /_api/v3/search/attachments | `?q=&pageIds=id1,id2,...` (`pageIds` はコンマ区切りか繰り返し。重複を除いて 1〜20 件の ObjectId) | `IResolvedSecondaryResult` (`{ facet: 'all', enrichments }`) | 400 `invalid_query` / `invalid_page_ids`, 403 (未ログインでゲストの閲覧が許可されていない), 500, 503 `feature_disabled` |
 | POST | /_api/v3/attachments/:id/reextract | — | `{ outcome: { kind } }` (`ReextractResponse`。抽出テキストは返さない) | 400 (id が ObjectId でない), 404 `notfound_or_forbidden` (添付なし・ページに属さない・親ページなし・admin でもページを閲覧できる利用者でもない、を区別しない同一応答), 429 (回数制限: 添付ごとに 1 分あたり 5 回。rate-limiter が `res.sendStatus(429)` で返すので、本文は `Too Many Requests` の文字だけで、エラーコードは無い), 500 `reextract_failed` (最後まで進められなかった) / `internal_server_error`, 503 `feature_disabled` / `reextract_timeout` (`timeoutMs × 2 + 30 秒` を超えた。抽出の順番待ちを含む) |
 | GET | /_api/v3/admin/attachment-search/failures | `?limit=N&since=iso` (`limit` は 1〜200、既定 50) | `{ items: ExtractionFailureEntry[], total: number }` (新しい順。`total` は `since` 以降の全件数) | 400 validation, 403 forbidden |
@@ -1023,7 +1023,7 @@ export type IFacetedSearchResult = IDataWithRequiredMeta<IPageWithSearchMeta[], 
 **`GET /_api/search` の互換性** (Req 9.1 / 9.3):
 - `facet` を付けない既存の利用者 (UI 以外の API 利用者、MCP など) には、機能の有効・無効にかかわらず従来と同じ処理・同じ応答を返す。UI は既定で `facet=all` を明示して送る
 - 機能無効時に `facet=all` / `attachments` が来た場合は `pages` として処理する (503 にはしない。検索そのものは成立するため)
-- **既知のずれ**: `facet` / `resolve` の値の検査は、機能の有効・無効を見る前に行う。そのため機能が無効でも、不正な `facet` (と、`facet` 付きの不正な `resolve`) には 400 が返る。機能導入前は未知のクエリとして無視されていたので、Req 9.1 の「無効時は導入前と同一」から外れている (直すタスクは tasks.md 9.4)
+- **機能が無効のとき**: `facet` / `resolve` を読まない。値が不正でも検査せず、従来のページ検索をそのまま行う (Req 9.1。機能導入前は未知のクエリとして無視されていたのと同じ動き)
 - 応答の外形 (`ApiResponse.success` + `IFormattedSearchResult`) は変えず、追加分はすべて optional
 
 **`GET /_api/v3/search/attachments` の制約**:
@@ -1571,4 +1571,4 @@ flowchart LR
 7. **`packages/attachment-text-extractor-client` の公開境界**: server 専用依存として apps/app から import し、UI 側に混入させないレイヤリング制約を lint ルール化するか検討
 8. **`requiresReindex` cardinality agg の共有 ES コスト**: 30 秒のキャッシュはインスタンスごとに独立しているので、複数インスタンスでは admin GET のたびに各インスタンスが集計を投げうる。`precision_threshold` の指定、共有のキャッシュ、MongoDB 上の件数の記録への置き換えのどれかを、リリース後に検討する
 9. **複数インスタンスでの作り直し**: 実行中の判定と、作り直し中の削除の記録はインスタンスごとのメモリにある (research.md 8.6 の「残っている制約」)
-10. **残っている作業**: tasks.md の未完了のタスク (3.3 応答の大きさと呼び出し全体の制限時間、3.4 監視メトリクス、6.4 10,000 ページを超える orphan sweep、9.4 無効時の `facet` の検査、10.8 検索の速さ)
+10. **残っている作業**: tasks.md の未完了のタスク (3.3 応答の大きさと呼び出し全体の制限時間、3.4 監視メトリクス、6.4 10,000 ページを超える orphan sweep、10.8 検索の速さ)
