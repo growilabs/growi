@@ -935,9 +935,11 @@ type CommentReactionHeaderButtonProps = {
 - `classifyReactionUpdateFailure`: `reaction-kind-limit-exceeded` → `kind-limit-exceeded`、`notfound_or_forbidden` → `comment-unavailable`、`validation_failed`・`invalid-reaction-emoji`・`code` の無いエラー・配列でない値・通信の失敗 → `failed` になること。
 - `useCanReactToComments`: ゲスト、共有リンク、閲覧専用（許可あり／なし）、`isReadOnly`、ごみ箱のページでも判定が変わらないこと（要件 5.4〜5.8、6.2）。
 - `CommentReactionHeaderButton`: 0 件のときだけ「リアクション追加」が描画され、1 件以上・`canReact` が false・`chips` が `null` や読み込み中では何も描画されないこと、Tab で到達できること、選んだ絵文字で追加が要求されること、更新中は無効になること、渡した `className` が最も外側の要素に付くこと、最初のリアクションの追加でヘッダーのボタンが消えたあと、フォーカスがチップ行の末尾の追加ボタンへ移ること（同じコメントが2か所に出ているときは、追加を始めた側へ移ること、利用者が別の要素へ動かしていたら動かさないこと、失敗して行が現れないときは何も動かさないこと）。コメント側のヘッダー（`Comment`、`InlineCommentItem`（広い画面と狭い画面）、`InlineCommentReplies`、`InlineCommentPopoverEntry`）に置かれること、折りたたみ表示には無いこと、ポップオーバーでは表示の出し分けのクラスを渡さないこと。表示の出し分け（`opacity`、ホバー、フォーカス、本文と重ならない位置）は CSS の挙動なので E2E で確かめる（要件 3.1、3.7）。
-- `ReactionChip`: 人数の表示、自分のチップの `aria-pressed`、押すと追加・解除が要求されること、`canReact` が false のときと更新中は押しても要求されないこと、ホバーできる端末ではホバーとフォーカスで利用者一覧（表示名、`username`、ID 文字列）が開き、離れると閉じ、どちらも要求しないこと（読み取り専用と更新中も同じ）、ホバーできない端末では一覧が出ないこと（要件 1.2、1.4、1.5、1.10、2.1、2.2、6.2）。
+- `ReactionChip`: 人数の表示、自分のチップの `aria-pressed`、押すと追加・解除が要求されること、`canReact` が false のときと更新中は押しても要求されないこと、ホバーできる端末ではホバーとフォーカスで利用者一覧が開き、離れると閉じ、どちらも要求しないこと（読み取り専用と更新中も同じ）、ホバーできない端末では一覧が出ないこと、説明文が人数と（ホバーできる端末では）利用者の表示名を持つこと（要件 1.2、1.4、1.5、2.1、2.2、6.2）。
+- `ReactionUsersPopover`: 利用者の表示名を渡された順に並べること、中をクリックしても閉じずフォーカスが中に移ること、フォーカスが外へ移ると閉じること（要件 1.5）。
+- `toReactionUserDisplayName`: `name` を優先し、空なら `username`、ID 文字列ならそのまま返すこと（要件 1.10）。表示名の規則はここだけで確かめ、チップと一覧のテストは名前のある利用者で表示名を並べることだけを確かめる。
 - `useCanHover`: `(hover: hover)` の結果を返し、変化に追従すること。
-- `CommentReactionBar`: チップと人数の表示、自分のチップの `aria-pressed`、チップを押すと API が呼ばれること、`canReact` が false のとき「リアクション追加」が無く、チップを押しても API を呼ばず、ホバーで利用者一覧が開くこと、上限で「リアクション追加」が無効になること、チップが無ければ（読み取り専用でなくても）何も描画しないこと、`chips` が `null` なら何も描画しないこと（要件 1.1〜1.7、1.10、3.1、6.2、6.5、7.2）。
+- `CommentReactionBar`: チップと人数の表示、自分のチップの `aria-pressed`、チップを押すと API が呼ばれること、`canReact` が false のときと更新中はチップを押しても API を呼ばないこと、`canReact` が false のとき「リアクション追加」が無いこと、上限で「リアクション追加」が無効になること、チップが無ければ（読み取り専用でなくても）何も描画しないこと、`chips` が `null` なら何も描画しないこと（要件 1.1〜1.7、3.1、6.2、6.5、7.2）。チップ単体の振る舞い（利用者一覧、押せないときの属性）はチップのテストに任せ、ここではフックの値がチップと追加ボタンに届くことを、押したときに API が呼ばれるかどうかで確かめる。
 - `overwrite-params/comment-reactions`: 24 桁の16進文字列が ObjectId になること、不正な値はそのまま返ること、`emoji` の別名（肌の色つきを含む）が正規のキーになり、正規化できない値はそのまま返ること、`generateOverwriteParams('commentreactions', ...)` がこの params を返すこと（要件 10.2）。
 - `@growi/emoji-mart-data`: 既存の `skins[0]` の値が拡張前と一致すること、肌の色対応の絵文字が6件の `skins` を持つこと、`aliases` の存在。`@emoji-mart/data` の既定の export のすべての id（と肌の色）が `normalizeReactionKey` を通ること（ピッカーとサーバーの検証のずれの検出）。
 

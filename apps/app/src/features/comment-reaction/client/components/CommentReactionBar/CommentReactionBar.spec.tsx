@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 
 import type { EmojiPickerSelection } from '@growi/editor/dist/client/components/EmojiPicker';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import type {
@@ -191,7 +191,7 @@ describe('CommentReactionBar', () => {
     expect(setReaction).toHaveBeenCalledWith(expectedKey, true);
   });
 
-  it('keeps the chips but has no add button when reactions are not allowed, and hovering a chip still lists the users', async () => {
+  it('keeps the chips but has no add button when reactions are not allowed, and pressing a chip writes nothing', async () => {
     const { setReaction } = setup({ chips: [makeChip()], canReact: false });
 
     render(
@@ -201,11 +201,6 @@ describe('CommentReactionBar', () => {
     const chip = screen.getByRole('button', { name: '+1' });
     expect(chip).toHaveTextContent('👍');
     expect(addButton()).toBeNull();
-
-    await userEvent.hover(chip);
-
-    await waitFor(() => expect(screen.getByText('Alice A.')).toBeTruthy());
-    expect(screen.getByText('bob')).toBeTruthy();
 
     await userEvent.click(chip);
     expect(setReaction).not.toHaveBeenCalled();
@@ -249,9 +244,7 @@ describe('CommentReactionBar', () => {
       />,
     );
 
-    const chip = screen.getByRole('button', { name: '+1' });
-    expect(chip).toHaveAttribute('aria-disabled', 'true');
-    await userEvent.click(chip);
+    await userEvent.click(screen.getByRole('button', { name: '+1' }));
     expect(setReaction).not.toHaveBeenCalled();
     expect(addButton()).toHaveAttribute('aria-disabled', 'true');
   });

@@ -33,8 +33,7 @@ const makeChip = (
   reactedByMe: false,
   users: [
     { _id: 'u1', username: 'alice', name: 'Alice A.', imageUrlCached: '' },
-    { _id: 'u2', username: 'bob', name: '', imageUrlCached: '' },
-    '64b0000000000000000000ff',
+    { _id: 'u2', username: 'bob', name: 'Bob B.', imageUrlCached: '' },
   ],
   ...overrides,
 });
@@ -63,7 +62,7 @@ describe('ReactionChip', () => {
     render(<ReactionChip chip={makeChip()} canReact onToggle={vi.fn()} />);
 
     expect(chipButton()).toHaveAccessibleDescription(
-      'comment_reaction.reacted_count:2: Alice A., bob, 64b0000000000000000000ff',
+      'comment_reaction.reacted_count:2: Alice A., Bob B.',
     );
   });
 
@@ -195,8 +194,7 @@ describe('ReactionChip', () => {
       await userEvent.hover(chipButton());
 
       expect(await screen.findByText('Alice A.')).toBeInTheDocument();
-      expect(screen.getByText('bob')).toBeInTheDocument();
-      expect(screen.getByText('64b0000000000000000000ff')).toBeInTheDocument();
+      expect(screen.getByText('Bob B.')).toBeInTheDocument();
 
       await userEvent.unhover(chipButton());
 

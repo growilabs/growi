@@ -30,20 +30,18 @@ afterEach(() => {
 });
 
 describe('ReactionUsersPopover', () => {
-  it('lists users in the given order, preferring name over username and keeping id strings as is', async () => {
+  it('lists the display names of the users in the given order', async () => {
     const anchor = renderPopover([
+      { _id: 'u2', username: 'bob', name: 'Bob B.', imageUrlCached: '' },
       { _id: 'u1', username: 'alice', name: 'Alice A.', imageUrlCached: '' },
-      { _id: 'u2', username: 'bob', name: '', imageUrlCached: '' },
-      '64b0000000000000000000ff',
     ]);
 
     await userEvent.hover(anchor);
     const items = await screen.findAllByRole('listitem');
 
     expect(items.map((item) => item.textContent)).toEqual([
+      'Bob B.',
       'Alice A.',
-      'bob',
-      '64b0000000000000000000ff',
     ]);
   });
 
