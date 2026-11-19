@@ -208,13 +208,12 @@ describe('CommentReactionBar', () => {
     expect(chip).toHaveTextContent('👍');
     expect(addButton()).toBeNull();
 
-    await userEvent.click(chip);
-    expect(setReaction).not.toHaveBeenCalled();
-
     await userEvent.hover(chip);
 
     await waitFor(() => expect(screen.getByText('Alice A.')).toBeTruthy());
     expect(screen.getByText('bob')).toBeTruthy();
+
+    await userEvent.click(chip);
     expect(setReaction).not.toHaveBeenCalled();
   });
 
