@@ -841,6 +841,7 @@
     "successfully_created": "The user {{username}} is successfully created.",
     "can_not_activate_maximum_number_of_users": "Can not activate more than the maximum number of users.",
     "failed_to_activate": "Failed to activate.",
+    "only_invited_user_can_activate": "Only an invited user can activate an account.",
     "unable_to_use_this_user": "Unable to use this user.",
     "complete_to_install1": "Complete to Install GROWI ! Please login as admin account.",
     "complete_to_install2": "Complete to Install GROWI ! Please check each settings on this page first.",
