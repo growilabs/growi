@@ -1105,7 +1105,7 @@
       "method": "DELETE",
       "path": "/_api/v3/pages/empty-trash",
       "unauthenticated": 403,
-      "guest": 500,
+      "guest": 403,
       "readonly": 400,
       "admin": 200
     },

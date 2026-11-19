@@ -154,6 +154,8 @@ async function provisionVaultE2eFixture(): Promise<void> {
   // must never be stored in the database. Pin them in env BEFORE loadConfigs.
   process.env.VAULT_MANAGER_ENDPOINT = vm.endpoint;
   process.env.VAULT_MANAGER_INTERNAL_SECRET = internalSecret;
+  // `app:vaultEnabled` is env-only as well; the gateway answers 404 without it.
+  process.env.VAULT_ENABLED = 'true';
 
   const seed = await seedVaultE2eFixture(vm.endpoint, internalSecret);
 

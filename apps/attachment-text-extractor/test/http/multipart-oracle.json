@@ -1,0 +1,2262 @@
+{
+  "about": [
+    "What the Python service (uvicorn, default settings) and its upload parser did with the requests of test/http/multipart-cases.ts (research.md 16.9 (a)), recorded 2026-11-09 before the Python service is removed.",
+    "http: status and ErrorResponse code of the first answer to the raw request (code null: no JSON code). parser: receive_upload steps on the body alone, in one chunk (accepted, file name, mimeType hint, file size and sha1).",
+    "parserWithoutCharset: the same with the charset parameter removed from the Content-Type: the Node service does not read the request charset (research.md 7.5 3), so this is its expectation.",
+    "requestSha1: sha1 of rawRequest(case, REQUEST_TOKEN); a mismatch means the generator no longer builds the bytes these results belong to."
+  ],
+  "cases": {
+    "10": {
+      "requestSha1": "867030f2b76f4127559565642ba79e3c95c00e33",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "A.TXT",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "11": {
+      "requestSha1": "933fc78ed7dbb62b0e411f964abdf1206042d49b",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": null,
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "12": {
+      "requestSha1": "42b3dd8e91c4ba176ec7edbfac50e33c661441d7",
+      "http": {
+        "status": 422,
+        "code": "extraction_failed"
+      },
+      "parser": {
+        "accepted": false
+      }
+    },
+    "13": {
+      "requestSha1": "4d217052279f06447fa2934ad539d9d2445b336b",
+      "http": {
+        "status": 422,
+        "code": "extraction_failed"
+      },
+      "parser": {
+        "accepted": false
+      }
+    },
+    "14": {
+      "requestSha1": "7decd6d93c8802bcd43d2017fdf44c2534bfb6cc",
+      "http": {
+        "status": 422,
+        "code": "extraction_failed"
+      },
+      "parser": {
+        "accepted": false
+      }
+    },
+    "15": {
+      "requestSha1": "7e103235221eb2a7d3bc3a008f7d36d90518ff0a",
+      "http": {
+        "status": 422,
+        "code": "extraction_failed"
+      },
+      "parser": {
+        "accepted": false
+      }
+    },
+    "16": {
+      "requestSha1": "25211a4bae8f35024e7f0da7f2eabc2a9abc78d0",
+      "http": {
+        "status": 422,
+        "code": "extraction_failed"
+      },
+      "parser": {
+        "accepted": false
+      }
+    },
+    "17": {
+      "requestSha1": "0981ddcf14802e706cd77dadcc2903f891dc29fa",
+      "http": {
+        "status": 422,
+        "code": "extraction_failed"
+      },
+      "parser": {
+        "accepted": false
+      }
+    },
+    "18": {
+      "requestSha1": "540cc170aa903c389d3d352ec9a1f1b08bfa99f3",
+      "http": {
+        "status": 422,
+        "code": "extraction_failed"
+      },
+      "parser": {
+        "accepted": false
+      }
+    },
+    "19": {
+      "requestSha1": "92fb1c4fb651656a5c9ddeb2b79c80b81cc44738",
+      "http": {
+        "status": 422,
+        "code": "extraction_failed"
+      },
+      "parser": {
+        "accepted": false
+      }
+    },
+    "20": {
+      "requestSha1": "bc66581dfee344a52664f98bc42207da6b19efe4",
+      "http": {
+        "status": 422,
+        "code": "extraction_failed"
+      },
+      "parser": {
+        "accepted": false
+      }
+    },
+    "21": {
+      "requestSha1": "7bca51dab052fa8df246b75141d420bfdbff5f4b",
+      "http": {
+        "status": 422,
+        "code": "extraction_failed"
+      },
+      "parser": {
+        "accepted": false
+      }
+    },
+    "22": {
+      "requestSha1": "ba5959c9633817744f79382901cd5fc6c2ffe82c",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": null,
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "23": {
+      "requestSha1": "6e064e3197180ab6fb951d0e8fa7ca8e1c2078a6",
+      "http": {
+        "status": 422,
+        "code": "extraction_failed"
+      },
+      "parser": {
+        "accepted": false
+      }
+    },
+    "24": {
+      "requestSha1": "e6180f9ab576382b301406584424c838084a6601",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 0,
+        "sha1": "da39a3ee5e6b4b0d3255bfef95601890afd80709"
+      }
+    },
+    "27": {
+      "requestSha1": "fa6017865e27c634b5460f1c732888fcc2acb1a6",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "28": {
+      "requestSha1": "1ecf18c3b4b725e819e8b1166d85fffeb9d63d30",
+      "http": {
+        "status": 422,
+        "code": "extraction_failed"
+      },
+      "parser": {
+        "accepted": false
+      }
+    },
+    "29": {
+      "requestSha1": "852059130a83a3eefb9b6a19ecd0d4a9b0160cad",
+      "http": {
+        "status": 422,
+        "code": "extraction_failed"
+      },
+      "parser": {
+        "accepted": false
+      }
+    },
+    "32": {
+      "requestSha1": "d906f248478d97eb1a9209787da15f4a6e8af368",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": null,
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "33": {
+      "requestSha1": "35703180d95c18a39341c8409b3b18e39e865df0",
+      "http": {
+        "status": 422,
+        "code": "extraction_failed"
+      },
+      "parser": {
+        "accepted": false
+      }
+    },
+    "34": {
+      "requestSha1": "e0904a9b945baa65c12cc7ad7f2addc60a9aa1f3",
+      "http": {
+        "status": 422,
+        "code": "extraction_failed"
+      },
+      "parser": {
+        "accepted": false
+      }
+    },
+    "35": {
+      "requestSha1": "d5789d47d7f5ac76fc3b0a82c0bff05354f92898",
+      "http": {
+        "status": 422,
+        "code": "extraction_failed"
+      },
+      "parser": {
+        "accepted": false
+      }
+    },
+    "36": {
+      "requestSha1": "4df247475d85920f3fc6e39f93b5c6633dc92990",
+      "http": {
+        "status": 422,
+        "code": "extraction_failed"
+      },
+      "parser": {
+        "accepted": false
+      }
+    },
+    "37": {
+      "requestSha1": "bc1afbedbf1ad3cfd4f0f8bac85df66ca30c618c",
+      "http": {
+        "status": 400,
+        "code": null
+      }
+    },
+    "38": {
+      "requestSha1": "dc0fff08a6c2e40d3291e8794b4ba30b79a79e72",
+      "http": {
+        "status": 422,
+        "code": "extraction_failed"
+      },
+      "parser": {
+        "accepted": false
+      }
+    },
+    "39": {
+      "requestSha1": "53f1a279f0c77ee19abe7596df119c93b440e2a0",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "40": {
+      "requestSha1": "7597bd0eeb07e65b97544180ec944b21809da452",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a\r\nb.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "41": {
+      "requestSha1": "6ae4fcfdbd984a114a17861b6f0d821d5e882589",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.zzz",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "42": {
+      "requestSha1": "0bba494a1ca5c260c17712e16d8acd0526fbe18b",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "ú{.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "43": {
+      "requestSha1": "f549c0fbf328cdf08da1a3cd8e968f43e8d75e42",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": null,
+        "size": 8,
+        "sha1": "70db2df97b3e88c66c50ef9df98dc51de491cc7d"
+      }
+    },
+    "01": {
+      "requestSha1": "2d7c7ca7611985463f87d358e8ab773518c31e72",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "02": {
+      "requestSha1": "f1df530bf1b1b5eabfa3477e3cb17d2986efc16c",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "日本語の資料.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "03": {
+      "requestSha1": "d4661f2bb606ce257d599bd6cac93d9c3f0b57e9",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "日本語.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "04": {
+      "requestSha1": "232bae5cae9d12762d5f7ab0a2587f2940967847",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "05": {
+      "requestSha1": "87d0ac6b43c82b4b1d3d4413c22c05c0cb28458a",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "dir/sub/a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "06": {
+      "requestSha1": "7e8a46b9ba5073e2cf81964fb20c2b90e9ce8e4b",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "07": {
+      "requestSha1": "b1331103c3d1e0ca95f6f064afa685cbfcaac24f",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "08": {
+      "requestSha1": "4de376d95dfa51b949a04e6ba9c4e979796a5591",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a\"b.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "09": {
+      "requestSha1": "eea49d5e04706e2f456ce10b1e637f8886b0f48b",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "my; file name.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "31a": {
+      "requestSha1": "4535f5bf12d97e2a8635c0e1853b1b272806c987",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn.txt",
+        "mimeType": null,
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "31b": {
+      "requestSha1": "86141d3688e879c1ace6465026be9f8f13a8aed7",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn.txt",
+        "mimeType": null,
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "31c": {
+      "requestSha1": "977a6c15f13cbad3b2d9e62626c2232f5612ce50",
+      "http": {
+        "status": 422,
+        "code": "extraction_failed"
+      },
+      "parser": {
+        "accepted": false
+      }
+    },
+    "31d": {
+      "requestSha1": "2aae343a6da676fa74a990d710f86a1a13f8cc19",
+      "http": {
+        "status": 422,
+        "code": "extraction_failed"
+      },
+      "parser": {
+        "accepted": false
+      }
+    },
+    "e01": {
+      "requestSha1": "4930b88f38cf76b1228d61b4d3ff1f542e30f94a",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "e02": {
+      "requestSha1": "68638c8ea27b0dc57b84c27fe9f93a13f21900c3",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "e02b": {
+      "requestSha1": "5d7359dbb3322d153a390a6003031deb24aaa7aa",
+      "http": {
+        "status": 422,
+        "code": "extraction_failed"
+      },
+      "parser": {
+        "accepted": false
+      }
+    },
+    "e03": {
+      "requestSha1": "719f11c623f1d278cc6a9885b8697d75d81a271b",
+      "http": {
+        "status": 422,
+        "code": "extraction_failed"
+      },
+      "parser": {
+        "accepted": false
+      }
+    },
+    "e06": {
+      "requestSha1": "67f94b7129c7bf89a47b5161cc10e4191ac5530e",
+      "http": {
+        "status": 422,
+        "code": "extraction_failed"
+      },
+      "parser": {
+        "accepted": false
+      }
+    },
+    "e07a": {
+      "requestSha1": "eac1e4ebe62f00cdf94d056cbb0ec5a49cb89ef9",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 29,
+        "sha1": "ad2b1040b39eaf09bb7527a745ea3c60bd02caff"
+      }
+    },
+    "e07b": {
+      "requestSha1": "6900691ce57d298a0962bdc33c26ce92d3af358f",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 27,
+        "sha1": "e8bf5cb26345b3b59cff23be3ea5e99356c4e5bd"
+      }
+    },
+    "e10": {
+      "requestSha1": "1efed4820c55cfd2e7dd8ea676341085ce96d250",
+      "http": {
+        "status": 422,
+        "code": "extraction_failed"
+      },
+      "parser": {
+        "accepted": false
+      }
+    },
+    "e11": {
+      "requestSha1": "66cc3e23d8d624f7abfa7f74e05cdedc90e6cfd4",
+      "http": {
+        "status": 422,
+        "code": "extraction_failed"
+      },
+      "parser": {
+        "accepted": false
+      }
+    },
+    "e12": {
+      "requestSha1": "c29ae87d06147536bd0c6853742e32411663e4f0",
+      "http": {
+        "status": 422,
+        "code": "extraction_failed"
+      },
+      "parser": {
+        "accepted": false
+      }
+    },
+    "e15b": {
+      "requestSha1": "d2e49fef004945c9d362dad7f5faa53e563c2764",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "e16": {
+      "requestSha1": "8422227cd34c9eca123e18ed5010c15b48ccc309",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 59,
+        "sha1": "03309b1979f11d679408d605f52202f37ac9e531"
+      }
+    },
+    "e19": {
+      "requestSha1": "96b9dea21a222c0d49494f95f6dcd5ad3d89ee50",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "e20": {
+      "requestSha1": "dd5b02a497ea35804319f0ee41023dfa3e724a40",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "e22": {
+      "requestSha1": "4e3ecbe377845195d434e11944ad239f74056155",
+      "http": {
+        "status": 422,
+        "code": "extraction_failed"
+      },
+      "parser": {
+        "accepted": false
+      }
+    },
+    "e23": {
+      "requestSha1": "d507985b33d1dad6185db2cb5fa3faaaa96e4785",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "e26": {
+      "requestSha1": "6feddc0b44c66d397e1517afb1809f738a950af3",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      },
+      "parserWithoutCharset": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "e27": {
+      "requestSha1": "ae30423451969e6b38dd96571e6f81653e511020",
+      "http": {
+        "status": 422,
+        "code": "extraction_failed"
+      },
+      "parser": {
+        "accepted": false
+      }
+    },
+    "e28": {
+      "requestSha1": "c7383fb23f5837446b4eb18cbc9efac5c16c98a3",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "e29": {
+      "requestSha1": "5d6c94177387b8abc016a4bff78b4363ff4cf4b4",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "e30": {
+      "requestSha1": "e27a8a7b5c8ab6b23980672852916fed1ec4f764",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "e33": {
+      "requestSha1": "dffd058130fd760a2dfc34da32d1ea54a696afdc",
+      "http": {
+        "status": 422,
+        "code": "extraction_failed"
+      },
+      "parser": {
+        "accepted": false
+      }
+    },
+    "h1": {
+      "requestSha1": "695ca53d3591f6b3859b4b44cd2c5b5ac66bb0b5",
+      "http": {
+        "status": 422,
+        "code": "extraction_failed"
+      },
+      "parser": {
+        "accepted": false
+      }
+    },
+    "h3": {
+      "requestSha1": "e272bceda252b9ea01de97768b1f1cee547ce0bd",
+      "http": {
+        "status": 422,
+        "code": "extraction_failed"
+      },
+      "parser": {
+        "accepted": false
+      }
+    },
+    "r01": {
+      "requestSha1": "21994ad9655d223cd9e8bda77d5f6c0084832a59",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "r02": {
+      "requestSha1": "1f779ae30cadfb595d02a4be800780e4fe2a65b1",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "r03": {
+      "requestSha1": "e996f3dcf78555297e4d936e59f0206bfa5b042c",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "r05": {
+      "requestSha1": "54cc881876d720bdc1fa1f02ed0211050c82a213",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "r08": {
+      "requestSha1": "4242b821cdff4432d14ab2d2b9fd3d08397cca3a",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt\nX",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "r12": {
+      "requestSha1": "f623d3c0c152c419dfbdd1e849be5d6f13114c10",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": null,
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "r14": {
+      "requestSha1": "b8d1708e2d70195135e15aa534005d81b720226a",
+      "http": {
+        "status": 422,
+        "code": "extraction_failed"
+      },
+      "parser": {
+        "accepted": false
+      }
+    },
+    "r16": {
+      "requestSha1": "da7cec3ef8a1c717caecf307c8f18b5986975b47",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": null,
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "r20": {
+      "requestSha1": "4b8556db31f7eb1fe56781d462f151c6c4c8fc0f",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 28,
+        "sha1": "b3e4f5c2f65d864ee99dff8dd92fb86a23c8681d"
+      }
+    },
+    "r21": {
+      "requestSha1": "71cee789b35c71be1eb776090a8aae0917b9dfcc",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 28,
+        "sha1": "3e3d1f99614524b1b668cad2b7fff096c808c9ac"
+      }
+    },
+    "r23": {
+      "requestSha1": "b84b8315e9000027641262adb95507c42202ca2c",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 31,
+        "sha1": "49509efe058645398117091a03c693e202b655b9"
+      }
+    },
+    "r31": {
+      "requestSha1": "ff3984b1822eb36b7356892792d95e4094900c1d",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "r34": {
+      "requestSha1": "883b7ac5ae8ac7f959452df42a67730b3659f44c",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "r36": {
+      "requestSha1": "63ee2fb2fac7628f3b31562bb2a873bd24fda8b8",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt/",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "r37": {
+      "requestSha1": "aae302cd924e35a3ad544f43e4b521d9d79aeefd",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a\u0000b.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "r41": {
+      "requestSha1": "3aeddd8f15601caa0c234d6041141d065916b920",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 28,
+        "sha1": "12d9213a7b4b3a09b038706be0c301b805903396"
+      }
+    },
+    "d01": {
+      "requestSha1": "aa8d0cd779a02de3091339c1973edf655ab085ab",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "d02": {
+      "requestSha1": "d78370cecad891426446cc354a693376f7f3580c",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "日本.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "d03": {
+      "requestSha1": "722c5f2cb387a45719f7b61e01b6a3d50d8cae91",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "xA.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "d07": {
+      "requestSha1": "740e93fa2076dbc5b9c6d138958bfea8695d0124",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "d08": {
+      "requestSha1": "2903288b019d45a893566d15eb7283b3fd63658d",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "ab.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "d09": {
+      "requestSha1": "d05bf9be1d0f1231cca6c121c8f0c82804fafb54",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "x.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "d10": {
+      "requestSha1": "ad6316b50c8b49b2a7c1c9a4c8f1b1ce197a7f08",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "b.pdf",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "d11": {
+      "requestSha1": "e9861488560069b874dbdc90e10a2b1c223c166c",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "d12": {
+      "requestSha1": "a76f27464ab2a47af0eeb6be4d133ddc6716af1f",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "日本.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      },
+      "parserWithoutCharset": {
+        "accepted": true,
+        "filename": "ú{.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "d13": {
+      "requestSha1": "5a248abbd7616a7f3425b06abb869d2e3e7792cb",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "d14": {
+      "requestSha1": "9667912141154408464c9ff110fbf73df06d2e12",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": null,
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "d15": {
+      "requestSha1": "df70999924fabe32d3bb60afe9b0b8561260a217",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": null,
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "d16": {
+      "requestSha1": "fb8b4271e195b086a4a2dc6e4883e38695ff9be3",
+      "http": {
+        "status": 422,
+        "code": "extraction_failed"
+      },
+      "parser": {
+        "accepted": false
+      }
+    },
+    "d17": {
+      "requestSha1": "a5ba615921865eea0c6dcec7b1555857eb179e05",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": null,
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "d18": {
+      "requestSha1": "852059130a83a3eefb9b6a19ecd0d4a9b0160cad",
+      "http": {
+        "status": 422,
+        "code": "extraction_failed"
+      },
+      "parser": {
+        "accepted": false
+      }
+    },
+    "d20": {
+      "requestSha1": "c81bc3f7446420a2647ed713210de72c6ce1b9b0",
+      "http": {
+        "status": 400,
+        "code": "unsupported_format"
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.zzz",
+        "mimeType": "application/x-unknown",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "d24": {
+      "requestSha1": "79306346244b04bf271fa15f83ff3fc38ead5bbd",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "\\server\\share\\a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "d26": {
+      "requestSha1": "bd89296387d2a4fb20981b516b7a2c23da03164d",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": null,
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "d27": {
+      "requestSha1": "6e064e3197180ab6fb951d0e8fa7ca8e1c2078a6",
+      "http": {
+        "status": 422,
+        "code": "extraction_failed"
+      },
+      "parser": {
+        "accepted": false
+      }
+    },
+    "d29": {
+      "requestSha1": "8a14372da01e249a56689a194b616ead7c5e68bf",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "日.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "d30": {
+      "requestSha1": "6e027e34f8992ba5d729b1a02056c5999858a9dd",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "d31": {
+      "requestSha1": "11616bc088cf356d2e2dd4b8de5c7b0206604ff7",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": null,
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "d32": {
+      "requestSha1": "0297db739a58606dd72d65b2ed5d3cfe17c5a425",
+      "http": {
+        "status": 422,
+        "code": "extraction_failed"
+      },
+      "parser": {
+        "accepted": false
+      }
+    },
+    "d33": {
+      "requestSha1": "c70cae8440a1e4a4fc5cb66a12dc94fd46a2dbcc",
+      "http": {
+        "status": 422,
+        "code": "extraction_failed"
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "report.pdf",
+        "mimeType": null,
+        "size": 21,
+        "sha1": "4c47940a387e09d6b967c00a7997474b0e624625"
+      }
+    },
+    "d33b": {
+      "requestSha1": "cc04586806834d5f5894d5e03ac76ceff9755c69",
+      "http": {
+        "status": 422,
+        "code": "extraction_failed"
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "report.pdf",
+        "mimeType": "application/pdf",
+        "size": 21,
+        "sha1": "4c47940a387e09d6b967c00a7997474b0e624625"
+      }
+    },
+    "d33c": {
+      "requestSha1": "0ed803e5a44d848ed6ee274f72b2470a2f735c4c",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 17,
+        "sha1": "84bbcaa91a97561da5b7b0fce524f2616acd9ee2"
+      }
+    },
+    "d34": {
+      "requestSha1": "6066abd577cd2bc95dde15c968af905b6d6f36bf",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "d35": {
+      "requestSha1": "5f99f37ee234a1cbda5ddfe57a45b8b8ab9c7dd1",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "UTF-8'a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "d36": {
+      "requestSha1": "87cecc29f8a445451272fb66a55c18fc6bf53080",
+      "http": {
+        "status": 500,
+        "code": null
+      },
+      "parser": {
+        "accepted": false
+      }
+    },
+    "d37": {
+      "requestSha1": "e7d602563eb06a9f5edfe00e8aeb733facf32415",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "d38": {
+      "requestSha1": "1237f4b2056bd0f74d8863f17ccde2ee427e4996",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a\\b.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "m09a": {
+      "requestSha1": "7fdd15e0c80bf4d130b291bdf3a227302dc7ba08",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "m09b": {
+      "requestSha1": "0091e2889edb8515bb40bfd2ac83b98fc5db4f5a",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "m09c": {
+      "requestSha1": "d414727ab5fcfd80b5ffc4ca5e3d75b5eb3195fb",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "m09d": {
+      "requestSha1": "4abe8be94a3de3ed514901776ba05a63d0bf2aa1",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "m21": {
+      "requestSha1": "a29f0c29fd98c9b3e98ca9e112bdbc316ab0c84f",
+      "http": {
+        "status": 500,
+        "code": null
+      },
+      "parser": {
+        "accepted": false
+      }
+    },
+    "m58": {
+      "requestSha1": "1e36eb5b0f74ff4601c6508dcc545b8154084ba1",
+      "http": {
+        "status": 422,
+        "code": "extraction_failed"
+      },
+      "parser": {
+        "accepted": false
+      },
+      "parserWithoutCharset": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "m59": {
+      "requestSha1": "52761c943e978be65f7ee9a3ce5ef3ebfdef1280",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "æ¥æ¬.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      },
+      "parserWithoutCharset": {
+        "accepted": true,
+        "filename": "日本.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "m60": {
+      "requestSha1": "d46b3b794e5fbe6bdc6a38ae5082c61a080486cb",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "æ¥æ¬.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      },
+      "parserWithoutCharset": {
+        "accepted": true,
+        "filename": "日本.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "m61": {
+      "requestSha1": "85e33c55bf975e433bb160b8e7b2e1d75b4138f3",
+      "http": {
+        "status": 422,
+        "code": "extraction_failed"
+      },
+      "parser": {
+        "accepted": false
+      },
+      "parserWithoutCharset": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "m64": {
+      "requestSha1": "3aa90d10b0d19938a88d3141401e82caa03d4e95",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "v01": {
+      "requestSha1": "3a4acc5a3794da888176ab6f3c6914295de884ec",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "整瑸瀯慬湩",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      },
+      "parserWithoutCharset": {
+        "accepted": false
+      }
+    },
+    "v02": {
+      "requestSha1": "71f5606076620517e1ad907b3ad182aceebac841",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "ÈÁÌÈ\u0007ø%/Ñ>",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      },
+      "parserWithoutCharset": {
+        "accepted": false
+      }
+    },
+    "v03": {
+      "requestSha1": "a76f27464ab2a47af0eeb6be4d133ddc6716af1f",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "日本.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      },
+      "parserWithoutCharset": {
+        "accepted": true,
+        "filename": "ú{.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "v04": {
+      "requestSha1": "6feddc0b44c66d397e1517afb1809f738a950af3",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      },
+      "parserWithoutCharset": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "v05": {
+      "requestSha1": "c5351984b6d61b8b35771f2eebb9336999c16e0a",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      },
+      "parserWithoutCharset": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "v06": {
+      "requestSha1": "cad414aaeda04ecd01834c89575d5e6a9d0e24dc",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "æ¥æ¬.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      },
+      "parserWithoutCharset": {
+        "accepted": true,
+        "filename": "日本.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "v07": {
+      "requestSha1": "a0a773345064ababc10d9410f0020b8ec9c536b0",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      },
+      "parserWithoutCharset": {
+        "accepted": true,
+        "filename": "a.+AHQAeAB0-",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "v08": {
+      "requestSha1": "ceb4c67d831b0c2ca2cc03ff91a6bcd42ec7af8b",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      },
+      "parserWithoutCharset": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "v09": {
+      "requestSha1": "e5321184e844a4265093d8f7e0a3d4845918186a",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      },
+      "parserWithoutCharset": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "v10": {
+      "requestSha1": "d3381cc7c4cd829371dfdd0b919f7c79185560f2",
+      "http": {
+        "status": 500,
+        "code": null
+      },
+      "parser": {
+        "accepted": false
+      },
+      "parserWithoutCharset": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "v11": {
+      "requestSha1": "9b276b67d7fb5a37fe805c8cac264cf00afe3143",
+      "http": {
+        "status": 422,
+        "code": "extraction_failed"
+      },
+      "parser": {
+        "accepted": false
+      },
+      "parserWithoutCharset": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "v12": {
+      "requestSha1": "3ebe5d189b2ab276af6cc3a077f639b58d5e0bae",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      },
+      "parserWithoutCharset": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "v13": {
+      "requestSha1": "12507d975f997f4358c494fdb8e556509563385e",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      },
+      "parserWithoutCharset": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "v14": {
+      "requestSha1": "f16e073ae2cf70424d2da7b2a50304931addc3dd",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      },
+      "parserWithoutCharset": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "v15": {
+      "requestSha1": "71741bb6db54f1013131ffc72f73278e9acdb48f",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a€.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      },
+      "parserWithoutCharset": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "v16": {
+      "requestSha1": "c8bbc72390448c500e64f06a8fd9aa39c4926262",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "整瑸瀯慬湩",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      },
+      "parserWithoutCharset": {
+        "accepted": false
+      }
+    },
+    "v17": {
+      "requestSha1": "c3e09323652984747286e004872eb43270bc4dde",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      },
+      "parserWithoutCharset": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "v18": {
+      "requestSha1": "1f383cadbf2779d43dd7c4bd309a9fbb9ba5621f",
+      "http": {
+        "status": 422,
+        "code": "extraction_failed"
+      },
+      "parser": {
+        "accepted": false
+      },
+      "parserWithoutCharset": {
+        "accepted": true,
+        "filename": "a.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "v19": {
+      "requestSha1": "fad0841ce4b2e856bff8dd49c830074034cc9624",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "日本.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      },
+      "parserWithoutCharset": {
+        "accepted": true,
+        "filename": "ÆüËÜ.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "v20": {
+      "requestSha1": "7b62f0bc11b3a817d070fb4132fd2f133ad726b0",
+      "http": {
+        "status": 200,
+        "code": null
+      },
+      "parser": {
+        "accepted": true,
+        "filename": "日本.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      },
+      "parserWithoutCharset": {
+        "accepted": true,
+        "filename": "\u001b$BF|K\\\u001b(B.txt",
+        "mimeType": "text/plain",
+        "size": 5,
+        "sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+      }
+    },
+    "w01": {
+      "requestSha1": "c9d81881da0126fe0f1e4c32b8de03c1508dbf16",
+      "http": {
+        "status": 200,
+        "code": null
+      }
+    },
+    "w02": {
+      "requestSha1": "e99f6e995a1894b83c4b5ff577133bcf2f381f6e",
+      "http": {
+        "status": 400,
+        "code": null
+      }
+    },
+    "w03": {
+      "requestSha1": "a1fed1379da947a245bb201e6d2981ef9c3fc725",
+      "http": {
+        "status": 400,
+        "code": null
+      }
+    },
+    "w04": {
+      "requestSha1": "05dfdd7ebf55841493e3ca69b486cec8c41ab8fe",
+      "http": {
+        "status": 400,
+        "code": null
+      }
+    },
+    "w05": {
+      "requestSha1": "3967d58e35761ddc9db96abcd76260c1aab291e0",
+      "http": {
+        "status": 400,
+        "code": null
+      }
+    },
+    "w06": {
+      "requestSha1": "3e6634d7529c0023c84631b8aa861e7c01c992fd",
+      "http": {
+        "status": 400,
+        "code": null
+      }
+    },
+    "w07": {
+      "requestSha1": "a8967de88868a1177cad6f2d2623453ba44fd6b9",
+      "http": {
+        "status": 400,
+        "code": null
+      }
+    },
+    "w08": {
+      "requestSha1": "677c954b34583dc7c3581c32a61095358ab03cd8",
+      "http": {
+        "status": 401,
+        "code": "unauthorized"
+      }
+    },
+    "w09": {
+      "requestSha1": "828088d15d48c0d73e475216459351ab95bebcc7",
+      "http": {
+        "status": 401,
+        "code": "unauthorized"
+      }
+    },
+    "w10": {
+      "requestSha1": "3bf549a05a6d6b30681301c469e7afac7d02ab69",
+      "http": {
+        "status": 401,
+        "code": "unauthorized"
+      }
+    },
+    "w11": {
+      "requestSha1": "88ed5105fb0df96d73a9125bdc118fff27af5f84",
+      "http": {
+        "status": 401,
+        "code": "unauthorized"
+      }
+    },
+    "w12": {
+      "requestSha1": "a8f62a263bf1d16e9b039516a959a54e73608b2a",
+      "http": {
+        "status": 400,
+        "code": null
+      }
+    },
+    "w13": {
+      "requestSha1": "2b300ff1eb01bd8d80744e181e70f3c32d49df7e",
+      "http": {
+        "status": 422,
+        "code": "extraction_failed"
+      }
+    },
+    "w14": {
+      "requestSha1": "2bacc3bbc05d710f487c14cc454ffcb361b92e0d",
+      "http": {
+        "status": 200,
+        "code": null
+      }
+    },
+    "w15": {
+      "requestSha1": "98a2a1867bbf4ae6dcb66b267a17c26f22bfbe24",
+      "http": {
+        "status": 200,
+        "code": null
+      }
+    },
+    "w16": {
+      "requestSha1": "f13c66aba8fa2c82558ae4c326aff7df29a10d01",
+      "http": {
+        "status": 400,
+        "code": null
+      }
+    },
+    "w17": {
+      "requestSha1": "e39327a0a24d5e1c3a5997922046df9136c35569",
+      "http": {
+        "status": 200,
+        "code": null
+      }
+    },
+    "w18": {
+      "requestSha1": "cff92da296cfbb42d484b2fa174059c55e864c16",
+      "http": {
+        "status": 200,
+        "code": null
+      }
+    },
+    "w19": {
+      "requestSha1": "0ab39772c796350171a42163db14792da4c3fe46",
+      "http": {
+        "status": 401,
+        "code": "unauthorized"
+      }
+    },
+    "x01": {
+      "requestSha1": "540cc170aa903c389d3d352ec9a1f1b08bfa99f3",
+      "http": {
+        "status": 422,
+        "code": "extraction_failed"
+      }
+    },
+    "x02": {
+      "requestSha1": "185eec2d2e6f348dc6bf31a5c8816e0cff7d3cb9",
+      "http": {
+        "status": 422,
+        "code": "extraction_failed"
+      }
+    },
+    "x03": {
+      "requestSha1": "ee32348a0b3ba7968f93fb586ae79ecf08ed2b1e",
+      "http": {
+        "status": 200,
+        "code": null
+      }
+    },
+    "x08": {
+      "requestSha1": "b1c4fa02cbc6307130e1cbb45cddeaed6860855b",
+      "http": {
+        "status": 200,
+        "code": null
+      }
+    },
+    "x09": {
+      "requestSha1": "e43bcfaa707bbab898b63b4099352dabaf62d5c7",
+      "http": {
+        "status": 200,
+        "code": null
+      }
+    },
+    "x10": {
+      "requestSha1": "22cf2343f7eebc380ba60f4e6363724469a97701",
+      "http": {
+        "status": 200,
+        "code": null
+      }
+    },
+    "y01": {
+      "requestSha1": "111eb307e14bc4ab78bfec12d7954abe2664da75",
+      "http": {
+        "status": 405,
+        "code": null
+      }
+    },
+    "y04": {
+      "requestSha1": "2be2210e6daea15bef9f8b6048c513c0a83a46e0",
+      "http": {
+        "status": 405,
+        "code": null
+      }
+    },
+    "y12": {
+      "requestSha1": "639aeda1c78a6e241ebba3d833be97efac34ee5d",
+      "http": {
+        "status": 405,
+        "code": null
+      }
+    },
+    "y14": {
+      "requestSha1": "9347a6beb16afd7bd1ca13a975104ff37dace642",
+      "http": {
+        "status": 405,
+        "code": null
+      }
+    },
+    "y15": {
+      "requestSha1": "11509da256d69c340d9b0b4bc222d4335648575e",
+      "http": {
+        "status": 307,
+        "code": null
+      }
+    },
+    "y16": {
+      "requestSha1": "f0de9fbc883806e9ac43c4c13f999ccdedfca709",
+      "http": {
+        "status": 200,
+        "code": null
+      }
+    },
+    "y22": {
+      "requestSha1": "31c02bfc9558b02922d4815b1693f238fbbc9b25",
+      "http": {
+        "status": 200,
+        "code": null
+      }
+    },
+    "y37": {
+      "requestSha1": "5e97d89d6f2ca3271a9aab407a1f703789f9f226",
+      "http": {
+        "status": 401,
+        "code": "unauthorized"
+      }
+    },
+    "y38": {
+      "requestSha1": "ea1990e0dcaf98a093bfd6de725c826bc42878a8",
+      "http": {
+        "status": 401,
+        "code": "unauthorized"
+      }
+    },
+    "y40": {
+      "requestSha1": "cf79daf25d5676e74e2541a1ca1502ca1aaf5061",
+      "http": {
+        "status": 200,
+        "code": null
+      }
+    }
+  }
+}

@@ -126,7 +126,7 @@ CI ログを遡って「これは flaky か本物の回帰か」を判定し、i
 失敗（flaky test）を、無人のルーティンとして検出・追跡・調査・修正する
 仕組みの要件を定義する。
 
-要件は 2 つのまとまりからなる。Requirement 1〜5 が仕組みの骨格 — 検出と
+Requirement 1〜11 は 2 つのまとまりからなる。Requirement 1〜5 が仕組みの骨格 — 検出と
 issue 追跡、確信度の段階付け、自律調査と修正 PR、実行環境の違いへの耐性、
 常設ダッシュボード — を定める。Requirement 6〜11 は、その骨格を人手を介さず
 に回り続けるループにするための要件で、次の 5 点を定める。(1) CI の再実行
@@ -135,6 +135,11 @@ issue 追跡、確信度の段階付け、自律調査と修正 PR、実行環�
 追跡対象から外すこと。(3) 人の判断を待って止まった issue を状態として持ち、
 人の返答で再開すること。(4) 再発しない issue を自動で閉じること。(5) 起動
 間隔と、隣接する汎用 issue 調査ルーティンとの整合。
+
+Requirement 14〜19 は、`run-playwright` ジョブのログから、失敗がどのテストの
+ものかを特定する決まりを定める。テスト名を Playwright がログ末尾に出す一覧から
+読み、特定できないときは推測せずジョブ単位の識別に記録し、既存の追跡 issue と
+同じ識別を使う。
 
 ## Boundary Context
 
@@ -159,8 +164,10 @@ issue 追跡、確信度の段階付け、自律調査と修正 PR、実行環�
     あり、その失敗は flaky として追跡しない
   - テスト基盤そのものの修正（共有 setup フックの負荷除去など）と、個別
     テストの設計不良の修正。これらは通常の PR として別途行う
-  - Playwright（e2e）の再現実行。Playwright は同一 run 内の retry で既に
-    確定済みの証拠が得られるため、再現ワークフローによる確認の対象外
+  - Playwright（e2e）の再現実行。再現ワークフローは vitest だけを動かす。
+    再試行で通ったテストは、同一 run 内の retry で既に確定済みの証拠が
+    得られている。全試行で失敗しただけのテストは確認する手段が無いので、
+    人の判断待ちに回す（Requirement 15.5）
   - routine が使うモデルの選択。判断材料は設計で記録するが、要件では定めない
   - 商用SaaSの導入・比較検討
 - **Adjacent expectations**:
@@ -350,3 +357,69 @@ Elasticsearch 9 のセルでしか出ない非決定性は、この手段では�
 2. The flaky-ci-routine shall 前項の一覧に含まれるissueを自動でクローズしない。
 3. If 該当するissueが1件も無い場合, the flaky-ci-routine shall その行を省略せず、0件であることを明示する。
 4. The flaky-ci-routine shall `flaky/suspected` と `flaky/confirmed` が自動クローズの対象外であるという既存の設計（Requirement 10）を変更しない。
+
+### Requirement 14: 再実行で通った Playwright のテストを、テストごとの識別で記録する
+
+**Objective:** flaky test を追跡する開発者として、再実行で通った Playwright のテストが、そのテストの追跡 issue に記録されてほしい。修正の後に再発したかどうかを、その issue で確かめられるようにするためである。
+
+#### Acceptance Criteria
+
+1. When `run-playwright` ジョブのログ末尾の一覧に、再実行で通ったテストが載っている, the flaky-ci-routine shall そのテストを、ブラウザ・spec・テスト名からなるテストごとの識別で、確定済みの発生として記録する。
+2. When 1 つのジョブの一覧に、再実行で通ったテストが 2 件以上載っている, the flaky-ci-routine shall それぞれのテストを別々の識別で記録する。
+3. The flaky-ci-routine shall ログ中の注釈の行がどの形で出ていても、また出ていなくても、同じテストに対して同じ識別を得る。
+4. When 同じ一覧が 1 つのジョブのログに重ねて出力されている, the flaky-ci-routine shall 同じテストを 1 回の発生として数える。
+5. When 得た識別が既存の追跡 issue の題名と一致する, the flaky-ci-routine shall 新しい issue を作らず、その issue に発生を追記する。
+
+### Requirement 15: 全試行で失敗した Playwright のテストは、確定ではなく観測として扱う
+
+**Objective:** flaky test を追跡する開発者として、再実行しても通らなかったテストが「不安定」と確定されないでほしい。全試行で失敗するのは本物の不具合でもあり得るためである。
+
+#### Acceptance Criteria
+
+1. When ログ末尾の一覧に、全試行で失敗したテストが載っている, the flaky-ci-routine shall そのテストをテストごとの識別で特定し、確定済みではなく観測として扱う。
+2. When 全試行で失敗したテストを観測として扱う, the flaky-ci-routine shall Requirement 2.1 の安価な証拠シグナルによる判定を、その判定の条件を変えずに適用する。
+3. When 1 つのジョブの一覧に、再実行で通ったテストと全試行で失敗したテストの両方が載っている, the flaky-ci-routine shall 前者を確定済みの発生、後者を観測として、テストごとに分けて扱う。
+4. The flaky-ci-routine shall Requirement 2.1 の「同一runの兄弟variant」を、Playwright のテストについては、そのテストが失敗したセルとブラウザと shard が同じで、MongoDB のバージョンだけが違うセルを指すものとして扱う。
+5. If 追跡 issue が Playwright のテストのもので、最後に再オープンされた後に記録された発生（再オープンされていなければ issue のすべての発生）のどれにも、そのテストが再実行で通った証拠が無い, then the flaky-ci-routine shall 確信度のラベルが確定済みであっても非決定性を実証済みとして扱わず、確認の測定ができないことを理由に原因追及に進まず人の判断待ち（Requirement 9）に回す。
+
+### Requirement 16: Playwright のテストを一覧から読めないときは、推測で割り当てない
+
+**Objective:** flaky test を追跡する開発者として、テストを特定できなかった発生が、誤ったテストの issue に記録されないでほしい。誤った記録は、記録が無いことより調査を誤らせるためである。
+
+#### Acceptance Criteria
+
+1. If 一覧の見出しが示す件数と、その下に載っているテストの数が一致しない, then the flaky-ci-routine shall その一覧からテストを特定しない。
+2. If ログの集計が再実行で通ったテストを 1 件以上と示しているのに、そのテストを一覧から特定できない, then the flaky-ci-routine shall その発生をジョブ単位の識別（ブラウザ名まで）で記録し、テストを特定できなかったことを issue の本文に書く。
+3. The flaky-ci-routine shall テスト名を、ログ末尾の一覧以外の箇所（再試行の出力の並びなど）から推測して識別に使わない。
+4. When 1 つのジョブで、一部のテストは一覧から特定でき、残りは特定できない, the flaky-ci-routine shall 特定できたテストだけをテストごとの識別で記録し、残りをジョブ単位の識別で記録する。
+
+### Requirement 17: Playwright の集計の件数を、テストの実行ごとに正しく読む
+
+**Objective:** flaky test を追跡する開発者として、ジョブのログから読んだ件数が、実際の実行結果と一致していてほしい。件数は、発生を確定とするか観測とするかの判定に使われるためである。
+
+#### Acceptance Criteria
+
+1. While 1 つのジョブの中でテストの実行が 2 回以上行われている, the flaky-ci-routine shall それぞれの実行の件数を別々に読み、別の実行の件数と混ぜない。
+2. The flaky-ci-routine shall あるテストを確定済みとするか観測とするかの判定に、そのテストが載っている一覧と同じ実行の結果だけを使う。
+3. If ログに件数の行が 1 つも無い, then the flaky-ci-routine shall 件数を 0 と読まず、不明として扱う。
+
+### Requirement 18: Playwright の識別を既存の追跡 issue と整合させる
+
+**Objective:** flaky test を追跡する開発者として、既存の追跡 issue がそのまま使われてほしい。同じテストの issue が新旧で 2 つに分かれると、発生回数と経緯が分散するためである。
+
+#### Acceptance Criteria
+
+1. The flaky-ci-routine shall テストごとの識別を、既存の追跡 issue の題名と同じ形で作る。
+2. When ある発生をテストごとの識別で記録した, the flaky-ci-routine shall 同じ発生をジョブ単位の追跡 issue には記録しない。
+3. The flaky-ci-routine shall 既存のジョブ単位の追跡 issue に過去に記録された発生を、テストごとの issue へ移し替えない。
+4. When 閉じられているジョブ単位の追跡 issue があり、その後の発生がすべてテストごとの識別で記録できた, the flaky-ci-routine shall そのジョブ単位の issue を再オープンしない。
+5. Where 既存の追跡 issue の題名が、テスト名のうち末尾の名前だけを持ち、それを囲むグループ名を欠いていて、いまあるテストのちょうど 1 つに対応づけられる, the flaky-ci-routine shall 同じテストの発生を、その issue とは別の新しい issue に分けて記録しない。
+
+### Requirement 19: Playwright のテストを特定した根拠を issue に残す
+
+**Objective:** 追跡 issue を読む開発者として、その発生がなぜこのテストのものと判断されたのかを、issue の上で確かめたい。ログの保存期間が過ぎた後でも、判断を追えるようにするためである。
+
+#### Acceptance Criteria
+
+1. When 発生をテストごとの識別で記録する, the flaky-ci-routine shall 特定の根拠にした一覧の該当部分を、issue の証拠として残す。
+2. When 発生をジョブ単位の識別で記録する, the flaky-ci-routine shall テストを特定できなかった理由（一覧が無い、件数が合わない、など）を issue の本文に書く。

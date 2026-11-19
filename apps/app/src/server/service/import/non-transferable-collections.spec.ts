@@ -70,6 +70,8 @@ describe('selectTransferableCollections', () => {
     // Points at the destination's own vault git repository.
     'vault_namespace_state',
     'vault_user_views',
+    // Failures of this environment's attachment text extractor.
+    'extractionfailurelogs',
   ])('drops %s', (collectionName) => {
     expect(selectTransferableCollections([collectionName])).toEqual([]);
     expect(NON_TRANSFERABLE_COLLECTIONS.has(collectionName)).toBe(true);

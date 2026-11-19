@@ -32,6 +32,7 @@ export interface IYjsService {
     editingMarkdownLength?: number,
   ): Promise<SyncLatestRevisionBody>;
   getCurrentYdoc(pageId: string): WSSharedDoc | undefined;
+  getConnectionCount(pageId: string): number;
 }
 
 class YjsService implements IYjsService {
@@ -185,6 +186,10 @@ class YjsService implements IYjsService {
 
   public getCurrentYdoc(pageId: string): WSSharedDoc | undefined {
     return docs.get(pageId);
+  }
+
+  public getConnectionCount(pageId: string): number {
+    return docs.get(pageId)?.conns.size ?? 0;
   }
 }
 

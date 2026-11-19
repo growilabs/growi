@@ -175,6 +175,29 @@ describe('updateByParameters — snapshot persistence (read back from DB)', () =
     expect(persisted.snapshot.pageId).toBeNull();
   });
 
+  it('Req 20.8 — an update snapshot carrying only the review channel persists it and keeps the existing username', async () => {
+    const unsettled = await arrangeUnsettledActivity({
+      userId: new Types.ObjectId().toHexString(),
+      username: 'grace',
+    });
+
+    await prisma.activities.updateByParameters(unsettled.id, {
+      action: SupportedAction.ACTION_CHANGE_PROPOSAL_REJECT,
+      targetModel: SupportedTargetModel.MODEL_CHANGE_PROPOSAL,
+      snapshot: { reviewChannel: 'ui' },
+    });
+
+    const persisted = await prisma.activities.findUniqueOrThrow({
+      where: { id: unsettled.id },
+    });
+    expect(persisted.action).toBe(
+      SupportedAction.ACTION_CHANGE_PROPOSAL_REJECT,
+    );
+    expect(persisted.snapshot.reviewChannel).toBe('ui');
+    expect(persisted.snapshot.username).toBe('grace');
+    expect(persisted.snapshot.id).toBe(unsettled.snapshot.id);
+  });
+
   it('req 2.1/2.2 — settles a user-less UNSETTLED activity (snapshot: {_id} only) and persists a username provided at update time', async () => {
     // Arrange: unauthenticated middleware call — snapshot has _id only
     // (73/912 real UNSETTLED docs have this shape; see premise note above)

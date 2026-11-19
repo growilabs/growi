@@ -685,9 +685,13 @@ export const getPageSchema = (crowi) => {
     pageSchema.statics.generateQueryToListByStartWith;
 
   /**
-   * find all templates applicable to the new page
+   * find all templates applicable to the new page that the creator is allowed to view
    */
-  pageSchema.statics.findTemplate = async function (path) {
+  pageSchema.statics.findTemplate = async function (
+    path,
+    user,
+    userGroups = null,
+  ) {
     const templatePath = nodePath.posix.dirname(path);
     const pathList = generatePathsOnTree(path, []);
     const regexpList = pathList.map((path) => {
@@ -697,8 +701,23 @@ export const getPageSchema = (crowi) => {
       );
     });
 
+    const relatedUserGroups =
+      user != null && userGroups == null
+        ? [
+            ...(await UserGroupRelation.findAllUserGroupIdsRelatedToUser(user)),
+            ...(await ExternalUserGroupRelation.findAllUserGroupIdsRelatedToUser(
+              user,
+            )),
+          ]
+        : userGroups;
+
+    const builder = new this.PageQueryBuilder(
+      this.find({ path: { $in: regexpList } }),
+    );
+    builder.addConditionToFilteringByViewer(user, relatedUserGroups, true);
+
     // biome-ignore lint/plugin: allow populate for backward compatibility
-    const templatePages = await this.find({ path: { $in: regexpList } })
+    const templatePages = await builder.query
       .populate({ path: 'revision', model: 'Revision' })
       .exec();
 

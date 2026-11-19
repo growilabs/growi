@@ -4,6 +4,7 @@ import archiver from 'archiver';
 import type { HydratedDocument } from 'mongoose';
 
 import { AuditLogBulkExportJobStatus } from '~/features/audit-log-bulk-export/interfaces/audit-log-bulk-export';
+import type { auditlogbulkexportjobs } from '~/generated/prisma/client';
 import { SupportedAction } from '~/interfaces/activity';
 import { AttachmentType } from '~/server/interfaces/attachment';
 import type { AttachmentDraft } from '~/server/models/attachment';
@@ -11,7 +12,6 @@ import type { FileUploader } from '~/server/service/file-uploader';
 import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 
-import type { AuditLogBulkExportJobDocument } from '../../../models/audit-log-bulk-export-job';
 import type { IAuditLogBulkExportJobCronService } from '..';
 
 const logger = loggerFactory(
@@ -39,7 +39,7 @@ function setUpAuditLogArchiver(
 
 async function postProcess(
   this: IAuditLogBulkExportJobCronService,
-  auditLogBulkExportJob: AuditLogBulkExportJobDocument,
+  auditLogBulkExportJob: auditlogbulkexportjobs,
   draft: AttachmentDraft,
   fileSize: number,
 ): Promise<void> {
@@ -47,15 +47,19 @@ async function postProcess(
     data: { ...draft, fileSize },
   });
 
-  auditLogBulkExportJob.completedAt = new Date();
-  auditLogBulkExportJob.attachment = attachment.id;
-  auditLogBulkExportJob.status = AuditLogBulkExportJobStatus.completed;
-  await auditLogBulkExportJob.save();
+  const updatedJob = await prisma.auditlogbulkexportjobs.update({
+    where: { id: auditLogBulkExportJob.id },
+    data: {
+      completedAt: new Date(),
+      attachmentId: attachment.id,
+      status: AuditLogBulkExportJobStatus.completed,
+    },
+  });
 
-  this.removeStreamInExecution(auditLogBulkExportJob._id);
+  this.removeStreamInExecution(updatedJob.id);
   await this.notifyExportResultAndCleanUp(
     SupportedAction.ACTION_AUDIT_LOG_BULK_EXPORT_COMPLETED,
-    auditLogBulkExportJob,
+    updatedJob,
   );
 }
 
@@ -66,7 +70,7 @@ async function postProcess(
 export async function compressAndUpload(
   this: IAuditLogBulkExportJobCronService,
   user: HydratedDocument<IUser>,
-  job: AuditLogBulkExportJobDocument,
+  job: auditlogbulkexportjobs,
 ): Promise<void> {
   const auditLogArchiver = setUpAuditLogArchiver.bind(this)();
 
@@ -86,7 +90,7 @@ export async function compressAndUpload(
   auditLogArchiver.directory(this.getTmpOutputDir(job), false);
   auditLogArchiver.finalize();
 
-  this.setStreamInExecution(job._id, auditLogArchiver);
+  this.setStreamInExecution(job.id, auditLogArchiver);
   try {
     await fileUploadService.uploadAttachment(auditLogArchiver, draft);
   } catch (e) {
@@ -96,8 +100,10 @@ export async function compressAndUpload(
     } catch (handleErrorErr) {
       logger.error('Error in handleError:', handleErrorErr);
     }
-    job.status = AuditLogBulkExportJobStatus.failed;
-    await job.save();
+    await prisma.auditlogbulkexportjobs.update({
+      where: { id: job.id },
+      data: { status: AuditLogBulkExportJobStatus.failed },
+    });
     return;
   }
   await postProcess.bind(this)(job, draft, auditLogArchiver.pointer());

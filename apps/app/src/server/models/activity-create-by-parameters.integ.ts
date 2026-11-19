@@ -32,6 +32,7 @@ import {
   SupportedEventModel,
   SupportedTargetModel,
 } from '~/interfaces/activity';
+import { settleActivityRecord } from '~/server/service/activity/settle-activity-record';
 import { prisma } from '~/utils/prisma';
 
 // Sentinel values so cleanup deletes only this suite's rows.
@@ -182,6 +183,62 @@ describe('createByParameters — snapshot persistence (read back from DB)', () =
     expect(persisted?.snapshot.pagePath).toBeNull();
     expect(persisted?.snapshot.pageId).toBeNull();
     expect(persisted?.snapshot.fileSize).toBeNull();
+  });
+
+  it('Req 20.8 — persists the review channel of a change proposal review snapshot together with username', async () => {
+    await prisma.activities.createByParameters({
+      action: SupportedAction.ACTION_CHANGE_PROPOSAL_APPROVE,
+      ip: TEST_IP,
+      endpoint: TEST_ENDPOINT,
+      user: new Types.ObjectId().toHexString(),
+      target: new Types.ObjectId().toHexString(),
+      targetModel: SupportedTargetModel.MODEL_CHANGE_PROPOSAL,
+      snapshot: { username: 'erin', reviewChannel: 'api' },
+    });
+
+    const persisted = await prisma.activities.findFirst({
+      where: {
+        ip: TEST_IP,
+        action: SupportedAction.ACTION_CHANGE_PROPOSAL_APPROVE,
+      },
+    });
+    expect(persisted).not.toBeNull();
+    expect(persisted?.snapshot.reviewChannel).toBe('api');
+    expect(persisted?.snapshot.username).toBe('erin');
+  });
+
+  it('Req 20.8/20.10 — the emit settle path keeps the operator username when the snapshot carries only the review channel', async () => {
+    // The review recorders emit a snapshot holding only reviewChannel; the
+    // operator name comes from the request context stashed by the middleware.
+    const activityId = new Types.ObjectId().toString();
+
+    await settleActivityRecord({
+      activityId,
+      shouldPersist: true,
+      context: {
+        ip: TEST_IP,
+        endpoint: TEST_ENDPOINT,
+        userId: new Types.ObjectId().toHexString(),
+        username: 'frank',
+        createdAt: new Date(),
+      },
+      activityParameters: {
+        action: SupportedAction.ACTION_CHANGE_PROPOSAL_REVIEWER_ADD,
+        target: new Types.ObjectId().toHexString(),
+        targetModel: SupportedTargetModel.MODEL_CHANGE_PROPOSAL,
+        snapshot: { reviewChannel: 'ai-tool' },
+      },
+    });
+
+    const persisted = await prisma.activities.findUnique({
+      where: { id: activityId },
+    });
+    expect(persisted).not.toBeNull();
+    expect(persisted?.action).toBe(
+      SupportedAction.ACTION_CHANGE_PROPOSAL_REVIEWER_ADD,
+    );
+    expect(persisted?.snapshot.reviewChannel).toBe('ai-tool');
+    expect(persisted?.snapshot.username).toBe('frank');
   });
 
   it("req 4.2 — a snapshot-less call still creates the activity; username stays unset (no '' placeholder)", async () => {

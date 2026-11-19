@@ -17,5 +17,6 @@
   two count lines indented by two spaces.
 - **What is constructed**: the combination — `  1 failed` present and **no
   `flaky` line at all**, which is the mirror image of #11903 and pins that an
-  absent line inside a captured summary reads as `0` in both directions.
+  absent line inside a run's counts reads as `0` in both directions, and that
+  the listed test is returned under `failed`, not `flaky`.
 - **Generated**: 2026-09-16.

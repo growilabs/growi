@@ -1,0 +1,18 @@
+2026-11-13T11:54:16.1156376Z ##[error]  1) [firefox] › playwright/20-basic-features/create-page-button.spec.ts:23:3 › Create page button dropdown menu › open and create today page 
+    Test timeout of 30000ms exceeded.
+2026-11-13T11:54:16.1174604Z ##[error]  1) [firefox] › playwright/20-basic-features/create-page-button.spec.ts:23:3 › Create page button dropdown menu › open and create today page 
+    Error: locator.click: Test timeout of 30000ms exceeded.
+    Call log:
+2026-11-13T11:57:10.1200194Z     Error Context: playwright/output/20-basic-features-create-p-f3048--open-and-create-today-page-firefox/error-context.md
+2026-11-13T11:57:10.1200805Z 
+2026-11-13T11:57:10.1200900Z   1 flaky
+2026-11-13T11:57:10.1201655Z     [firefox] › playwright/20-basic-features/create-page-button.spec.ts:23:3 › Create page button dropdown menu › open and create today page 
+2026-11-13T11:57:10.1202212Z   119 passed (5.0m)
+2026-11-13T11:57:10.1208073Z ##[notice]  1 flaky
+    [firefox] › playwright/20-basic-features/create-page-button.spec.ts:23:3 › Create page button dropdown menu › open and create today page 
+  119 passed (5.0m)
+2026-11-13T11:57:24.2154889Z   pw:api => browser.close started +6ms
+2026-11-13T11:57:24.2391045Z   pw:api <= browser.close succeeded +23ms
+2026-11-13T11:57:24.3037890Z ···
+2026-11-13T11:57:24.3041969Z   3 passed (12.7s)
+2026-11-13T11:57:24.3045296Z ##[notice]  3 passed (12.7s)

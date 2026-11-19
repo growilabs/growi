@@ -58,6 +58,9 @@ export const NON_TRANSFERABLE_COLLECTIONS: ReadonlySet<string> = new Set([
   // The AI usage of this environment's users, reported for this GrowiApp alone.
   'aiusagelogs',
 
+  // Failures of this environment's attachment text extractor, for its admin to act on.
+  'extractionfailurelogs',
+
   // GROWI Vault state. Every one of these points into the destination's own git
   // repository (commit OIDs, composed view refs) or is a queue that this environment's
   // vault-manager is working through.
@@ -93,6 +96,7 @@ export const TRANSFERABLE_COLLECTIONS: ReadonlySet<string> = new Set([
   'attachments',
   'bookmarkfolders',
   'bookmarks',
+  'changeproposals',
   'commentreactions',
   'comments',
   'configs',

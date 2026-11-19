@@ -15,12 +15,11 @@
     106 passed (5.5m)
   ```
 
-  the second time echoed by the runner as a `##[notice]` annotation. Summing
-  every matching count line would report `2 flaky` / `212 passed` for a shard
-  that had one flaky test — the "single item counted twice" shape of the same
-  bug class tasks 2.2 and 2.3 hit. `extractSummary` takes the first reading of
-  each keyword.
+  the second time echoed by the runner as a `##[notice]` annotation. Reading
+  both would report `2 flaky` / `212 passed` for a shard that had one flaky
+  test, so the run is read from the plain summary only and the echo is dropped
+  as a whole.
 - It also carries **no `::error` annotation at all** (the failure is reported
-  as ` 1) [chromium] › …`), which is the zero-annotation case for
-  `extractPlaywrightAnnotations`.
+  as ` 1) [chromium] › …`): the flaky test is still returned, read from the
+  end-of-run list.
 - **Captured**: 2026-09-16.
