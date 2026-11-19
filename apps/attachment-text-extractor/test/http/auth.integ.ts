@@ -17,10 +17,12 @@ import {
 } from '../../src/http/spec-support/raw-http';
 import { useBlackboxService } from './blackbox-service';
 
-// Black box (research.md 22.7 `auth`): only /healthz, /readyz and
-// /openapi.json answer without a token; every other path, unknown ones
-// included, is 401 before anything else happens. Python test_integration_auth.py
-// and the "missing or invalid token" rows of test_e2e_http.py.
+// Black box (research.md 22.7 `auth`): only /healthz, /readyz, /openapi.json
+// and /metrics answer without a token (/metrics is checked in
+// src/http/metrics-route.integ.ts and open-path-targets.integ.ts); every other
+// path, unknown ones included, is 401 before anything else happens. Python
+// test_integration_auth.py and the "missing or invalid token" rows of
+// test_e2e_http.py.
 
 const service = useBlackboxService();
 // What each open path answers, so a service that answers 200 to everything fails.

@@ -84,7 +84,7 @@
   - _Requirements: 2.1, 2.2, 2.3, 2.4_
   - _Boundary: AttachmentTextExtractorService (apps/app)_
 
-- [ ] 6. 運用者向けの文書と、サービスの説明書を直す
+- [x] 6. 運用者向けの文書と、サービスの説明書を直す
   - `docker/README.md`: 公開タグの一覧に `1.1.0`、`1.1` を加え (`1`、`latest` も 1.1.0 を指す。Dockerfile の link のタグは `attachment-text-extractor/v1.1.0`)、`1.0.0`、`1.0` の行を残す。ログの節に `app=` (値の意味と、自己申告で判断に使わないこと) と、`/metrics` (指標の名前、トークンなしで開いていて内向きの通信の制限で守ること、親のプロセスの値で子を含まないこと、自動スケールに `slots_in_use / slots_max` を使えること、数えない答え) を書く。「a request refused with 401 leaves no line」は残し、`/metrics` で数えることを足す。Health checks の節に、`/readyz` の結果を 10 秒覚えることと、確認の間隔を 10 秒以下にしないことを書き、「neither path needs the token」をトークンの要らない 4 つのパスの記述にする
   - `docker/README.md` の「Non-root, read-only, no privileges.」の段落の後に、子と親の環境変数の段落を置く。書く強さは research.md §5.4 の範囲を超えない (確かめた環境、確かめていない環境 (image の中、GROWI.cloud のノード)、親のメモリはノードの ptrace の設定によること、対策は未決であること)
   - `apps/attachment-text-extractor/AGENTS.md`: API の一覧に `GET /metrics`、Invariants のトークンの項 (子には渡さないが、同じ uid の子は親の環境変数を読めること)、トークンの要らないパスの項 (4 つ)、ログの行の項目 (`app=`) を直す

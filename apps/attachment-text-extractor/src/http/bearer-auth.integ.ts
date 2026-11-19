@@ -9,7 +9,8 @@ import { fakeRunner } from './spec-support/fake-runner';
 import { useTestService } from './spec-support/test-service';
 
 // On the HTTP layer with a stand-in runner: the token is checked
-// before anything else, on every path but /healthz, /readyz and /openapi.json.
+// before anything else, on every path but /healthz, /readyz, /openapi.json and
+// /metrics (/metrics is checked in metrics-route.integ.ts).
 // Python test_bearer_auth.py (its 3 import checks have no Node counterpart)
 // and test_main.py's TestExtractAuthIntegration.
 
@@ -65,7 +66,7 @@ describe('POST /extract and the Bearer token', () => {
   });
 });
 
-describe('the three paths open without a token', () => {
+describe('the health and OpenAPI paths open without a token', () => {
   it.each([
     '/healthz',
     '/readyz',

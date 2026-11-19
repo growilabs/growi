@@ -7,7 +7,8 @@ memory, CPU and time limits. The service is stateless and Linux-only (the child 
 started through `/usr/bin/prlimit`).
 
 - API: `POST /extract` (multipart `file`, optional `mimeType`; Bearer token),
-  `GET /healthz`, `GET /readyz`, `GET /openapi.json`.
+  `GET /healthz`, `GET /readyz`, `GET /openapi.json`, `GET /metrics` (Prometheus
+  text format; not in the OpenAPI document).
 - Consumer: `apps/app` through the generated client
   `packages/attachment-text-extractor-client`.
 - Operators' conditions (memory limit, read-only rootfs, probes, graceful stop,
@@ -115,17 +116,24 @@ cross-cutting ones live in `test/`.
 The HTTP parent must never load conversion code, and the child must never load the
 parent's code: `runner` and `http` may not import `conversion` or `child`;
 `conversion` and `child` may not import `runner` or `http`; `contract`, `formats`
-and `wire` are leaves shared by both sides. `zod` and `hono-openapi` belong to
-`http` alone. `test/layers/layer-dependencies.spec.ts` enforces this from
+and `wire` are leaves shared by both sides. `zod`, `hono-openapi` and
+`@prometheus-io/client` belong to `http` alone.
+`test/layers/layer-dependencies.spec.ts` enforces this from
 `test/layers/layer-rules.ts`; change the rules only with a design reason.
 
 ## Invariants
 
-- **The token never reaches a child or a log.** A child gets an explicit
-  environment (`src/runner/child-env.ts`), never `process.env`. Start-up errors name
-  the setting at fault, not its value.
+- **The token is never passed to a child or written to a log.** A child gets an
+  explicit environment (`src/runner/child-env.ts`), never `process.env`. Start-up
+  errors name the setting at fault, not its value. A child still runs as the same
+  uid as the parent, so a child taken over by a hostile file can read the parent's
+  environment, token included, from `/proc` (see `docker/README.md`; no
+  countermeasure decided yet). Do not rely on the explicit environment alone to
+  keep a secret from a child.
 - **No file content or file name in logs or error messages.** The request log line
-  carries format, size, duration, result and child peak RSS only.
+  carries only format, size, duration, result, child peak RSS and `app=`. `app=`
+  comes from the `X-Growi-App-Id` header, which is not authenticated: use it to
+  break logs down by app, never for a decision, and never as a metrics label.
 - **The child is untrusted.** It parses hostile input, so the parent validates
   everything a child sends (`src/wire/`, `src/runner/result-frame.ts`) and enforces
   the limits from outside (prlimit, the RSS watch, the deadline). Do not move a
@@ -135,9 +143,10 @@ and `wire` are leaves shared by both sides. `zod` and `hono-openapi` belong to
   `docker/README.md`. An upload is held in memory and never written to disk. A
   change to a default, to what the parent buffers, or to a conversion library needs
   the memory measurement above.
-- **Bearer auth runs before the body is read**; only `/healthz`, `/readyz` and
-  `/openapi.json` are open. `/healthz` stays 200 when conversion is broken;
-  `/readyz` turns 503.
+- **Bearer auth runs before the body is read**; only `/healthz`, `/readyz`,
+  `/openapi.json` and `/metrics` are open, matched exactly on the request target
+  as sent (`src/http/request-target.ts`). `/healthz` stays 200 when conversion
+  is broken; `/readyz` turns 503.
 - **(status, `ErrorCode`) pairs are part of the contract.** They come from
   `src/http/error-table.ts` (`ERROR_TABLE`, `REFUSAL_TABLE`), which also feeds the
   OpenAPI document.
