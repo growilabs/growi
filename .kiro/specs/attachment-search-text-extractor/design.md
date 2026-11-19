@@ -584,7 +584,7 @@ interface ConversionRunner {
 - **検索の品質のベンチマーク** (`benchmark/`): 日本語を含む 23 文書と正解の語句 118 個で、語句の再現率、位置の正しさ、文字化けと分断、Elasticsearch (kuromoji) での検索の当たり方を測る。PDF の部品や anydoc の版を替えたら流し、`benchmark/baseline/python-baseline.json` と比べて下回らないことを確かめる (research.md §4.1)。このファイルは、移行の前の実装で測った基準値である
 - **負荷に弱いテスト**: 子の RSS の余裕、イベントループの止まり、「1 秒以内」を見るテストなどは、2 vCPU の機械や並行して動くテストで落ちうる。落ちたら許容を広げるのではなく、時間に頼る部分を外すか、制限時間を明示する (一覧は research.md §4.14)
 - **テストの書き方**: `essential-test-design` (観察できる結果を確かめ、仕組みを確かめない) と `essential-test-patterns` (vitest、`mock<T>()` を使い、型の主張 `as` を避ける) に従う
-- **自動では確かめられず、人が確かめること** (未確認のまま残っている): (1) linux-arm64 の image の build と動作。(2) 展開した image の大きさ (CI の報告 89,175,439 バイトは圧縮した大きさの見込み)。(3) 既定のブランチに入った後に、メモリの計測を人が起動して流すこと。(4) GitHub 上で workflow を変えたときは、trigger の条件に合うブランチで動かし、`gh api repos/<org>/<repo>/actions/runs/<id>/jobs` でジョブの数が 0 より多く、すべてのステップが成功していることを確かめる (0 ジョブの実行は成功とみなさない)
+- **自動では確かめられず、人が確かめること**: (1) 変換のライブラリ (anydoc、PDFium) や Node の元の image を上げたとき、メモリに関わるコードを変えたときに、メモリの計測を人が起動して流すこと (`workflow_dispatch`。linux/amd64 と linux/arm64 の両方で走る)。(2) 実際のオーケストレーターの下での動作 (確認の probe、ローリングアップデート、停止の合図の後の待ち時間)。(3) GitHub 上で workflow を変えたときは、trigger の条件に合うブランチで動かし、`gh api repos/<org>/<repo>/actions/runs/<id>/jobs` でジョブの数が 0 より多く、すべてのステップが成功していることを確かめる (0 ジョブの実行は成功とみなさない)
 
 ## 配布物と CI
 
@@ -595,7 +595,7 @@ interface ConversionRunner {
 - 実行の段: `node:24.x-bookworm-slim` (版まで固定し、CI の Node と一緒に上げる)、`RUN /usr/bin/prlimit --version` (無いか動かなければビルドが失敗する。5.8 の前提を守る)、uid / gid 10001、`CMD ["node", "dist/main.js"]` (exec の形。Node が PID 1 で SIGTERM を自分で扱う)
 - image に入れないもの: `src`・テスト・ベンチマーク・scripts・開発用の依存・第三者のライセンスの文 (ほかの app の image と同じ扱い。依存が許容的なライセンスであることは調べてある。research.md §1.4)
 - init のプロセスは要らない。子は親の直接の子で、親がいなくなると自分で終わる
-- 400MB 以下 (CI が検査する)
+- 展開した大きさで 400MB 以下 (CI が検査する)
 
 ### 運用者向けの文書 (`apps/attachment-text-extractor/docker/README.md`)
 
@@ -618,9 +618,16 @@ AC 3.3 の推奨設定を含め、サービスを動かすときに守る条件�
 
 - trigger は push (この app、生成クライアントの `openapi.json`、workflow 自身、ルートの `biome.json`・`tsconfig.base.json`・`turbo.json`、`pnpm-lock.yaml` の変更) と `workflow_dispatch`。`apps/attachment-text-extractor/turbo.json` の `test` の `inputs` にも、生成クライアントの `openapi.json` を入れる (生成クライアントだけを変えた変更でも検査が動くように)
 - ジョブ 1 (lint とテスト): `turbo run lint test --filter @growi/attachment-text-extractor` (biome、`tsgo`、vitest。OpenAPI の drift の検査を含む)
-- ジョブ 2 (image の確認。`scripts/image-check/check-image.sh` を段階ごとに呼ぶ): build、400MB 以下、image の中身 (本番に不要なものが無い、uid 10001)、`--read-only --user 10001 --network none --cap-drop ALL --security-opt no-new-privileges` (tmpfs なし) での起動、`/readyz` が 200、PDF と DOCX の `POST /extract` が 200、動いているコンテナの中で本番と同じ条件で `prlimit` を実行して上限を確かめること、コンテナの `/openapi.json` が書き出しの手順の文書と同じこと、失敗したときのログ、後片づけ。メモリの計測のステップは `workflow_dispatch` のときだけ動く
+- ジョブ 2 (image の確認。`scripts/image-check/check-image.sh` を段階ごとに呼ぶ。公開する 2 つの環境 linux/amd64 と linux/arm64 のそれぞれで、エミュレーションなしの runner で動かす): build、保存された大きさと展開した大きさがどちらも 400MB 以下、image の中身 (本番に不要なものが無い、uid 10001)、`--read-only --user 10001 --network none --cap-drop ALL --security-opt no-new-privileges` (tmpfs なし) での起動、`/readyz` が 200、PDF と DOCX の `POST /extract` が 200、動いているコンテナの中で本番と同じ条件で `prlimit` を実行して上限を確かめること、コンテナの `/openapi.json` が書き出しの手順の文書と同じこと、失敗したときのログ、後片づけ。メモリの計測のステップは `workflow_dispatch` のときだけ動く
 - 2 つのジョブは互いを待たない。ほかの workflow はこの package のテストを流さない。apps/app の CI は、生成クライアントを orval で作り直して commit 済みのものと同じことを確かめる
 - `if:` の中にコメントを書かない (`.claude/rules/github-actions-workflows.md`)
+
+### image の公開 (`.github/workflows/release-attachment-text-extractor.yml`)
+
+- 公開先は Docker Hub の `growilabs/attachment-text-extractor`。環境は linux/amd64 と linux/arm64。タグは `latest`、`{major}`、`{major}.{minor}`、`{major}.{minor}.{patch}`
+- 仕組みは `apps/growi-vault-manager` と `apps/pdf-converter` の公開と同じにする。master への push で `apps/attachment-text-extractor/package.json` が変わったときに動き、その版数が安定版で、git のタグ `attachment-text-extractor/v<版数>` がまだ無いときだけ公開する。公開に成功した後でタグを打つので、タグがあることは「その版が Docker Hub にある」ことを表す
+- 版数は changesets で上げる。開発の PR に `@growi/attachment-text-extractor` の changeset を書き、生成される「Release Subpackages」の PR をマージすると公開される。`docker/README.md` の公開タグの一覧は changesets が直さないので、changeset を書く PR で一緒に直す
+- 公開する image が満たすべきことは、公開の workflow では確かめない。CI のジョブ 2 が push のたびに確かめている
 
 ### OpenAPI の書き出し
 

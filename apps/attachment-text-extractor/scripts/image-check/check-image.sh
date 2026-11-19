@@ -7,7 +7,8 @@
 #   check-image.sh <step>...
 #
 #   build     builds the image (context: the repository root)
-#   size      the image is no larger than IMAGE_MAX_BYTES
+#   size      neither the image as stored nor its unpacked filesystem is
+#             larger than IMAGE_MAX_BYTES
 #   contents  what the image must and must not hold
 #   start     starts the container: read-only rootfs, uid 10001, no
 #             capabilities, no network, no tmpfs
@@ -61,10 +62,17 @@ build() {
 }
 
 size() {
-  local bytes
+  local bytes unpacked container
+  # Compressed layers where docker uses the containerd image store.
   bytes=$(docker image inspect "$IMAGE_TAG" --format '{{.Size}}')
   echo "image size: ${bytes} bytes (limit ${IMAGE_MAX_BYTES})"
   test "$bytes" -le "$IMAGE_MAX_BYTES"
+  # The flattened filesystem as a tar stream: what the image takes once pulled.
+  container=$(docker create "$IMAGE_TAG")
+  unpacked=$(docker export "$container" | wc -c)
+  docker rm "$container" >/dev/null
+  echo "unpacked size: ${unpacked} bytes (limit ${IMAGE_MAX_BYTES})"
+  test "$unpacked" -le "$IMAGE_MAX_BYTES"
 }
 
 contents() {

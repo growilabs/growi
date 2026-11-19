@@ -1,6 +1,16 @@
 GROWI Attachment Text Extractor docker image
 ==============================================
 
+Supported tags and respective Dockerfile links
+------------------------------------------------
+
+* [`1.0.0`, `1.0`, `1`, `latest` (Dockerfile)](https://github.com/growilabs/growi/blob/attachment-text-extractor/v1.0.0/apps/attachment-text-extractor/docker/Dockerfile)
+
+Images are published for `linux/amd64` and `linux/arm64`.
+
+What is this
+------------
+
 Extracts the text of an attachment (PDF, Office documents, CSV, HTML, plain text)
 for GROWI's full-text search. It parses untrusted files, so each conversion runs
 in a short-lived child process under memory and time limits.
@@ -9,31 +19,38 @@ This page is for whoever writes the real deployment (Kubernetes, Docker Compose,
 the conditions the service is designed and tested under, each with its reason.
 No deployment manifests are shipped.
 
-> **Verified by the first CI image check** (2026-11-11, commit 38ec6d53bf,
-> `scripts/image-check/check-image.sh`): the image builds on the CI runner;
-> `docker image inspect` reports 89,175,439 bytes (most likely the compressed
-> size, as that runner uses the containerd image store; the limit is
-> 400,000,000); it starts with a read-only root filesystem, uid 10001, no
-> network and no tmpfs, answers `/readyz` and extracts a PDF and a DOCX. Memory
-> in the image: idle 34 - 35 MiB; heaviest load 918 - 1,095 MiB of the 2 Gi
-> limit; conversion children 291 MB (XLSX), 262 - 266 MB (DOCX) and 305 - 306 MB
-> (a single-page 2-million-character PDF) against the 320 MB cap.
+> **Verified by the CI image check** (`scripts/image-check/check-image.sh`,
+> on native linux/amd64 and linux/arm64 runners; figures from the run of
+> 2026-11-18, started by hand so that it includes the memory measurement): the
+> image builds; it starts with a read-only root filesystem, uid 10001, no
+> network and no tmpfs, answers `/readyz` and extracts a PDF and a DOCX.
 >
-> **Still unverified:** linux-arm64, the memory
-> measurement started by hand (`workflow_dispatch`), and behaviour under a real
-> orchestrator (probes, rolling update, termination grace).
+> | | linux/amd64 | linux/arm64 |
+> |---|---|---|
+> | Unpacked filesystem (limit 400,000,000 bytes) | 259,258,880 | 277,116,416 |
+> | Idle | 34 - 35 MiB | 33 - 34 MiB |
+> | Heaviest load (limit 2 Gi) | 1,013 - 1,167 MiB | 1,024 - 1,144 MiB |
+> | Conversion child, XLSX (cap 320 MB) | 290 - 291 MB | 288 MB |
+> | Conversion child, DOCX | 263 - 266 MB | 260 - 264 MB |
+> | Conversion child, single-page 2-million-character PDF | 302 - 303 MB | 300 - 301 MB |
+>
+> **Still unverified:** behaviour under a real orchestrator (probes, rolling
+> update, termination grace).
 
-Build and run
--------------
+Run
+---
 
-The build context is the repository root (the pnpm workspace is needed):
 ```bash
-docker build -f apps/attachment-text-extractor/docker/Dockerfile -t attachment-text-extractor .
-
 docker run -d --read-only --user 10001:10001 --cap-drop ALL \
   --security-opt no-new-privileges --memory 2g \
   -e ATTACHMENT_EXTRACTOR_SERVICE_TOKEN -p 127.0.0.1:8000:8000 \
-  attachment-text-extractor
+  growilabs/attachment-text-extractor:1
+```
+
+To build the image yourself, use the repository root as the build context (the
+pnpm workspace is needed):
+```bash
+docker build -f apps/attachment-text-extractor/docker/Dockerfile -t attachment-text-extractor .
 ```
 
 The service listens on `0.0.0.0:8000` (IPv4 only); no setting changes the address.

@@ -164,11 +164,14 @@ umbrella 側の資料: [../attachment-search/research.md](../attachment-search/r
 
 未決の設計判断は無い。既定値は下げていない (`MAX_CHILD_RSS_MB` 320、`MAX_XLSX_CELLS` 70,000)。
 
-次の確認は、開発環境に docker が無いため行っておらず、未確認のまま完了にした (ユーザーの決定、2026-11-12)。
+CI の image の確認 (linux/amd64 と linux/arm64 のエミュレーションなしの runner) で、次のことを確かめた (2026-11-18 に人が起動した実行。メモリの計測を含む)。
 
-- linux-arm64 の image の build と動作 (`node:24.22.2-bookworm-slim` の arm64 のタグと、`@firecrawl/anydoc-linux-arm64-gnu` が npm にあることは確かめた)。
-- 展開した image の大きさ (CI が報告した 89,175,439 バイトは圧縮した大きさの見込み。見積もりは約 300MB)。
-- メモリの計測を人が workflow を起動して流すこと (workflow のファイルが既定のブランチに入るまで起動できない)。
+- linux-arm64 の image の build と動作。
+- 展開した image の大きさ: linux/amd64 で 259,258,880 バイト、linux/arm64 で 277,116,416 バイト (上限 400,000,000)。
+- メモリの計測: どちらの環境でも上限の内側 (最も重い負荷で 1,013 〜 1,167 MiB、変換の子は最大 303 MB)。
+
+次の確認は行っておらず、未確認のまま残っている。
+
 - 304MB を超えたときの `::warning::` の行が GitHub Actions の注釈になること。
 - 本物のオーケストレーターの下での動き (確認、入れ替え、停止の猶予)。
 
