@@ -78,8 +78,7 @@
   - _Boundary: features/search-attachments/server/services_
   - _Depends: 1.2, 2.1, 2.3, 3.1_
 
-- [ ] 3.3 抽出サービスの応答の大きさの上限と、呼び出し全体の制限時間を設ける
-  - いまは axios の `timeout` を渡しているだけで、応答の大きさに上限が無く、応答が少しずつ届き続ける場合に全体を打ち切る時刻も無い
+- [x] 3.3 抽出サービスの応答の大きさの上限と、呼び出し全体の制限時間を設ける
   - axios の `maxContentLength` で応答の大きさを制限し、`AbortSignal.timeout` で 1 回の呼び出し全体を打ち切る (呼び出し元の `signal` と合わせる)
   - 上限と制限時間を超えた応答が、例外にならずに決まった `ExtractionOutcome` になることを、本物の生成クライアントを代わりのサーバに向けるテストで固定する
   - _Requirements: 1.1, 1.3, 1.4_
@@ -175,10 +174,9 @@
   - _Boundary: features/search-attachments/server/services_
   - _Depends: 3.2, 4.1, 5.2, 6.2_
 
-- [ ] 6.4 親ページが 10,000 を超える添付 index でも orphan sweep が全ページを確かめるようにする
-  - いまは terms aggregation (`size: 10000`) で pageId を集めるので、添付を持つページが 10,000 を超えると、超えた分の pageId は確かめられず、親ページの無い文書が残る (検索結果には出ない。research.md 10.10)
-  - composite aggregation などで pageId を最後まで順に取り出し、MongoDB との照合と削除を分割して行う
-  - あわせて、sweep が自前で持つ削除 (`server/index.ts` の `runDeleteByPageId`) を、`attachment-search-delegator-extension.ts` の共通の削除に揃える
+- [x] 6.4 親ページが 10,000 を超える添付 index でも orphan sweep が全ページを確かめるようにする
+  - composite aggregation で pageId を最後まで順に取り出し、MongoDB との照合と削除を分割して行う
+  - sweep の削除を、`attachment-search-delegator-extension.ts` の共通の削除に揃える
   - _Requirements: 3.2_
   - _Boundary: features/search-attachments/server/services_
 

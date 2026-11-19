@@ -1,276 +1,133 @@
-/**
- * Tests for AttachmentOrphanSweeper (task 6.2).
- *
- * All MongoDB and ES calls are stubbed — no live services required.
- */
-
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import mongoose from 'mongoose';
+import { mock } from 'vitest-mock-extended';
 
 import {
-  type AttachmentOrphanSweeper,
   createAttachmentOrphanSweeper,
+  type OrphanSweepIndexOperations,
 } from './attachment-orphan-sweeper';
 
-// ---------------------------------------------------------------------------
-// Helpers / stubs
-// ---------------------------------------------------------------------------
-
-/** Build a minimal AttachmentIndexOperations stub. */
-function makeDelegatorExtStub() {
-  return {
-    syncAttachmentIndexed: vi.fn(),
-    syncAttachmentRemoved: vi.fn(),
-  };
-}
+const INDEX = 'attachments-rebuild';
 
 /**
- * Build a `runSearch` stub that returns an ES aggregation response containing
- * the given pageIds as terms buckets.
+ * An index holding docs of `pageIds`, listed `listingSize` page ids at a
+ * time in id order, the way the real index lists them.
  */
-function makeRunSearch(pageIds: string[]) {
-  return vi.fn().mockResolvedValue({
-    aggregations: {
-      unique_page_ids: {
-        buckets: pageIds.map((key) => ({ key, doc_count: 1 })),
-      },
-    },
+const makeIndexFake = (pageIds: string[], listingSize = 2) => {
+  const remaining = new Set(pageIds);
+  const operations = mock<OrphanSweepIndexOperations>();
+  operations.listPageIds.mockImplementation(async (_index, after) => {
+    const rest = [...remaining]
+      .sort()
+      .filter((id) => after == null || id > after);
+    const listed = rest.slice(0, listingSize);
+    return {
+      pageIds: listed,
+      after: rest.length > listingSize ? listed.at(-1) : undefined,
+    };
   });
-}
+  operations.removePagesFromIndex.mockImplementation(async (ids) => {
+    for (const id of ids) remaining.delete(id);
+  });
+  return { operations, remaining: () => [...remaining].sort() };
+};
 
-/** Mongoose model stub — mocks `Page.find(...).lean()` */
-function makeMongooseMock(existingIds: string[]) {
-  return {
-    find: vi.fn().mockReturnValue({
-      lean: vi.fn().mockResolvedValue(existingIds.map((id) => ({ _id: id }))),
+/** The pages that still exist in MongoDB. */
+const givenExistingPages = (existingIds: string[]) => {
+  const Page = {
+    find: (query: { _id: { $in: string[] } }) => ({
+      lean: async () =>
+        query._id.$in
+          .filter((id) => existingIds.includes(id))
+          .map((id) => ({ _id: id })),
     }),
   };
-}
-
-// ---------------------------------------------------------------------------
-// Test suite
-// ---------------------------------------------------------------------------
+  // WHY: mongoose.model returns a full Model; the sweeper only calls find().lean()
+  vi.spyOn(mongoose, 'model').mockReturnValue(
+    Page as unknown as ReturnType<typeof mongoose.model>,
+  );
+};
 
 describe('AttachmentOrphanSweeper', () => {
-  let delegatorExt: ReturnType<typeof makeDelegatorExtStub>;
-  let runDeleteByPageId: ReturnType<typeof vi.fn>;
-
-  beforeEach(() => {
-    delegatorExt = makeDelegatorExtStub();
-    runDeleteByPageId = vi.fn().mockResolvedValue(undefined);
+  afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  // -------------------------------------------------------------------------
-  // 1. No orphans — empty index
-  // -------------------------------------------------------------------------
-  describe('sweep — empty index', () => {
-    it('returns { removed: 0, failed: 0 } when the index has no documents', async () => {
-      const runSearch = makeRunSearch([]); // no pageIds in index
+  it('removes the docs of every page that no longer exists, however many listings the index needs', async () => {
+    const index = makeIndexFake(['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7']);
+    givenExistingPages(['p2', 'p5', 'p6']);
 
-      const sweeper: AttachmentOrphanSweeper = createAttachmentOrphanSweeper(
-        // biome-ignore lint/suspicious/noExplicitAny: test stub
-        delegatorExt as any,
-        runSearch,
-        runDeleteByPageId,
-      );
+    const result = await createAttachmentOrphanSweeper(index.operations).sweep(
+      INDEX,
+    );
 
-      const result = await sweeper.sweep('attachments-tmp');
-
-      expect(result).toEqual({ removed: 0, failed: 0 });
-      expect(runDeleteByPageId).not.toHaveBeenCalled();
-    });
+    expect(index.remaining()).toEqual(['p2', 'p5', 'p6']);
+    expect(result).toEqual({ removed: 4, failed: 0 });
   });
 
-  // -------------------------------------------------------------------------
-  // 2. No orphans — all pageIds exist in MongoDB
-  // -------------------------------------------------------------------------
-  describe('sweep — all pages exist', () => {
-    it('returns { removed: 0, failed: 0 } when every pageId found in ES exists in MongoDB', async () => {
-      const pageIds = ['page1', 'page2', 'page3'];
-      const runSearch = makeRunSearch(pageIds);
+  it('removes nothing when every page still exists', async () => {
+    const index = makeIndexFake(['p1', 'p2', 'p3']);
+    givenExistingPages(['p1', 'p2', 'p3']);
 
-      // Mock mongoose so all candidate pages are returned as existing
-      const { default: mongoose } = await import('mongoose');
-      vi.spyOn(mongoose, 'model').mockReturnValue(
-        // biome-ignore lint/suspicious/noExplicitAny: mongoose model mock
-        makeMongooseMock(pageIds) as any,
-      );
+    const result = await createAttachmentOrphanSweeper(index.operations).sweep(
+      INDEX,
+    );
 
-      const sweeper = createAttachmentOrphanSweeper(
-        // biome-ignore lint/suspicious/noExplicitAny: test stub
-        delegatorExt as any,
-        runSearch,
-        runDeleteByPageId,
-      );
-
-      const result = await sweeper.sweep('attachments-tmp');
-
-      expect(result).toEqual({ removed: 0, failed: 0 });
-      expect(runDeleteByPageId).not.toHaveBeenCalled();
-    });
+    expect(index.remaining()).toEqual(['p1', 'p2', 'p3']);
+    expect(result).toEqual({ removed: 0, failed: 0 });
   });
 
-  // -------------------------------------------------------------------------
-  // 3. Orphans found — delete succeeds
-  // -------------------------------------------------------------------------
-  describe('sweep — orphan pageIds found', () => {
-    it('calls runDeleteByPageId for each orphan and returns correct removed count', async () => {
-      const allPageIds = ['page1', 'page2', 'page3'];
-      // page1 and page3 exist; page2 is an orphan
-      const existingIds = ['page1', 'page3'];
-      const runSearch = makeRunSearch(allPageIds);
+  it('removes nothing from an empty index', async () => {
+    const index = makeIndexFake([]);
+    givenExistingPages([]);
 
-      const { default: mongoose } = await import('mongoose');
-      vi.spyOn(mongoose, 'model').mockReturnValue(
-        // biome-ignore lint/suspicious/noExplicitAny: mongoose model mock
-        makeMongooseMock(existingIds) as any,
-      );
+    const result = await createAttachmentOrphanSweeper(index.operations).sweep(
+      INDEX,
+    );
 
-      const sweeper = createAttachmentOrphanSweeper(
-        // biome-ignore lint/suspicious/noExplicitAny: test stub
-        delegatorExt as any,
-        runSearch,
-        runDeleteByPageId,
-      );
-
-      const result = await sweeper.sweep('attachments-tmp');
-
-      expect(result).toEqual({ removed: 1, failed: 0 });
-      expect(runDeleteByPageId).toHaveBeenCalledOnce();
-      expect(runDeleteByPageId).toHaveBeenCalledWith(
-        'attachments-tmp',
-        'page2',
-      );
-    });
-
-    it('calls runDeleteByPageId for every orphan when multiple orphans exist', async () => {
-      const allPageIds = ['page1', 'page2', 'page3'];
-      const runSearch = makeRunSearch(allPageIds);
-
-      // No pages exist → all three are orphans
-      const { default: mongoose } = await import('mongoose');
-      vi.spyOn(mongoose, 'model').mockReturnValue(
-        // biome-ignore lint/suspicious/noExplicitAny: mongoose model mock
-        makeMongooseMock([]) as any,
-      );
-
-      const sweeper = createAttachmentOrphanSweeper(
-        // biome-ignore lint/suspicious/noExplicitAny: test stub
-        delegatorExt as any,
-        runSearch,
-        runDeleteByPageId,
-      );
-
-      const result = await sweeper.sweep('attachments-tmp');
-
-      expect(result).toEqual({ removed: 3, failed: 0 });
-      expect(runDeleteByPageId).toHaveBeenCalledTimes(3);
-    });
+    expect(result).toEqual({ removed: 0, failed: 0 });
   });
 
-  // -------------------------------------------------------------------------
-  // 4. Partial delete failure
-  // -------------------------------------------------------------------------
-  describe('sweep — partial delete failure', () => {
-    it('accumulates failed count without throwing when some deletes fail', async () => {
-      const allPageIds = ['orphan1', 'orphan2', 'orphan3'];
-      const runSearch = makeRunSearch(allPageIds);
+  it('counts the pages of a failed removal and goes on with the rest of the index', async () => {
+    const index = makeIndexFake(['p1', 'p2', 'p3', 'p4']);
+    givenExistingPages([]);
+    index.operations.removePagesFromIndex.mockRejectedValueOnce(
+      new Error('delete failed'),
+    );
 
-      // No pages exist → all are orphans
-      const { default: mongoose } = await import('mongoose');
-      vi.spyOn(mongoose, 'model').mockReturnValue(
-        // biome-ignore lint/suspicious/noExplicitAny: mongoose model mock
-        makeMongooseMock([]) as any,
-      );
+    const result = await createAttachmentOrphanSweeper(index.operations).sweep(
+      INDEX,
+    );
 
-      // Second delete fails
-      runDeleteByPageId
-        .mockResolvedValueOnce(undefined) // orphan1 succeeds
-        .mockRejectedValueOnce(new Error('ES timeout')) // orphan2 fails
-        .mockResolvedValueOnce(undefined); // orphan3 succeeds
-
-      const sweeper = createAttachmentOrphanSweeper(
-        // biome-ignore lint/suspicious/noExplicitAny: test stub
-        delegatorExt as any,
-        runSearch,
-        runDeleteByPageId,
-      );
-
-      const result = await sweeper.sweep('attachments-tmp');
-
-      expect(result).toEqual({ removed: 2, failed: 1 });
-      // Must not throw
-    });
+    expect(index.remaining()).toEqual(['p1', 'p2']);
+    expect(result).toEqual({ removed: 2, failed: 2 });
   });
 
-  // -------------------------------------------------------------------------
-  // 5. Catastrophic failure — sweep never throws
-  // -------------------------------------------------------------------------
-  describe('sweep — catastrophic failure', () => {
-    it('returns { removed: 0, failed: 0 } when runSearch throws', async () => {
-      const runSearch = vi.fn().mockRejectedValue(new Error('ES unreachable'));
+  it('reports what it removed so far, without throwing, when the index stops answering', async () => {
+    const index = makeIndexFake(['p1', 'p2', 'p3', 'p4']);
+    givenExistingPages([]);
+    const listFirst = index.operations.listPageIds.getMockImplementation();
+    index.operations.listPageIds
+      .mockImplementationOnce((...args) => listFirst?.(...args) as never)
+      .mockRejectedValueOnce(new Error('ES unreachable'));
 
-      const sweeper = createAttachmentOrphanSweeper(
-        // biome-ignore lint/suspicious/noExplicitAny: test stub
-        delegatorExt as any,
-        runSearch,
-        runDeleteByPageId,
-      );
+    const result = await createAttachmentOrphanSweeper(index.operations).sweep(
+      INDEX,
+    );
 
-      const result = await sweeper.sweep('attachments-tmp');
-
-      expect(result).toEqual({ removed: 0, failed: 0 });
-    });
-
-    it('returns { removed: 0, failed: 0 } when mongoose.model throws', async () => {
-      const allPageIds = ['page1'];
-      const runSearch = makeRunSearch(allPageIds);
-
-      const { default: mongoose } = await import('mongoose');
-      vi.spyOn(mongoose, 'model').mockImplementation(() => {
-        throw new Error('MongoDB disconnected');
-      });
-
-      const sweeper = createAttachmentOrphanSweeper(
-        // biome-ignore lint/suspicious/noExplicitAny: test stub
-        delegatorExt as any,
-        runSearch,
-        runDeleteByPageId,
-      );
-
-      const result = await sweeper.sweep('attachments-tmp');
-
-      expect(result).toEqual({ removed: 0, failed: 0 });
-    });
+    expect(result).toEqual({ removed: 2, failed: 0 });
   });
 
-  // -------------------------------------------------------------------------
-  // 6. No independent trigger
-  // -------------------------------------------------------------------------
-  describe('no independent trigger', () => {
-    it('exports only sweep() — no cron, no event listener, no setInterval', () => {
-      const runSearch = makeRunSearch([]);
-
-      const sweeper = createAttachmentOrphanSweeper(
-        // biome-ignore lint/suspicious/noExplicitAny: test stub
-        delegatorExt as any,
-        runSearch,
-        runDeleteByPageId,
-      );
-
-      // The public interface must expose exactly one method: sweep
-      const publicKeys = Object.getOwnPropertyNames(
-        Object.getPrototypeOf(sweeper),
-      ).filter((k) => k !== 'constructor');
-
-      expect(publicKeys).toContain('sweep');
-      // There must be no scheduling methods
-      expect(publicKeys).not.toContain('start');
-      expect(publicKeys).not.toContain('schedule');
-      expect(publicKeys).not.toContain('listen');
-      expect(publicKeys).not.toContain('subscribe');
-      expect(publicKeys).not.toContain('onPageDeleted');
-      expect(publicKeys).not.toContain('onPageEvent');
+  it('removes nothing, without throwing, when MongoDB cannot be asked', async () => {
+    const index = makeIndexFake(['p1']);
+    vi.spyOn(mongoose, 'model').mockImplementation(() => {
+      throw new Error('MongoDB disconnected');
     });
+
+    const result = await createAttachmentOrphanSweeper(index.operations).sweep(
+      INDEX,
+    );
+
+    expect(index.remaining()).toEqual(['p1']);
+    expect(result).toEqual({ removed: 0, failed: 0 });
   });
 });

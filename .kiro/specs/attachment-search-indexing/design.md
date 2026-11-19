@@ -678,7 +678,7 @@ export interface AttachmentTextExtractorService {
 ```
 
 - Postconditions: どの失敗でも throw せず `ExtractionOutcome` を返す (ネットワーク障害は `serviceUnreachable`、添付が無ければ `failed` / `attachment_not_found`、ファイルを読めなければ `failed` / `file_read_failed`)
-- Invariants: 1 呼び出しで送る multipart request は 1 回 (混雑時の再試行があれば 2 回)。ファイルは全体をメモリに読んでから送る (ストリーミング不採用)。応答の大きさの上限と、呼び出し全体の制限時間は無い (tasks.md 3.3)
+- Invariants: 1 呼び出しで送る multipart request は 1 回 (混雑時の再試行があれば 2 回)。ファイルは全体をメモリに読んでから送る (ストリーミング不採用)。抽出サービスの応答は 64MiB まで受け取り、超えたら `resourceLimit` にする。1 回の呼び出しは、応答を受け取り終えるまでの全体を `timeoutMs` で打ち切り、`serviceUnreachable` にする (research.md 10.13)
 
 ### AttachmentSearchIndexer
 
@@ -730,7 +730,7 @@ export interface AttachmentSearchIndexer {
 
 **Responsibilities & Constraints**
 - `AttachmentReindexBatch` から呼び出される。独立トリガは持たない (定期 cron や pageEvent 購読は行わない)
-- 作り直し先の index を埋めた後に、その index にある pageId を terms aggregation で集め (最大 10,000 件)、Page collection に無い pageId の文書を作り直し先から削除する。添付を持つページが 10,000 を超えると、超えた分は確かめない (分かっている制限。research.md 10.10、tasks.md 6.4)
+- 作り直し先の index を埋めた後に、その index にある pageId を composite aggregation で 1,000 件ずつ最後まで取り出し、取り出すたびに Page collection と照合して、無い pageId の文書を作り直し先から削除する。添付を持つページの数に上限は無い (research.md 10.10)。一覧と削除は `AttachmentIndexOperations` の `listPageIds` / `removePagesFromIndex` で行う
 - 失敗しても rebuildIndex 本体の成功を阻害しない (pino ログに記録し continue)
 - query-time permission lookup により「sweep までの間の snippet 漏洩」は発生しないため、定期実行は不要 (R4.4 は query-time で、R3.2 は eventual cleanup で満たす二段構え)
 
@@ -1437,6 +1437,7 @@ Index は migration `20261117120000-add-indexes-to-extractionfailurelogs.js` が
   - 同時に走る抽出が 3 件を超えず、超えた呼び出しが到着順に実行されること (`concurrency-limit`)
   - ファイルの読み込みが `timeoutMs` を超えたら stream を閉じて `failed` (`file_read_failed`) になること。`signal` の中断でも止まること (`read-file-chunks`)
   - `maxFileSizeBytes` を超える添付は読まずに `tooLarge` になること
+  - 上限を超える大きさの応答が `resourceLimit` になり、少しずつ届き続ける応答が `timeoutMs` で打ち切られて `serviceUnreachable` になり、接続が閉じること (本物の生成クライアントを代わりのサーバに向ける。`attachment-text-extractor.response-limits.spec.ts`)
 - 作り直しの失敗の上限 (`rebuild-failure-budget`):
   - 障害を疑う結果が `20 + ceil(対象数 × 5%)` に達した時点で止まること。ファイルごとの結果 (`unsupported` など) は数えないこと
   - 全件が障害を疑う結果なら、上限に届かなくても最後に失敗になること。1 件も処理していなければ失敗にならないこと
@@ -1571,4 +1572,4 @@ flowchart LR
 7. **`packages/attachment-text-extractor-client` の公開境界**: server 専用依存として apps/app から import し、UI 側に混入させないレイヤリング制約を lint ルール化するか検討
 8. **`requiresReindex` cardinality agg の共有 ES コスト**: 30 秒のキャッシュはインスタンスごとに独立しているので、複数インスタンスでは admin GET のたびに各インスタンスが集計を投げうる。`precision_threshold` の指定、共有のキャッシュ、MongoDB 上の件数の記録への置き換えのどれかを、リリース後に検討する
 9. **複数インスタンスでの作り直し**: 実行中の判定と、作り直し中の削除の記録はインスタンスごとのメモリにある (research.md 8.6 の「残っている制約」)
-10. **残っている作業**: tasks.md の未完了のタスク (3.3 応答の大きさと呼び出し全体の制限時間、3.4 監視メトリクス、6.4 10,000 ページを超える orphan sweep、10.8 検索の速さ)
+10. **残っている作業**: tasks.md の未完了のタスク (3.4 監視メトリクス、10.8 検索の速さ)
