@@ -236,18 +236,18 @@ export const setup = (crowi: Crowi, app) => {
       return res.json(ApiResponse.error('SearchService is not reachable.'));
     }
 
-    const facetParams = parseFacetSearchParams(req.query);
-    if (!facetParams.ok) {
-      return res.json(ApiResponse.error(facetParams.message, 400));
-    }
-    const { facet, resolve } = facetParams;
-    // A named query runs on another delegator, which has no attachment index.
-    if (
-      (facet === 'all' || facet === 'attachments') &&
-      nq == null &&
-      isAttachmentFullTextSearchEnabled(searchService.isConfigured)
-    ) {
-      return searchByFacet(req, res, { q, facet, resolve });
+    // While attachment search is disabled, facet / resolve stay unread, as
+    // they were before the feature existed.
+    if (isAttachmentFullTextSearchEnabled(searchService.isConfigured)) {
+      const facetParams = parseFacetSearchParams(req.query);
+      if (!facetParams.ok) {
+        return res.json(ApiResponse.error(facetParams.message, 400));
+      }
+      const { facet, resolve } = facetParams;
+      // A named query runs on another delegator, which has no attachment index.
+      if ((facet === 'all' || facet === 'attachments') && nq == null) {
+        return searchByFacet(req, res, { q, facet, resolve });
+      }
     }
 
     const userGroups =

@@ -292,8 +292,8 @@
   - _Boundary: basic-layout-page SSR props_
   - _Depends: 2.1_
 
-- [ ] 9.4 機能が無効のときの `GET /_api/search` を、機能導入前と完全に同じにする
-  - いまは `facet` の値の検査を、機能の有効・無効を見る前に行うので、機能が無効でも不正な `facet` (または `facet` 付きの不正な `resolve`) に 400 を返す。導入前は未知のクエリとして無視されていた (Req 9.1 からのずれ。research.md 10.11)
+- [x] 9.4 機能が無効のときの `GET /_api/search` を、機能導入前と完全に同じにする
+  - `facet` の値の検査は、機能が有効なときだけ行う (research.md 10.11)
   - 機能が無効のときは `facet` / `resolve` を読まず、従来のページ検索をそのまま行う
   - _Requirements: 9.1_
   - _Boundary: apps/app/src/server/routes/search.ts_
