@@ -491,15 +491,19 @@ describe('config-definition change-proposal keys', () => {
 
 describe('env var type declarations', () => {
   it('declares envVarType on every env-backed config whose default cannot reveal its type', () => {
-    const undeclared = Object.entries(CONFIG_DEFINITIONS)
-      .filter(
-        ([, definition]) =>
-          definition.envVarName != null &&
-          definition.defaultValue == null &&
-          definition.envVarType == null,
-      )
+    const candidates = Object.entries(CONFIG_DEFINITIONS).filter(
+      ([, definition]) =>
+        definition.envVarName != null && definition.defaultValue == null,
+    );
+    const undeclared = candidates
+      .filter(([, definition]) => definition.envVarType == null)
       .map(([key]) => key);
 
+    // Guard the guard: an empty candidate set would make this pass vacuously
+    expect(candidates).toContainEqual([
+      'security:sessionMaxAge',
+      expect.anything(),
+    ]);
     expect(undeclared).toEqual([]);
   });
 

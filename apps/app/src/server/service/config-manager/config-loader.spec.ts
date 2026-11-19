@@ -3,6 +3,17 @@ import type { RawConfigData } from '@growi/core/dist/interfaces';
 import type { ConfigKey, ConfigValues } from './config-definition';
 import { ConfigLoader } from './config-loader';
 
+const { loggerWarn } = vi.hoisted(() => ({ loggerWarn: vi.fn() }));
+
+vi.mock('~/utils/logger', () => ({
+  default: () => ({
+    warn: loggerWarn,
+    error: vi.fn(),
+    info: vi.fn(),
+    debug: vi.fn(),
+  }),
+}));
+
 const mockExec = vi.fn();
 const mockFind = vi.fn().mockReturnValue({ exec: mockExec });
 
@@ -187,7 +198,6 @@ describe('ConfigLoader', () => {
 
       it('throws when the strict mode flag itself is invalid', async () => {
         vi.stubEnv('CHECK_CONFIGURATION_VALUE_STRICTLY', 'ture');
-        vi.stubEnv('ELASTICSEARCH_REQUEST_TIMEOUT', 'abc');
 
         await expect(configLoader.loadFromEnv()).rejects.toThrow(
           'CHECK_CONFIGURATION_VALUE_STRICTLY',
@@ -227,13 +237,24 @@ describe('ConfigLoader', () => {
       });
 
       it('uses the default value for an invalid env var', async () => {
+        // Inputs a lenient parser would accept (12abc -> 12, yes -> false)
         vi.stubEnv('ELASTICSEARCH_REQUEST_TIMEOUT', '12abc');
-        vi.stubEnv('ELASTICSEARCH_REJECT_UNAUTHORIZED', 'yes');
+        vi.stubEnv('CHANGE_PROPOSAL_IS_MOVE_ENABLED', 'yes');
 
         const config = await configLoader.loadFromEnv();
 
         expect(config['app:elasticsearchRequestTimeout'].value).toBe(8000);
-        expect(config['app:elasticsearchRejectUnauthorized'].value).toBe(false);
+        expect(config['changeProposal:isMoveEnabled'].value).toBe(true);
+      });
+
+      it('warns with the invalid env var name, without its value', async () => {
+        vi.stubEnv('ELASTICSEARCH_REQUEST_TIMEOUT', '12abc');
+
+        await configLoader.loadFromEnv();
+
+        const warned = loggerWarn.mock.calls.flat().join('\n');
+        expect(warned).toContain('ELASTICSEARCH_REQUEST_TIMEOUT');
+        expect(warned).not.toContain('12abc');
       });
 
       it('still parses valid values', async () => {
