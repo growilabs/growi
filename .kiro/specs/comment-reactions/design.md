@@ -874,6 +874,7 @@ type CommentReactionHeaderButtonProps = {
   - **押せないとき**: `canReact` が false のとき（要件 6.2）と更新中は、`disabled` ではなく `aria-disabled="true"` にして、押しても何もしない。`disabled` のボタンはマウスイベントを出さないので、ホバーで利用者一覧を出せなくなるため。読み取り専用でもボタンのままにして、キーボードのフォーカスで一覧に届くようにする。更新中は `aria-busy` も付け、見た目を薄くする。
   - **利用者の一覧**: ホバーできる端末（`useCanHover`）でだけ `ReactionUsersPopover` を描画し、チップにマウスを乗せたとき、またはキーボードでフォーカスしたときに出す（要件 1.5）。ホバーできない端末では描画しない。タップでフォーカスが移るとフォーカスで開いてしまうため、トリガーを残したまま隠すのではなく、描画そのものをしない。
   - 枠は区切り線を引かず、絵文字と人数の間の余白を 0 にして詰める。絵文字だけのチップを想定して、高さは `min-height: 1.5rem` までにする。
+  - 押せるチップは、ホバーで背景を変える。自分のチップは灰色に置き換えず、同系色のまま一段濃く（`--bs-primary-border-subtle`）して、ホバー中も自分のリアクションの印を保つ。押せないチップは変えない。
   - Popover の対象は、チップのボタンへの ref（`ReactionUsersPopover` の `target` は `RefObject<HTMLElement>`）。`useId()` の文字列はコロンを含み、reactstrap がセレクターとして解決できないため使わない（`apps/app/.claude/rules/ui-pitfalls.md`）。
 - ReactionUsersPopover: reactstrap の `UncontrolledPopover`（`trigger="hover focus"`。マウスを乗せるかフォーカスすると開き、離れると閉じる。Popover の中にマウスを移しても閉じないので、人数が多いときに中をスクロールできる）で、チップの `users` を `createdAt` の昇順のまま並べる。表示名は、`name` があれば `name`、無ければ `username`、ID 文字列ならそのまま（要件 1.10）。人数が多いときは、高さの上限を決めて中をスクロールさせる。
 - useCanHover: `matchMedia('(hover: hover)')` の結果を返し、変化を購読する。サーバーの描画とハイドレーションでは `false`（一覧を出さない）。追加ボタンの出し分け（`_comment-inheritance.scss` の `@media (hover: hover)`）と同じ条件にそろえ、タッチ対応のノート PC などはマウスでのホバーで一覧が出る。

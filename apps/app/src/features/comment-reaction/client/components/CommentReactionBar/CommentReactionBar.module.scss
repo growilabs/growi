@@ -28,6 +28,11 @@
     background-color: var(--bs-secondary-bg);
   }
 
+  // Mine stays in its own hue, one step stronger, so the "reacted" mark never drops out on hover.
+  &.reaction-chip-mine:not([aria-disabled='true']):hover {
+    background-color: var(--bs-primary-border-subtle);
+  }
+
   &[aria-disabled='true'] {
     cursor: default;
   }
