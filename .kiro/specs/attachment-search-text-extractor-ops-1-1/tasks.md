@@ -22,7 +22,7 @@
   - 枠を `/extract` の route の登録の中ではなく、アプリの組み立て (`createApp`) で 1 つ作り、route に渡す
   - 終わった状態: 枠の単体テストが通り、`/extract` の既存のテスト (503 `service_busy`、枠が返ること) が変わらず通る
   - _Requirements: 3.2_
-- [ ] 2.2 文書に載っている経路とトークンの要らないパスを 1 か所にまとめる
+- [x] 2.2 文書に載っている経路とトークンの要らないパスを 1 か所にまとめる
   - 経路のパスの一覧、トークンの要らないパスの一覧、送られた要求の文字列 (`?` より前) から経路のラベル (一致しなければ `other`) を決める関数を置く。`bearerAuth` の判定はこれを使う
   - このタスクでは `/metrics` をまだ加えない (振る舞いを変えない)
   - 終わった状態: ラベルを決める関数の単体テスト (`/./healthz`、`/%68ealthz`、`//healthz`、`http://test/healthz`、`?` の付いた要求が、`open-path-targets.integ.ts` と同じ結論になる) と、既存の `open-path-targets.integ.ts`・`bearer-auth.integ.ts` が通る
