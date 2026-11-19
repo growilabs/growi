@@ -1,10 +1,13 @@
 import { resolveEnvVarType } from './resolve-env-var-type';
 
 describe('resolveEnvVarType', () => {
-  it('uses the declared envVarType over the default value', () => {
-    expect(
-      resolveEnvVarType('k', { envVarType: 'number', defaultValue: undefined }),
-    ).toBe('number');
+  it.each([
+    ['an undefined default', undefined],
+    ['a default of a different type', 8000],
+  ])('uses the declared envVarType over %s', (_, defaultValue) => {
+    expect(resolveEnvVarType('k', { envVarType: 'string', defaultValue })).toBe(
+      'string',
+    );
   });
 
   it.each([
@@ -25,8 +28,13 @@ describe('resolveEnvVarType', () => {
     ['symbol', Symbol('lru')],
     ['function', () => 30],
   ])('throws naming the config for a %s default without envVarType', (_, defaultValue) => {
-    expect(() =>
-      resolveEnvVarType('app:example', { envVarName: 'EXAMPLE', defaultValue }),
-    ).toThrow(/EXAMPLE.*'app:example'/);
+    const resolve = () =>
+      resolveEnvVarType('app:example', {
+        envVarName: 'EXAMPLE',
+        defaultValue,
+      });
+
+    expect(resolve).toThrow('EXAMPLE');
+    expect(resolve).toThrow("'app:example'");
   });
 });
