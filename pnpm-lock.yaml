@@ -13,6 +13,7 @@ overrides:
   '@lezer/lr': ^1.4.10
   '@codemirror/language': ^6.12.3
   rehype-katex>katex: ^0.18.2
+  streamdown>katex: ^0.18.2
 
 packageExtensionsChecksum: sha256-8AVTVG6XqA8Sdx2pyiL0NkxKdDqAh83Jgy7TwdlUUks=
 
@@ -31542,7 +31543,7 @@ snapshots:
       hast: 1.0.0
       hast-util-to-jsx-runtime: 2.3.6
       html-url-attributes: 3.0.1
-      katex: 0.16.47
+      katex: 0.18.2
       lucide-react: 0.542.0(react@18.2.0)
       marked: 16.4.2
       mermaid: 11.16.1
