@@ -1,14 +1,21 @@
 import { Document } from 'mongoose';
 
 import { isPopulated, isRef, type Ref } from '../../interfaces/common.js';
-import type { IUser } from '../../interfaces/user.js';
 
-export type IUserSerializedSecurely<U extends IUser> = Omit<
+/** The only attributes the serializer reads. */
+export type SerializableUser = {
+  password?: string | null;
+  apiToken?: string | null;
+  email?: string | null;
+  isEmailPublished: boolean;
+};
+
+export type IUserSerializedSecurely<U extends SerializableUser> = Omit<
   U,
   'password' | 'apiToken' | 'email'
-> & { email?: string };
+> & { email?: NonNullable<U['email']> };
 
-export const omitInsecureAttributes = <U extends IUser>(
+export const omitInsecureAttributes = <U extends SerializableUser>(
   user: U,
 ): IUserSerializedSecurely<U> => {
   const leanDoc = user instanceof Document ? user.toObject<U>() : user;
@@ -18,20 +25,20 @@ export const omitInsecureAttributes = <U extends IUser>(
   const secureUser: IUserSerializedSecurely<U> = rest;
 
   // omit email
-  if (secureUser.isEmailPublished) {
+  if (leanDoc.isEmailPublished && email != null) {
     secureUser.email = email;
   }
 
   return secureUser;
 };
 
-export function serializeUserSecurely<U extends IUser>(
+export function serializeUserSecurely<U extends SerializableUser>(
   user?: U,
 ): IUserSerializedSecurely<U>;
-export function serializeUserSecurely<U extends IUser>(
+export function serializeUserSecurely<U extends SerializableUser>(
   user?: Ref<U>,
 ): Ref<IUserSerializedSecurely<U>>;
-export function serializeUserSecurely<U extends IUser>(
+export function serializeUserSecurely<U extends SerializableUser>(
   user?: U | Ref<U>,
 ): undefined | IUserSerializedSecurely<U> | Ref<IUserSerializedSecurely<U>> {
   if (user == null) return user;
