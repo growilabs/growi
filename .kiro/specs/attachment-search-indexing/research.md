@@ -369,6 +369,7 @@ umbrella gap analysis 時点では「親ページ権限変更のイベントフ�
 - 問題: 作り直し先の index にある pageId を terms aggregation (`size: 10000`) で 1 回に集めると、添付を持つページが 10,000 を超えた分は MongoDB と照合されず、親ページの無い添付の文書が index に残る。残っても検索結果には出ない (検索時に親ページの権限を確かめるため) が、index の大きさと、`requiresReindex` の件数の比較に影響する
 - 判断: composite aggregation で pageId を 1,000 件ずつ、id の順に最後まで取り出す。取り出すたびに MongoDB と照合し、無い pageId の文書を 1 回の delete-by-query で消す。pageId の一覧も MongoDB への問い合わせも、添付を持つページの数に比例して大きくならない
 - 取り出しの途中で消しても、次の取り出しは「直前の最後の pageId より後」を指定するので、飛ばしも重複も起きない
+- 一覧の前に index を refresh する (最初の 1 回)。検索は refresh されるまで書いたばかりの文書を見ないので、しないと作り直しの直後の index では一覧が空になり、何も消えない (実際の Elasticsearch で動かす統合テストで見つけた)
 - 削除は、添付の削除と同じ共通の処理 (refresh してから delete-by-query。消せなかった文書があれば失敗にする) を使う
 - 件数 (`removed` / `failed`) は pageId の数。途中で Elasticsearch か MongoDB が応答しなくなったら、そこまでの件数を返して終わる (作り直しは止めない。Req 3.4)
 
