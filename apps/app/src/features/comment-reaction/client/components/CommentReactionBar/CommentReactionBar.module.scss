@@ -1,13 +1,27 @@
-// One button holding the emoji and the count, with no divider or gap between them.
-.reaction-chip {
+// The chip and the add button share one pill, so the add button stays as tall as a chip.
+%reaction-pill {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   min-height: 1.5rem;
   padding: 0 0.5rem;
   color: inherit;
   background: transparent;
   border: 1px solid var(--bs-border-color);
   border-radius: 1rem;
+
+  &[aria-disabled='true'] {
+    cursor: default;
+  }
+
+  &:not([aria-disabled='true']):hover {
+    background-color: var(--bs-secondary-bg);
+  }
+}
+
+// One button holding the emoji and the count, with no divider or gap between them.
+.reaction-chip {
+  @extend %reaction-pill;
 
   &.reaction-chip-mine {
     background-color: var(--bs-primary-bg-subtle);
@@ -24,19 +38,12 @@
     font-size: 0.85rem;
   }
 
-  &:not([aria-disabled='true']):hover {
-    background-color: var(--bs-secondary-bg);
-  }
-
   // Mine stays in its own hue, one step stronger, so the "reacted" mark never drops out on hover.
   &.reaction-chip-mine:not([aria-disabled='true']):hover {
     background-color: var(--bs-primary-border-subtle);
   }
 
-  &[aria-disabled='true'] {
-    cursor: default;
-  }
-
+  // Only while in flight: a read-only chip is not dimmed, since its content is still current.
   &[aria-busy='true'] {
     opacity: 0.6;
   }
@@ -54,23 +61,10 @@
   display: inline-flex;
 
   .add-reaction-button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 1.5rem;
-    padding: 0 0.5rem;
-    color: inherit;
-    background: transparent;
-    border: 1px solid var(--bs-border-color);
-    border-radius: 1rem;
+    @extend %reaction-pill;
 
     &[aria-disabled='true'] {
-      cursor: default;
       opacity: 0.6;
-    }
-
-    &:not([aria-disabled='true']):hover {
-      background-color: var(--bs-secondary-bg);
     }
   }
 }
