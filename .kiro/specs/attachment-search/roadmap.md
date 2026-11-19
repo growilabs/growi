@@ -9,6 +9,7 @@
 | [attachment-search-text-extractor](../attachment-search-text-extractor/) | 抽出サービス (`apps/attachment-text-extractor`) |
 | [attachment-search-indexing](../attachment-search-indexing/) | apps/app のサーバ側 (抽出の呼び出し、Elasticsearch の索引、API) |
 | [attachment-search-ui](../attachment-search-ui/) | apps/app のクライアント側 (検索結果、管理画面) |
+| [attachment-search-text-extractor-ops-1-1](../attachment-search-text-extractor-ops-1-1/) | 抽出サービス 1.1.0 の amend spec (呼び出し元の app のログ、`/metrics`、(f) の抽出サービス側)。取り込みが済んだら消す |
 
 ## リリースまでの順番
 
