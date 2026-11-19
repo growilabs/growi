@@ -3,6 +3,7 @@ import {
   CONFIG_KEYS,
   ENV_ONLY_GROUPS,
 } from './config-definition';
+import { resolveEnvVarType } from './resolve-env-var-type';
 
 describe('config-definition resilience keys', () => {
   describe('CONFIG_KEYS array', () => {
@@ -495,21 +496,27 @@ describe('config-definition change-proposal keys', () => {
 });
 
 describe('env var type declarations', () => {
-  it('declares envVarType on every env-backed config whose default cannot reveal its type', () => {
-    const candidates = Object.entries(CONFIG_DEFINITIONS).filter(
-      ([, definition]) =>
-        definition.envVarName != null && definition.defaultValue == null,
+  it('resolves an env var type for every env-backed config', () => {
+    const envBacked = Object.entries(CONFIG_DEFINITIONS).filter(
+      ([, definition]) => definition.envVarName != null,
     );
-    const undeclared = candidates
-      .filter(([, definition]) => definition.envVarType == null)
+    const unresolvable = envBacked
+      .filter(([key, definition]) => {
+        try {
+          resolveEnvVarType(key, definition);
+          return false;
+        } catch {
+          return true;
+        }
+      })
       .map(([key]) => key);
 
-    // Guard the guard: an empty candidate set would make this pass vacuously
-    expect(candidates).toContainEqual([
+    // Guard the guard: an empty set would make this pass vacuously
+    expect(envBacked).toContainEqual([
       'security:sessionMaxAge',
       expect.anything(),
     ]);
-    expect(undeclared).toEqual([]);
+    expect(unresolvable).toEqual([]);
   });
 
   it('declares app:checkConfigurationValueStrictly as a strict-by-default env var', () => {

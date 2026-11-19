@@ -1,14 +1,11 @@
-import type {
-  EnvVarType,
-  IConfigLoader,
-  RawConfigData,
-} from '@growi/core/dist/interfaces';
+import type { IConfigLoader, RawConfigData } from '@growi/core/dist/interfaces';
 
 import loggerFactory from '~/utils/logger';
 
 import type { ConfigKey, ConfigValues } from './config-definition';
 import { CONFIG_DEFINITIONS } from './config-definition';
 import { parseEnvValue } from './parse-env-value';
+import { resolveEnvVarType } from './resolve-env-var-type';
 
 const logger = loggerFactory('growi:service:ConfigLoader');
 
@@ -18,24 +15,6 @@ const STRICT_MODE_ENV_VAR_NAME = 'CHECK_CONFIGURATION_VALUE_STRICTLY';
 type InvalidEnvVar = {
   readonly envVarName: string;
   readonly reason: string;
-};
-
-const resolveEnvVarType = (definition: {
-  readonly envVarType?: EnvVarType;
-  readonly defaultValue: unknown;
-}): EnvVarType => {
-  if (definition.envVarType != null) {
-    return definition.envVarType;
-  }
-  const inferred = typeof definition.defaultValue;
-  switch (inferred) {
-    case 'number':
-    case 'boolean':
-    case 'object':
-      return inferred;
-    default:
-      return 'string';
-  }
 };
 
 /**
@@ -70,21 +49,22 @@ export class ConfigLoader implements IConfigLoader<ConfigKey, ConfigValues> {
 
     for (const [key, metadata] of Object.entries(CONFIG_DEFINITIONS)) {
       let configValue: unknown = metadata.defaultValue;
-
       const { envVarName } = metadata;
-      const envVarValue =
-        envVarName != null ? process.env[envVarName] : undefined;
-      const envVarType = resolveEnvVarType(metadata);
 
-      // An empty value cannot be a valid number/boolean/JSON, so it means "unset"
-      const isEmptyNonString = envVarValue === '' && envVarType !== 'string';
+      if (envVarName != null) {
+        // Resolved even when the env var is unset, so a wrong definition fails every boot
+        const envVarType = resolveEnvVarType(key, metadata);
+        const envVarValue = process.env[envVarName];
+        // An empty value cannot be a valid number/boolean/JSON, so it means "unset"
+        const isEmptyNonString = envVarValue === '' && envVarType !== 'string';
 
-      if (envVarName != null && envVarValue != null && !isEmptyNonString) {
-        const result = parseEnvValue(envVarValue, envVarType);
-        if (result.ok) {
-          configValue = result.value;
-        } else {
-          invalidEnvVars.push({ envVarName, reason: result.reason });
+        if (envVarValue != null && !isEmptyNonString) {
+          const result = parseEnvValue(envVarValue, envVarType);
+          if (result.ok) {
+            configValue = result.value;
+          } else {
+            invalidEnvVars.push({ envVarName, reason: result.reason });
+          }
         }
       }
 
