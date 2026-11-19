@@ -32,7 +32,12 @@
   - `@prometheus-io/client` 0.16.1 (最初の公開は 2026-08-21)。ライセンスは Apache-2.0。依存は `@opentelemetry/api` (Apache-2.0) と `tdigest` (MIT。さらに `bintrees` MIT)。Node は ^22 || ^24 || >=26 で、このサービスの >=24 に合う。install のときのスクリプトは無い
   - `prom-client` 15.1.3 も Apache-2.0 で、依存は同じ。非推奨で、後継が `@prometheus-io/client` である
   - 版は 0.x なので、`^0.16.1` は 0.16.x の範囲に限られる。API が今後変わりうる点を、依存の更新のときに確かめる
-- **Follow-up (実装のタスクで確かめること)**: `@prometheus-io/client` は、いまの `pnpm-lock.yaml` にも、手元の pnpm の store にも無い。入れるときに次を確かめ、対象 spec の research.md §1.4 の形で記録する: この spec が使う API (`Registry`、`Gauge`、`Counter`、`Histogram`、プロセスの既定の指標、`registry.contentType`) が、そのままの名前で在ること。版を固定する範囲 (ほかの依存と同じく `^`)、`pnpm-lock.yaml` に入る依存の木が上の内容と一致すること、install のときにスクリプトを動かさないこと (`pnpm-workspace.yaml` の `allowBuilds` を広げない)、image の大きさ (いまは展開して amd64 で 259,258,880 バイト、arm64 で 277,116,416 バイト。上限 400,000,000 バイト) が大きく変わらないこと。
+- **pnpm-lock.yaml に入った実際の内容で確かめたこと (2026-11-19)**:
+  - `@prometheus-io/client` 0.16.1 は Apache-2.0。依存は `@opentelemetry/api` 1.9.0 (Apache-2.0)、`tdigest` 0.1.3 (MIT)、`tdigest` の依存 `bintrees` 1.0.2 (MIT) の 3 つ。どれも install のときのスクリプト (preinstall / install / postinstall) を持たない (`bintrees` の scripts は test だけ)。engines は ^22 || ^24 || >=26
+  - この spec が使う API (`Registry`、`Gauge`、`Counter`、`Histogram`、`collectDefaultMetrics`) は、そのままの名前で在る。`registry.contentType` は `text/plain; version=0.0.4; charset=utf-8`
+  - `pnpm-lock.yaml` の差分は `@prometheus-io/client`・`bintrees`・`tdigest` の追加だけ。無関係な peer の再解決の差分は除いた
+  - Follow-up のうち image の大きさは、docker が無い環境では測れないので、task 8.1 の CI で確かめる
+- **残っている確認**: image の大きさ (いまは展開して amd64 で 259,258,880 バイト、arm64 で 277,116,416 バイト。上限 400,000,000 バイト) が大きく変わらないこと。install のときにスクリプトを動かさないこと (`pnpm-workspace.yaml` の `allowBuilds` を広げない) は、変更していないことを差分で確かめた。
 
 ### 本番の依存を増やすときに一緒に直す場所 (確かめた)
 

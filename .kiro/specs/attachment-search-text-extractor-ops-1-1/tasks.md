@@ -62,7 +62,7 @@
   - _Boundary: ResultBudget_
 
 - [ ] 4. `/metrics`
-- [ ] 4.1 `@prometheus-io/client` を本番の依存に加える
+- [x] 4.1 `@prometheus-io/client` を本番の依存に加える
   - 先に、本番の依存の一覧のテスト (`production-dependencies.spec.ts`) に `@prometheus-io/client` を足し (11 → 12 個。テスト名とコメントも直す)、層の規則 (`layer-rules.ts` の `PACKAGE_RULES`) で `@prometheus-io/client` を HTTP の層だけに許す。層のテストに、HTTP の層の外で import すると落ちる合成の例を足す
   - `pnpm install` で `apps/attachment-text-extractor/package.json` と `pnpm-lock.yaml` に加える (ほかの pnpm の実行と同時に動かさない)
   - `@prometheus-io/client` とその依存のすべてのライセンス (research.md §1 では Apache-2.0 と MIT)、install のときのスクリプトの有無、この spec が使う API の名前を、`pnpm-lock.yaml` に入った実際の内容で確かめ、research.md §1 に記録する。許容的でないライセンスや、使う API が無いことが分かれば、先に進まず人に諮る
