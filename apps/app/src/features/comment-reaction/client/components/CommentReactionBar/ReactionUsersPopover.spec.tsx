@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import type { ReactionUser } from '../../../interfaces';
@@ -66,14 +66,27 @@ describe('ReactionUsersPopover', () => {
     expect(screen.queryByRole('list')).toBeNull();
   });
 
-  it('stays open, keeping focus on its target, when clicked inside while the target has focus', async () => {
+  it('stays open when clicked inside while the target has focus, taking the focus so its text can be selected', async () => {
     const anchor = renderPopover(['u1', 'u2']);
     anchor.focus();
     const item = (await screen.findAllByRole('listitem'))[0];
 
     await userEvent.click(item);
 
-    expect(anchor).toHaveFocus();
     expect(screen.getByRole('list')).toBeInTheDocument();
+    expect(document.activeElement?.closest('.popover')).not.toBeNull();
+  });
+
+  it('closes when the focus leaves its target for somewhere outside it', async () => {
+    const anchor = renderPopover(['u1']);
+    const elsewhere = document.createElement('button');
+    anchors.push(elsewhere);
+    document.body.appendChild(elsewhere);
+    anchor.focus();
+    await screen.findByRole('list');
+
+    elsewhere.focus();
+
+    await waitFor(() => expect(screen.queryByRole('list')).toBeNull());
   });
 });

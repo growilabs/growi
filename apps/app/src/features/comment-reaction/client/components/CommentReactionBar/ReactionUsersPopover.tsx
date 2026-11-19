@@ -1,6 +1,7 @@
-import type { JSX, MouseEvent, RefObject } from 'react';
+import type { JSX, RefObject } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'next-i18next';
-import { PopoverBody, PopoverHeader, UncontrolledPopover } from 'reactstrap';
+import { Popover, PopoverBody, PopoverHeader } from 'reactstrap';
 
 import type { ReactionUser } from '../../../interfaces';
 import { toReactionUserDisplayName } from '../../utils/to-reaction-user-display-name';
@@ -13,11 +14,15 @@ const DELAY = { show: 0, hide: 200 };
 const toKey = (user: ReactionUser): string =>
   typeof user === 'string' ? user : user._id;
 
-// The focus trigger hides on the target's focusout with no delay, and a press on the
-// non-focusable list would blur the target; keep focus there so a click inside does not close it.
-const keepTargetFocus = (e: MouseEvent<HTMLElement>): void => {
-  e.preventDefault();
-};
+/** Whether a toggle request is the target losing its focus to the popover itself. */
+const isFocusMovingInto = (
+  event: unknown,
+  popover: HTMLElement | null,
+): boolean =>
+  event instanceof FocusEvent &&
+  event.type === 'focusout' &&
+  event.relatedTarget instanceof Node &&
+  popover?.contains(event.relatedTarget) === true;
 
 type ReactionUsersPopoverProps = {
   readonly target: RefObject<HTMLElement>;
@@ -30,15 +35,29 @@ export const ReactionUsersPopover = ({
   users,
 }: ReactionUsersPopoverProps): JSX.Element => {
   const { t } = useTranslation();
+  const [isOpen, setIsOpen] = useState(false);
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  // The focus trigger closes as soon as the target loses focus. A press inside the popover
+  // moves the focus there (it is focusable so its text can be selected), which must not close it.
+  const toggle = useCallback((event?: unknown) => {
+    if (isFocusMovingInto(event, popoverRef.current)) {
+      return;
+    }
+    setIsOpen((open) => !open);
+  }, []);
 
   return (
-    <UncontrolledPopover
+    <Popover
       target={target}
+      isOpen={isOpen}
+      toggle={toggle}
       trigger="hover focus"
       placement="bottom"
       delay={DELAY}
       fade={false}
-      onMouseDown={keepTargetFocus}
+      innerRef={popoverRef}
+      tabIndex={-1}
     >
       <PopoverHeader>{t('comment_reaction.reacted_by')}</PopoverHeader>
       <PopoverBody>
@@ -48,6 +67,6 @@ export const ReactionUsersPopover = ({
           ))}
         </ul>
       </PopoverBody>
-    </UncontrolledPopover>
+    </Popover>
   );
 };
