@@ -545,7 +545,7 @@ Key decisions:
 - **rebuild window 中の dual-write**: `AttachmentSearchIndexer.onAttach/onDetach` が `AttachmentReindexBatch.isRebuilding()` を参照し、true の間は live alias (`{page}-attachments-alias`) と、作り直し先の index (`getTmpIndexName()` が返す名前) の**両方**に書き込む。これにより alias swap 後に新規アップロードや削除が失われない。ただし削除には、作り直しの走査がその添付を読んで抽出している間に起きた場合の穴がある。削除はその時点の両 index に効くが、走査はその後で抽出結果を作り直し先へ書くので、削除済みの添付が戻ってしまう。そこで `onDetach` は削除した添付の id を `AttachmentReindexBatch.recordDetached()` に渡し、batch は作り直し中に渡された id を覚えておく。走査と orphan sweep が終わったら、alias swap の直前にそれらを作り直し先から消す (`removeAttachmentsFromIndex`)。delete-by-query は refresh 前の文書を見ないので、添付の削除はどれも先に対象 index を refresh してから行い、消せなかった文書 (`failures`) があれば失敗として扱う。ふだんのアップロードと再抽出では、抽出中に削除された添付の文書が書き込みで戻らないよう、書いた後に MongoDB にまだ添付があるか確かめ、無ければ消す (research.md 8.6)。この時点で走査は終わっているので、以後の削除は二重削除だけで足りる。`getTmpIndexName()` は作り直し先の index を作り終えてから名前を返す。それより前の書き込みは live だけに入るが、走査はその後に MongoDB を読むので、その添付も新しい index に入る
 - **dual-write の冪等性**: tmp index への書き込みは、bulk upsert が後から同 `_id` で上書きする可能性があるが、doc ID が `${attachmentId}_${pageNumber ?? 0}` で決定的なため順序に依存しない。bulk 側が後勝ちでも real-time 側が後勝ちでも最終状態は同一
 - **dual-write 失敗時**: tmp 側 write の失敗は live 側の成功を阻害しない (pino 記録して continue)。alias swap 後は live が単一 source になり自動的に整合
-- **orphan sweeper**: real-time cascade (pageEvent 購読による即時削除) は採用しない。`AttachmentService.removeAllAttachments()` (ページ削除に伴う一括削除) は detach handler を呼ばないため、ページ削除で残った添付 doc もここで回収する。`AttachmentOrphanSweeper` が MongoDB Page collection と照合して親 Page 不在の添付 doc を eventual に cleanup する。query-time permission 判定により、sweeper 実行までの間も snippet 漏洩は発生しない (`facet=attachments` primary の ids 検索で親 Page 不在 → 該当添付ヒットを drop、`facet=all` の 1 ページ目と secondary が検索するのは、判定を通ったページの添付だけなので、孤児添付は含まれない)。集める pageId は最大 10,000 件で、それを超える分は確かめない (分かっている制限。research.md 10.10、tasks.md 6.4)
+- **orphan sweeper**: real-time cascade (pageEvent 購読による即時削除) は採用しない。`AttachmentService.removeAllAttachments()` (ページ削除に伴う一括削除) は detach handler を呼ばないため、ページ削除で残った添付 doc もここで回収する。`AttachmentOrphanSweeper` が MongoDB Page collection と照合して親 Page 不在の添付 doc を eventual に cleanup する。query-time permission 判定により、sweeper 実行までの間も snippet 漏洩は発生しない (`facet=attachments` primary の ids 検索で親 Page 不在 → 該当添付ヒットを drop、`facet=all` の 1 ページ目と secondary が検索するのは、判定を通ったページの添付だけなので、孤児添付は含まれない)
 - **sweep タイミング**: sweep は tmp への bulk 完了後、alias swap**前**に実行する。rebuild window 中の real-time `onAttach` で追加された doc は `AttachmentService` 自身が Attachment を作成する前提なので、MongoDB の Page collection に親 Page が存在する限り orphan にはならない。rebuild window 中の親 Page 削除は real-time cascade しない設計のため、次回 rebuild で eventual cleanup される (query-time permission により漏洩は防止される)
 
 ## Requirements Traceability
@@ -798,6 +798,8 @@ export interface AttachmentIndexOperations {
   swapAttachmentAlias(index: string): Promise<void>;                                                  // 1 回の updateAliases で alias を index へ付け替え、前の実 index を削除
   dropRebuildIndex(index: string): Promise<void>;                                                     // alias が指していなければ index を削除 (失敗時の後始末)
   removeAttachmentsFromIndex(attachmentIds: string[], index: string): Promise<void>;                 // refresh してから指定添付の文書を delete-by-query で消す (swap 直前)
+  listPageIds(index: string, after: string | undefined): Promise<{ pageIds: string[]; after: string | undefined }>; // index に文書がある pageId を id の順に 1,000 件ずつ返す (orphan sweep 用。after が undefined なら終わり)
+  removePagesFromIndex(pageIds: string[], index: string): Promise<void>;                             // 指定ページの文書を delete-by-query で消す (orphan sweep 用)
   syncAttachmentIndexed(attachmentId: string, pageId: string, docs: IAttachmentEsDoc[], targetIndex: string): Promise<void>; // alias 宛てだけ require_alias: true。bulk の項目エラーは例外
   removeStaleAttachmentDocs(attachmentId: string, currentDocs: IAttachmentEsDoc[], index: string): Promise<void>; // その添付の文書のうち currentDocs 以外を消す (再抽出の成功後)
   syncAttachmentRemoved(attachmentId: string, targetIndexes: string[]): Promise<void>;                // index ごとの失敗はログに残して続ける
@@ -811,7 +813,7 @@ export interface AttachmentIndexOperations {
 - rebuild window 中: `AttachmentSearchIndexer` が `reindexBatch.getTmpIndexName()` から作り直し先 (例: `'{page}-attachments-2'`) を得て、live alias と作り直し先に 1 回ずつ書く (live を先に書き、作り直し先の失敗は live の成功を妨げない)。書き込み先は抽出の後で決める (抽出中に作り直しが始まることがあるため)
 
 - ES 8/9 mapping 変種を version-aware に選択 (**権限フィールドは mapping に含めない**)
-- 削除 (`removeAttachmentsFromIndex` / `removeStaleAttachmentDocs` / `syncAttachmentRemoved`) は、どれも対象の index を refresh してから delete-by-query を行い、消せなかった文書が返ってきたら失敗として扱う。alias がまだ無い場合 (機能を 1 度も有効にしていない) は何もせずに終わる (`ignore_unavailable`)
+- 削除 (`removeAttachmentsFromIndex` / `removePagesFromIndex` / `removeStaleAttachmentDocs` / `syncAttachmentRemoved`) は、どれも対象の index を refresh してから delete-by-query を行い、消せなかった文書が返ってきたら失敗として扱う。alias がまだ無い場合 (機能を 1 度も有効にしていない) は何もせずに終わる (`ignore_unavailable`)
 - 検索クエリの組み立ては、この拡張ではなく `queries/` の pure function が受け持つ (次の節)
 
 ### 添付検索のクエリ builder と searchAccessiblePages

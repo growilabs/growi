@@ -12,10 +12,17 @@ const INDEX = 'attachments-rebuild';
  * An index holding docs of `pageIds`, listed `listingSize` page ids at a
  * time in id order, the way the real index lists them.
  */
-const makeIndexFake = (pageIds: string[], listingSize = 2) => {
+const makeIndexFake = (
+  pageIds: string[],
+  { failListingAt }: { failListingAt?: number } = {},
+) => {
+  const listingSize = 2;
   const remaining = new Set(pageIds);
   const operations = mock<OrphanSweepIndexOperations>();
+  let listings = 0;
   operations.listPageIds.mockImplementation(async (_index, after) => {
+    listings += 1;
+    if (listings === failListingAt) throw new Error('ES unreachable');
     const rest = [...remaining]
       .sort()
       .filter((id) => after == null || id > after);
@@ -103,12 +110,10 @@ describe('AttachmentOrphanSweeper', () => {
   });
 
   it('reports what it removed so far, without throwing, when the index stops answering', async () => {
-    const index = makeIndexFake(['p1', 'p2', 'p3', 'p4']);
+    const index = makeIndexFake(['p1', 'p2', 'p3', 'p4'], {
+      failListingAt: 2,
+    });
     givenExistingPages([]);
-    const listFirst = index.operations.listPageIds.getMockImplementation();
-    index.operations.listPageIds
-      .mockImplementationOnce((...args) => listFirst?.(...args) as never)
-      .mockRejectedValueOnce(new Error('ES unreachable'));
 
     const result = await createAttachmentOrphanSweeper(index.operations).sweep(
       INDEX,

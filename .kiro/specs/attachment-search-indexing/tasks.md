@@ -157,7 +157,7 @@
   - _Depends: 3.2, 4.1, 5.2_
 
 - [x] 6.2 `AttachmentOrphanSweeper.sweep(targetIndex)` を実装する
-  - 指定 index 上の unique pageId 集合を取得し、Page collection に存在しない pageId を持つ doc を tmp index から削除する (pageId の取得は terms aggregation で最大 10,000 件。それを超える場合の対応は 6.4)
+  - 指定 index 上の unique pageId 集合を取得し、Page collection に存在しない pageId を持つ doc を tmp index から削除する (pageId の取得は 6.4 で分割した取り出しに変えた)
   - 失敗しても throw せず `{ removed, failed }` を返し、呼び出し側 rebuild 本体の成功を阻害しない
   - 独立トリガ (cron / pageEvent) を**持たない** ことを test で固定 (rebuildIndex 内からのみ呼ばれる)
   - _Requirements: 3.2, 4.4_
