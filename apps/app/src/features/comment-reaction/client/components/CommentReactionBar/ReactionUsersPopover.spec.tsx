@@ -65,4 +65,15 @@ describe('ReactionUsersPopover', () => {
 
     expect(screen.queryByRole('list')).toBeNull();
   });
+
+  it('stays open, keeping focus on its target, when clicked inside while the target has focus', async () => {
+    const anchor = renderPopover(['u1', 'u2']);
+    anchor.focus();
+    const item = (await screen.findAllByRole('listitem'))[0];
+
+    await userEvent.click(item);
+
+    expect(anchor).toHaveFocus();
+    expect(screen.getByRole('list')).toBeInTheDocument();
+  });
 });

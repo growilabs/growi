@@ -1,4 +1,4 @@
-import type { JSX, RefObject } from 'react';
+import type { JSX, MouseEvent, RefObject } from 'react';
 import { useTranslation } from 'next-i18next';
 import { PopoverBody, PopoverHeader, UncontrolledPopover } from 'reactstrap';
 
@@ -12,6 +12,12 @@ const DELAY = { show: 0, hide: 200 };
 
 const toKey = (user: ReactionUser): string =>
   typeof user === 'string' ? user : user._id;
+
+// The focus trigger hides on the target's focusout with no delay, and a press on the
+// non-focusable list would blur the target; keep focus there so a click inside does not close it.
+const keepTargetFocus = (e: MouseEvent<HTMLElement>): void => {
+  e.preventDefault();
+};
 
 type ReactionUsersPopoverProps = {
   readonly target: RefObject<HTMLElement>;
@@ -32,6 +38,7 @@ export const ReactionUsersPopover = ({
       placement="bottom"
       delay={DELAY}
       fade={false}
+      onMouseDown={keepTargetFocus}
     >
       <PopoverHeader>{t('comment_reaction.reacted_by')}</PopoverHeader>
       <PopoverBody>
