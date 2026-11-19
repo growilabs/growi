@@ -9,10 +9,10 @@
 - `git stash` を名前なしで使わない
 
 - [ ] 1. 古い要件番号を引くコメントを取り除く
-  - `apps/attachment-text-extractor/` の `src`・`scripts`・`test`・`benchmark` から、`Req N.M` と `Requirement N.M` の形の参照 (2026-11-19 の時点で 68 ファイル、108 か所) を消す。`.github/workflows/ci-attachment-text-extractor.yml` の 122 行目のコメントの「Req 3.14 and 11.2」も消す (`if:` の中ではない、ジョブのステップの上の YAML のコメントである)
+  - `apps/attachment-text-extractor/` の `src`・`scripts`・`test`・`benchmark` から、`Req N.M` と `Requirement N.M` の形の参照 (2026-11-19 の時点で 68 ファイル、108 か所。うち約 30 か所はテストの名前 (`describe` / `it` の文字列) の中にある) を消す。テストの名前は番号を外した名前に変える (テストの中身は変えない)。`.github/workflows/ci-attachment-text-extractor.yml` の 122 行目のコメントの「Req 3.14 and 11.2」も消す (`if:` の中ではない、ジョブのステップの上の YAML のコメントである)
   - コードから読み取れない理由を述べているコメントは、番号なしの文として残す。何をしているかを言い直しているだけのコメントは、行ごと消す (`.claude/rules/coding-style.md`)。`research.md N.M` の形の節の番号、`(16.3)` のような番号、`D1`〜`D5` は、このタスクでは触らない
-  - コメント以外を変えない。変更は 1 つの commit にまとめる
-  - 終わった状態: 上の範囲で `grep -rnE "Req(uirement)?s? ?[0-9]+\.[0-9]+"` が 0 件。lint と抽出サービスの全テストが、変更の前と同じ結果になる
+  - コメントとテストの名前以外を変えない。変更は 1 つの commit にまとめる
+  - 終わった状態: 上の範囲で `grep -rnE "Req(uirement)?s? ?[0-9]+\.[0-9]+"` が 0 件。lint と抽出サービスの全テストが、変更の前と同じ件数で通る (名前だけが変わる)
   - 後のタスクが同じファイル (`bearer-auth.ts`、`request-log.ts`、`create-app.ts`、`child-env.ts` など) を変えるので、最初に行い、ほかと並べない
   - _Requirements: 8.1, 8.2, 8.3_
 
@@ -77,7 +77,7 @@
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9_
 
 - [ ] 5. (P) apps/app が app の ID を送る
-  - 先に次のテストを書き、落ちることを確かめる: 設定 `app:growiAppIdForCloud` に `'4242'` があると、`postExtract` に渡す axios の `headers` に `X-Growi-App-Id: 4242` と `Authorization` が両方入る。設定が無い・空・改行を含む・非 ASCII を含むときは `X-Growi-App-Id` が入らず、抽出は続く。値は呼ぶたびに読み直される
+  - 先に次のテストを書き、落ちることを確かめる: 設定 `app:growiAppIdForCloud` に `'4242'` があると、`postExtract` に渡す axios の `headers` に `X-Growi-App-Id: 4242` と `Authorization` が両方入る。設定が無い・空・空白を含む・改行を含む・非 ASCII を含むときは `X-Growi-App-Id` が入らず、抽出は続く。値は呼ぶたびに読み直される
   - ヘッダーに入れるかどうかの判定は純関数にする (文字列が空でなく、0x21〜0x7E の文字だけでできている)。値は `String(value)` で扱い、数であることを前提にしない (research.md §2.3)
   - このファイルはすでにサーバの処理の中で `configManager.getConfig` を呼んでいるので、同じ読み方に合わせる
   - 終わった状態: 上のテストと `attachment-text-extractor` の既存のテスト (apps/app 側) が通り、`turbo run lint --filter @growi/app` が通る

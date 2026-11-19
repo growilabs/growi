@@ -207,9 +207,9 @@ open sibling mem: ERROR EACCES
 
 ## 6. 古い要件番号を引くコメント
 
-- **数えた結果** (2026-11-19 の master): `apps/attachment-text-extractor/` の `src`・`scripts`・`test`・`benchmark` に、`Req N.M` の形が 108 か所 (68 ファイル)。ほかに `.github/workflows/ci-attachment-text-extractor.yml` の 122 行目のコメント (`# Req 3.14 and 11.2: …`)。
+- **数えた結果** (2026-11-19 の master): `apps/attachment-text-extractor/` の `src`・`scripts`・`test`・`benchmark` に、`Req N.M` の形が 108 か所 (68 ファイル)。そのうち約 30 か所はコメントではなく、テストの名前 (`describe` に渡す `the deadline (Req 3.4)` など) の中にある。これらも番号を外した名前に変える (テストの中身は変えない)。ほかに `.github/workflows/ci-attachment-text-extractor.yml` の 122 行目のコメント (`# Req 3.14 and 11.2: …`)。
 - **なぜ古いか**: これらは、削除した作業用の spec (`attachment-search-text-extractor-node-rewrite`) の要件の番号である。対象 spec の research.md §8.2 が読み替えの表を持っているが、表を引かないと読めず、いまの requirements.md の同じ番号は別の要件を指す (例: `request-log.ts` の「Req 1.7」はログの行のことだが、いまの AC 1.7 は外部バイナリの要件。`Req 3.8`、`Req 3.11`、`Req 8.8` はいまの requirements.md に無い)。
-- **Decision**: 番号を引く部分を消す。コードから読み取れない理由を述べているコメントは、番号なしの文として残す。理由を述べていない (何をしているかを言い直しているだけの) コメントは、行ごと消す (`.claude/rules/coding-style.md` のコメントの規則)。コメントだけを変える 1 つの commit にして、レビューしやすくする。
+- **Decision**: 番号を引く部分を、コメントからもテストの名前からも消す。コードから読み取れない理由を述べているコメントは、番号なしの文として残す。理由を述べていない (何をしているかを言い直しているだけの) コメントは、行ごと消す (`.claude/rules/coding-style.md` のコメントの規則)。コメントだけを変える 1 つの commit にして、レビューしやすくする。
 - **検査のテストは足さない**: 足すなら、`test/layers/layer-dependencies.spec.ts` の `listSourceFiles` と同じファイルの一覧を作る処理を複製するか、共有の場所に移す必要がある (約 20 行)。lead の目安 (既存の形で 10 行程度なら足す) を超える。コメントの規則は `.claude/rules/coding-style.md` にすでにあり、番号が古くなる原因 (作業用の spec を消して番号を付け直したこと) はこの片づけで無くなる。
 - **扱わないもの**: `research.md 15.4` のような節の番号 (約 174 か所)、`(16.3)` のような裸の番号 (約 12 か所)、`D1`〜`D5` (約 18 か所)。これらも作業用の spec の番号だが、対象 spec の research.md §8.1 の表で読める。範囲を広げると、この版の差分が大きくなる。
 - **取り込みのときに直すもの**: 対象 spec の research.md §8 の前書きと §8.2 の表 (コメントが `Req N.M` を引かなくなるので、§8.2 は要らなくなる)。

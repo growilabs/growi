@@ -70,9 +70,9 @@ GROWI.cloud の運用者は、1 つの抽出サービス (`apps/attachment-text-
 
 #### Acceptance Criteria
 
-1. When apps/app が `POST /extract` を送り、設定 `app:growiAppIdForCloud` に値がある, the apps/app shall その値を文字列にして `X-Growi-App-Id` ヘッダーに入れて送る
+1. When apps/app が `POST /extract` を送り、設定 `app:growiAppIdForCloud` に値がある, the apps/app shall その値を文字列にして (前後の空白を取り除かずに) `X-Growi-App-Id` ヘッダーに入れて送る。ただし 2.2 と 2.3 に当たるときは送らない
 2. Where 設定 `app:growiAppIdForCloud` に値が無いか空の文字列である, the apps/app shall `X-Growi-App-Id` ヘッダーを付けずに送る
-3. If 設定の値が HTTP のヘッダーに入れられない文字 (改行など) を含む, the apps/app shall ヘッダーを付けずに抽出を続け、抽出の要求そのものを失敗させない
+3. If 設定の値を文字列にしたものが、表示できる ASCII 文字 (0x21〜0x7E) だけでできていない (空白、改行、非 ASCII の文字を含む), the apps/app shall ヘッダーを付けずに抽出を続け、抽出の要求そのものを失敗させない
 4. The apps/app shall 設定の値を、送るたびに読み直す (抽出サービスの URI とトークンと同じ読み方)
 
 ### Requirement 3: 稼働状況の指標 (`GET /metrics`)
@@ -139,9 +139,9 @@ GROWI.cloud の運用者は、1 つの抽出サービス (`apps/attachment-text-
 
 #### Acceptance Criteria
 
-1. The 抽出サービスのコード (`apps/attachment-text-extractor/` の `src`・`scripts`・`test`・`benchmark`) と `.github/workflows/ci-attachment-text-extractor.yml` shall コメントで要件の番号 (`Req N.M`、`Requirement N.M` の形) を引かない
+1. The 抽出サービスのコード (`apps/attachment-text-extractor/` の `src`・`scripts`・`test`・`benchmark`) と `.github/workflows/ci-attachment-text-extractor.yml` shall コメントとテストの名前 (`describe` / `it` に渡す文字列) で要件の番号 (`Req N.M`、`Requirement N.M` の形) を引かない
 2. When 番号を消したコメントが、コードから読み取れない理由を述べている, the 変更作業 shall その理由を番号なしの文として残す。理由を述べていないコメントは、行ごと消す
-3. The 変更作業 shall コメントの変更だけを 1 つの commit にまとめ、コードの振る舞いを変えない
+3. The 変更作業 shall コメントとテストの名前の変更だけを 1 つの commit にまとめ、コードとテストの振る舞いを変えない
 
 ### Requirement 9: 版 1.1.0 として公開する
 
