@@ -28,6 +28,9 @@ export interface PageLinkBackfillCronDeps
   readonly cronSchedule: string;
 }
 
+/** The idle poll runs every minute; design.md (PageLinkBackfillCron) has the reasoning. */
+export const BACKFILL_POLL_CRON_SCHEDULE = '* * * * *';
+
 /**
  * Sends backfill progress to the admin Socket.IO channel. A progress line is best-effort: before
  * the HTTP server attaches, or on an emit failure, it is dropped rather than failing the run.

@@ -534,12 +534,12 @@ Independent of B4/B5.
   - _Boundary: PageLinkBackfillCron, backfill-range_
   - _Depends: B3.1, B1.3, B1.2_
 
-- [ ] B3.3 Register the backfill job and start it from a request
+- [x] B3.3 Register the backfill job and start it from a request
   - Register the backfill cron poll in server setup; an idle tick claims a pending start request, or
     a run whose lease has expired, and starts the paced loop (B3.2). Do not schedule the poll at boot
     when coverage is already `all`. The tick reads the job document directly from the database, not
-    through `configManager`; the idle interval is chosen here (1 to 5 minutes), as is whether the
-    start endpoint (B3.6) also nudges an immediate claim. `failed` keeps the tick so the job is
+    through `configManager`; the idle interval is one minute, and the start endpoint (B3.6) does not
+    nudge an immediate claim (design.md). `failed` keeps the tick so the job is
     retried from the marker; a finished run returns the document to rest
   - Note: edits the same server-setup file as B1.12 — sequence after it to avoid a merge
   - Done when a pending request starts within one idle interval, the job claims and runs
@@ -609,14 +609,17 @@ Independent of B4/B5.
     run, and sets `stopped` directly when the run's lease has expired; and POST resume, valid only in
     `stopped`, which sets `requested` and keeps the scope, `runCutoff` and the marker. Validate the
     scope (N a positive integer, the date not in the future). Reject a start while a run is active
-    and when coverage is `all`
+    and when coverage is `all`. When the job document is missing, do not recreate it: GET reports
+    it as missing and start, stop and resume are rejected without writing (design.md, "If the
+    document goes missing")
   - Done when a non-admin is refused on every route; a valid start writes the request, clears the
     previous run's fields, and returns the state; a new start after a completed or stopped run walks
     its own range rather than resuming the old one; a start while a run is active, with coverage `all`, or with an invalid scope is rejected
     without changing the document; two concurrent starts leave exactly one request; after a partial run the not-included count equals
     the number of seeded pages older than `coveredSince` and excludes pages the walk skips; stop cancels an
     unclaimed request, flags a running one, and ends an expired-lease run directly; resume is
-    rejected outside `stopped`
+    rejected outside `stopped`; with the job document deleted, GET reports it missing and start,
+    stop and resume are rejected and leave it absent
   - _Requirements: 4.5, 4.6, 4.8, 4.9, 4.10_
   - _Boundary: backlinks-backfill-admin routes_
   - _Depends: B3.1_
@@ -627,7 +630,7 @@ Independent of B4/B5.
     `complete` and with skipped pages as their own count, per design.md's "Counts shown to the admin") over the admin Socket.IO channel, the
     not-included count in the partial-coverage line, and the states
     in design.md's table: not started, running, failed, stopping, stopped (Resume or a new scope), partial coverage (the
-    control stays), all pages covered (a status line, no control). Choose where it sits in the admin
+    control stays), all pages covered (a status line, no control), and no job document (a restart warning, no control). Choose where it sits in the admin
     menu and add the i18n keys for every locale the repo keeps
   - Make the backlinks panel show an "index still building / partial" state whenever coverage is not
     `all` or a run is active, saying that pages not edited since `coveredSince` are not included
