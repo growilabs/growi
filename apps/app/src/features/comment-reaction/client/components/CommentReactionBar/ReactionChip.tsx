@@ -60,12 +60,9 @@ export const ReactionChip = ({
     onToggle(emoji, !reactedByMe);
   }, [emoji, isToggleBlocked, onToggle, reactedByMe]);
 
-  const className = [
-    styles['reaction-chip'],
-    reactedByMe ? styles['reaction-chip-mine'] : '',
-  ]
-    .filter((name) => name !== '')
-    .join(' ');
+  const className = reactedByMe
+    ? `${styles['reaction-chip']} ${styles['reaction-chip-mine']}`
+    : styles['reaction-chip'];
 
   return (
     <>
