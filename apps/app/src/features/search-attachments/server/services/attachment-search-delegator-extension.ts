@@ -17,9 +17,30 @@ import {
 } from '~/server/service/search-delegator/elasticsearch-client-delegator';
 import loggerFactory from '~/utils/logger';
 
+import { searchWithTopLevelParams } from './search-with-top-level-params';
+
 const logger = loggerFactory(
   'growi:service:search-attachments:delegator-extension',
 );
+
+/** How many page ids one listPageIds call returns at most. */
+export const PAGE_IDS_PER_LISTING = 1000;
+
+export type PageIdListing = {
+  readonly pageIds: string[];
+  /** Pass to the next call; undefined once the index is exhausted. */
+  readonly after: string | undefined;
+};
+
+type PageIdsAggregationResponse = {
+  readonly aggregations?: {
+    readonly page_ids?: {
+      readonly buckets?: readonly {
+        readonly key: { readonly pageId: string };
+      }[];
+    };
+  };
+};
 
 export type AttachmentIndexNames = {
   /** Every read and live write goes through this alias. */
@@ -59,6 +80,13 @@ export interface AttachmentIndexOperations {
     attachmentIds: string[],
     index: string,
   ): Promise<void>;
+  /**
+   * Lists the page ids that have docs in `index`, in id order, starting
+   * behind `after`. Has no upper bound on the number of pages in the index.
+   */
+  listPageIds(index: string, after: string | undefined): Promise<PageIdListing>;
+  /** Deletes every doc of the given pages from `index`. */
+  removePagesFromIndex(pageIds: string[], index: string): Promise<void>;
   syncAttachmentIndexed(
     attachmentId: string,
     pageId: string,
@@ -83,6 +111,19 @@ export interface AttachmentIndexOperations {
  */
 const buildDocId = (attachmentId: string, pageNumber: number | null): string =>
   `${attachmentId}_${pageNumber ?? 0}`;
+
+/** Makes the docs written so far searchable; a missing index is not an error. */
+const refreshIndex = async (
+  client: ElasticsearchClientDelegator,
+  index: string,
+): Promise<void> => {
+  const params = { index, ignore_unavailable: true };
+  if (isES8ClientDelegator(client) || isES9ClientDelegator(client)) {
+    await client.indices.refresh(params);
+    return;
+  }
+  throw new Error('Unsupported Elasticsearch version');
+};
 
 /**
  * Deletes the docs matching `query` from `index`. Rejects when
@@ -356,6 +397,46 @@ export class AttachmentSearchDelegatorExtension
           },
         ],
       },
+    });
+  }
+
+  async listPageIds(
+    index: string,
+    after: string | undefined,
+  ): Promise<PageIdListing> {
+    // A search only sees docs made searchable by a refresh; later listings
+    // follow the first, and the sweep's own deletes refresh.
+    if (after == null) {
+      await refreshIndex(this.client, index);
+    }
+    // A terms aggregation returns at most its `size` buckets; a composite
+    // aggregation walks every value.
+    const response = (await searchWithTopLevelParams(this.client, {
+      index,
+      size: 0,
+      aggs: {
+        page_ids: {
+          composite: {
+            size: PAGE_IDS_PER_LISTING,
+            sources: [{ pageId: { terms: { field: 'pageId' } } }],
+            ...(after != null ? { after: { pageId: after } } : {}),
+          },
+        },
+      },
+    })) as PageIdsAggregationResponse;
+
+    const pageIds = (response.aggregations?.page_ids?.buckets ?? []).map(
+      (bucket) => bucket.key.pageId,
+    );
+    return {
+      pageIds,
+      after: pageIds.length < PAGE_IDS_PER_LISTING ? undefined : pageIds.at(-1),
+    };
+  }
+
+  removePagesFromIndex(pageIds: string[], index: string): Promise<void> {
+    return deleteDocsByQuery(this.client, index, {
+      terms: { pageId: pageIds },
     });
   }
 
