@@ -2,6 +2,10 @@ import type { Request, Response } from 'express';
 import mongoose from 'mongoose';
 import { mock } from 'vitest-mock-extended';
 
+import type { AclService } from '~/server/service/acl';
+import type { ConfigManager } from '~/server/service/config-manager/config-manager';
+import type { FileUploader } from '~/server/service/file-uploader';
+
 import type Crowi from '../crowi';
 import type { PageModel } from '../models/page';
 import { setup } from './ogp';
@@ -27,11 +31,11 @@ describe('ogpValidator', () => {
   });
 
   const buildCrowi = (): Crowi => {
-    const configManager = mock<Crowi['configManager']>();
+    const configManager = mock<ConfigManager>();
     configManager.getConfig.mockReturnValue('http://ogp.example');
-    const fileUploadService = mock<Crowi['fileUploadService']>();
+    const fileUploadService = mock<FileUploader>();
     fileUploadService.getIsUploadable.mockReturnValue(true);
-    const aclService = mock<Crowi['aclService']>();
+    const aclService = mock<AclService>();
     aclService.isGuestAllowedToRead.mockReturnValue(true);
     return mock<Crowi>({ configManager, fileUploadService, aclService });
   };

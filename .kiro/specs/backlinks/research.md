@@ -1,0 +1,601 @@
+# Research & Design Decisions
+
+## Summary
+
+- **Feature**: `backlinks`
+- **Discovery Scope**: Complex Integration (new server-side index woven into existing page
+  lifecycle, permission, rendering, and migration subsystems)
+- **Key Findings**:
+  - GROWI has **no** links/backlinks infrastructure today; link handling is render-only.
+    A new server-side link index (`PageLink`) is required, modelled as a Prisma-only collection (`pagelinks`, no Mongoose schema; indexes provisioned by a migration).
+  - The existing remark/rehype link-resolution plugins (`relative-links`,
+    `pukiwiki-like-linker`, `relative-links-by-pukiwiki-like-linker`) are **Node-compatible**
+    and already resolve every link form (Markdown, wiki-link, raw HTML `<a>`) against a
+    per-page base. Server-side extraction can reuse this exact pipeline, so the index sees
+    the same links the renderer does — no second parser to drift.
+  - The page lifecycle exposes a ready-made **event bus** (`crowi.events.page`, a Node
+    `EventEmitter`). The search service already subscribes to it the way the backlinks index
+    will, so no edits to `PageService` are needed.
+  - Permission filtering is solved: `Page.findByIdsAndViewer(ids, user, groups)` applies the
+    same grant `$or` condition (`generateGrantCondition`) used everywhere else.
+
+## Research Log
+
+### Link extraction — can it run server-side, and what is reusable?
+
+- **Context**: Requirements 1.2–1.4 demand recognizing Markdown, wiki-link, and raw-HTML
+  anchors that target internal pages, while excluding external URLs, in-page anchors, and
+  links inside code. We must extract these server-side at save time and during backfill.
+- **Sources Consulted**:
+  - `apps/app/src/services/renderer/rehype-plugins/relative-links.ts:1-65`
+  - `apps/app/src/services/renderer/rehype-plugins/relative-links-by-pukiwiki-like-linker.ts:1-30`
+  - `apps/app/src/services/renderer/remark-plugins/pukiwiki-like-linker.ts:1-88`
+  - `apps/app/src/services/renderer/renderer.tsx:111-181` (`generateCommonOptions`)
+  - `packages/core/src/utils/path-utils.ts:113-122` (`normalizePath`)
+  - `packages/core/src/utils/page-path-utils/index.ts:119-121` (`isCreatablePage`)
+  - `apps/app/src/components/ReactMarkdownComponents/NextLink.tsx:26-35`
+- **Findings**:
+  - `relativeLinks({ pagePath })` walks `selectAll('a[href]')` over the **HAST** (after
+    `rehype-raw` has materialized raw HTML), resolving relative hrefs against `pagePath`.
+    Zero DOM/`window` dependencies → runs in Node.
+  - The pukiwiki rehype variant resolves wiki-links against a **trailing-slash base** (so
+    relative wiki-links resolve as children, not siblings) — the per-type relative base.
+  - Code spans/blocks never produce `<a>` nodes (they become `<code>`/`<pre>` text), so
+    requirement 1.4 is satisfied structurally, not by a special case.
+  - `isCreatablePage()` is the same gate `NextLink` uses to decide "internal page vs.
+    external/non-page" — the correct target-scope filter.
+- **Implications**: Extraction is a thin terminal step on the **existing** pipeline. We build
+  a server processor from the same plugins, append a collector that harvests resolved `a[href]`
+  values into an accumulator, then post-filter (strip `#`/`?` via `new URL(...).pathname`,
+  `normalizePath`, `isCreatablePage`, drop self, dedupe). No new parser, no AST mutation.
+
+### Page lifecycle events — how to stay in sync without touching PageService
+
+- **Context**: Requirements 3.1–3.3 and 5–6 require the index to react to create/update/delete.
+  The design subscribes to the event bus rather than editing `PageService`.
+- **Sources Consulted**:
+  - `apps/app/src/server/events/page.ts` (PageEvent extends EventEmitter)
+  - `apps/app/src/server/crowi/index.ts:248-255` (`this.events.page = new PageEvent(this)`)
+  - `apps/app/src/server/service/search.ts:172-239` (existing subscriber precedent)
+  - `apps/app/src/server/service/page/index.ts` (emit sites)
+- **Findings — confirmed event payloads**:
+  | Event | Payload |
+  |---|---|
+  | `create` | `(page, user)` |
+  | `update` | `(page, user)` |
+  | `delete` (soft / trash) | `(targetPage, deletedPage, user)` |
+  | `deleteCompletely` | `(page, user)` |
+  | `syncDescendantsDelete` | `(pages[], user)` — fires in **both** soft and complete descendant flows |
+  | `rename` | `()` — no payload, and the main-page rename does not even emit |
+- **Implications**:
+  - A new `PageLinkService` subscribes in `crowi` setup exactly like `search.ts`.
+  - `syncDescendantsDelete` cannot tell soft from complete delete from its payload. This drove
+    the **reconcile-by-current-DB-state** decision below.
+  - Rename emits nothing usable and needs nothing (see redirect decision).
+
+### Permission filtering — reuse the canonical grant condition
+
+- **Context**: Requirement 2 forbids leaking pages a viewer cannot read.
+- **Sources Consulted**: `apps/app/src/server/models/page.ts:526-571` (`addViewerCondition`,
+  `addConditionToFilteringByViewer`), `:808-825` (`findByIdsAndViewer`), `:1288-1325`
+  (`generateGrantCondition`).
+- **Findings**: `findByIdsAndViewer(pageIds, user, userGroups?, includeEmpty?, includeAnyoneWithTheLink?)`
+  takes a set of ids and returns only the readable ones, auto-fetching the user's groups. It is
+  the exact primitive the backlinks read path needs.
+- **Implications**: Backlinks resolve `fromPage` ids → `findByIdsAndViewer` → readable pages.
+  Because the filter runs **per request**, grant changes are reflected with no index writes
+  (requirement 2.4).
+
+### UI/API conventions
+
+- **Context**: Requirements 1.1, 1.7, 1.8 need a panel and an endpoint.
+- **Findings**:
+  - apiv3 routes are factory functions `(crowi) => [ ...middleware, handler ]`, registered in
+    `routes/apiv3/index.js`; auth via `accessTokenParser([...scopes])` + `loginRequired`;
+    user on `req.user`; responses via `res.apiv3(...)` / `res.apiv3Err(...)`.
+  - SWR hooks live in `apps/app/src/stores/`, pattern `useSWRImmutable(key, () => apiv3Get(...))`.
+  - `PageAccessoriesModal` has a tab map (`PageAccessoriesModalContents`); a new tab plugs in.
+  - `PageListItemS` / `PagePathLabel` already render a page's title+path for reuse.
+- **Implications**: No new framework patterns; the feature follows established route/hook/panel
+  conventions.
+
+## Architecture Pattern Evaluation
+
+| Option | Description | Strengths | Risks / Limitations | Notes |
+|--------|-------------|-----------|---------------------|-------|
+| Server-side index via event listener (**chosen**) | Extract links at save, persist `PageLink` edges, react via `crowi.events.page` | Single trust boundary; backfillable; covers every write path; no `PageService` edits | Index lags HTTP response by the async listener window (same as search) | Mirrors `search.ts` precedent |
+| Client-side reporting | Browser reports rendered links | Reuses client render | Only runs on view; no backfill; server must re-validate anyway | Rejected |
+| Synchronous in-line write inside `PageService` | Write index inside the save transaction | Str+ always current | Couples to `PageService`; raises save latency | Rejected |
+| Derived target-state (no broken/trashed flags stored) (**chosen**) | Store only `toPage` id cache; derive normal/trashed/broken at read from target page status | `_id`-stable cache survives rename & restore with **no** write-time work | Read path must join target status | Resolves the trashed-vs-broken question |
+
+## Design Decisions
+
+### Decision: `toPage` is an `_id` cache; link target state is **derived**, not stored
+
+- **Context**: Requirements 6.1–6.3 require distinguishing *trashed (recoverable)* from
+  *broken (permanently gone)* targets and returning to *normal* on restore. An earlier draft
+  originally proposed nulling inbound `toPage` on soft-delete and deleting `fromPage` rows.
+- **Alternatives Considered**:
+  1. Null `toPage` on soft-delete (the earlier draft) — collapses "trashed" into "broken", and
+     makes restore require re-resolution + a restore event.
+  2. Store an explicit `state` enum column, mutated on every lifecycle event — more writes,
+     more event coupling, more drift surface.
+  3. **Keep `toPage` pointing at the stable page `_id`; derive state at read time from the
+     target page's existence/status.**
+- **Selected Approach**: (3). `toPage` is only ever `null` when no page and no redirect chain
+  resolves `toPath`. A soft-deleted (trashed) page keeps its `_id`, so inbound `toPage` stays
+  valid and the read path reports `trashed` from the target's status; restore needs no write.
+  Only **permanent** delete nulls inbound `toPage` → `broken`.
+- **Rationale**: GROWI keeps `_id` across rename and trash; deriving state from the live target
+  is the minimal model that satisfies requirements 5 and 6 with the fewest write-time hooks.
+- **Trade-offs**: Read path must fetch target pages' status (one extra indexed lookup); in
+  exchange, rename/move/restore need **zero** index writes.
+- **Follow-up**: Confirm `findByIdsAndViewer` does not silently include trashed pages on the
+  source side; add an explicit non-trashed filter for backlink *sources*.
+
+### Decision: delete-family handlers **reconcile by current DB state**, not by event semantics
+
+- **Context**: `syncDescendantsDelete` fires for descendants in *both* the soft-delete and the
+  permanent-delete flows, with an indistinguishable `(pages[], user)` payload.
+- **Selected Approach**: All of `delete`, `deleteCompletely`, `syncDescendantsDelete` route to
+  one idempotent `reconcileDeletedPages(pageIds)` that checks each page's **current** state:
+  - page still exists (trashed) → no-op (derived state covers it);
+  - page truly gone → remove its outbound rows and null inbound `toPage` (→ broken).
+- **Rationale**: Robust regardless of which flow emitted the event; idempotent and safe to
+  re-run. Listeners run after the operation, so the DB reflects the final state.
+- **Trade-offs**: One existence check per affected page; avoids brittle event-type branching.
+
+### Decision: coalesce live extraction through an in-process dirty-set drained on a paced tick
+
+- **Context**: Requirement 3.5. Extraction is CPU-bound (~120–140 ms per 60 KB body) and runs on
+  the single JS thread. Without control, a burst of saves runs full-body parses back-to-back and
+  blocks the event loop, degrading live request latency.
+- **Trace evidence** (how saves actually reach the `update` event):
+  - The `update`/`create` events fire only from an **explicit save** (`PageService.updatePage`
+    `apiv3Put('/page')`), triggered by the Save button or Ctrl-S. There is **no client autosave**
+    interval; the editor's only debounce (100 ms) drives the *preview*, not saving.
+  - Under Yjs, co-editors share a **single** server-side document; continuous edits persist to the
+    `yjs_writings` collection (not a Page revision) and do **not** emit `update`. So N users editing
+    one large doc produce **one** `update` event per explicit save, not N concurrent extractions.
+- **Selected Approach**: `create`/`update` handlers enqueue `pageId` into an in-memory `Set` instead
+  of extracting inline; a drain re-reads each queued page's latest body at drain time and runs the existing upsert handler, resting between pages in proportion to measured extraction cost.
+  - Same-page saves coalesce for free (the `Set` dedupes); the duty-cycle rest after each page paces parses
+    for the many-distinct-pages case, yielding the loop between them.
+  - A `delete`-family event removes the id from the set and routes to `reconcileDeletedPages`, so a
+    stale upsert cannot re-create rows for a deleted page.
+- **Rationale**: The upsert is idempotent last-writer-wins, so intermediate saves carry no
+  information and collapsing them loses nothing. Pacing (not parallelism) is the right lever for
+  CPU-bound work on one thread. Reuses the backfill's duty-cycle intuition.
+- **Superseded in part (review of B2.2)**: the coalescing dirty-set stands, but the *bounded ids per
+  tick* half was replaced by a duty cycle: a drain runs until the queue is empty and rests
+  `charged*(100-duty)/duty` after each page, where `charged` is the measured extraction time;
+  `drainIntervalMs` is only the coalescing window before a drain starts. Measuring the real cost
+  showed it spans ~700x across bodies (1.6 ms at 0.2 KiB, 8.4 ms at 3.2 KiB, 88 ms at 32.6 KiB,
+  1116 ms at 333 KiB), so a page-denominated budget was simultaneously a ~2.5% duty cycle for
+  typical pages and a licence for ~3.3 s of blocking for three large ones. See design.md B2.2.
+- **Trade-offs**: Index trails the save by by the coalescing window plus the paced drain of the pages queued ahead — consistent with the
+  already-async listener. The set is best-effort/in-memory: a restart drops pending work (self-heals
+  on next edit or backfill), and coalescing is per-instance in multi-container deployments (safe
+  because idempotent, but less dedup). A durable queue / off-thread parsing stays deferred.
+
+### Decision: resolve `toPage` through `PageRedirect`; rename needs no write-time work
+
+- **Context**: Requirement 5 (links survive rename/move, including descendants).
+- **Selected Approach**: Resolution order — `PageRedirect.retrievePageRedirectEndpointsBatch(allPaths, REDIRECT_CHAIN_MAX_DEPTH)`
+  for every path, concurrently with the live path lookup; a path with a redirect resolves at its
+  chain's `end.toPath`, a path without one resolves at its own live page; else unresolved. Because
+  rename keeps `_id`, existing inbound `toPage` caches stay valid; new links to the old path resolve
+  via the redirect chain.
+- **Rationale**: Matches what a user clicking the stale link actually experiences; keeps
+  `toPath` faithful to the body. `$graphLookup` handles double renames (A→B→C) in one query.
+- **Redirect before live page, for every path (revised after B4.1 review)**: page view's
+  `resolvePathAndCheckIdentical` follows a redirect without ever checking for a live page at the
+  requested path, so resolving the live page first would answer differently from a click whenever a
+  path both holds a page and kept a redirect. Two ways to reach that state, one of them ordinary:
+  - the **v5 path** deletes the redirect on create, but from a sub-operation that is not awaited and
+    swallows its own failure, so a single transient failure leaves it forever (being fixed
+    separately in #11683 by deleting it inside `create`, before the page is written);
+  - the **v4 path** (`createV4`, taken whenever `app:isV5Compatible` is false) never touches
+    `PageRedirect` at all, so on a not-yet-migrated install the coexistence is the *normal* outcome,
+    not a failure case. Precedence cannot be treated as a defense against a rare failure.
+
+  **Cost of the agreement, accepted deliberately**: the redirect aggregation cannot be limited to the
+  paths that missed — a live hit no longer settles the answer — so it runs on every save (three
+  concurrent queries instead of two, plus the endpoint query only for endpoints the path query did
+  not already answer). This gives up the "two queries when everything resolves" property that B4.1
+  review called out as a strength; agreeing with a click was judged worth more than the query. Do
+  **not** restore live-page-first as an optimization: it reintroduces the disagreement, and #11683
+  does not remove the need (the v4 path above stays as it is).
+- **Batched on the model, not per link (revised at B4.1)**: a page commonly carries several paths
+  that resolve to nothing — renamed targets, but also the ordinary habit of linking to
+  not-yet-created pages — and every save re-resolves all of them. Matching with
+  `$in` keeps that at one aggregation regardless of how many paths a page carries. The batch lives as a
+  `PageRedirect` static (`retrievePageRedirectEndpointsBatch`) and the pre-existing singular
+  `retrievePageRedirectEndpoints` — which page view uses for its "redirected from" banner — is
+  re-implemented as a lookup over it. Rejected alternative: a backlinks-local batch resolver,
+  which was implemented first and duplicated the `$match` + `$graphLookup` + deepest-hop logic;
+  two copies can drift (a `maxDepth` cap, a collection rename) so that page view and the link
+  index disagree about where a chain ends, which is exactly the invariant this feature relies on.
+- **Trade-offs**: Redirect records accumulate (`removePageRedirectsByToPath` is unused) — a
+  data-hygiene caveat, not a correctness one. The save path caps its walk at `REDIRECT_CHAIN_MAX_DEPTH`, since
+  `$graphLookup` is memory-bound at 100MB and cannot spill to disk, so an unbounded walk fails the
+  whole aggregation rather than degrading. **The cap is an argument, not a property of the static**:
+  it was first written into the shared pipeline, which silently made page view answer a URL whose
+  chain is longer than the cap with a not-found (an intermediate hop holds no live page). Page view
+  therefore calls the static with no cap, and only the save path passes one.
+  (`removePageRedirectsByToPath` walks the graph the other way and is also uncapped; it runs on
+  delete, not on save.) **Breadth is chunked**: `fromPaths` are split into batches of `FROM_PATHS_CHUNK_SIZE` (100,
+  `page-redirect.ts`), so no single aggregation sends a `$in` of unbounded size into a stage that
+  cannot spill to disk (B4.5).
+
+### Decision: requirement 6.4 implies a **forward-link health** read over the same index
+
+- **Context**: 6.4 — when an editor views a page that links to a trashed/deleted target,
+  indicate it. This is the *outgoing* direction.
+- **Selected Approach**: The `PageLink` table is a directed link graph. Backlinks read reverse
+  edges (`toPage = X`); forward-link health reads forward edges (`fromPage = X`) and surfaces
+  rows whose derived target state is `trashed`/`broken`. Both reuse the same model, resolution,
+  and derived-state logic; the forward view is presented within the Backlinks panel.
+- **Rationale**: One index serves both directions; no extra storage. Delivery order of the
+  forward-health surface is a backlog concern (requirements doc defers ordering).
+
+### Decision: build vs. adopt — reuse the renderer pipeline, build only the collector
+
+- **Generalization**: Backlinks (reverse) and forward-link health (forward) are the same
+  directed-edge query in two directions — modeled once as `PageLink`.
+- **Build vs. Adopt**: Adopt the existing remark/rehype link plugins, `normalizePath`,
+  `isCreatablePage`, `findByIdsAndViewer`, `PageRedirect`, the event bus, migrate-mongo (indexes
+  only), and `CronService` + the page-bulk-export job pattern (backfill). Build only: the
+  `PageLink` model, a pure `extractInternalLinkPaths` collector, the resolution helper, the listener
+  service, the backfill cron + its job/claim model, one apiv3 route, one SWR hook, and the panel
+  components.
+- **Simplification**: No queue/worker in v1 (event listener is the seam); no stored state enum;
+  no rename hooks (target state needs no write); `revert` (restore) is subscribed only to re-extract the restored page's own outbound links; no second Markdown parser.
+
+### Decision: backfill is an online `CronService` job, not a boot-time migrate-mongo migration
+
+- **Context**: Requirement 4 (backfill pre-existing pages). The initial draft put the whole
+  backfill in a migrate-mongo migration. Investigation showed two problems for large-plan
+  customers (instances with very many pages).
+- **Finding 1 — migrate-mongo blocks boot.** GROWI runs migrations synchronously in the Docker
+  entrypoint (`runMigration` at `docker-entrypoint.ts:218-235`, called at `:300`, `execFileSync`) *before* `spawnApp`, and via the
+  `preserver` npm hook (`package.json:17`). A data migration ⇒ the wiki is **offline for the full
+  backfill duration**.
+- **Finding 2 — per-link resolution is the real cost.** Resolving one link at a time is
+  `findByPath` (+ redirect `$graphLookup`) × millions of links ⇒ potentially hours. (This drove
+  both the backfill's in-memory map and, later, batching the resolver itself — see the redirect
+  decision above.)
+- **Finding 3 — process model.** GROWI is a **single Node process**, no `worker_threads`, no job
+  queue, no distributed lock; horizontal scaling = multiple containers on one MongoDB. The
+  closest precedent for a heavy background job is the **page-bulk-export job** (extends
+  `CronService`, streams pages, persists a progress marker, has a companion in-progress check),
+  and the Elasticsearch reindex (streams, GC per batch, admin Socket.IO progress).
+- **Selected Approach**:
+  1. migrate-mongo creates **only the indexes** (fast, safe to block on at boot).
+  2. The heavy backfill is an **online job** started by a `CronService` poll and run as a
+     self-paced loop: after each page it rests in proportion to the work (the duty cycle over
+     measured extraction time is the throttle), resumable via a progress-marker document (last
+     `_id`, saved at checkpoints after the pages' writes), run-once + multi-instance-safe via an
+     **atomic Mongo claim** (`findOneAndUpdate`) with a lease renewed at checkpoints for crash
+     recovery, an in-process overlap flag, progress over the admin Socket.IO channel.
+  3. Resolution during backfill uses an **in-memory `{path → _id}` map** built from one projection
+     query (hash lookups, not per-link DB round-trips); redirect-following skipped (stragglers
+     self-heal on next edit/read).
+- **Benchmark anchor** (measured locally on the unified parse pipeline, proxy for extraction):
+  ~0.9 ms (0.5 KB) / ~4 ms (3 KB) / ~17 ms (15 KB) / ~87 ms (60 KB) per page; +30–60% for the
+  full plugin chain. Central estimate ~5 ms/page. Full-speed totals (also = blocking-downtime if
+  it ran at boot): ~1 min/10k, ~10 min/100k, ~50 min/500k, ~1.7 h/1M. Online throttled =
+  full-speed ÷ duty cycle (e.g. 25% ⇒ ×4); ×~4 again if pages average ~15 KB.
+- **Parse cost is linear in body size** (measured locally through the real
+  `extractInternalLinkPaths` on synthetic bodies, median of 3 after warm-up, one machine; the
+  benchmark script is not kept). Per KiB: text ≈1.5 ms, table-dense bodies ≈2.5 ms (many 10×4,
+  50×6 or 300-row tables, or one giant table), log/code blocks ≈0.4 ms, a draw.io block ≈0.2 ms
+  (stored inline as a ```` ```drawio ```` fence and parsed as a single `code` node; attachments add
+  only a short reference), a mixed page ≈0.9 ms. Reaching ~100 / 250 / 500 / 1000 ms takes about
+  70 / 190 / 350 / 700 KiB of text (≈13k / 35k / 64k / 129k words) and about 45 / 105 / 210 /
+  400 KiB of tables (≈600 / 1,500 / 2,800 / 5,000 rows; the 1 s point is extrapolated from 864 ms
+  at 336 KiB). Reference pages: a typical 600-word page
+  5 ms, a 7,000-word document 48 ms, a 1,000-row table 217 ms, a runbook with a table and code
+  33 ms. The 87 ms per 60 KB anchor above agrees with the text rate.
+- **Parser pin — `micromark-extension-gfm-table` ≥ 2.1.2**: up to 2.1.1 the GFM parse is quadratic
+  in table cells (400 ten-row tables, 202 KiB: 10.7 s against 232 ms with plain remark-parse; one
+  1,000-row table 1.6 s; 800 ten-row tables 44 s). `EditMap.add` scanned the whole edit list on
+  every edit (about 90% of parse time in a CPU profile); 2.1.2 indexes edits by position and
+  parses 405 KiB / 8,000 rows in 1.2 s. A workspace override pins it because remark-gfm reaches the
+  package through `micromark-extension-gfm`, which only asks for ^2.0.0. Not chosen: an extraction
+  pipeline without the table construct (plain remark-parse plus the autolink-literal extension) —
+  about 2.5× faster than 2.1.2 on table-dense bodies (0.55 s against 1.4 s at 422 KiB) and the same
+  links on a 1,200-link fixture, but it differs from the renderer where GFM splits cells
+  (`[a | b](/x)`, `|` in a link destination) and gives up a single source of link forms.
+- **Scale assumption (customer data)**: largest wiki 45k pages, most under 3k, a few at 8k–20k.
+  Estimated at 25% duty, charging parse time only (unmeasured; the page-cycle charge and the
+  page-rate floor lengthen it): ~1.5 min for 3k pages, 4–8 min for 8k–20k, ~18 min for 45k
+  (~70 min if pages average 15 KB). This covers only the customers we can see; self-hosted
+  installs may be larger, which is why the job stays online and throttled rather than assuming
+  small wikis.
+- **Scheduler facts that shape the throttle** (node-cron 3.0.3 source): the callback is not
+  awaited and there is no no-overlap option, so ticks can overlap on a slow write; a tick due
+  while the previous is running is dropped (`recoverMissedExecutions: false`) and the next starts
+  immediately; polling is once per second. Hence the overlap flag, and a measured-time throttle
+  instead of `cadence × chunk size`.
+- **Duty cycle vs. stall length**: the duty cycle is the average share of wall time the job is
+  active; only its synchronous parsing blocks the event loop. What live requests feel is the longest
+  uninterrupted block, which the per-page rest bounds at one page. Success is judged on event-loop
+  delay max/p99 (`perf_hooks.monitorEventLoopDelay`), not on the duty number.
+- **Considered and deferred — MongoDB `$regex` prefilter**: skip parsing pages whose current
+  revision cannot contain a link. Deferred because (1) the benefit is unmeasured (27% pass rate on
+  59 short dev pages says little); (2) the regex is a second definition of "a link", and a miss
+  means permanently missing backlinks, silently — a dev regex missed reference-style links,
+  `<https://…>` autolinks and possibly bare URLs (unverified against the extractor); (3) it must
+  target only each page's *current* revision (a naive all-revisions query matched 2× as many);
+  (4) DB read load is similar to the plain scan, which reads every body anyway. If added: one
+  source of link forms or a drift test against the extractor, and a deliberately broad regex.
+- **Other options ruled out**: *lazy per target* — not exact (relative links, wiki-links,
+  renames) and depends on Elasticsearch; *lazy on view of the source page* — cannot work, rows live
+  under the source page; *lazy start (first backlinks panel open)* — cheap and can be added later
+  without changing the job; *admin trigger* — already deferred above.
+- **Open questions (settle in B3.2)**: write ordering between the live listener and the backfill on
+  the same page (can a stale backfill read overwrite fresher rows?); the checkpoint cadence and
+  lease length; the policy for a page whose write keeps failing; whether to cap the body size
+  parsed, since the per-page rest cannot interrupt a parse and so cannot bound one large page (~1.1 s at
+  333 KiB on the B2.2 pipeline; about 400 KiB of table-dense text reaches 1 s on the current one).
+  Parse time is linear in size, so a size cap bounds the stall. Options considered: skip-and-record
+  (a gap that is visible but still missing until the page's next save), truncate (loses the links
+  after the cutoff, silently — rejected), parse off-thread (the real fix, deferred with
+  `worker_threads`). A table-aware guard (count of table-row lines) and skipping pages that contain
+  tables were considered unnecessary once the parser pin removed the quadratic cost, and skipping
+  them would silently lose link-bearing tables.
+- **Pacing shape (resolved): rest proportional to work, per page** (PR #12066 review notes).
+  Three shapes were compared. *A — cron tick with a time budget (about 250 ms) and a yield*:
+  follows the `CronService` / page-bulk-export pattern and a tick is a natural checkpoint, but it
+  needs two knobs, hits node-cron's 1 s floor and dropped ticks (so an overlap guard), delivers one
+  burst per second, and is a second pacing design next to the live drain. *B — sleep proportional
+  to work per slice (about 50 ms of work, then a multiple of it)*: exact duty and evenly spaced
+  short bursts, but a slice accumulator and a second knob, stalls up to the slice length on small
+  pages, and custom loop code. *C — sleep proportional to work per page, as the live drain does*:
+  chosen. One setting (the duty), the longest stall is one page, the rest calculation is shared with
+  the drain after a small refactor, and it is the same design as B2.2. Costs: about one timer per
+  page (negligible here; the 1 ms timer floor makes the duty slightly under target on tiny pages),
+  the drain's handler cannot be reused as is because the backfill needs its own step over the
+  in-memory path→id map, and a separate checkpoint cadence is needed. None of A, B or C bounds one
+  large page; the body-size cap does. Long rests after a large page are harmless.
+- **Trade-offs**: backlinks are incomplete for pre-existing pages until the job finishes
+  (acceptable per 4.2 — completeness only required *after* completion; new edits index instantly).
+  In-process means the parse still shares the one JS thread; the duty cycle bounds but cannot
+  remove that contention — only `worker_threads` could, which GROWI lacks (deferred).
+- **Delivery decision**: throttled (one pass at 25% duty); started by an administrator from the admin settings with a scope (all pages, the newest N, or
+  pages edited after a date), the same on-prem and on GROWI.cloud, bounded on cloud
+  by the per-app limits only (see the last bullet of this decision). The mechanism and settings are in design.md's
+  Delivery decision; the reasoning behind them is here:
+  - *Admin-started, no start env variables (decided 2026-10-28)*: an upgrade has never run a heavy
+    job and admins do not expect one, so nothing starts on its own. The earlier on-prem design
+    opted in with an env flag, which left an admin who never set it with no backfill and gave the
+    admin no say in scope; a start control with a scope fixes both, so the auto-start flag, the
+    start window and the scope-limit env values are dropped.
+  - *Coverage recorded as a cutoff (`coverage` + `coveredSince`)*: every scope is an `updatedAt`
+    boundary (`maxPages` is the boundary at the Nth newest page), so "what is done" is one date,
+    and "all pages done" is a run with no lower bound that reaches the end of its cursor, with no
+    need to detect the oldest page. A second run then walks only the gap. A run moves `coveredSince`
+    only on completion: the walk is in `_id` order, so a stopped run has no clean cutoff, and the
+    progress marker (an `_id` position that resets each run) cannot define an `updatedAt` range. A
+    marker and a coverage cutoff therefore both exist, with different lifetimes.
+  - *Control document, not a config key, holds the completion state*: completion is written by the
+    job, not edited by an operator, the document already is the status surface and the tick reads
+    it directly, and a copy in config could disagree with it. If the document goes missing, the boot
+    upsert recreates it as "not started", and a rerun is harmless because the upsert is idempotent;
+    reconstructing "complete" from `pagelinks` is not possible (a page without links has no rows).
+  - *Stop and resume are part of the design (decided 2026-10-28)*: now that admins start the job, a
+    long run on a large wiki needs a way to be interrupted that is not a restart. It is cheap because
+    resume is the crash-recovery path the design already has (marker saved only after a page's rows
+    are written, idempotent upsert, so at most one checkpoint interval is redone). Its edges are
+    recorded in design.md: a stale flag cleared at claim, cancel of an unclaimed request, the
+    claim released on stop, and a stop on a run with an expired lease. A stop changes no coverage.
+  - *Counts are computed on read, except the run total (decided 2026-10-28)*: the admin sees processed
+    of `runTotal` while a run is active and "about N older pages are not included" after a partial
+    run. `runTotal` is counted once at the first claim so the progress bar does not move; the
+    not-included count is computed when the state is read because a stored figure would go stale as
+    pages are created and edited. The `updatedAt` index serves the count. The numbers are worded as
+    approximate. The walk's page filter is defined once so a page the backfill skips cannot be
+    counted as remaining forever.
+  - *A status line stays after completion*: the controls are hidden when coverage is `all`, but one
+    line ("indexed for all pages, completed <date>") remains, so an admin who comes back can tell
+    finished from missing. The server rejects the start independently of the UI.
+  - *Unconditional auto-start was rejected for cloud*: apps share one MongoDB, a duty cycle bounds
+    per-instance load only, so a fleet starting together has no aggregate cap.
+  - *One pass at one duty, no recent-first phases (decided 2026-10-29)*: an earlier design walked
+    recent pages (edited within a year) at 25% duty, then older pages at 10%, with a stored
+    `recentCutoff` so the two sets did not shift across restarts. The phases only ordered the work;
+    scope and coverage already bound it. An administrator who wants recent pages first runs a recent
+    scope first and then a wider one, and the second run walks only the gap (`coveredSince`). Dropping
+    the phases removes `phase`, `recentCutoff` and the second counter, the marker reset between
+    phases and the second `updatedAt` filter. A lower duty for old pages only stretches the same
+    work over more time: it lowers the peak per app but not the total load, and it lengthens the
+    window in which apps overlap. The duty protects the app's own event loop, and one value does that.
+  - *Cloud candidate (1), not adopted: a uniform start window*. The constraint from the infra
+    review is that GROWI.cloud infra must not do repeated work: one-time setup at release (the same
+    env values everywhere) is fine, starting a few apps at a time and checking load between batches
+    is not. A start flag in the job document needed exactly that repeated work, so it was dropped.
+    Instead every app gets the same `BACKLINKS_BACKFILL_START_WINDOW_HOURS` and derives its own
+    offset from a hash of its app id, anchored to its own first boot of this version (stored, so a
+    restart does not move it). With about 295 active apps, average concurrency is
+    `apps × average duration ÷ window`: ~2 for a 30-minute average over 72 h, ~8 for 2 h, ~0.9 and
+    ~3.5 over 7 days; random clumping puts the peak above that average. This **spreads starts but
+    does not cap concurrency**, and it says nothing about how long each app runs, so the window is
+    sized from the measured duration (B3.4). A shared lease would give a real cap, but it needs shared
+    state across tenants or a service infra would build, so it is not planned.
+  - *Per-app load is not bounded by the duty alone*: the rest was set from parse time only, so the
+    body read and the writes were free. By the reviewer's estimate (not measured), a 5 ms page at
+    25% duty rests ~15 ms (~40 pages/s per app) and a 1.3 ms note runs 100+ pages/s, so lowering
+    the duty barely lowers the database load for small pages. Hence the charge covers the whole
+    page cycle, a page-rate floor bounds the operation rate directly, and B3.4 measures the
+    database side (operations/s, writes, oplog, replication delay) that the event-loop and
+    live-request numbers do not show.
+  - *Cloud candidate (2), not adopted: a bounded scope set by infra*: bounding the backfill (for example the last
+    year, or the last 10,000 pages) cuts the total work and the
+    overlap window, which are the main levers on shared-DB load. As an env value infra sets in the
+    shared config, never unlimited, it would also mean a full backfill is not available on cloud. The
+    cost is that stable, rarely edited pages that link to others are skipped until someone edits
+    them or a wider run covers them; it is for Yuki and infra to accept. With the admin choosing the
+    scope, this would only apply if the control were bounded on cloud.
+  - *Precedent — v8 `revisions` index pre-creation* (internal wiki page, Redmine 186296): to avoid
+    all apps building `{ author: 1, createdAt: -1 }` at once through `autoIndex` at v8 boot, infra
+    pre-created it per app from an `operation-mongo` pod with the admin credential (databases named
+    `growi-app-{GrowiAppId}`), over the active apps (`GrowiApp.status = 'UP'`, 295 on 2026-07-02),
+    largest plans first. A script takes a comma-separated batch of ids, processes them one at a
+    time, aborts on the first failure, and never chains batches; a person checks Grafana (shared
+    MongoDB I/O, CPU, memory) between batches. Batch size starts near 5 and grows to 10 and 20;
+    the plan was about 50 apps a day, but the run recorded on the page covered every plan group on
+    2026-07-07 (batches of 5 to 10), and a 30-app sample (20 random, 10 of the largest or slowest)
+    all had the index afterwards. That pace does not predict the backfill's: a `createIndex` took
+    seconds to about two minutes per app (the largest, 14 GB of revisions, 109 s), while the
+    backfill runs for much longer under its duty cycle, and its per-app time is not measured yet.
+    The precedent supports the facts it records (database naming, active-app count, the plan
+    groups) but not the control: a person watching Grafana between batches is the repeated manual
+    work the backfill must avoid, and `createIndex` (one call, database-side only) is not a
+    safety argument for a job that parses markdown in the app and may issue tens of thousands to
+    hundreds of thousands of reads and writes (estimated) over minutes to hours.
+  - *Considered, not adopted for a cloud-side start*: a start flag in the job document set by infra
+    (manual wave control); an env var per app or per wave (per-app values to maintain, a restart per
+    wave); relying on the release cadence as the wave (concurrent backfills would be
+    `5 × (duration ÷ 20 min)` and nothing bounds the duration); fixed 1-hour slots by app index
+    (fleet-sized total time, and a slow backfill overlaps the next slot); tying waves to staged
+    releases; a scheduled absolute start time; a control-plane permission endpoint or a shared lease
+    (the only options with a real concurrency cap, but infra would have to build them or tenants
+    would share state, which is more infra work than the one-time setup allows; revisit only if
+    B3.4 shows the per-app limits and the latency backoff are not enough).
+  - *Also considered, not adopted*: lazy backfill on page view (cannot work for backlinks, which
+    come from other pages' bodies); an infra-run external
+    script that parses pages (the parse needs the app's extractor). The planned fallback if B3.4
+    shows the fixed limits are not enough is backing off when the page's own database round trips
+    slow down (design.md); it needs no permissions or infra work. A candidate to add later: reading
+    bodies with `secondaryPreferred` (backfill tolerates stale reads, not verified against the
+    cluster).
+  - *Infra answers (2026-10-21)*: the GROWI.cloud release job updates at most 5 apps every 20
+    minutes (15 an hour, 360 a day); restarting an app is not treated as an outage, though strictly
+    it is one; querying a tenant database directly depends on the operation, and infra wants to be
+    consulted before it is run. Consequences: (1) auto-starting on update was rejected —
+    concurrent backfills would be `5 × (backfill duration ÷ 20 min)`, and nothing bounds the
+    duration. (2) The release goes out at the normal cadence (about 295 active apps finish in
+    under a day), so under candidate (1) each app's own first boot, not a release timestamp, would
+    have anchored its start window. (3) The design no longer needs infra to write to tenant databases.
+  - *GROWI.cloud policy: candidate (3), the same control as on-prem (reviewer feedback)*: the admin
+    control is usable on cloud, which reverses the earlier rejection of an admin button on cloud
+    (customers can start backfills at arbitrary times, outside any start window). The shared-DB
+    concern behind that rejection still stands: many customer admins starting full backfills
+    together load the shared cluster at (apps × duty). Of the candidates, (1) hide the control on
+    cloud and keep an infra-driven start, and (2) show it with a scope bounded by infra config, both
+    need infra work or limit what a customer can do; (3) show it unbounded and rely on the per-app
+    limits was chosen because it needs neither. The per-app limits are the whole-page-cycle charge,
+    the page-rate floor and the duty. B3.4's per-app duration and database-side numbers decide
+    whether they suffice or the latency-backoff fallback is added. The backfill load is estimated,
+    not measured, until then.
+  Implementation reuses the page-bulk-export scaffolding:
+  `CronService` base, `createBatchStream`, the cursor→resume(progress marker)→`pipeline` skeleton, and
+  the watchdog start/stop logic; the new code is link extraction/resolution, the in-memory `{path→_id}`
+  map, the write sink (Prisma raw/upsert; mechanism decided in B3), and an atomic claim (stronger than the bulk-export watchdog race).
+
+### Decision: recognize permalink (`/{id}`) and same-wiki absolute-URL link targets
+
+- **Context**: Requirements 1.9–1.11 and 5.4 (added after the first design pass) extend recognition
+  to links written as page **permalinks** (`/{pageId}`) and to **absolute URLs** whose host is
+  this wiki. Requirement 1.3 redefines "external" as *different-host* absolute URLs, and 1.6 extends
+  self-link exclusion to a page's own permalink.
+- **Sources Consulted**:
+  - `packages/core/src/utils/page-path-utils/index.ts:21-24` (`isPermalink` = `isValidObjectId(path.substring(1))`),
+    `:101-121` (`restrictedPatternsToCreate` / `isCreatablePage`)
+  - `packages/core/src/utils/path-utils.ts:85-97` (`removeHeadingSlash`)
+  - `packages/core/src/utils/objectid-utils.ts:3-16` (`isValidObjectId`)
+  - `apps/app/src/components/ReactMarkdownComponents/NextLink.tsx:15-24` (`isExternalLink`:
+    `new URL(siteUrl ?? 'https://example.com')`, compares `baseUrl.host !== hrefUrl.host`, uses
+    `hrefUrl.pathname`), `:48` (`useSiteUrl()`)
+  - `apps/app/src/services/renderer/rehype-plugins/relative-links.ts:35-65` (skips `isAbsolute(href)`
+    and anchor links; resolves relative hrefs against `pagePath`)
+  - `apps/app/src/server/service/config-manager/config-definition.ts` (`app:siteUrl`, env `APP_SITE_URL`,
+    default `undefined`)
+- **Findings**:
+  - `isCreatablePage('/{objectid}')` returns **true** (a bare ObjectId matches none of the restricted
+    patterns), so a resolved permalink path survives the extraction gate and needs no special keep-rule.
+  - `relativeLinks` **leaves absolute `http(s)://` URLs untouched**, so the extraction collector must
+    classify absolute hrefs itself (host vs. `app:siteUrl`), mirroring `NextLink.isExternalLink`.
+  - **AC 9 caveat surfaced during design**: the renderer resolves relative links against the linking
+    page's *directory*, and `isPermalink` matches only an exact `/{id}` path — so `./{pageId}` is a
+    permalink only from a top-level page. AC 9 was reworded to key recognition off the **resolved
+    absolute path** rather than promising the `./{pageId}` syntax. (Requirements clarification, not
+    a design workaround.)
+- **Selected Approach**:
+  - `resolveToPageIds`: permalink branch first — inputs where `isPermalink(toPath)` are resolved by
+    `_id` in their own query; no path lookup or redirect-following. Such rows are `_id`-stable
+    and rename-immune (5.4).
+  - `extractInternalLinkPaths(markdown, pagePath, siteUrl?)`: classify each `a[href]` — absolute URL kept
+    as `url.pathname` iff `siteUrl` set and same host (1.10); dropped otherwise / when `siteUrl` unset
+    (1.3, 1.11); `siteUrl` is an injected param (function stays pure; the service reads `configManager`).
+  - Self-permalink exclusion (1.6): drop at sync any resolved row where `toPage == fromPage` (the path
+    self-link is still dropped cheaply in extraction).
+  - Backfill: permalink resolution is an **id-existence check** against the `{path→_id}` map's values,
+    not a path lookup.
+- **Rationale**: keys recognition off the resolved path (robust to authoring form), reuses GROWI's own
+  `isExternalLink` host rule for consistency with what the renderer/UI treat as internal, and keeps the
+  pure extractor config-free. No schema change — `toPath`/`toPage` already model id-stable edges.
+- **Trade-offs**: absolute-URL recognition requires `app:siteUrl` to be configured (1.11); host (not
+  origin) comparison ignores scheme/port, matching `NextLink`.
+
+### Decision: a share-link view hides the Backlinks tab
+
+- **Decision**: with `shareLinkId != null` the Backlinks tab is hidden in `PageAccessoriesModal` and
+  the navbar entry is disabled.
+- **Rationale**: a share link grants access to one page, not to the link graph around it.
+
+### Decision: `decodeURIComponent` runs on the pathname before `normalizePath`
+
+- **Decision**: `extractInternalLinkPaths` percent-decodes `url.pathname`, then normalizes. A link
+  whose path has malformed escapes throws on decode and is dropped.
+- **Rationale**: stored page paths are decoded, so non-ASCII paths only match when decoded first.
+
+## Risks & Mitigations
+
+- **Index lag after save** (listener is async, not awaited) — Mitigation: acceptable for v1
+  and identical to search indexing; document the window. Durable queue / off-thread parsing deferred
+  (the in-process coalescing drain below is not that).
+- **Write-side CPU burst** (many saves close together parse full bodies back-to-back on the single
+  JS thread) — Mitigation: coalesce via an in-process `Set<pageId>`, drained on a paced tick; same-page
+  saves collapse, distinct-page parses are spread over time. Naturally low-pressure given no autosave
+  and one-event-per-shared-Yjs-doc. See the coalescing decision above (requirement 3.5), including
+  the note on how the drain came to be paced by duty cycle rather than by a page budget.
+- **`findByIdsAndViewer` may include trashed pages on the source side** — Mitigation: add an
+  explicit non-trashed status filter to the backlink-source query; verify during implementation.
+- **Backfill on very large wikis** — Mitigation: online throttled `CronService` job (not a
+  boot-blocking migration); in-memory `{path→_id}` resolution; cursor + `createBatchStream` +
+  idempotent raw-command upserts (`pagelinks` is Prisma-only, no `Model.bulkWrite`; see design.md); resumable
+  progress marker; atomic Mongo claim with a renewed lease for multi-instance and crash recovery. See the
+  backfill decision above.
+- **Backfill CPU contention with live traffic** (single JS thread) — Mitigation: a rest
+  proportional to the work after every page (duty cycle), so a stall is at most one page;
+  conservative default; admin-tunable. Full elimination needs
+  `worker_threads` (deferred, no infra).
+- **Redirect record accumulation** — Mitigation: none required for correctness (`$graphLookup`
+  handles depth); note for future cleanup.
+- **Pipeline cost per save** — Mitigation: run a trimmed processor (link plugins only, skip
+  sanitize/katex/math) since we only need resolved anchors.
+
+## References
+
+- `apps/app/src/server/models/page-tag-relation.ts` — model precedent (schema/index/statics)
+- `apps/app/src/server/service/search.ts:172-239` — event-subscriber precedent
+- `apps/app/src/server/models/page.ts:526-571,808-825,1288-1325` — viewer/grant filtering
+- `apps/app/src/services/renderer/renderer.tsx:111-181` — shared remark/rehype pipeline
+- `apps/app/src/server/models/page-redirect.ts` — `retrievePageRedirectEndpointsBatch` ($graphLookup),
+  with `retrievePageRedirectEndpoints` as a single-path lookup over it
+- `apps/app/src/pages/[[...path]]/page-data-props.ts:68` — the singular static's caller (page-view
+  redirect banner); the resolution order there is what the link index must agree with
+- migrate-mongo refs: `20220131001218-convert-redirect-to-pages-to-page-redirect-documents.js`,
+  `20211227060705-revision-path-to-page-id-schema-migration--fixed-8998.js`
+- `apps/app/docker/docker-entrypoint.ts:218-235` (`runMigration`, called at `:300`) — migrations run synchronously at boot (blocking)
+- `apps/app/src/server/service/cron.ts` — `CronService` base (node-cron) for background jobs
+- `apps/app/src/server/service/page/index.ts` — `updatePage` emits `create`/`update` (explicit save only)
+- `apps/app/src/client/components/PageEditor/PageEditor.tsx` — save triggers (Save/Ctrl-S); no autosave
+- `apps/app/src/server/service/yjs/create-mongodb-persistence.ts` — Yjs state persists to
+  `yjs_writings`, not a Page revision (collaborative typing does not emit `update`)
+- `apps/app/src/features/page-bulk-export/server/service/page-bulk-export-job-cron/` — background
+  job precedent (CronService + progress marker + in-progress check)
+- `apps/app/src/server/service/search-delegator/elasticsearch.ts:602-643` — streaming bulk job
+  with admin Socket.IO progress + GC-per-batch

@@ -3,6 +3,7 @@ import request from 'supertest';
 import { mock } from 'vitest-mock-extended';
 
 import type Crowi from '~/server/crowi';
+import type { ConfigManager } from '~/server/service/config-manager/config-manager';
 
 import { type ContributorSection, contributors } from './contributors';
 
@@ -26,7 +27,7 @@ const buildApp = async (growiCloudUri: string | undefined) => {
   vi.resetModules();
   const { setup } = await import('./index');
 
-  const configManager = mock<Crowi['configManager']>();
+  const configManager = mock<ConfigManager>();
   configManager.getConfig.mockReturnValue(growiCloudUri);
   const crowi = mock<Crowi>({ configManager });
 

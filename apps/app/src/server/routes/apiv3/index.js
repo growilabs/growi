@@ -4,6 +4,7 @@ import express from 'express';
 import { factory as aiToolsRouteFactory } from '~/features/ai-tools/server/routes/apiv3';
 import { createAiUsageRouter } from '~/features/ai-usage/server';
 import { factory as auditLogBulkExportRouteFactory } from '~/features/audit-log-bulk-export/server/routes/apiv3';
+import { getBacklinksHandlerFactory } from '~/features/backlinks/server/routes/backlinks';
 import {
   createChangeProposalAdminRouter,
   createChangeProposalRouter,
@@ -222,7 +223,12 @@ export const setup = (crowi, app) => {
   router.use('/attachments', createAttachmentReextractRouter(crowi));
   router.use('/search', setupSearch(crowi));
 
-  router.use('/page', setupPage(crowi));
+  {
+    const pageRouter = setupPage(crowi);
+    pageRouter.get('/backlinks', getBacklinksHandlerFactory(crowi));
+    router.use('/page', pageRouter);
+  }
+
   router.use('/pages', setupPages(crowi));
   {
     const revisionsRouter = setupRevisions(crowi);
