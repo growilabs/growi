@@ -101,3 +101,13 @@ export const PROPOSAL_LINK_LABEL_KEYS = {
 // Takes `{ percent }` (see toAchievementPercent).
 export const ACHIEVEMENT_LABEL_KEY =
   'change_proposal.achievement.settled_with_percent';
+
+export const REVIEW_TERM_LABEL_KEYS = {
+  reviewer: 'change_proposal.review_term.reviewer',
+  approve: 'change_proposal.review_term.approve',
+  reject: 'change_proposal.review_term.reject',
+  abstain: 'change_proposal.review_term.abstain',
+  comment: 'change_proposal.review_term.comment',
+  purpose: 'change_proposal.review_term.purpose',
+  decision: 'change_proposal.review_term.decision',
+} as const;

@@ -21,6 +21,7 @@ import type {
   ChangeProposalDocument,
   ChangeProposalNotificationSnapshot,
   OperationRecord,
+  ReviewerRef,
 } from '../../interfaces';
 import type { CreateOperationInput } from '../models/change-proposal-types';
 import type { EditingPresenceSource } from './editing-presence';
@@ -52,6 +53,8 @@ export type StoreProposalOptions = {
   readonly basedOn?: ChangeProposalDocument['basedOn'];
   readonly perPageNotifications?: boolean;
   readonly expiresAt?: Date;
+  readonly reviewers?: readonly ReviewerRef[];
+  readonly purpose?: string;
 };
 
 const PAGE_OPERATION_WAIT_MS = 5000;
@@ -162,6 +165,8 @@ export const createApplierTestKit = (args: {
       basedOn: options.basedOn,
       perPageNotifications: options.perPageNotifications ?? false,
       expiresAt: options.expiresAt,
+      reviewers: options.reviewers,
+      purpose: options.purpose,
       operations: operations.map((op) => ({ ...op, approvedAt })),
     });
     proposalIds.push(created._id);
@@ -267,7 +272,16 @@ export const createApplierTestKit = (args: {
       $or: [{ target: { $in: pageIds } }, { target: { $in: proposalIds } }],
     });
     await Subscription.deleteMany({ target: { $in: pageIds } });
-    await prisma.activities.deleteMany({ where: { ip } });
+    // An apply set off by an approval records no ip, so its rows go by proposal and operator.
+    await prisma.activities.deleteMany({
+      where: {
+        OR: [
+          { ip },
+          { target: { in: proposalIds } },
+          { userId: { in: Object.values(users).map((u) => u._id.toString()) } },
+        ],
+      },
+    });
     await prisma.changeproposals.deleteMany({
       where: { id: { in: proposalIds } },
     });

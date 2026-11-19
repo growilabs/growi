@@ -27,6 +27,7 @@ import type {
   ChangeProposalNotificationSnapshot,
   OperationRecord,
   OperationStatus,
+  ReviewerRef,
 } from '../../interfaces';
 import type { CreateOperationInput } from '../models/change-proposal-types';
 import { createProposalNotifier } from './proposal-notifier';
@@ -129,6 +130,7 @@ describe('ProposalNotifier.notifyApplied', () => {
       entry?: ChangeProposalDocument['entry'];
       revertOf?: string;
       perPageNotifications?: boolean;
+      reviewers?: readonly ReviewerRef[];
     },
     operations: readonly {
       input: CreateOperationInput;
@@ -141,6 +143,7 @@ describe('ProposalNotifier.notifyApplied', () => {
       entry: args.entry ?? 'ai-chat',
       revertOf: args.revertOf,
       perPageNotifications: args.perPageNotifications ?? false,
+      reviewers: args.reviewers,
       operations: operations.map(({ input }) => input),
     });
     return {
@@ -611,6 +614,55 @@ describe('ProposalNotifier.notifyApplied', () => {
 
     expect(sent).toHaveLength(1);
     expect(notSent).toEqual(sent);
+  });
+
+  it('sends the same aggregated notifications to the same users whether the proposal has reviewers or not (Req 20.7)', async () => {
+    const page = await createPage('with-reviewers');
+    await subscribe(users.subscriber, page);
+    const addedAt = new Date();
+    const requesterId = users.requester._id.toString();
+
+    const notifyWith = async (reviewers: readonly ReviewerRef[]) => {
+      const proposal = await storeProposal(
+        { requester: users.requester, reviewers },
+        [{ input: editInput(page), status: 'applied' }],
+      );
+      await createProposalNotifier(crowi).notifyApplied({
+        proposal,
+        activityId: new mongoose.Types.ObjectId().toString(),
+        action: SupportedAction.ACTION_CHANGE_PROPOSAL_APPLY,
+      });
+      const notifications = await notificationsFor(proposal._id);
+      return notifications.map((n) => {
+        const { proposalId: _ignored, ...rest } = JSON.parse(n.snapshot);
+        return { user: n.user.toString(), action: n.action, snapshot: rest };
+      });
+    };
+
+    const withReviewers = await notifyWith([
+      {
+        kind: 'user',
+        id: users.outsider._id.toString(),
+        addedBy: requesterId,
+        addedAt,
+      },
+      {
+        kind: 'user-group',
+        id: groupId.toString(),
+        addedBy: requesterId,
+        addedAt,
+      },
+    ]);
+    const withoutReviewers = await notifyWith([]);
+
+    expect(withoutReviewers).toEqual([
+      {
+        user: users.subscriber._id.toString(),
+        action: SupportedAction.ACTION_CHANGE_PROPOSAL_APPLY,
+        snapshot: expect.objectContaining({ pages: [pageEntry(page)] }),
+      },
+    ]);
+    expect(withReviewers).toEqual(withoutReviewers);
   });
 
   it('only logs when creating the notifications fails', async () => {

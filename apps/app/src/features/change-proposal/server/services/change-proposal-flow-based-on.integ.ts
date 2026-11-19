@@ -84,12 +84,11 @@ describe('change proposal flow: a follow-up and a rework built on an earlier pro
   };
 
   const approveAll = async (proposalId: string) => {
-    const result = await service.approve(
-      proposalId,
-      users.requester,
-      'all',
-      BACKGROUND,
-    );
+    const result = await service.approve(proposalId, {
+      user: users.requester,
+      channel: 'ui',
+      trigger: BACKGROUND,
+    });
     await kit.waitForPageOperationsToFinish();
     if (!result.ok) throw new Error(JSON.stringify(result.error));
     return result.value;

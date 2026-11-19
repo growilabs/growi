@@ -77,6 +77,12 @@ jobs:
           pnpm add turbo --global
           pnpm install --frozen-lockfile
 
+      - name: Check attachment-text-extractor-client orval drift
+        run: |
+          pnpm -F @growi/attachment-text-extractor-client gen
+          git diff --exit-code packages/attachment-text-extractor-client/src/
+          git diff --exit-code packages/attachment-text-extractor-client/openapi.json
+
       - name: Lint
         run: |
           turbo run lint --filter=@growi/app --filter=./packages/*
@@ -159,12 +165,7 @@ jobs:
 
       - &start-mongodb-step
         name: Start MongoDB (replica set)
-        uses: supercharge/mongodb-github-action@89d1ecb837145f486898e235478a7e267f68c44e # unreleased main (adds mongodb-extra-env)
-        with:
-          mongodb-version: ${{ matrix.mongodb-version }}
-          mongodb-replica-set: rs0
-          mongodb-extra-env: |
-            GLIBC_TUNABLES=glibc.pthread.rseq=1
+        run: .github/scripts/start-mongodb-replica-set.sh "${{ matrix.mongodb-version }}"
 
       - name: Test
         run: |

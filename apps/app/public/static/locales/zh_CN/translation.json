@@ -48,6 +48,7 @@
   "Update": "更新",
   "Update Page": "更新本页",
   "Error": "误差",
+  "Retry": "重试",
   "Warning": "警告",
   "Sign in": "登录",
   "Sign in with External auth": "Sign in with {{signin}}",
@@ -439,7 +440,9 @@
     "user_not_admin": "仅管理员用户可以删除",
     "single_deletion_empty_pages": "空的页面不能被单一删除",
     "complete_deletion_not_allowed_for_user": "您无权永久删除该页面",
-    "deletion_not_allowed_for_user": "您无权删除该页面"
+    "deletion_not_allowed_for_user": "您无权删除该页面",
+    "grant_not_assignable": "上级页面的公开范围更窄，因此无法以当前的公开范围将页面放在此路径下。",
+    "operation_in_progress": "此页面或相邻页面上的其他操作仍在进行中，请稍后再试。"
   },
   "page_history": {
     "revision_list": "修订清单",
@@ -702,11 +705,14 @@
     "delete_all_selected_page": "删除所有",
     "select_all": "选择所有",
     "delete_selected_pages": "删除选定页面",
+    "selected_count": "已选择 {{selectedCount}} 项",
+    "selected_count_of_loaded": "已选择 {{selectedCount}} 项（已加载 {{loadedCount}} 项）",
     "currently_not_implemented": "这是当前未实现的功能",
     "search_again": "再次搜索",
     "number_of_list_to_display": "显示器的数量",
     "page_number_unit": "例",
     "hit_number_unit": "例",
+    "failed_to_load_more": "加载更多结果失败",
     "filter": "筛选",
     "search_option": "搜索选项",
     "filter_remove": "移除",
@@ -1246,6 +1252,20 @@
     },
     "achievement": {
       "settled_with_percent": "已完成（完成度 {{percent}}%）"
+    },
+    "review_term": {
+      "reviewer": "批准人",
+      "approve": "批准",
+      "reject": "驳回",
+      "abstain": "弃权",
+      "comment": "评论",
+      "purpose": "变更目的",
+      "decision": "决定"
     }
+  },
+  "plantuml": {
+    "url-too-long": "图表过大，很可能超出了 PlantUML 服务器的 URL 长度限制。请拆分或简化图表。",
+    "post-unavailable": "PlantUML 服务器可能不支持 POST，或者浏览器无法连接到该服务器。管理员可以通过设置 PLANTUML_HTTP_METHOD=get 切换回 GET 方式。",
+    "render-failed": "无法渲染图表。无法连接到 PlantUML 服务器，或服务器返回了错误。"
   }
 }

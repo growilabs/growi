@@ -101,6 +101,7 @@ Path-scoped rules load only when the work touches matching files:
 Each application has its own CLAUDE.md with detailed instructions:
 
 - `apps/app/CLAUDE.md` - Main GROWI application
+- `apps/attachment-text-extractor/CLAUDE.md` - Attachment text extraction microservice
 - `apps/pdf-converter/CLAUDE.md` - PDF conversion microservice
 - `apps/slackbot-proxy/CLAUDE.md` - Slack integration proxy
 
@@ -127,6 +128,7 @@ pnpm start                      # Build and start
 growi/
 ├── apps/
 │   ├── app/                # Main GROWI application (Next.js + Express)
+│   ├── attachment-text-extractor/ # Attachment text extraction microservice (Hono)
 │   ├── pdf-converter/      # PDF conversion microservice
 │   └── slackbot-proxy/     # Slack integration proxy
 ├── packages/               # Shared libraries (@growi/core, @growi/ui, etc.)
