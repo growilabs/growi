@@ -1,5 +1,6 @@
 import type { ConversionLimits, PageInfo } from '../../contract';
 import { convertOffice } from '../office';
+import { spendResultBudget } from '../result-budget';
 import { inspectArchive } from './archive-guard';
 import { cleanSlideText } from './pptx-cleanup';
 import { PRESENTATION, slidePackages } from './pptx-slide-packages';
@@ -21,9 +22,11 @@ export const convertPptx = async (
   }
   try {
     const pages: PageInfo[] = [];
+    let usedBytes = 0;
     for await (const slidePackage of slidePackages(archive, limits)) {
       const number = pages.length + 1;
       const content = cleanSlideText(await convertOffice(slidePackage, 'pptx'));
+      usedBytes = spendResultBudget(usedBytes, content, limits.maxResultBytes);
       pages.push({ pageNumber: number, label: String(number), content });
     }
     return pages;

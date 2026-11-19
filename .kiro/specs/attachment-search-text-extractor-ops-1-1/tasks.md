@@ -54,7 +54,7 @@
   - 終わった状態: 上のテストが通り、暗号化された PPTX / XLSX が `file_encrypted`、旧形式の PPT / XLS が今と同じ結果になる (既存のテスト)。research.md §3.3 の記録 (以前の動き・いまの動き・合わせない理由) が、テストのコメントではなく spec にあることを確かめる
   - _Requirements: 5.1, 5.2, 5.3, 5.4_
   - _Boundary: ArchiveGuard_
-- [ ] 3.5 (P) PDF と PPTX のページごとに結果の大きさを確かめる
+- [x] 3.5 (P) PDF と PPTX のページごとに結果の大きさを確かめる
   - 先に次のテストを書き、落ちることを確かめる: 上限を超えるスライドの後に anydoc が `malformed` を返すスライドを置いた PPTX が、`result_too_large` になる (途中で止まったことを結果の違いで確かめる)。1 ページで上限を超える PDF が `result_too_large` になる。CRLF を含むスライドで、LF に揃えた後の大きさが上限ちょうどなら通る
   - 数え方 (改行を LF に揃えた `content` の UTF-8 のバイト数。`label` は数えない) を 1 か所に置き、PDF の繰り返し、PPTX の繰り返し、`assemblePages` がそれを使う。`assemblePages` の最後の確かめは残す
   - 終わった状態: 上のテストと、既存の結果の大きさのテスト (`label` が巨大な XLSX が通る、など) が通る

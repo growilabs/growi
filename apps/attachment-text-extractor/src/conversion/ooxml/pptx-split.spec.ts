@@ -501,3 +501,51 @@ describe('limits and malformed packages', () => {
     expect(await convertPptx(buildPptx([]), limits())).toEqual([]);
   });
 });
+
+describe('result size limit', () => {
+  const malformedFromAnydoc = (): Error =>
+    Object.assign(new Error('bad slide'), { code: 'malformed' });
+
+  // A stop before the second slide leaves its queued once-value behind.
+  afterEach(() => {
+    anydoc.mockReset();
+  });
+
+  const threeSlides = (): Buffer =>
+    buildPptx([{ title: 'a' }, { title: 'b' }, { title: 'c' }]);
+
+  it('stops at the slide that exceeds the limit, before a later malformed slide is read', async () => {
+    anydoc.mockResolvedValueOnce('x'.repeat(11));
+    anydoc.mockRejectedValueOnce(malformedFromAnydoc());
+
+    const error = await conversionErrorOf(() =>
+      convertPptx(threeSlides(), limits({ maxResultBytes: 10 })),
+    );
+
+    expect(error.kind).toBe('result_too_large');
+  });
+
+  it('still reports the later malformed slide while the total stays within the limit', async () => {
+    anydoc.mockResolvedValueOnce('x'.repeat(10));
+    anydoc.mockRejectedValueOnce(malformedFromAnydoc());
+
+    const error = await conversionErrorOf(() =>
+      convertPptx(threeSlides(), limits({ maxResultBytes: 10 })),
+    );
+
+    expect(error.kind).toBe('malformed');
+  });
+
+  it('counts a slide after newlines are unified, so CRLF does not stop it early', async () => {
+    anydoc.mockResolvedValueOnce('a\r\nb');
+    anydoc.mockResolvedValueOnce('c\r\nd');
+
+    // 6 bytes once unified; 8 bytes if the carriage returns were counted.
+    const pages = await convertPptx(
+      buildPptx([{ title: 'a' }, { title: 'b' }]),
+      limits({ maxResultBytes: 6 }),
+    );
+
+    expect(pages).toHaveLength(2);
+  });
+});

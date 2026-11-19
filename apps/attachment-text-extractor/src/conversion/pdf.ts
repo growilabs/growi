@@ -7,10 +7,11 @@ import {
   readPageText,
   withPdfDocument,
 } from './pdfium';
+import { spendResultBudget } from './result-budget';
 
 /**
  * One element per page, pages without text included (convert drops them).
- * The page text is not capped here: MAX_RESULT_BYTES applies to the whole result.
+ * The text of a single page is not capped; MAX_RESULT_BYTES applies to the running total.
  */
 export const convertPdf = async (
   bytes: Uint8Array,
@@ -32,14 +33,25 @@ export const convertPdf = async (
           'PDF page count exceeds the limit',
         );
       }
-      return Array.from({ length: count }, (_, index) => ({
-        pageNumber: index + 1,
-        label: String(index + 1),
+      const pages: PageInfo[] = [];
+      let usedBytes = 0;
+      for (let index = 0; index < count; index++) {
         // PDFium separates lines with CRLF; the gap closing relies on LF.
-        content: joinBrokenJapanese(
+        const content = joinBrokenJapanese(
           normalizeNewlines(readPageText(pdfium, document, index)),
-        ),
-      }));
+        );
+        usedBytes = spendResultBudget(
+          usedBytes,
+          content,
+          limits.maxResultBytes,
+        );
+        pages.push({
+          pageNumber: index + 1,
+          label: String(index + 1),
+          content,
+        });
+      }
+      return pages;
     });
   } catch (thrown) {
     if (thrown instanceof ConversionError && thrown.kind !== 'internal') {
