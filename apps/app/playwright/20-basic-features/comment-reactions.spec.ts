@@ -130,12 +130,22 @@ const pickEmoji = async (
   await expect(picker).toBeHidden();
 };
 
-const reactionEmojiButton = (scope: Locator, label: string): Locator =>
+// A chip is one button named after its emoji.
+const reactionChip = (scope: Locator, label: string): Locator =>
   scope.getByRole('button', { name: label, exact: true });
 
-// The count part is labelled "N person/people reacted" (comment_reaction.reacted_count).
-const reactionCountButtons = (scope: Locator): Locator =>
-  scope.getByRole('button', { name: /reacted$/ });
+// The number of reacting users is each chip's description (comment_reaction.reacted_count).
+const reactionChips = (scope: Locator): Locator =>
+  scope.getByRole('button').filter({ hasText: /reacted$/ });
+
+const ONE_PERSON = '1 person reacted';
+const TWO_PEOPLE = '2 people reacted';
+
+const usersPopover = (page: Page): Locator =>
+  page.locator('.popover').filter({ hasText: 'Reacted by' });
+
+const canHover = (page: Page): Promise<boolean> =>
+  page.evaluate(() => window.matchMedia('(hover: hover)').matches);
 
 test.describe('Comment reactions', () => {
   test.describe.configure({ mode: 'serial' });
@@ -209,19 +219,19 @@ test.describe('Comment reactions', () => {
 
     await pickEmoji(page, comment, THUMBS_UP);
 
-    const emojiButton = reactionEmojiButton(comment, '+1');
-    await expect(emojiButton).toHaveAttribute('aria-pressed', 'true');
-    await expect(reactionCountButtons(comment)).toHaveCount(1);
-    await expect(reactionCountButtons(comment)).toHaveText('1');
+    const chip = reactionChip(comment, '+1');
+    await expect(chip).toHaveAttribute('aria-pressed', 'true');
+    await expect(reactionChips(comment)).toHaveCount(1);
+    await expect(chip).toHaveAccessibleDescription(ONE_PERSON);
 
     // The reaction is stored, not only reflected in the client cache.
     await page.reload();
-    await expect(emojiButton).toHaveAttribute('aria-pressed', 'true');
-    await expect(reactionCountButtons(comment)).toHaveText('1');
+    await expect(chip).toHaveAttribute('aria-pressed', 'true');
+    await expect(chip).toHaveAccessibleDescription(ONE_PERSON);
 
-    await emojiButton.click();
-    await expect(emojiButton).toHaveCount(0);
-    await expect(reactionCountButtons(comment)).toHaveCount(0);
+    await chip.click();
+    await expect(chip).toHaveCount(0);
+    await expect(reactionChips(comment)).toHaveCount(0);
 
     await page.reload();
     const addButton = comment.getByRole('button', { name: 'Add reaction' });
@@ -238,7 +248,7 @@ test.describe('Comment reactions', () => {
     await page.keyboard.press('Tab');
     await expect(addButton).toBeFocused();
     await expect(addReaction).toHaveCSS('opacity', '1');
-    await expect(reactionCountButtons(comment)).toHaveCount(0);
+    await expect(reactionChips(comment)).toHaveCount(0);
 
     // It sits in the header beside the history link, not over the comment body.
     const historyLink = comment.locator('a[id^="page-comment-revision-"]');
@@ -261,8 +271,8 @@ test.describe('Comment reactions', () => {
     const comment = normalComment(page);
 
     await pickEmoji(page, comment, THUMBS_UP);
-    const emojiButton = reactionEmojiButton(comment, '+1');
-    await expect(emojiButton).toBeVisible();
+    const chip = reactionChip(comment, '+1');
+    await expect(chip).toBeVisible();
 
     // Exactly one add button, after the chip, and not hidden behind the hover reveal.
     const addButton = comment.getByRole('button', { name: 'Add reaction' });
@@ -270,7 +280,7 @@ test.describe('Comment reactions', () => {
     await page.mouse.move(0, 0);
     await expect(addButton.locator('xpath=..')).toHaveCSS('opacity', '1');
     const [chipBox, addBox, bodyBox] = await Promise.all([
-      emojiButton.boundingBox(),
+      chip.boundingBox(),
       addButton.boundingBox(),
       comment.locator('.page-comment-body').boundingBox(),
     ]);
@@ -280,8 +290,8 @@ test.describe('Comment reactions', () => {
     expect(addBox.x).toBeGreaterThanOrEqual(chipBox.x + chipBox.width);
     expect(addBox.y).toBeGreaterThanOrEqual(bodyBox.y + bodyBox.height);
 
-    await emojiButton.click();
-    await expect(emojiButton).toHaveCount(0);
+    await chip.click();
+    await expect(chip).toHaveCount(0);
   });
 
   test('After the first reaction is added with the keyboard, focus lands on the add button at the end of the chip row', async ({
@@ -305,13 +315,13 @@ test.describe('Comment reactions', () => {
       .click();
     await expect(picker).toBeHidden();
 
-    const emojiButton = reactionEmojiButton(comment, '+1');
-    await expect(emojiButton).toBeVisible();
+    const chip = reactionChip(comment, '+1');
+    await expect(chip).toBeVisible();
     await expect(addButton).toHaveCount(1);
     await expect(addButton).toBeFocused();
 
-    await emojiButton.click();
-    await expect(emojiButton).toHaveCount(0);
+    await chip.click();
+    await expect(chip).toHaveCount(0);
   });
 
   test('In the popover the add button is always visible, without hovering', async ({
@@ -347,12 +357,12 @@ test.describe('Comment reactions', () => {
       .click();
     await expect(picker).toBeHidden();
 
-    const emojiButton = reactionEmojiButton(origin, '+1');
-    await expect(emojiButton).toBeVisible();
+    const chip = reactionChip(origin, '+1');
+    await expect(chip).toBeVisible();
     await expect(addButton).toBeFocused();
 
-    await emojiButton.click();
-    await expect(emojiButton).toHaveCount(0);
+    await chip.click();
+    await expect(chip).toHaveCount(0);
   });
 
   test('The same emoji with a different skin tone becomes a separate chip (Req 1.3, 3.5)', async ({
@@ -362,17 +372,20 @@ test.describe('Comment reactions', () => {
     const comment = normalComment(page);
 
     await pickEmoji(page, comment, THUMBS_UP);
-    await expect(reactionEmojiButton(comment, '+1')).toBeVisible();
+    await expect(reactionChip(comment, '+1')).toBeVisible();
 
     await pickEmoji(page, comment, THUMBS_UP_MEDIUM, { skinTone: 'Medium' });
 
-    const toned = reactionEmojiButton(comment, '+1 skin-tone-4');
+    const toned = reactionChip(comment, '+1 skin-tone-4');
     await expect(toned).toHaveAttribute('aria-pressed', 'true');
-    await expect(reactionEmojiButton(comment, '+1')).toHaveAttribute(
+    await expect(reactionChip(comment, '+1')).toHaveAttribute(
       'aria-pressed',
       'true',
     );
-    await expect(reactionCountButtons(comment)).toHaveText(['1', '1']);
+    await expect(toned).toHaveAccessibleDescription(ONE_PERSON);
+    await expect(reactionChip(comment, '+1')).toHaveAccessibleDescription(
+      ONE_PERSON,
+    );
   });
 
   test('A reaction on an inline comment reply shows in both the body popover and the thread (Req 1.8, 3.7)', async ({
@@ -383,7 +396,7 @@ test.describe('Comment reactions', () => {
     await expect(replyInThread).toContainText(inlineReplyText);
 
     await pickEmoji(page, replyInThread, THUMBS_UP);
-    await expect(reactionEmojiButton(replyInThread, '+1')).toHaveAttribute(
+    await expect(reactionChip(replyInThread, '+1')).toHaveAttribute(
       'aria-pressed',
       'true',
     );
@@ -393,14 +406,14 @@ test.describe('Comment reactions', () => {
       'inline-comment-preview-popover-reply',
     );
     await expect(replyInPopover).toContainText(inlineReplyText);
-    const popoverEmojiButton = reactionEmojiButton(replyInPopover, '+1');
-    await expect(popoverEmojiButton).toHaveAttribute('aria-pressed', 'true');
-    await expect(reactionCountButtons(replyInPopover)).toHaveText('1');
+    const popoverChip = reactionChip(replyInPopover, '+1');
+    await expect(popoverChip).toHaveAttribute('aria-pressed', 'true');
+    await expect(popoverChip).toHaveAccessibleDescription(ONE_PERSON);
 
     // The other direction: removing it from the popover clears the thread too.
-    await popoverEmojiButton.click();
-    await expect(popoverEmojiButton).toHaveCount(0);
-    await expect(reactionEmojiButton(replyInThread, '+1')).toHaveCount(0);
+    await popoverChip.click();
+    await expect(popoverChip).toHaveCount(0);
+    await expect(reactionChip(replyInThread, '+1')).toHaveCount(0);
   });
 
   test('The share-link view shows normal comment chips without the add-reaction button, and no inline comment reactions (Req 5.6, 6.2, 6.3)', async ({
@@ -414,8 +427,10 @@ test.describe('Comment reactions', () => {
     await page.goto(pagePath(testInfo));
     const replyInThread = inlineReplyInThread(page);
     await pickEmoji(page, replyInThread, THUMBS_UP);
-    await expect(reactionCountButtons(replyInThread)).toHaveText('1');
-    await expect(reactionCountButtons(normalComment(page))).toHaveCount(2);
+    await expect(reactionChip(replyInThread, '+1')).toHaveAccessibleDescription(
+      ONE_PERSON,
+    );
+    await expect(reactionChips(normalComment(page))).toHaveCount(2);
 
     const shareLinkRes = await request.post('/_api/v3/share-links', {
       data: { relatedPage: createdPage.pageId },
@@ -438,44 +453,83 @@ test.describe('Comment reactions', () => {
       const guestComment = normalComment(guestPage);
       await expect(guestComment).toBeVisible();
 
-      await expect(reactionCountButtons(guestComment)).toHaveText(['1', '1']);
-      await expect(guestComment.getByText(THUMBS_UP).first()).toBeVisible();
-      // Read-only: the emoji part is not a toggle and there is no add-reaction button.
+      const guestChip = reactionChip(guestComment, '+1');
+      await expect(reactionChips(guestComment)).toHaveCount(2);
+      await expect(guestChip).toHaveAccessibleDescription(ONE_PERSON);
       await expect(
-        guestComment.getByRole('button', { name: '+1', exact: true }),
-      ).toHaveCount(0);
+        reactionChip(guestComment, '+1 skin-tone-4'),
+      ).toHaveAccessibleDescription(ONE_PERSON);
+      await expect(guestComment.getByText(THUMBS_UP).first()).toBeVisible();
+      // Read-only: the chip does not toggle and there is no add-reaction button.
+      await expect(guestChip).toHaveAttribute('aria-disabled', 'true');
       await expect(
         guestPage.getByRole('button', { name: 'Add reaction' }),
       ).toHaveCount(0);
 
+      // Hovering still lists who reacted (Req 6.2).
+      await guestChip.hover();
+      await expect(usersPopover(guestPage).getByRole('listitem')).toHaveText([
+        'Admin',
+      ]);
+
       // The inline reply's reaction is the only other one, and it is not shown.
       await expect(guestPage.getByText(inlineReplyText)).toHaveCount(0);
-      await expect(reactionCountButtons(guestPage.locator('body'))).toHaveCount(
-        2,
-      );
+      await expect(reactionChips(guestPage.locator('body'))).toHaveCount(2);
     } finally {
       await guestContext.close();
     }
   });
 
+  test('Hovering or focusing a chip lists who reacted without changing the reaction (Req 1.5)', async ({
+    page,
+  }, testInfo) => {
+    await page.goto(pagePath(testInfo));
+    expect(await canHover(page)).toBe(true);
+    const comment = normalComment(page);
+    const chip = reactionChip(comment, '+1');
+    await expect(chip).toHaveAttribute('aria-pressed', 'true');
+    await expect(usersPopover(page)).toBeHidden();
+
+    await chip.hover();
+    await expect(usersPopover(page).getByRole('listitem')).toHaveText([
+      'Admin',
+    ]);
+    await page.mouse.move(0, 0);
+    await expect(usersPopover(page)).toBeHidden();
+
+    await chip.focus();
+    await expect(usersPopover(page).getByRole('listitem')).toHaveText([
+      'Admin',
+    ]);
+    await chip.blur();
+    await expect(usersPopover(page)).toBeHidden();
+
+    // Neither hovering nor focusing wrote anything.
+    await page.reload();
+    await expect(chip).toHaveAttribute('aria-pressed', 'true');
+    await expect(chip).toHaveAccessibleDescription(ONE_PERSON);
+  });
+
   test.describe('on a touch phone', () => {
     test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
 
-    test("Tapping the count lists who reacted without changing the reaction; tapping the emoji adds and removes the viewer's own reaction (Req 1.5, 2.1, 2.2)", async ({
+    test("Tapping a chip adds and removes the viewer's own reaction and never lists who reacted (Req 1.5, 2.1, 2.2)", async ({
       browser,
       page,
     }, testInfo) => {
       await page.goto(pagePath(testInfo));
+      // The list is only for devices that can hover; this must emulate one that cannot.
+      expect(await canHover(page)).toBe(false);
       const comment = normalComment(page);
-      const emojiButton = reactionEmojiButton(comment, '+1');
-      const toned = reactionEmojiButton(comment, '+1 skin-tone-4');
+      const chip = reactionChip(comment, '+1');
+      const toned = reactionChip(comment, '+1 skin-tone-4');
 
-      // Tapping the emoji of a chip only the viewer reacted with removes it.
+      // Tapping a chip only the viewer reacted with removes it.
       await toned.tap();
       await expect(toned).toHaveCount(0);
-      await emojiButton.tap();
-      await expect(emojiButton).toHaveCount(0);
-      await expect(reactionCountButtons(comment)).toHaveCount(0);
+      await chip.tap();
+      await expect(chip).toHaveCount(0);
+      await expect(reactionChips(comment)).toHaveCount(0);
 
       // Another user's 👍 gives the viewer a chip they have not reacted with.
       const otherContext = await browser.newContext({
@@ -487,7 +541,7 @@ test.describe('Comment reactions', () => {
         await otherPage.goto(pagePath(testInfo));
         const otherComment = normalComment(otherPage);
         await pickEmoji(otherPage, otherComment, THUMBS_UP);
-        await expect(reactionEmojiButton(otherComment, '+1')).toHaveAttribute(
+        await expect(reactionChip(otherComment, '+1')).toHaveAttribute(
           'aria-pressed',
           'true',
         );
@@ -496,41 +550,22 @@ test.describe('Comment reactions', () => {
       }
 
       await page.reload();
-      const onePerson = comment.getByRole('button', {
-        name: '1 person reacted',
-      });
-      await expect(emojiButton).toHaveAttribute('aria-pressed', 'false');
-      await expect(onePerson).toHaveText('1');
+      await expect(chip).toHaveAttribute('aria-pressed', 'false');
+      await expect(chip).toHaveAccessibleDescription(ONE_PERSON);
 
-      await onePerson.tap();
-      const usersPopover = page
-        .locator('.popover')
-        .filter({ hasText: 'Reacted by' });
-      await expect(usersPopover).toBeVisible();
-      await expect(usersPopover.getByRole('listitem')).toHaveText([
-        FILTER_TEST_USER_A.name,
-      ]);
-      await expect(onePerson).toHaveAttribute('aria-expanded', 'true');
-      await expect(emojiButton).toHaveAttribute('aria-pressed', 'false');
+      await chip.tap();
+      await expect(chip).toHaveAttribute('aria-pressed', 'true');
+      await expect(chip).toHaveAccessibleDescription(TWO_PEOPLE);
+      await expect(usersPopover(page)).toBeHidden();
 
-      // A mis-tap would have sent a write; the stored state must be unchanged.
-      await page.reload();
-      await expect(emojiButton).toHaveAttribute('aria-pressed', 'false');
-      await expect(onePerson).toHaveText('1');
-
-      await emojiButton.tap();
-      await expect(emojiButton).toHaveAttribute('aria-pressed', 'true');
-      await expect(
-        comment.getByRole('button', { name: '2 people reacted' }),
-      ).toHaveText('2');
-
-      await emojiButton.tap();
-      await expect(emojiButton).toHaveAttribute('aria-pressed', 'false');
-      await expect(onePerson).toHaveText('1');
+      await chip.tap();
+      await expect(chip).toHaveAttribute('aria-pressed', 'false');
+      await expect(chip).toHaveAccessibleDescription(ONE_PERSON);
+      await expect(usersPopover(page)).toBeHidden();
 
       await page.reload();
-      await expect(emojiButton).toHaveAttribute('aria-pressed', 'false');
-      await expect(onePerson).toHaveText('1');
+      await expect(chip).toHaveAttribute('aria-pressed', 'false');
+      await expect(chip).toHaveAccessibleDescription(ONE_PERSON);
     });
   });
 });
