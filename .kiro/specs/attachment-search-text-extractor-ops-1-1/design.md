@@ -25,7 +25,7 @@
 
 **Users**: GROWI.cloud の SRE (ログと監視と自動スケール)、OSS の運用者 (`/metrics` は使わなくてもよい)、抽出サービスの開発者。
 
-**Impact**: 本番の依存に `prom-client` が 1 つ加わる (12 個になる)。apps/app は、`GROWI_APP_ID_FOR_GROWI_CLOUD` が設定された app でだけ、要求のヘッダーが 1 つ増える。
+**Impact**: 本番の依存に `@prometheus-io/client` が 1 つ加わる (12 個になる)。apps/app は、`GROWI_APP_ID_FOR_GROWI_CLOUD` が設定された app でだけ、要求のヘッダーが 1 つ増える。
 
 ### Goals
 
@@ -67,8 +67,8 @@
 
 ### Allowed Dependencies
 
-- 既存の本番の依存 11 個に、`prom-client` を 1 つ加える。HTTP の層 (`src/http/`) だけが import してよい (zod と `hono-openapi` と同じ扱い。`test/layers/layer-rules.ts` の `PACKAGE_RULES` に足す)。変換の子は読み込まない
-- `prom-client` とその依存のライセンスは、入れるときに確かめる (許容的なライセンスであること。research.md §1)
+- 既存の本番の依存 11 個に、`@prometheus-io/client` を 1 つ加える。HTTP の層 (`src/http/`) だけが import してよい (zod と `hono-openapi` と同じ扱い。`test/layers/layer-rules.ts` の `PACKAGE_RULES` に足す)。変換の子は読み込まない
+- `@prometheus-io/client` は Apache-2.0、その依存は Apache-2.0 と MIT で、許容的である (research.md §1 で確かめ済み。入れるときに依存の木をもう一度確かめる)
 - 新しい環境変数は足さない。`/readyz` の結果を覚える期間とヒストグラムの区切りはコードの定数にする
 
 ### Revalidation Triggers
@@ -137,7 +137,7 @@ graph TB
 
 | 層 | 選んだもの | 役割 | 根拠 |
 |---|---|---|---|
-| 指標 | `prom-client` (15.x の予定。入れるときの最新の安定版に固定) | Prometheus のテキスト形式、プロセスの既定の指標 | research.md §1 |
+| 指標 | `@prometheus-io/client` (0.16.x。`^0.16.1` で固定) | Prometheus のテキスト形式、プロセスの既定の指標 | research.md §1 |
 | ほか | 変更なし | — | — |
 
 ## File Structure Plan
@@ -148,7 +148,7 @@ graph TB
 apps/attachment-text-extractor/src/http/
 ├── app-label.ts            # X-Growi-App-Id → the value written after "app=" ("-" / value / "(invalid)")
 ├── request-target.ts       # the documented route paths, the open paths, and the endpoint label of a raw request target
-├── service-metrics.ts      # the prom-client registry of one app: slot gauges, response counter, result counter and histogram, default process metrics
+├── service-metrics.ts      # the @prometheus-io/client registry of one app: slot gauges, response counter, result counter and histogram, default process metrics
 └── metrics-route.ts        # GET /metrics, and the middleware that counts every response Hono produces
 apps/attachment-text-extractor/src/conversion/
 └── result-budget.ts        # the one counting rule for MAX_RESULT_BYTES, used by pdf, pptx and assemblePages
@@ -168,9 +168,9 @@ apps/attachment-text-extractor/src/conversion/
 - `src/http/health-routes.ts`、`src/runner/readiness.ts`、`src/runner/conversion-runner.ts` — 確認の結果を 10 秒覚える
 - `src/conversion/ooxml/archive-guard.ts`、`src/conversion/ooxml/zip-directory.ts` — `null` を「ZIP ではない」だけの意味にし、ほかの 3 つの場合は `malformed` にする
 - `src/conversion/pdf.ts`、`src/conversion/ooxml/pptx-split.ts`、`src/conversion/assemble-pages.ts` — `result-budget.ts` を使う
-- `test/layers/layer-rules.ts` — `prom-client` を HTTP の層だけに許す
-- `test/deploy/production-dependencies.spec.ts` — 本番の依存の一覧に `prom-client` を加える (11 → 12)
-- `package.json`、`pnpm-lock.yaml` — `prom-client` を加える
+- `test/layers/layer-rules.ts` — `@prometheus-io/client` を HTTP の層だけに許す
+- `test/deploy/production-dependencies.spec.ts` — 本番の依存の一覧に `@prometheus-io/client` を加える (11 → 12)
+- `package.json`、`pnpm-lock.yaml` — `@prometheus-io/client` を加える
 - ログの行の形を `$` で固定しているテスト (`src/http/request-log.integ.ts`、`src/http/diagnostic-log.integ.ts`、`src/http/extract-limits.integ.ts`) と、見本の行を持つテスト (`scripts/image-check/memory/report.spec.ts`)
 - `docker/README.md`、`AGENTS.md` — 公開タグ、ログ、`/metrics`、`/readyz`、子の環境
 - `packages/attachment-text-extractor-client/openapi.json`、`src/generated/index.ts` — 書き出し直しと作り直し
@@ -270,7 +270,7 @@ interface ConcurrencySlots {
 
 #### ServiceMetrics (`http/service-metrics.ts`) と MetricsRoute (`http/metrics-route.ts`)
 
-アプリごとに `prom-client` の registry を 1 つ作る (既定の global registry は使わない。テストは 1 つのプロセスで多くのアプリを作るため)。
+アプリごとに `@prometheus-io/client` の registry を 1 つ作る (既定の global registry は使わない。テストは 1 つのプロセスで多くのアプリを作るため)。
 
 | 名前 | 種類 | ラベル | 中身 |
 |---|---|---|---|
@@ -279,7 +279,7 @@ interface ConcurrencySlots {
 | `attachment_extractor_http_responses_total` | counter | `endpoint`、`status` | Hono が作った答えの数 |
 | `attachment_extractor_extract_results_total` | counter | `result` | `/extract` の結果ごとの件数 |
 | `attachment_extractor_extract_duration_seconds` | histogram | `result` | `/extract` の所要時間 (ログの `duration_ms` と同じ区間)。区切りは 0.05、0.1、0.25、0.5、1、2.5、5、10、20、40、60、80 秒 |
-| `prom-client` の既定の指標 | — | — | `process_cpu_seconds_total`、`process_resident_memory_bytes`、`nodejs_eventloop_lag_seconds` など (HTTP を受けるプロセスだけ) |
+| `@prometheus-io/client` の既定の指標 | — | — | `process_cpu_seconds_total`、`process_resident_memory_bytes`、`nodejs_eventloop_lag_seconds` など (HTTP を受けるプロセスだけ) |
 
 - `endpoint` の値は 6 つ (`/extract`、`/healthz`、`/readyz`、`/openapi.json`、`/metrics`、`other`)。`status` は Hono が作りうる 3 桁のステータスで、数は限られる。`result` の値は、成功の `ok`、変換の後の失敗の種類 (`ERROR_TABLE` のキー)、変換の前に断る理由 (`REFUSAL_TABLE` のキー) で、これらの表から作る。どのラベルにも、要求が送った自由な文字列を入れない
 - `result` の値は、起動の時点ですべて 0 で作っておく (まだ起きていない結果も、監視の側で増え方を計算できるように)
@@ -376,7 +376,7 @@ interface ConcurrencySlots {
 - **ZIP**: `archive-guard.spec.ts` の「通す」テストのうち、ZIP である形 (必要な部品が無い、2 つある、空の ZIP、扱えない版の印、UTF-8 の印と合わない名前) を「`malformed` で断る」に変える。ZIP でない形 (空、テキスト、途中で切れた ZIP、中央の一覧が無い、暗号化された OOXML) は通すままにする。上限を超える XLSX (セル数) と、上限を超えるエントリ数の ZIP に、変な形のエントリを 1 つ足したものが、変換されずに断られることを確かめる (research.md §3 の実験の形)
 - **結果の大きさ**: 1 ページで上限を超える PDF と、1 枚で超える PPTX で、`result_too_large` になること。上限を超えた後を読まないことは、呼んだ回数を数える偽の部品ではなく、結果の違いで確かめる: 上限を超えるスライドの後に、anydoc が `malformed` を返すスライドを置いた PPTX が、`malformed` ではなく `result_too_large` になること。CRLF を含むスライドで、LF に揃えた後の大きさが上限ちょうどなら通ること。同じ入力で、途中の確かめと最後の確かめが同じ結論になること
 - **apps/app**: 設定に値があるとヘッダーが付くこと、無い・空・改行を含むときは付かずに抽出が続くこと
-- **層の向き**: `prom-client` を HTTP の層の外で import すると落ちること (`layer-dependencies.spec.ts` の既存の形)
+- **層の向き**: `@prometheus-io/client` を HTTP の層の外で import すると落ちること (`layer-dependencies.spec.ts` の既存の形)
 - **OpenAPI**: 書き出し直した `openapi.json` と commit 済みのものが一致すること (既存のテスト)。生成クライアントを作り直しても関数と型が変わらないこと (apps/app の CI の既存の検査)
 
 ## Requirements Traceability
@@ -411,8 +411,8 @@ interface ConcurrencySlots {
 
 - requirements.md: Scope (32 行、`GET /metrics` を足す)、Boundary Context の In scope、AC 7.1 (文書に載せるものに任意のヘッダーを足す。番号は変えない)、末尾に Req 8 (この spec の Req 1)、Req 9 (Req 3)、Req 2 の末尾に AC 2.10〜2.13 (Req 5)・AC 2.14〜2.16 (Req 6)、Req 3 の末尾に AC 3.5〜3.8 (Req 4)・AC 3.9〜3.11 (Req 7) を足す (番号の対応は brief.md の「Port-back の前提」)
 - brief.md: Scope の Hono アプリの一覧 (49 行)
-- design.md: Boundary Commitments の HTTP の契約 (50 行)、Allowed Dependencies (66〜73 行。12 個、`prom-client`)、Revalidation Triggers (89 行の health / readiness、91 行の生成クライアント、この spec の Revalidation Triggers の 4 つを足す)、運用者から見える振る舞いの `/docs` (104 行) とログ (107 行)、Technology Stack、抽出の流れの主な決定 (239 行の認証の要らないパス)、HealthRoutes (301〜302 行)、Limits (308 行。確認用の子は `slots_in_use` に入らない)、ConversionRunner の子の `env` (337 行)、Convert (366 行)、PptxSlideSplitter と XlsxSheetSplitter の前提 (402、411 行)、PdfConverter、ArchiveGuard (444 行)、Error Handling の表 (541 行の 3 つのパス、549 行の `malformed` の行)、Monitoring (565、569、571 行と、`/metrics` の節)、Testing Strategy (577 行の「トークンが子に渡らないこと」)、運用者向けの文書の一覧 (609、613、615 行)、Security Considerations (644 行の認証、645 行のトークンの受け渡し)、Performance & Scalability (655 行の CPU は目安)、Requirements Traceability、Open Questions / Risks (698 行の readiness の CPU)
-- research.md: §1.4 (本番の依存とライセンスに `prom-client` とその依存)、§5.7 (833 行。401 の要求は行を残さないが `/metrics` で数える)、§5.9 (884 行の「`readiness()` は結果を覚えない」)、§8 の前書き (コメントが `Req N.M` を引かなくなった) と §8.2 の削除。この spec の research.md の §1〜§8 を、新しい節として移す
+- design.md: Boundary Commitments の HTTP の契約 (50 行)、Allowed Dependencies (66〜73 行。12 個、`@prometheus-io/client`)、Revalidation Triggers (89 行の health / readiness、91 行の生成クライアント、この spec の Revalidation Triggers の 4 つを足す)、運用者から見える振る舞いの `/docs` (104 行) とログ (107 行)、Technology Stack、抽出の流れの主な決定 (239 行の認証の要らないパス)、HealthRoutes (301〜302 行)、Limits (308 行。確認用の子は `slots_in_use` に入らない)、ConversionRunner の子の `env` (337 行)、Convert (366 行)、PptxSlideSplitter と XlsxSheetSplitter の前提 (402、411 行)、PdfConverter、ArchiveGuard (444 行)、Error Handling の表 (541 行の 3 つのパス、549 行の `malformed` の行)、Monitoring (565、569、571 行と、`/metrics` の節)、Testing Strategy (577 行の「トークンが子に渡らないこと」)、運用者向けの文書の一覧 (609、613、615 行)、Security Considerations (644 行の認証、645 行のトークンの受け渡し)、Performance & Scalability (655 行の CPU は目安)、Requirements Traceability、Open Questions / Risks (698 行の readiness の CPU)
+- research.md: §1.4 (本番の依存とライセンスに `@prometheus-io/client` とその依存)、§5.7 (833 行。401 の要求は行を残さないが `/metrics` で数える)、§5.9 (884 行の「`readiness()` は結果を覚えない」)、§8 の前書き (コメントが `Req N.M` を引かなくなった) と §8.2 の削除。この spec の research.md の §1〜§8 を、新しい節として移す
 - `apps/attachment-text-extractor/AGENTS.md` と `docker/README.md` は、Req 7 と Req 9 のタスクで同じ PR の中で直す (取り込みの対象ではなく、実装の一部)
 
 **`attachment-search-indexing`**

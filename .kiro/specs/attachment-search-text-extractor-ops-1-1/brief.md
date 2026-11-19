@@ -93,7 +93,7 @@ GROWI.cloud で 1 つの抽出サービスを複数の顧客 (GROWI の app) で
 ## Approach
 
 - app の ID: apps/app が `X-Growi-App-Id` ヘッダーで送り、抽出サービスが形を確かめてログの行の最後に出す。値は認可・上限・判断のどれにも使わない。
-- `/metrics`: `prom-client` を本番の依存に加える (理由は research.md §1)。応答の数は、`bearerAuth` より前に置く Hono の middleware で数える。
+- `/metrics`: `@prometheus-io/client` を本番の依存に加える (理由は research.md §1)。応答の数は、`bearerAuth` より前に置く Hono の middleware で数える。
 - `/readyz`: 同時の呼び出しで 1 回の確認を共有する今の仕組みに、終わった確認の結果を 10 秒覚える働きを足す。
 - ZIP: 「ZIP ではない」ときだけファイル全体を anydoc に渡し、ZIP なのに検査を通せない形は断る。
 - 結果の大きさ: 合計の数え方を 1 つの関数にまとめ、PDF と PPTX の繰り返しと最後の確かめが同じ関数を使う。

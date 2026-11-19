@@ -62,10 +62,10 @@
   - _Boundary: ResultBudget_
 
 - [ ] 4. `/metrics`
-- [ ] 4.1 `prom-client` を本番の依存に加える
-  - 先に、本番の依存の一覧のテスト (`production-dependencies.spec.ts`) に `prom-client` を足し (11 → 12 個。テスト名とコメントも直す)、層の規則 (`layer-rules.ts` の `PACKAGE_RULES`) で `prom-client` を HTTP の層だけに許す。層のテストに、HTTP の層の外で import すると落ちる合成の例を足す
+- [ ] 4.1 `@prometheus-io/client` を本番の依存に加える
+  - 先に、本番の依存の一覧のテスト (`production-dependencies.spec.ts`) に `@prometheus-io/client` を足し (11 → 12 個。テスト名とコメントも直す)、層の規則 (`layer-rules.ts` の `PACKAGE_RULES`) で `@prometheus-io/client` を HTTP の層だけに許す。層のテストに、HTTP の層の外で import すると落ちる合成の例を足す
   - `pnpm install` で `apps/attachment-text-extractor/package.json` と `pnpm-lock.yaml` に加える (ほかの pnpm の実行と同時に動かさない)
-  - `prom-client` とその依存のすべてのライセンス、install のときのスクリプトの有無を確かめ、research.md §1 に記録する。許容的でないライセンスがあれば、先に進まず人に諮る
+  - `@prometheus-io/client` とその依存のすべてのライセンス (research.md §1 では Apache-2.0 と MIT)、install のときのスクリプトの有無、この spec が使う API の名前を、`pnpm-lock.yaml` に入った実際の内容で確かめ、research.md §1 に記録する。許容的でないライセンスや、使う API が無いことが分かれば、先に進まず人に諮る
   - 終わった状態: 依存の一覧のテストと層のテストが通り、ライセンスの記録が research.md にある
   - _Requirements: 3.1_
 - [ ] 4.2 指標を集め、`GET /metrics` で答える
@@ -119,7 +119,7 @@
   - 終わった状態: 2 つの文書に「結果は覚えない」「認証の要らない 3 つのパス」「トークンは子に渡らない」だけを書いた箇所が残っていない (`grep` で確かめる)
   - _Requirements: 10.1_
 - [ ] 9.2 設計の理由と実験の記録を、対象 spec の research.md に移す
-  - この spec の research.md の §1〜§8 を、`attachment-search-text-extractor` の research.md の新しい節として移す (§2.3・§2.4 は `attachment-search-indexing` の research.md へ)。§1.4 に `prom-client` とその依存のライセンスを足す。§5.6 に orval がヘッダーから何も作らないことを足す。§5.7 と §5.9 (884 行) を直す
+  - この spec の research.md の §1〜§8 を、`attachment-search-text-extractor` の research.md の新しい節として移す (§2.3・§2.4 は `attachment-search-indexing` の research.md へ)。§1.4 に `@prometheus-io/client` とその依存のライセンスを足す。§5.6 に orval がヘッダーから何も作らないことを足す。§5.7 と §5.9 (884 行) を直す
   - 対象 spec の research.md §8 の前書きを直し、§8.2 の表を消す (コメントが要件番号を引かなくなったため)
   - 終わった状態: この spec のディレクトリを消しても失われる根拠が無い
   - _Requirements: 10.2_

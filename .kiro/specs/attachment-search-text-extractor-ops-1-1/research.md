@@ -12,13 +12,14 @@
   - orval 7.2 は、OpenAPI の文書のヘッダーの parameter から関数の引数も型も作らない。生成クライアントは変わらない (§2.2)
   - 設定 `app:growiAppIdForCloud` は、型の宣言は `number | undefined` だが、実際には環境変数の文字列がそのまま入る (§2.3)
 
-## 1. `/metrics` の部品: `prom-client` を使う
+## 1. `/metrics` の部品: `@prometheus-io/client` を使う
 
-### Decision: `prom-client` を本番の依存に加える
+### Decision: `@prometheus-io/client` を本番の依存に加える
 
 - **Context**: Req 3 は、gauge・ラベル付きのカウンタ・ヒストグラムと、プロセスの CPU・メモリ・イベントループの遅れを、Prometheus のテキスト形式で出すことを求める。
 - **Alternatives Considered**:
-  1. `prom-client` を使う
+  1. Prometheus の公式の JavaScript のクライアント `@prometheus-io/client` を使う (リポジトリは prometheus/client_js。旧名の `@prometheus-io/client` の後継)
+  1b. `@prometheus-io/client` を使う (採らない。npm で「`@prometheus-io/client` に置き換えられた」と非推奨の表示が出ている。最新は 15.1.3 で 2024-06 のまま)
   2. テキスト形式を自分で書く (`process.cpuUsage()`、`process.memoryUsage()`、`perf_hooks.monitorEventLoopDelay()` を読み、形式の決まり (エスケープ、`# HELP`・`# TYPE` の行、ヒストグラムの `_bucket`・`_sum`・`_count` と `le="+Inf"`) を自分で守る)
   3. OpenTelemetry の SDK と Prometheus の exporter (apps/app は `@opentelemetry/exporter-prometheus` を使っている)
 - **Selected Approach**: 1。
@@ -26,13 +27,17 @@
   - プロセスの既定の指標の名前 (`process_cpu_seconds_total`、`process_resident_memory_bytes`、`nodejs_eventloop_lag_seconds` など) は、Node のサービスで広く使われている名前で、運用者の既存のダッシュボードと警報の設定がそのまま使える。2 で同じ名前と意味を再現すると、保守するコードが増え、意味のずれを確かめる手段も無い
   - 2 は依存を増やさないが、形式の決まりを守るコードとテストを自分で持つことになる。小さくはならない
   - 3 は部品が多く、このサービスの小さな image と少ない依存の方針に合わない
-- **Trade-offs**: 本番の依存が 11 個から 12 個になる。`prom-client` は HTTP の層だけで使い、変換の子は読み込まない (`test/layers/layer-rules.ts` に足す)。
-- **Follow-up (実装のタスクで確かめること)**: `prom-client` は、いまの `pnpm-lock.yaml` にも、手元の pnpm の store にも無い。この spec を書いた環境はネットワークに出られないので、版、依存の木、ライセンスは確かめていない。入れるときに次を確かめ、対象 spec の research.md §1.4 の形で記録する: 版を固定する範囲 (ほかの依存と同じく `^`)、依存のすべてが許容的なライセンス (MIT / Apache-2.0 / BSD / ISC) であること、install のときにスクリプトを動かさないこと (`pnpm-workspace.yaml` の `allowBuilds` を広げない)、image の大きさ (いまは展開して amd64 で 259,258,880 バイト、arm64 で 277,116,416 バイト。上限 400,000,000 バイト) が大きく変わらないこと。
+- **Trade-offs**: 本番の依存が 11 個から 12 個になる。`@prometheus-io/client` は HTTP の層だけで使い、変換の子は読み込まない (`test/layers/layer-rules.ts` に足す)。
+- **npm で確かめたこと (2026-11-19)**:
+  - `@prometheus-io/client` 0.16.1 (最初の公開は 2026-08-21)。ライセンスは Apache-2.0。依存は `@opentelemetry/api` (Apache-2.0) と `tdigest` (MIT。さらに `bintrees` MIT)。Node は ^22 || ^24 || >=26 で、このサービスの >=24 に合う。install のときのスクリプトは無い
+  - `@prometheus-io/client` 15.1.3 も Apache-2.0 で、依存は同じ。非推奨で、後継が `@prometheus-io/client` である
+  - 版は 0.x なので、`^0.16.1` は 0.16.x の範囲に限られる。API が今後変わりうる点を、依存の更新のときに確かめる
+- **Follow-up (実装のタスクで確かめること)**: `@prometheus-io/client` は、いまの `pnpm-lock.yaml` にも、手元の pnpm の store にも無い。入れるときに次を確かめ、対象 spec の research.md §1.4 の形で記録する: この spec が使う API (`Registry`、`Gauge`、`Counter`、`Histogram`、プロセスの既定の指標、`registry.contentType`) が、そのままの名前で在ること。版を固定する範囲 (ほかの依存と同じく `^`)、`pnpm-lock.yaml` に入る依存の木が上の内容と一致すること、install のときにスクリプトを動かさないこと (`pnpm-workspace.yaml` の `allowBuilds` を広げない)、image の大きさ (いまは展開して amd64 で 259,258,880 バイト、arm64 で 277,116,416 バイト。上限 400,000,000 バイト) が大きく変わらないこと。
 
 ### 本番の依存を増やすときに一緒に直す場所 (確かめた)
 
-- `test/deploy/production-dependencies.spec.ts`: 本番の依存の一覧を完全一致で固定している (いまは 11 個)。`prom-client` を足し、テスト名とコメントの「eleven」を直す
-- `test/layers/layer-rules.ts` の `PACKAGE_RULES`: いまは `{ packages: ['zod', 'hono-openapi'], onlyLayers: ['http'] }`。`prom-client` を足す
+- `test/deploy/production-dependencies.spec.ts`: 本番の依存の一覧を完全一致で固定している (いまは 11 個)。`@prometheus-io/client` を足し、テスト名とコメントの「eleven」を直す
+- `test/layers/layer-rules.ts` の `PACKAGE_RULES`: いまは `{ packages: ['zod', 'hono-openapi'], onlyLayers: ['http'] }`。`@prometheus-io/client` を足す
 - `docker/Dockerfile`: 変えなくてよい。build の段の `pnpm deploy out --prod --legacy` が本番の依存を取り出すので、`package.json` と `pnpm-lock.yaml` を直せば image に入る
 - `pnpm-lock.yaml`: `pnpm install` で更新する (ほかの pnpm の実行と同時に動かさない。`.claude/rules/devcontainer.md`)。`ci-attachment-text-extractor.yml` は `pnpm-lock.yaml` の変更でも動く
 
@@ -252,7 +257,7 @@ open sibling mem: ERROR EACCES
 
 ## Risks & Mitigations
 
-- `prom-client` の依存とライセンスを、この spec を書いた時点では確かめていない — 入れるタスクで確かめ、許容的でなければ人に諮る (§1)
+- `@prometheus-io/client` は 0.x で、最初の公開から 3 か月ほどしか経っていない — API の名前を入れるタスクで確かめ、版は 0.16.x に固定する (§1)。ライセンスは確かめ済みで Apache-2.0 (依存は Apache-2.0 と MIT)
 - ZIP を断る範囲を広げたことで、いままで anydoc が読めた変な形の PPTX / XLSX が `extraction_failed` になる — 実験では、上限を回避する形以外は anydoc も読めなかった。zip64 の既存のテストは残す (§3.2)
 - `/readyz` の結果が最大 10 秒古い — 確認の間隔 (20 秒) より短く、kubelet の確認は普段は新しい結果を受け取る (§4)
 - `/metrics` がトークンなしで開いている — 中身に利用者のデータは無い。内向きの通信の制限で守る (design.md §Security Considerations)
@@ -264,4 +269,4 @@ open sibling mem: ERROR EACCES
 - `.claude/rules/coding-style.md` — コメントの規則
 - `.kiro/specs/attachment-search/roadmap.md` — (f)、(h)
 - `.kiro/specs/attachment-search-text-extractor/research.md` §5.4 (以前の動きとの違いの記録の形)、§5.6 (生成クライアントの名前)、§5.7 (ログ)、§8 (コメントの番号の対応表)
-- Prometheus のテキスト形式 (exposition format) — `prom-client` の `registry.contentType` が返す `text/plain; version=0.0.4` の形
+- Prometheus のテキスト形式 (exposition format) — `@prometheus-io/client` の `registry.contentType` が返す `text/plain; version=0.0.4` の形
