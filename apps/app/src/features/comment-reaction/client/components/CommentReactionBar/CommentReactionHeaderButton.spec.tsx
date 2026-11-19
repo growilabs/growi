@@ -174,6 +174,6 @@ describe('CommentReactionHeaderButton', () => {
 
     renderButton();
 
-    expect((addButton() as HTMLButtonElement).disabled).toBe(true);
+    expect(addButton()).toHaveAttribute('aria-disabled', 'true');
   });
 });

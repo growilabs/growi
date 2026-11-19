@@ -44,9 +44,17 @@ export const AddReactionButton = ({
   const ownRef = useRef<HTMLSpanElement>(null);
   const wrapperRef = rootRef ?? ownRef;
 
+  const isLimitReached = chipCount >= MAX_REACTION_KINDS_PER_COMMENT;
+  // aria-disabled rather than disabled, as on a chip: a disabled button cannot take focus,
+  // so a keyboard user would never reach the tooltip saying the limit is reached.
+  const isDisabled = isLimitReached || isUpdating;
+
   const openPicker = useCallback(() => {
+    if (isDisabled) {
+      return;
+    }
     setIsPickerOpen(true);
-  }, []);
+  }, [isDisabled]);
 
   const closePicker = useCallback(() => {
     setIsPickerOpen(false);
@@ -68,11 +76,8 @@ export const AddReactionButton = ({
     return null;
   }
 
-  const isLimitReached = chipCount >= MAX_REACTION_KINDS_PER_COMMENT;
-
   return (
     <>
-      {/* A disabled button emits no mouse events, so the tooltip hangs off its wrapper. */}
       <span
         ref={wrapperRef}
         className={
@@ -87,7 +92,7 @@ export const AddReactionButton = ({
           aria-label={t('comment_reaction.add_reaction')}
           aria-haspopup="dialog"
           {...reactionAddButtonAttributes}
-          disabled={isLimitReached || isUpdating}
+          aria-disabled={isDisabled || undefined}
           onClick={openPicker}
         >
           <span className="material-symbols-outlined fs-5" aria-hidden="true">

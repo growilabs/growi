@@ -213,7 +213,9 @@ apps/app/src/features/comment-reaction/
     │   ├── use-comment-reactions.ts          # コメント一覧のキャッシュから1コメント分のチップを読み、PUT の応答でキャッシュの1件を置き換える
     │   ├── use-comment-reactions.spec.tsx
     │   ├── use-can-react-to-comments.ts      # 画面上でリアクションできるかの判定
-    │   └── use-can-react-to-comments.spec.ts
+    │   ├── use-can-react-to-comments.spec.ts
+    │   ├── use-can-hover.ts                  # ホバーできる端末か（`(hover: hover)`。追加ボタンの出し分けの CSS と同じ条件）
+    │   └── use-can-hover.spec.ts
     ├── utils/
     │   ├── classify-reaction-update-failure.ts      # PUT の失敗 → 利用者に示す失敗の種類（純粋関数）
     │   └── classify-reaction-update-failure.spec.ts
@@ -225,9 +227,9 @@ apps/app/src/features/comment-reaction/
             ├── CommentReactionHeaderButton.tsx  # リアクションが 0 件のコメントのヘッダー用「リアクション追加」
             ├── CommentReactionHeaderButton.spec.tsx
             ├── CommentReactionBar.module.scss
-            ├── ReactionChip.tsx             # 絵文字の部分（追加・解除）と人数の部分（利用者一覧を開く）、自分の強調
+            ├── ReactionChip.tsx             # 絵文字と人数を1つにしたボタン（押すと追加・解除）、自分の強調
             ├── ReactionChip.spec.tsx
-            ├── ReactionUsersPopover.tsx     # 人数の部分から開く、リアクションした利用者の一覧
+            ├── ReactionUsersPopover.tsx     # チップへのホバー・フォーカスで出す、リアクションした利用者の一覧（ホバーできる端末だけ）
             ├── ReactionUsersPopover.spec.tsx
             ├── AddReactionButton.tsx        # 「リアクション追加」とピッカーの開閉、上限時の無効化
             └── AddReactionButton.spec.tsx
@@ -355,7 +357,7 @@ graph TB
 |-------------|---------|------------|------------|-------|
 | 1.1, 1.2, 1.3 | 絵文字ごとのチップ、人数、肌の色ごとに別チップ | summarizeReactions, ReactionChip | `ReactionChip.emoji` / `count` | — |
 | 1.4 | 自分のリアクションの区別 | summarizeReactions, ReactionChip | `ReactionChip.reactedByMe`、`aria-pressed` | — |
-| 1.5, 1.10 | リアクションした利用者の表示、退会者は投稿者と同じ規則 | summarizeReactions, ReactionChip, ReactionUsersPopover | `ReactionUser`（`ReactionUserSummary` または ID 文字列）、人数の部分のクリック・タップで開く Popover | — |
+| 1.5, 1.10 | リアクションした利用者の表示、退会者は投稿者と同じ規則 | summarizeReactions, ReactionChip, ReactionUsersPopover, useCanHover | `ReactionUser`（`ReactionUserSummary` または ID 文字列）、ホバーできる端末でチップへのホバー・フォーカスで開く Popover | — |
 | 1.6 | 最初に付いた順 | summarizeReactions | チップの並び（残っている行の最小 `createdAt` の昇順） | — |
 | 1.7 | リアクションが無ければチップなし | CommentReactionBar | `reactions: []` | — |
 | 1.8 | 末尾のコメント欄とインラインコメントの両方 | CommentReactionBar の差し込み先 | `CommentCard.footer`（ポップオーバーは本文の下） | — |
@@ -381,7 +383,7 @@ graph TB
 | 5.6, 5.7 | 共有リンク・ゲストは手段なし | useCanReactToComments, update route | `loginRequiredStrictly`、「リアクション追加」非表示、チップは非活性 | — |
 | 5.8 | ごみ箱のページでも追加・解除できる | useCanReactToComments | ごみ箱かどうかを判定に使わない（クライアントの判定も、サーバーの update route も、ごみ箱かどうかで分岐しない） | — |
 | 6.1 | コメントを読める相手と同じ範囲で返す | comment の list / get route, loadReactionChips | `ICommentListItem.reactions` | 読み取り |
-| 6.2 | ゲスト・共有リンクにも読み取り専用で表示 | CommentReactionBar, ReactionChip, ReactionUsersPopover | `canReact = false`（絵文字の部分は押せない。人数の部分から利用者一覧を開ける） | — |
+| 6.2 | ゲスト・共有リンクにも読み取り専用で表示 | CommentReactionBar, ReactionChip, ReactionUsersPopover | `canReact = false`（チップは `aria-disabled` で、押しても追加・解除しない。ホバーできる端末ではホバー・フォーカスで利用者一覧を見られる） | — |
 | 6.3 | 共有リンク画面・検索プレビューでインラインのリアクションを出さない | 差し込み先の選定 | インラインコメントの部品が描画されない画面には出ない | — |
 | 6.4 | 利用者情報は4項目 | summarizeReactions, loadReactionChips | `ReactionUserSummary`、`toCreatorSummary` を引数で渡す | — |
 | 6.5 | 取得失敗はコメント表示を妨げない | comment の list / get route, CommentReactionBar | `reactions: null`、バーを描画しない | 読み取り |
@@ -425,7 +427,7 @@ graph TB
 | useCanReactToComments | Client / hook | 画面上のリアクション可否 | 5.4–5.8, 6.2 | context フック（P0） | State |
 | CommentReactionBar | Client / UI | 1コメント分のチップ列（1件以上あるとき末尾に「リアクション追加」） | 1.1–1.8, 2.3, 3.1, 3.7, 6.2, 6.3, 6.5 | hooks（P0） | — |
 | CommentReactionHeaderButton | Client / UI | リアクションが 0 件のコメントのヘッダー用「リアクション追加」 | 3.1, 3.7, 5.4, 5.6, 6.2, 6.5 | hooks（P0）、AddReactionButton（P0） | — |
-| ReactionChip | Client / UI | チップの表示、絵文字の部分の押下（追加・解除）、人数の部分の押下（利用者一覧） | 1.2, 1.4, 1.5, 1.10, 2.1, 2.2, 6.2 | reaction-key（P0）、ReactionUsersPopover（P0） | — |
+| ReactionChip | Client / UI | チップの表示、押下（追加・解除）、ホバー・フォーカス（利用者一覧） | 1.2, 1.4, 1.5, 1.10, 2.1, 2.2, 6.2 | reaction-key（P0）、ReactionUsersPopover（P0）、useCanHover（P0） | — |
 | ReactionUsersPopover | Client / UI | リアクションした利用者の一覧 | 1.5, 1.10, 6.2 | reactstrap `Popover`（P0） | — |
 | AddReactionButton | Client / UI | 「リアクション追加」とピッカー、上限時の無効化 | 3.1–3.6, 7.2 | EmojiPicker（P0） | — |
 | EmojiPicker | editor package / UI | 遅延読み込みのピッカー | 3.2, 3.5, 3.6 | emoji-mart（P0） | — |
@@ -867,13 +869,16 @@ type CommentReactionHeaderButtonProps = {
 - **表示の出し分けはコメント側が持つ**: ヘッダーのボタンは、コメントにマウスを乗せたとき、またはボタンにキーボードでフォーカスしたときだけ表示する（ホバーできない端末と、本文のポップオーバーでは常に表示）。「どの要素にマウスを乗せると出るか」はコメント側の構造の知識なので、`className` で渡すクラス（`reaction-add-control`）を、コメント側の SCSS が `_comment-inheritance.scss` の mixin で定義する。リアクション側の SCSS は、コメント側のクラス名（`.page-comment-main` など）を参照しない。
 
 **Implementation Notes（ReactionChip / AddReactionButton / EmojiPicker）**
-- ReactionChip: 1つのチップを、見た目は1つの枠のまま、押せる部分を2つに分ける（要件 1.5。マウスでもタッチ端末でも同じ操作で、追加・解除と利用者の確認を区別できるようにする）。
-  - **絵文字の部分**: `canReact` が true のときは `button` 要素で、押すと追加・解除する（要件 2.1、2.2）。`aria-pressed={reactedByMe}`、`aria-label` に絵文字名を入れる。`canReact` が false のときは押せない要素（`span`）にする。グリフは `resolveReactionGlyph`。解決できない（絵文字データの更新で消えた）ときは `:<shortcode>:` の文字列を出す。
-  - **人数の部分**: `canReact` によらず、常に `button` 要素にする。押す（クリック・タップ）と `ReactionUsersPopover` を開き、もう一度押すか外側を押すと閉じる。追加・解除の API は呼ばない。`aria-label` に人数（「N 人がリアクション」）を入れ、`aria-haspopup="dialog"` と `aria-expanded` を付ける。ゲスト・共有リンク閲覧者も、この部分から利用者一覧を見られる（要件 6.2）。
-  - 2つの部分は区切り線を引かず、絵文字の右側と人数の左側の余白を 0 にして詰める。絵文字だけのチップを想定して、高さは `min-height: 1.5rem` までにする（押せる部分は2つのまま）。
-  - Popover の対象は、人数ボタンへの ref（`ReactionUsersPopover` の `target` は `RefObject<HTMLElement>`）。`useId()` の文字列はコロンを含み、reactstrap がセレクターとして解決できないため使わない（`apps/app/.claude/rules/ui-pitfalls.md`）。
-- ReactionUsersPopover: reactstrap の `Popover`（`trigger="legacy"`。クリック・タップで開き、外側のクリック・タップで閉じる）で、チップの `users` を `createdAt` の昇順のまま並べる。表示名は、`name` があれば `name`、無ければ `username`、ID 文字列ならそのまま（要件 1.10）。人数が多いときは、高さの上限を決めて中をスクロールさせる。
-- AddReactionButton: 見た目は Material Symbols Outlined の `add_reaction`（`material-symbols-outlined fs-5`、`aria-hidden`）で、読み上げ名は `button` の `aria-label`（`comment_reaction.add_reaction`）が担う。高さはチップと同じ `min-height: 1.5rem`。自身は常に表示する（隠す処理は持たない）。リアクションが 0 件のコメントでは `CommentReactionHeaderButton` がヘッダーに置き、ホストが渡す `className` で、コメントにマウスを乗せたとき、またはこのボタンにキーボードでフォーカスしたときだけ表示される（ホバーできない端末では常に表示。隠すのは `opacity: 0` で行い、`display` や `visibility` は使わない。Tab で到達でき、読み上げの名前も変わらない。ヘッダーは本文と重ならないので、`pointer-events` は触らない）。1 件以上あるコメントでは `CommentReactionBar` がチップ行の末尾に常に表示する。ホバーの範囲は `.page-comment-main`（ページ末尾のコメント、インラインコメントとその返信）で、コメント1件ごとに独立している。本文のポップオーバーでは、編集・削除と同じく隠さず常に表示する。`canReact` のときだけ描画する（要件 3.1、5.4、5.6、5.7）。ツールチップは常に表示し（ホバーとキーボードフォーカス）、通常は `comment_reaction.add_reaction` を示す。チップの数が `MAX_REACTION_KINDS_PER_COMMENT` 以上なら無効化し、ツールチップの文言を `comment_reaction.kind_limit_reached` に切り替えて上限に達したことを示す。サーバーの 409 を受けた場合は、`useCommentReactions` が同じ文言のトーストを出して一覧を取り直す（要件 7.2）。ピッカーの `onSelect` は `fromPickerSelection` でキーにし、`setReaction(key, true)` を呼ぶ（要件 3.3、3.4）。閉じたら何もしない（要件 3.6）。
+- ReactionChip: 1つのチップを、絵文字と人数を並べた1つの `button` 要素にする（Slack と同じ見た目。押せる部分を分けない）。
+  - **押下**: `canReact` が true で更新中でないとき、押すと追加・解除する（要件 2.1、2.2）。`aria-pressed={reactedByMe}`、`aria-label` に絵文字名を入れ、人数（「N 人がリアクション」）は見えない文言を `aria-describedby` でつなぐ（`useId()` は `aria-describedby` には使える）。ホバーできる端末では、この文言の後ろに利用者の表示名を「: 名前, 名前」の形で続け、フォーカスしたときに読み上げで誰がリアクションしたかがわかるようにする（要件 1.5）。Popover は閉じている間は DOM に無く、開いても `body` 直下に描画されてチップとつながらないので、読み上げが届くのはチップ自身の説明文だけである。グリフは `resolveReactionGlyph`。解決できない（絵文字データの更新で消えた）ときは `:<shortcode>:` の文字列を出す。
+  - **押せないとき**: `canReact` が false のとき（要件 6.2）と更新中は、`disabled` ではなく `aria-disabled="true"` にして、押しても何もしない。`disabled` のボタンはマウスイベントを出さないので、ホバーで利用者一覧を出せなくなるため。読み取り専用でもボタンのままにして、キーボードのフォーカスで一覧に届くようにする。更新中は `aria-busy` も付け、見た目を薄くする。
+  - **利用者の一覧**: ホバーできる端末（`useCanHover`）でだけ `ReactionUsersPopover` を描画し、チップにマウスを乗せたとき、またはキーボードでフォーカスしたときに出す（要件 1.5）。ホバーできない端末では描画しない。タップでフォーカスが移るとフォーカスで開いてしまうため、トリガーを残したまま隠すのではなく、描画そのものをしない。
+  - 枠は区切り線を引かず、絵文字と人数の間の余白を 0 にして詰める。絵文字だけのチップを想定して、高さは `min-height: 1.5rem` までにする。
+  - 押せるチップは、ホバーで背景を変える。自分のチップは灰色に置き換えず、同系色のまま一段濃く（`--bs-primary-border-subtle`）して、ホバー中も自分のリアクションの印を保つ。押せないチップは変えない。
+  - Popover の対象は、チップのボタンへの ref（`ReactionUsersPopover` の `target` は `RefObject<HTMLElement>`）。`useId()` の文字列はコロンを含み、reactstrap がセレクターとして解決できないため使わない（`apps/app/.claude/rules/ui-pitfalls.md`）。
+- ReactionUsersPopover: reactstrap の `Popover`（`trigger="hover focus"`。マウスを乗せるかフォーカスすると開き、離れると閉じる。Popover の中にマウスを移しても閉じないので、人数が多いときに中をスクロールできる。開閉の状態は部品が持つ）。Popover の中は、クリックしても閉じず、表示名を選択・コピーできる。そのために Popover の内側を `tabIndex={-1}` にしてフォーカスを受け取れるようにし、中を押すとフォーカスが Popover に移るようにする。`focus` のトリガーはチップからフォーカスが外れた瞬間に閉じるが、フォーカスの移り先（`relatedTarget`）が Popover の中のときだけ、その閉じる要求を無視する。`mousedown` の既定の動作を止めてフォーカスをチップに残す方法は、文字の選択も止めてしまうので使わない。中を押した後も、マウスが Popover から離れるか、Escape を押すと閉じる）で、チップの `users` を `createdAt` の昇順のまま並べる。表示名は、`name` があれば `name`、無ければ `username`、ID 文字列ならそのまま（要件 1.10）。人数が多いときは、高さの上限を決めて中をスクロールさせる。
+- useCanHover: `matchMedia('(hover: hover)')` の結果を返し、変化を購読する。サーバーの描画とハイドレーションでは `false`（一覧を出さない）。追加ボタンの出し分け（`_comment-inheritance.scss` の `@media (hover: hover)`）と同じ条件にそろえ、タッチ対応のノート PC などはマウスでのホバーで一覧が出る。そうした端末で指でタップすると、ブラウザが出す互換のマウスイベント（`mouseover`）で一覧が開くが、タップの直後に `mouseout` も出るので、閉じるまでの待ち時間（200ms）の後に閉じる。一覧が一瞬出るだけで操作は妨げないため、入力の種類（`pointerType`）で開閉を絞る制御は持たない。
+- AddReactionButton: 見た目は Material Symbols Outlined の `add_reaction`（`material-symbols-outlined fs-5`、`aria-hidden`）で、読み上げ名は `button` の `aria-label`（`comment_reaction.add_reaction`）が担う。高さはチップと同じ `min-height: 1.5rem`。自身は常に表示する（隠す処理は持たない）。リアクションが 0 件のコメントでは `CommentReactionHeaderButton` がヘッダーに置き、ホストが渡す `className` で、コメントにマウスを乗せたとき、またはこのボタンにキーボードでフォーカスしたときだけ表示される（ホバーできない端末では常に表示。隠すのは `opacity: 0` で行い、`display` や `visibility` は使わない。Tab で到達でき、読み上げの名前も変わらない。ヘッダーは本文と重ならないので、`pointer-events` は触らない）。1 件以上あるコメントでは `CommentReactionBar` がチップ行の末尾に常に表示する。ホバーの範囲は `.page-comment-main`（ページ末尾のコメント、インラインコメントとその返信）で、コメント1件ごとに独立している。本文のポップオーバーでは、編集・削除と同じく隠さず常に表示する。`canReact` のときだけ描画する（要件 3.1、5.4、5.6、5.7）。ツールチップは常に表示し（ホバーとキーボードフォーカス）、通常は `comment_reaction.add_reaction` を示す。チップの数が `MAX_REACTION_KINDS_PER_COMMENT` 以上のときと更新中は無効化し、ツールチップの文言を、上限のときは `comment_reaction.kind_limit_reached` に切り替えて上限に達したことを示す。無効化はチップと同じく `disabled` ではなく `aria-disabled="true"` にして、押してもピッカーを開かない。`disabled` のボタンはフォーカスを受け取れないので、キーボードの利用者が上限の理由のツールチップに届かなくなるため。サーバーの 409 を受けた場合は、`useCommentReactions` が同じ文言のトーストを出して一覧を取り直す（要件 7.2）。ピッカーの `onSelect` は `fromPickerSelection` でキーにし、`setReaction(key, true)` を呼ぶ（要件 3.3、3.4）。閉じたら何もしない（要件 3.6）。
 - EmojiPicker（`packages/editor`）: props は `{ isOpen: boolean; onSelect: (selection: EmojiPickerSelection) => void; onClose: () => void; theme?: 'light' | 'dark' | 'auto' }`。`EmojiPickerSelection` は絵文字の種類を `kind` で見分ける判別ユニオンで、いまのメンバーは `{ kind: 'native'; id: string; skin?: number }` だけ。初めて開いたときに `@emoji-mart/react` と `@emoji-mart/data` を動的 import する（ページ表示時の読み込みを増やさない）。読み込みに失敗したときはエラーを `console.error` に記録して `onClose` を呼ぶ。親の開閉の状態が閉に戻るので、次に開いたときに読み込みをやり直せる（「リアクション追加」が効かなくなったままにならない）。`@emoji-mart/data` の既定の export は `sets/15/native.json` で、`@growi/emoji-mart-data` の抽出元（サーバーの検証の根拠）と同じデータなので、ピッカーで選べる絵文字はすべてサーバーの検証を通る。reactstrap の `Modal`（中央寄せ）で表示し、`modal-content` の背景・枠線・影（`box-shadow`）はすべて消して、ピッカーだけが見えるようにし、スマートフォンでも使える。`skinTonePosition` を有効にする（要件 3.5）。
 - 文言: `comment_reaction.add_reaction`、`comment_reaction.reacted_by`、`comment_reaction.reacted_count`、`comment_reaction.kind_limit_reached`、`comment_reaction.comment_unavailable`、`comment_reaction.update_failed` を5言語に追加する。
 
@@ -930,7 +935,11 @@ type CommentReactionHeaderButtonProps = {
 - `classifyReactionUpdateFailure`: `reaction-kind-limit-exceeded` → `kind-limit-exceeded`、`notfound_or_forbidden` → `comment-unavailable`、`validation_failed`・`invalid-reaction-emoji`・`code` の無いエラー・配列でない値・通信の失敗 → `failed` になること。
 - `useCanReactToComments`: ゲスト、共有リンク、閲覧専用（許可あり／なし）、`isReadOnly`、ごみ箱のページでも判定が変わらないこと（要件 5.4〜5.8、6.2）。
 - `CommentReactionHeaderButton`: 0 件のときだけ「リアクション追加」が描画され、1 件以上・`canReact` が false・`chips` が `null` や読み込み中では何も描画されないこと、Tab で到達できること、選んだ絵文字で追加が要求されること、更新中は無効になること、渡した `className` が最も外側の要素に付くこと、最初のリアクションの追加でヘッダーのボタンが消えたあと、フォーカスがチップ行の末尾の追加ボタンへ移ること（同じコメントが2か所に出ているときは、追加を始めた側へ移ること、利用者が別の要素へ動かしていたら動かさないこと、失敗して行が現れないときは何も動かさないこと）。コメント側のヘッダー（`Comment`、`InlineCommentItem`（広い画面と狭い画面）、`InlineCommentReplies`、`InlineCommentPopoverEntry`）に置かれること、折りたたみ表示には無いこと、ポップオーバーでは表示の出し分けのクラスを渡さないこと。表示の出し分け（`opacity`、ホバー、フォーカス、本文と重ならない位置）は CSS の挙動なので E2E で確かめる（要件 3.1、3.7）。
-- `CommentReactionBar`: チップと人数の表示、自分のチップの `aria-pressed`、絵文字の部分を押すと API が呼ばれること、人数の部分を押すと利用者一覧（表示名、`username`、ID 文字列）が開き API は呼ばれないこと、`canReact` が false のとき「リアクション追加」が無く、絵文字の部分を押しても API を呼ばず、人数の部分からは利用者一覧が開くこと、上限で「リアクション追加」が無効になること、チップが無ければ（読み取り専用でなくても）何も描画しないこと、`chips` が `null` なら何も描画しないこと（要件 1.1〜1.7、1.10、3.1、6.2、6.5、7.2）。
+- `ReactionChip`: 人数の表示、自分のチップの `aria-pressed`、押すと追加・解除が要求されること、`canReact` が false のときと更新中は押しても要求されないこと、ホバーできる端末ではホバーとフォーカスで利用者一覧が開き、離れると閉じ、どちらも要求しないこと（読み取り専用と更新中も同じ）、ホバーできない端末では一覧が出ないこと、説明文が人数と（ホバーできる端末では）利用者の表示名を持つこと（要件 1.2、1.4、1.5、2.1、2.2、6.2）。
+- `ReactionUsersPopover`: 利用者の表示名を渡された順に並べること、中をクリックしても閉じずフォーカスが中に移ること、フォーカスが外へ移ると閉じること（要件 1.5）。
+- `toReactionUserDisplayName`: `name` を優先し、空なら `username`、ID 文字列ならそのまま返すこと（要件 1.10）。表示名の規則はここだけで確かめ、チップと一覧のテストは名前のある利用者で表示名を並べることだけを確かめる。
+- `useCanHover`: `(hover: hover)` の結果を返し、変化に追従すること。
+- `CommentReactionBar`: チップと人数の表示、自分のチップの `aria-pressed`、チップを押すと API が呼ばれること、`canReact` が false のときと更新中はチップを押しても API を呼ばないこと、`canReact` が false のとき「リアクション追加」が無いこと、上限で「リアクション追加」が無効になること、チップが無ければ（読み取り専用でなくても）何も描画しないこと、`chips` が `null` なら何も描画しないこと（要件 1.1〜1.7、3.1、6.2、6.5、7.2）。チップ単体の振る舞い（利用者一覧、押せないときの属性）はチップのテストに任せ、ここではフックの値がチップと追加ボタンに届くことを、押したときに API が呼ばれるかどうかで確かめる。
 - `overwrite-params/comment-reactions`: 24 桁の16進文字列が ObjectId になること、不正な値はそのまま返ること、`emoji` の別名（肌の色つきを含む）が正規のキーになり、正規化できない値はそのまま返ること、`generateOverwriteParams('commentreactions', ...)` がこの params を返すこと（要件 10.2）。
 - `@growi/emoji-mart-data`: 既存の `skins[0]` の値が拡張前と一致すること、肌の色対応の絵文字が6件の `skins` を持つこと、`aliases` の存在。`@emoji-mart/data` の既定の export のすべての id（と肌の色）が `normalizeReactionKey` を通ること（ピッカーとサーバーの検証のずれの検出）。
 
@@ -959,7 +968,8 @@ type CommentReactionHeaderButtonProps = {
 - ピッカーで肌の色を変えて同じ絵文字を付けると、別のチップになること（要件 1.3、3.5）。
 - インラインコメントの返信にリアクションを付けられ、本文のポップオーバーと末尾の一覧の両方に反映されること（要件 1.8、3.7）。
 - 共有リンクの画面で、通常コメントのチップは見えるが「リアクション追加」が無く、インラインコメントのリアクションは出ないこと（要件 5.6、6.2、6.3）。
-- スマートフォンの画面幅とタッチ操作で、チップの人数の部分をタップすると利用者一覧が開き、リアクションが変わらないこと。絵文字の部分をタップすると追加・解除されること（要件 1.5、2.1、2.2）。
+- マウスでチップにマウスを乗せると利用者一覧が開き、離すと閉じ、リアクションが変わらないこと。キーボードでチップにフォーカスしても開くこと（要件 1.5）。
+- スマートフォンの画面幅とタッチ操作で、チップをタップすると追加・解除され、利用者一覧は出ないこと（要件 1.5、2.1、2.2）。
 
 ## Security Considerations
 - 書き込みは、ログイン、閲覧専用ユーザーの設定、対象コメントのページの閲覧権限の3段で守る。コメント ID だけを知っている利用者が、閲覧権限の無いページのコメントにリアクションすることを防ぐ。
@@ -995,7 +1005,7 @@ type CommentReactionHeaderButtonProps = {
     - 既定の設定と Small の環境では記録されない。記録したい環境は、詳細度を Medium 以上にするか、`AUDIT_LOG_ADDITIONAL_ACTIONS` に `COMMENT_REACTION_ADD,COMMENT_REACTION_REMOVE` を足せば、リアクションだけを記録できる。
   - どちらの案でも、要件 9.4（状態を変えない要求・拒否は記録しない）と 9.5（通知しない。`EssentialActionGroup` に入れない）は変わらない。
 - **種類数の上限の厳密さ**: 同時に別々の新しい絵文字が追加されると、上限を超えうる（research.md の Decision）。
-- **チップの押し間違い（要件 1.5、2.1、2.2）**: 利用者一覧は人数の部分を押して開き、追加・解除は絵文字の部分を押して行う。そのため、マウスでもタッチ端末でも、リアクションできる利用者もできない利用者も、同じ操作で一覧を見られる。一方で、小さなチップの中に押せる部分が2つ並ぶので、タッチ端末では隣の部分を押し間違えうる（一覧を見ようとして、リアクションを外してしまう）。区切り線を無くして詰めたチップ（高さ `min-height: 1.5rem`）では押せる範囲が小さくなるが、このトレードオフはデザインの指定として受け入れる。絵文字と人数で位置が分かれていることで減らし、E2E で確かめる。押し間違えても、もう一度押せば元に戻せる。マウスで押さずに一覧を見る手段（hover で出すツールチップ）は、v1 では足さない。
+- **タッチ端末では利用者を見られない（要件 1.5）**: チップは1つのボタンで、押すと追加・解除し、利用者一覧はホバーとフォーカスで出す。タッチ端末にはホバーが無いので、誰がリアクションしたかは見られない（人数と自分のリアクションの区別は見える）。主にパソコンのブラウザで使われることを前提に、デザインの判断として受け入れる（research.md の Decision）。一覧を見ようとしてリアクションを外す押し間違いは、押せる部分が1つなので起きない。
 - **コメントの取得とリアクションの結合**: リアクションがコメントの応答に載るので、リアクションの不具合がコメントの表示に波及しうる。取り込みの失敗は `reactions: null` に閉じ込めるが、集計の性能劣化はコメント一覧の応答時間に直接効く。
 - **応答の要求者依存**: `reactedByMe` は要求者ごとに変わるので、コメント一覧の応答も要求者ごとになる。もともと閲覧権限で要求者ごとの応答なので、新たな制約は生まない。
 - **Slack 名との対応**: emoji-mart の id と Slack のショートコードが一部ずれる可能性がある。v1 では Slack と連携しないため実害はないが、Slack 連携のスペックで対応表を検証する。
