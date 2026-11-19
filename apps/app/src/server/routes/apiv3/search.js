@@ -2,6 +2,7 @@ import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 
 import { AuditlogEsSyncStatus } from '~/features/auditlog-es-sync/server';
+import { isAttachmentFullTextSearchEnabled } from '~/features/search-attachments/server/services/is-attachment-full-text-search-enabled';
 import { SupportedAction } from '~/interfaces/activity';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import adminRequiredFactory from '~/server/middlewares/admin-required';
@@ -16,9 +17,6 @@ const logger = loggerFactory('growi:routes:apiv3:search');
 
 import express from 'express';
 import { body } from 'express-validator';
-
-const router = express.Router();
-
 import noCache from 'nocache';
 
 /**
@@ -107,6 +105,8 @@ import noCache from 'nocache';
  * @returns {import('express').Router} router
  */
 export const setup = (crowi) => {
+  const router = express.Router();
+
   const loginRequired = loginRequiredFactory(crowi);
   const adminRequired = adminRequiredFactory(crowi);
   const addActivity = generateAddActivityMiddleware(crowi);
@@ -141,7 +141,7 @@ export const setup = (crowi) => {
     }),
     loginRequired,
     adminRequired,
-    async (req, res) => {
+    async (_req, res) => {
       const { searchService } = crowi;
 
       if (!searchService.isConfigured) {
@@ -184,7 +184,7 @@ export const setup = (crowi) => {
     loginRequired,
     adminRequired,
     addActivity,
-    async (req, res) => {
+    async (_req, res) => {
       const { searchService } = crowi;
 
       if (!searchService.isConfigured) {
@@ -213,6 +213,7 @@ export const setup = (crowi) => {
 
   const validatorForPutIndices = [
     body('operation').isString().isIn(['rebuild', 'normalize']),
+    body('includeAttachments').optional().isBoolean(),
   ];
 
   /**
@@ -235,6 +236,12 @@ export const setup = (crowi) => {
    *                    * `normalize` - Normalize indices
    *                    * `rebuild` - Rebuild indices
    *                  enum: [normalize, rebuild]
+   *                includeAttachments:
+   *                  type: boolean
+   *                  description: >
+   *                    With `rebuild`, also rebuild the attachment full-text index after the pages.
+   *                    The response does not wait for completion; progress and the result are
+   *                    sent over Socket.io (`finishAddAttachment` / `attachmentRebuildingFailed`).
    *      responses:
    *        200:
    *          description: Return 200
@@ -245,6 +252,16 @@ export const setup = (crowi) => {
    *                  message:
    *                    type: string
    *                    description: Operation is successfully processed, or requested
+   *        409:
+   *          description: >
+   *            `rebuild_in_progress` — a rebuild with `includeAttachments` is already running
+   *        400:
+   *          description: >
+   *            `search-service-unconfigured` / `search-service-unreachable`, or invalid parameters
+   *        503:
+   *          description: >
+   *            `feature_disabled` — `includeAttachments` was requested while attachment
+   *            full-text search is disabled — or the operation itself failed
    */
   router.put(
     '/indices',
@@ -258,6 +275,7 @@ export const setup = (crowi) => {
     apiV3FormValidator,
     async (req, res) => {
       const operation = req.body.operation;
+      const includeAttachments = req.body.includeAttachments === true;
 
       // @type {import('~/server/service/search').SearchService}
       const { searchService } = crowi;
@@ -293,6 +311,56 @@ export const setup = (crowi) => {
               .status(200)
               .send({ message: 'Operation is successfully processed.' });
           case 'rebuild':
+            if (includeAttachments) {
+              // Guard: attachment search feature must be enabled
+              if (
+                !isAttachmentFullTextSearchEnabled(searchService.isConfigured)
+              ) {
+                return res.apiv3Err(
+                  new ErrorV3(
+                    'Attachment full-text search feature is disabled',
+                    'feature_disabled',
+                  ),
+                  503,
+                );
+              }
+
+              // Optional on Crowi: unset when the attachment search module was not wired
+              const batch = crowi.attachmentReindexBatch;
+              if (batch == null) {
+                return res.apiv3Err(
+                  new ErrorV3(
+                    'Attachment reindex batch service is not available',
+                    'feature_disabled',
+                  ),
+                  503,
+                );
+              }
+
+              // NOT wait the processing is terminated
+              const isStarted = batch.startRebuild(() =>
+                searchService.rebuildIndex(true),
+              );
+              if (!isStarted) {
+                return res.apiv3Err(
+                  new ErrorV3(
+                    'A rebuild including attachments is already running',
+                    'rebuild_in_progress',
+                  ),
+                  409,
+                );
+              }
+
+              activityEvent.emit('update', res.locals.activity._id, {
+                action: SupportedAction.ACTION_ADMIN_SEARCH_INDICES_REBUILD,
+              });
+
+              return res
+                .status(200)
+                .send({ message: 'Operation is successfully requested.' });
+            }
+
+            // includeAttachments=false: existing fire-and-forget page rebuild
             // NOT wait the processing is terminated
             searchService.rebuildIndex(true);
 

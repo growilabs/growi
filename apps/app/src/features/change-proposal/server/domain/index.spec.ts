@@ -4,15 +4,23 @@ describe('change-proposal domain barrel', () => {
   it('exports the functions of the judgement files', () => {
     expect(Object.keys(domain).sort()).toEqual(
       [
+        'activeReviewers',
         'buildProposalLinks',
         'buildRevertOperations',
         'computeAchievement',
+        'dedupeReviewerInputs',
         'deriveProposalStatus',
+        'deriveViewerRole',
+        'deriveVisibleStage',
         'expandApprovalTargets',
+        'hasForeignReviewer',
         'isMovableSourcePath',
         'isOwnPageForAutoApply',
+        'isReviewer',
         'judgeRevertability',
         'planApplyOrder',
+        'resolveAncestors',
+        'reviewScopeOf',
         'selectAutoApplyTargets',
         'selectNotifiedPageIds',
         'selectVisibleOperations',

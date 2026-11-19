@@ -1081,12 +1081,16 @@ schema.statics.findParentByPath = async function (
 /*
  * Utils from obsolete-page.js
  */
+/**
+ * Resolves with the stored page; its `revision` is the new revision's id,
+ * left unpopulated.
+ */
 export async function pushRevision(
   pageData: HydratedDocument<PageDocument>,
   newRevisionData,
   user,
   options?: { readonly expectedRevisionId?: ObjectIdLike },
-) {
+): Promise<HydratedDocument<PageDocument>> {
   const newRevision = await prisma.revisions.create({ data: newRevisionData });
 
   pageData.revision = newRevision._id;
@@ -1104,9 +1108,8 @@ export async function pushRevision(
     };
   }
 
-  let savedPage: HydratedDocument<PageDocument>;
   try {
-    savedPage = await pageData.save();
+    return await pageData.save();
   } catch (err) {
     if (
       expectedRevisionId != null &&
@@ -1124,14 +1127,6 @@ export async function pushRevision(
   } finally {
     pageData.$where = {};
   }
-
-  // Setting `revision` to a bare id (above) leaves the path unpopulated.
-  // The old Mongoose flow assigned a hydrated Revision document here instead,
-  // which Mongoose treats as already-populated; recreate that by populating
-  // for real -- the 'Revision' mongoose model still queries the same
-  // `revisions` collection that Prisma writes to.
-  // biome-ignore lint/plugin: allow populate for backward compatibility
-  return savedPage.populate<HydratedDocument<PageDocument>>('revision');
 }
 
 // True while the page still points at the expected revision, i.e. a failed

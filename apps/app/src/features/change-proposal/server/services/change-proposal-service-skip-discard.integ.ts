@@ -56,7 +56,11 @@ describe('ChangeProposalService: skip, discard and the per-page notification swi
     const proposal = await storeWaiting([
       kit.editInput(await kit.createPage(label)),
     ]);
-    await service.approve(proposal._id, users.requester, 'all', BACKGROUND);
+    await service.approve(proposal._id, {
+      user: users.requester,
+      channel: 'ui',
+      trigger: BACKGROUND,
+    });
     expect((await kit.reload(proposal._id)).lifecycle).toBe('settled');
     return proposal;
   };
@@ -110,9 +114,8 @@ describe('ChangeProposalService: skip, discard and the per-page notification swi
       const proposal = await storeTwoEdits('skip-last');
       await service.approve(
         proposal._id,
-        users.requester,
+        { user: users.requester, channel: 'ui', trigger: BACKGROUND },
         [keyOf(proposal, 0)],
-        BACKGROUND,
       );
 
       expect(
@@ -132,9 +135,8 @@ describe('ChangeProposalService: skip, discard and the per-page notification swi
       const applied = keyOf(proposal, 0);
       await service.approve(
         proposal._id,
-        users.requester,
+        { user: users.requester, channel: 'ui', trigger: BACKGROUND },
         [applied],
-        BACKGROUND,
       );
 
       expect(
@@ -176,9 +178,8 @@ describe('ChangeProposalService: skip, discard and the per-page notification swi
       const applied = keyOf(proposal, 0);
       await service.approve(
         proposal._id,
-        users.requester,
+        { user: users.requester, channel: 'ui', trigger: BACKGROUND },
         [applied],
-        BACKGROUND,
       );
 
       expect(await service.discard(proposal._id, users.requester)).toEqual(
@@ -268,7 +269,11 @@ describe('ChangeProposalService: skip, discard and the per-page notification swi
         await prisma.changeproposals.readPerPageNotifications(proposal._id),
       ).toBe(false);
 
-      await service.approve(proposal._id, users.requester, 'all', BACKGROUND);
+      await service.approve(proposal._id, {
+        user: users.requester,
+        channel: 'ui',
+        trigger: BACKGROUND,
+      });
       expect(sendPerPageNotifications).not.toHaveBeenCalled();
     });
 
@@ -284,7 +289,11 @@ describe('ChangeProposalService: skip, discard and the per-page notification swi
         users.requester,
         true,
       );
-      await service.approve(proposal._id, users.requester, 'all', BACKGROUND);
+      await service.approve(proposal._id, {
+        user: users.requester,
+        channel: 'ui',
+        trigger: BACKGROUND,
+      });
 
       expect(sendPerPageNotifications).toHaveBeenCalledTimes(1);
     });

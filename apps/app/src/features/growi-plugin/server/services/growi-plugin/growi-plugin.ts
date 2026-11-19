@@ -28,6 +28,9 @@ import { generateThemePluginMeta } from './generate-theme-plugin-meta';
 
 const logger = loggerFactory('growi:plugins:plugin-utils');
 
+// Without a limit, a stalled connection leaves install() pending forever.
+const DOWNLOAD_TIMEOUT_MS = 30_000;
+
 export type GrowiPluginResourceEntries = [
   installedPath: string,
   href: string,
@@ -236,30 +239,18 @@ export class GrowiPluginService implements IGrowiPluginService {
 
   // !! DO NOT USE WHERE NOT SSRF GUARDED !! -- 2022.12.26 ryoji-s
   private async download(requestUrl: string, filePath: string): Promise<void> {
-    return new Promise<void>((resolve, rejects) => {
-      axios({
+    try {
+      const res = await axios({
         method: 'GET',
         url: requestUrl,
         responseType: 'stream',
-      })
-        .then((res) => {
-          if (res.status === 200) {
-            const file = fs.createWriteStream(filePath);
-            res.data
-              .pipe(file)
-              .on('close', () => file.close())
-              .on('finish', () => {
-                return resolve();
-              });
-          } else {
-            rejects(res.status);
-          }
-        })
-        .catch((err) => {
-          logger.error({ err }, 'Failed to download file');
-          rejects('Failed to download file.');
-        });
-    });
+        signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS),
+      });
+      await pipeline(res.data, fs.createWriteStream(filePath));
+    } catch (err) {
+      logger.error({ err }, 'Failed to download file');
+      throw new Error('Failed to download file.');
+    }
   }
 
   private async unzip(

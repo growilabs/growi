@@ -1,8 +1,35 @@
 # Changelog
 
-## [Unreleased](https://github.com/growilabs/compare/v8.0.10...HEAD)
+## [Unreleased](https://github.com/growilabs/compare/v8.0.11...HEAD)
 
 *Please do not manually update this file. We've automated the process.*
+
+## [v8.0.11](https://github.com/growilabs/compare/v8.0.10...v8.0.11) - 2026-11-17
+
+### 💎 Features
+
+* feat: infinite scroll at search (#11970) @mariko-h
+* feat(change-proposal): Implement the core of change proposals (#12222) @yuki-takei
+
+### 🚀 Improvement
+
+* imprv: render large PlantUML diagrams (choose GET/POST by destination, lighter theme, per-diagram errors) (#12243) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix(user-activities): stop returning activities on pages the viewer cannot list (#12239) @yuki-takei
+* fix(page-operation): clean up interrupted operation records at startup again (#12264) @yuki-takei
+* fix: Plugin installation never finishes when the download stalls (#12261) @yuki-takei
+* fix: Sidebar menus close by themselves right after page load (#12256) @yuki-takei
+
+### 🧰 Maintenance
+
+* test(e2e): await page template modal expectations (#12229) @katesaikishore
+* ci: Integration tests intermittently time out when the CI runner's disk is slow (#12258) @yuki-takei
+* chore(deps): Bump @mastra/core to 1.80.0 (#12217) @Appleple47
+* ci(deps): Bump mongoose from 6.13.9 to 6.13.12 (#12231) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps): Bump isomorphic-git from 1.38.4 to 1.38.6 (#12224) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps): Bump next from 16.4.1 to 16.4.5 (#12259) @[dependabot[bot]](https://github.com/apps/dependabot)
 
 ## [v8.0.10](https://github.com/growilabs/compare/v8.0.9...v8.0.10) - 2026-11-09
 

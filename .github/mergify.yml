@@ -6,6 +6,7 @@ queue_rules:
       - check-success ~= ci-app-launch-dev
       - -check-failure ~= ci-app-
       - -check-failure ~= ci-slackbot-
+      - -check-failure ~= attachment-text-extractor
       - -check-failure ~= test-prod-node24 /
       - -check-failure ~= test-prod-node24 / build-prod
       - -check-failure ~= test-prod-node24 / launch-prod
@@ -24,6 +25,7 @@ queue_rules:
       - check-success = test-prod-node24 / report-playwright
       - -check-failure ~= ci-app-
       - -check-failure ~= ci-slackbot-
+      - -check-failure ~= attachment-text-extractor
       - -check-failure ~= test-prod-node24 /
       - -check-failure ~= test-prod-node24 / build-prod
       - -check-failure ~= test-prod-node24 / launch-prod

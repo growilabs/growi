@@ -4,7 +4,10 @@ import type { Namespace } from '@growi/core/dist/interfaces/vault';
 import { VaultInstruction } from '~/features/growi-vault/server/models/vault-instruction';
 import loggerFactory from '~/utils/logger';
 
-import type { VaultNamespaceMapper } from './vault-namespace-mapper';
+import type {
+  PageGrantState,
+  VaultNamespaceMapper,
+} from './vault-namespace-mapper';
 
 const logger = loggerFactory(
   'growi:features:growi-vault:service:vault-dispatcher',
@@ -29,6 +32,12 @@ export const CHUNK_SIZE = 1000;
 // Event types
 // ---------------------------------------------------------------------------
 
+/** The page fields the dispatcher reads. */
+export type DispatchedPage = PageGrantState & {
+  readonly _id: { toString(): string };
+  readonly path: string;
+};
+
 /**
  * Represents a single-page lifecycle event emitted by PageService.
  *
@@ -36,7 +45,9 @@ export const CHUNK_SIZE = 1000;
  *   - 'create' — new page persisted
  *   - 'update' — page body or metadata updated (ACL unchanged)
  *   - 'delete' — page deleted; pagePath contains the pre-deletion path
- *   - 'acl-change' — page ACL changed; previousNamespaces must be provided
+ *   - 'acl-change' — page saved together with its previous namespaces; the
+ *     page is removed from those it left, and handled like 'update' when it
+ *     left none
  */
 export type PageChangedEventType =
   | 'create'
@@ -48,7 +59,7 @@ export interface PageChangedEvent {
   /** Type of change that occurred. */
   readonly type: PageChangedEventType;
   /** The page object reflecting the current (post-change) state. */
-  readonly page: IPage & { _id: { toString(): string } };
+  readonly page: DispatchedPage;
   /** Revision ID of the current revision (undefined for delete events). */
   readonly revisionId?: string;
   /**
@@ -103,7 +114,7 @@ export interface BulkPageOperationEvent {
  */
 export interface PageRenamedEvent {
   /** The page object reflecting the current (post-rename) state. */
-  readonly page: IPage & { _id: { toString(): string } };
+  readonly page: DispatchedPage;
   /** The page path before the rename. */
   readonly oldPath: string;
   /** The page path after the rename. */
@@ -324,6 +335,23 @@ export const createVaultDispatcher = (
     }
   };
 
+  /**
+   * Drop the page's upserts still waiting in the coalesce window. Instructions
+   * written right away (remove, acl-change, rename) would otherwise be
+   * overtaken by the buffered upsert when its timer fires.
+   */
+  const dropPendingUpserts = (
+    namespaces: ReadonlyArray<Namespace>,
+    pageId: string,
+  ): void => {
+    for (const ns of namespaces) {
+      const buf = coalesceMap.get(ns);
+      if (buf != null) {
+        buf.entries = buf.entries.filter((entry) => entry.pageId !== pageId);
+      }
+    }
+  };
+
   return {
     async onPageChanged(event: PageChangedEvent): Promise<void> {
       const { type, page } = event;
@@ -354,6 +382,7 @@ export const createVaultDispatcher = (
         // Compute current (pre-deletion) namespaces and write a remove per namespace.
         // Concurrent writes are safe here — remove instructions are independent.
         const { current } = namespaceMapper.computePageNamespaces(page);
+        dropPendingUpserts(current, pageId);
         await Promise.all(
           current.map((ns) =>
             writeWithRetry(
@@ -371,61 +400,53 @@ export const createVaultDispatcher = (
       }
 
       if (type === 'acl-change') {
-        const previousNamespaces = event.previousNamespaces ?? [];
         const { current } = namespaceMapper.computePageNamespaces(page);
+        // A namespace the page stays in gets no remove: removes and upserts
+        // are written concurrently, so their order is not guaranteed.
+        const leftNamespaces = (event.previousNamespaces ?? []).filter(
+          (ns) => !current.includes(ns),
+        );
 
-        // Emit remove instructions for all previous namespaces concurrently.
-        // Upsert instructions for current namespaces are only emitted when
-        // revisionId is present — pages without a revision (e.g. auto-generated
-        // intermediate paths) would cause a MongoDB ObjectId cast error in
-        // vault-manager if forwarded.
-        if (!revisionId) {
-          logger.debug(
-            { pageId, pagePath },
-            'vault-dispatcher: skipping acl-change upsert for page without revision',
-          );
-          await Promise.all(
-            previousNamespaces.map((ns) =>
-              writeWithRetry(
-                () =>
-                  VaultInstruction.create({
-                    op: 'remove',
-                    payload: { namespace: ns, pageId, pagePath },
-                    issuedAt: new Date(),
-                  }).then(() => undefined),
-                `acl-remove namespace=${ns} pageId=${pageId}`,
-              ),
-            ),
-          );
+        if (leftNamespaces.length === 0) {
+          if (revisionId) {
+            for (const ns of current) {
+              enqueueUpsert(ns, { pageId, pagePath, revisionId });
+            }
+          }
           return;
         }
 
-        // Emit remove instructions for all previous namespaces and upsert
-        // instructions for all current namespaces, both concurrently.
-        await Promise.all([
-          ...previousNamespaces.map((ns) =>
-            writeWithRetry(
-              () =>
-                VaultInstruction.create({
-                  op: 'remove',
-                  payload: { namespace: ns, pageId, pagePath },
-                  issuedAt: new Date(),
-                }).then(() => undefined),
-              `acl-remove namespace=${ns} pageId=${pageId}`,
-            ),
+        dropPendingUpserts([...leftNamespaces, ...current], pageId);
+
+        const removes = leftNamespaces.map((ns) =>
+          writeWithRetry(
+            () =>
+              VaultInstruction.create({
+                op: 'remove',
+                payload: { namespace: ns, pageId, pagePath },
+                issuedAt: new Date(),
+              }).then(() => undefined),
+            `acl-remove namespace=${ns} pageId=${pageId}`,
           ),
-          ...current.map((ns) =>
-            writeWithRetry(
-              () =>
-                VaultInstruction.create({
-                  op: 'upsert',
-                  payload: { namespace: ns, pageId, pagePath, revisionId },
-                  issuedAt: new Date(),
-                }).then(() => undefined),
-              `acl-upsert namespace=${ns} pageId=${pageId}`,
-            ),
-          ),
-        ]);
+        );
+
+        // A page without a revision (e.g. an auto-generated intermediate
+        // path) cannot be upserted: vault-manager rejects an empty revisionId.
+        const upserts = revisionId
+          ? current.map((ns) =>
+              writeWithRetry(
+                () =>
+                  VaultInstruction.create({
+                    op: 'upsert',
+                    payload: { namespace: ns, pageId, pagePath, revisionId },
+                    issuedAt: new Date(),
+                  }).then(() => undefined),
+                `acl-upsert namespace=${ns} pageId=${pageId}`,
+              ),
+            )
+          : [];
+
+        await Promise.all([...removes, ...upserts]);
         return;
       }
 
@@ -444,6 +465,7 @@ export const createVaultDispatcher = (
       // namespaces before and after. Remove the page's blob at the old path
       // and re-add it at the new path in every namespace it belongs to.
       const { current } = namespaceMapper.computePageNamespaces(page);
+      dropPendingUpserts(current, pageId);
 
       const removes = current.map((ns) =>
         writeWithRetry(

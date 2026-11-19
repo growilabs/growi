@@ -1,3 +1,4 @@
+import assert from 'node:assert';
 import type { IUserHasId } from '@growi/core';
 import { isPopulated } from '@growi/core/dist/interfaces';
 import type { HydratedDocument, Model } from 'mongoose';
@@ -10,11 +11,6 @@ import { type PageDocument, pushRevision } from '~/server/models/page';
 import { prisma } from '~/utils/prisma';
 
 const PAGE_PATH_PREFIX = '/page-push-revision';
-
-const populatedBody = (page: PageDocument): string | undefined =>
-  page.revision != null && isPopulated(page.revision)
-    ? page.revision.body
-    : undefined;
 
 describe('pushRevision', () => {
   let user: IUserHasId;
@@ -108,8 +104,10 @@ describe('pushRevision', () => {
       expect(reloaded.revision?.toString()).not.toBe(initialRevisionId);
       expect(reloaded.latestRevisionBodyLength).toBe('next body'.length);
       expect(saved._id.toString()).toBe(pageId);
-      // The returned page carries the populated new revision, like the unconditional path.
-      expect(populatedBody(saved)).toBe('next body');
+      // The returned page points at the stored new revision, left unpopulated.
+      assert(saved.revision != null);
+      expect(saved.revision.toString()).toBe(reloaded.revision?.toString());
+      expect(isPopulated(saved.revision)).toBe(false);
       expect(await countRevisions(pageId)).toBe(2);
     });
 
@@ -159,12 +157,14 @@ describe('pushRevision', () => {
       expect(rejected).toHaveLength(1);
       expect(rejected[0].reason).toBeInstanceOf(RevisionConflictError);
 
-      const winnerBody = populatedBody(fulfilled[0].value);
       const reloaded = await loadPage(pageId);
+      expect(reloaded.revision?.toString()).toBe(
+        fulfilled[0].value.revision?.toString(),
+      );
       const latest = await prisma.revisions.findUniqueOrThrow({
         where: { id: reloaded.revision?.toString() },
       });
-      expect(latest.body).toBe(winnerBody);
+      expect([`writer A ${i}`, `writer B ${i}`]).toContain(latest.body);
       // Initial revision plus the winner's only; the loser's revision is gone.
       expect(await countRevisions(pageId)).toBe(2);
     });
