@@ -2,7 +2,7 @@ import { loadPackageManifest } from './deploy-files';
 
 // The production dependencies are exactly the twelve adopted libraries
 // (research.md 21.2; hono-openapi and zod generate the OpenAPI document,
-// 17.13; @prometheus-io/client renders /metrics, ops-1-1 research.md 1).
+// 17.13; @prometheus-io/client renders /metrics, research.md §1.4, §9.1).
 // Anything else in `dependencies` ends up in the image through `pnpm deploy --prod`, so a new entry must be a deliberate change to this list.
 // This maps Python's test_dependencies.py "production dependencies exclude external
 // binary and removed libraries" (research.md 22.3): the exact list also keeps out

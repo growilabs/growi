@@ -6,7 +6,7 @@ const ABSENT = '-';
 const INVALID = '(invalid)';
 
 // The value after "app=" on the request line. Why a bad value is never echoed
-// and why a repeated header reads as invalid: research §2.1, §2.5.
+// and why a repeated header reads as invalid: research.md §9.2.1, §9.2.3.
 export const appLabelOf = (headers: IncomingHttpHeaders): string => {
   const value: unknown = headers['x-growi-app-id'];
   if (value === undefined) return ABSENT;

@@ -81,7 +81,7 @@ const MIB = 1024 * 1024;
 // Python's DEFAULT_PROBE_TIMEOUT_S; a readiness check must wait longer than
 // this for /readyz (docker/README.md gives 15 s; research.md 23.7).
 const DEFAULT_PROBE_TIMEOUT_S = 10;
-// research.md §4: shorter than the operator's probe period, not a setting.
+// research.md §9.4: shorter than the operator's probe period, not a setting.
 const READINESS_KEEP_MS = 10_000;
 // research.md 20.6 / 20.12: on the command line, never in NODE_OPTIONS.
 const CHILD_NODE_FLAGS = [

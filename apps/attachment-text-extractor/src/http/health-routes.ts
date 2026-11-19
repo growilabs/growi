@@ -43,7 +43,7 @@ export const registerHealthRoutes = (
     }),
   );
   // The route keeps nothing itself; the runner keeps a settled check for 10 s
-  // (research.md §4), after which a pod that was not ready can come back.
+  // (research.md §9.4), after which a pod that was not ready can come back.
   app.get(
     '/readyz',
     describeResponse(

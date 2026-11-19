@@ -73,7 +73,7 @@ export type PackageRule = {
 };
 
 // Schema / OpenAPI packages and the Prometheus client belong to the HTTP layer
-// alone (research 17.13, 27.8; ops-1-1 research.md 1).
+// alone (research 17.13, 27.8; research.md §1.4, §9.1).
 export const PACKAGE_RULES: readonly PackageRule[] = [
   {
     packages: ['zod', 'hono-openapi', '@prometheus-io/client'],

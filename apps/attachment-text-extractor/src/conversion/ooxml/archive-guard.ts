@@ -92,7 +92,7 @@ const toArchive = (
  * Reads only the central directory; part data is read on demand. null when
  * the bytes are not a ZIP (the caller hands them to anydoc whole); a ZIP that
  * cannot be listed, or does not hold `requiredPart` exactly once, is
- * malformed (research.md §3). The caller owns and must close the returned
+ * malformed (research.md §9.3). The caller owns and must close the returned
  * archive.
  */
 export const inspectArchive = async (

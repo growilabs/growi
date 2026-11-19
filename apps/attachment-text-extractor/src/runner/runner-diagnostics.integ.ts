@@ -55,7 +55,7 @@ const SENTENCES: Readonly<Record<string, string>> = {
 const LINE =
   /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z ((?:INFO|WARNING|ERROR) [ -~]+)$/;
 
-// Past the time a settled readiness check is kept (research.md §4).
+// Past the time a settled readiness check is kept (research.md §9.4).
 const PAST_KEPT_MS = 10_001;
 
 interface Capture {

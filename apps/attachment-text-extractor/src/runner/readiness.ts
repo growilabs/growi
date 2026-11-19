@@ -59,7 +59,7 @@ export const probeConversions = async (
  * not ready, or thrown) answers every caller for `keepMs` after it settled:
  * /readyz needs no token, so its callers must not be able to start probe
  * children without bound. Why the result is kept, and counted from the end of
- * the check: research.md §4.
+ * the check: research.md §9.4.
  */
 export const sharedThenKept = <T>(
   task: () => Promise<T>,

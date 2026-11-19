@@ -3,7 +3,7 @@ import { normalizeNewlines } from './normalize';
 
 /**
  * Bytes used after adding one element's content: UTF-8 bytes with newlines
- * unified to LF, label and page number not counted (research.md §7). Throws
+ * unified to LF, label and page number not counted (research.md §9.7). Throws
  * result_too_large once the total passes maxResultBytes.
  */
 export const spendResultBudget = (

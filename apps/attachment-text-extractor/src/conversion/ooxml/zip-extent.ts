@@ -4,7 +4,7 @@
 // the file are not checked), and entries flagged "strong encryption", which
 // CPython refuses only when they are read. yauzl refuses all of these. The
 // end record is looked for in the whole file, not only in the last 64 KiB
-// as CPython's _EndRecData does (research.md §3.2).
+// as CPython's _EndRecData does (research.md §9.3.2).
 
 const END_SIGNATURE = Buffer.from([0x50, 0x4b, 0x05, 0x06]);
 const CENTRAL_SIGNATURE = 0x02014b50;
@@ -53,7 +53,7 @@ const leadsToDirectory = (data: Buffer, at: number): boolean => {
  * In the last 64 KiB, the last end record as it is. Before them, the last
  * one that leads to its directory, or else the last one if a central record
  * signature comes before it anywhere; a lone end record signature there is
- * not a ZIP (research.md §3.2).
+ * not a ZIP (research.md §9.3.2).
  */
 const endRecordAt = (data: Buffer): number => {
   const last = data.length - END_RECORD_BYTES;
@@ -182,7 +182,7 @@ export const zipExtent = (bytes: Uint8Array): ZipExtent | null => {
     prepended >= 0 ? readCentralDirectory(data, at - size, size) : null;
   if (directory == null) {
     // Unlike CPython, a directory not where the end record's size and offset
-    // put it is left to yauzl, so the limits still apply (research.md §3.2).
+    // put it is left to yauzl, so the limits still apply (research.md §9.3.2).
     return unchanged(bytes);
   }
   const { entries, strongRecords } = directory;
