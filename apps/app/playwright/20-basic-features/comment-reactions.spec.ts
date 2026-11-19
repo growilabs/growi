@@ -134,12 +134,13 @@ const pickEmoji = async (
 const reactionChip = (scope: Locator, label: string): Locator =>
   scope.getByRole('button', { name: label, exact: true });
 
-// The number of reacting users is each chip's description (comment_reaction.reacted_count).
+// A chip's description starts with the number of reacting users (comment_reaction.reacted_count);
+// where the device can hover, their names follow it.
 const reactionChips = (scope: Locator): Locator =>
-  scope.getByRole('button').filter({ hasText: /reacted$/ });
+  scope.getByRole('button').filter({ hasText: /\d+ (person|people) reacted/ });
 
-const ONE_PERSON = '1 person reacted';
-const TWO_PEOPLE = '2 people reacted';
+const ONE_PERSON = /^1 person reacted\b/;
+const TWO_PEOPLE = /^2 people reacted\b/;
 
 const usersPopover = (page: Page): Locator =>
   page.locator('.popover').filter({ hasText: 'Reacted by' });
@@ -503,6 +504,9 @@ test.describe('Comment reactions', () => {
     ]);
     await chip.blur();
     await expect(usersPopover(page)).toBeHidden();
+
+    // A screen reader cannot reach the portaled popover, so the names are on the chip itself.
+    await expect(chip).toHaveAccessibleDescription('1 person reacted: Admin');
 
     // Neither hovering nor focusing wrote anything.
     await page.reload();

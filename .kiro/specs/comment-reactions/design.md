@@ -870,7 +870,7 @@ type CommentReactionHeaderButtonProps = {
 
 **Implementation Notes（ReactionChip / AddReactionButton / EmojiPicker）**
 - ReactionChip: 1つのチップを、絵文字と人数を並べた1つの `button` 要素にする（Slack と同じ見た目。押せる部分を分けない）。
-  - **押下**: `canReact` が true で更新中でないとき、押すと追加・解除する（要件 2.1、2.2）。`aria-pressed={reactedByMe}`、`aria-label` に絵文字名を入れ、人数（「N 人がリアクション」）は見えない文言を `aria-describedby` でつなぐ（`useId()` は `aria-describedby` には使える）。グリフは `resolveReactionGlyph`。解決できない（絵文字データの更新で消えた）ときは `:<shortcode>:` の文字列を出す。
+  - **押下**: `canReact` が true で更新中でないとき、押すと追加・解除する（要件 2.1、2.2）。`aria-pressed={reactedByMe}`、`aria-label` に絵文字名を入れ、人数（「N 人がリアクション」）は見えない文言を `aria-describedby` でつなぐ（`useId()` は `aria-describedby` には使える）。ホバーできる端末では、この文言の後ろに利用者の表示名を「: 名前, 名前」の形で続け、フォーカスしたときに読み上げで誰がリアクションしたかがわかるようにする（要件 1.5）。Popover は閉じている間は DOM に無く、開いても `body` 直下に描画されてチップとつながらないので、読み上げが届くのはチップ自身の説明文だけである。グリフは `resolveReactionGlyph`。解決できない（絵文字データの更新で消えた）ときは `:<shortcode>:` の文字列を出す。
   - **押せないとき**: `canReact` が false のとき（要件 6.2）と更新中は、`disabled` ではなく `aria-disabled="true"` にして、押しても何もしない。`disabled` のボタンはマウスイベントを出さないので、ホバーで利用者一覧を出せなくなるため。読み取り専用でもボタンのままにして、キーボードのフォーカスで一覧に届くようにする。更新中は `aria-busy` も付け、見た目を薄くする。
   - **利用者の一覧**: ホバーできる端末（`useCanHover`）でだけ `ReactionUsersPopover` を描画し、チップにマウスを乗せたとき、またはキーボードでフォーカスしたときに出す（要件 1.5）。ホバーできない端末では描画しない。タップでフォーカスが移るとフォーカスで開いてしまうため、トリガーを残したまま隠すのではなく、描画そのものをしない。
   - 枠は区切り線を引かず、絵文字と人数の間の余白を 0 にして詰める。絵文字だけのチップを想定して、高さは `min-height: 1.5rem` までにする。

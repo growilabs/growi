@@ -124,13 +124,7 @@ describe('CommentReactionBar', () => {
     const thumbsUp = screen.getByRole('button', { name: '+1' });
     const heart = screen.getByRole('button', { name: 'heart' });
     expect(thumbsUp).toHaveTextContent('👍2');
-    expect(thumbsUp).toHaveAccessibleDescription(
-      'comment_reaction.reacted_count:2',
-    );
     expect(heart).toHaveTextContent('❤️1');
-    expect(heart).toHaveAccessibleDescription(
-      'comment_reaction.reacted_count:1',
-    );
     expect(addButton()).not.toBeNull();
   });
 

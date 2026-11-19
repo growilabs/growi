@@ -51,12 +51,26 @@ beforeEach(() => {
 });
 
 describe('ReactionChip', () => {
-  it('is one button showing the glyph and the number of reacting users, described by that number', () => {
+  it('is one button showing the glyph and the number of reacting users', () => {
     render(<ReactionChip chip={makeChip()} canReact onToggle={vi.fn()} />);
 
     expect(screen.getAllByRole('button')).toHaveLength(1);
     expect(chipButton()).toHaveTextContent(THUMBS_UP_GLYPH);
     expect(chipButton()).toHaveTextContent('2');
+  });
+
+  it('is described by the number and the names of the reacting users, so a screen reader announces who reacted on focus', () => {
+    render(<ReactionChip chip={makeChip()} canReact onToggle={vi.fn()} />);
+
+    expect(chipButton()).toHaveAccessibleDescription(
+      'comment_reaction.reacted_count:2: Alice A., bob, 64b0000000000000000000ff',
+    );
+  });
+
+  it('is described by the number only on a device that cannot hover', () => {
+    mocks.useCanHover.mockReturnValue(false);
+    render(<ReactionChip chip={makeChip()} canReact onToggle={vi.fn()} />);
+
     expect(chipButton()).toHaveAccessibleDescription(
       'comment_reaction.reacted_count:2',
     );
