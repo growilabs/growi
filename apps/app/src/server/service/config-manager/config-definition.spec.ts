@@ -488,3 +488,26 @@ describe('config-definition change-proposal keys', () => {
     });
   });
 });
+
+describe('env var type declarations', () => {
+  it('declares envVarType on every env-backed config whose default cannot reveal its type', () => {
+    const undeclared = Object.entries(CONFIG_DEFINITIONS)
+      .filter(
+        ([, definition]) =>
+          definition.envVarName != null &&
+          definition.defaultValue == null &&
+          definition.envVarType == null,
+      )
+      .map(([key]) => key);
+
+    expect(undeclared).toEqual([]);
+  });
+
+  it('declares app:checkConfigurationValueStrictly as a strict-by-default env var', () => {
+    expect(CONFIG_KEYS).toContain('app:checkConfigurationValueStrictly');
+    const definition =
+      CONFIG_DEFINITIONS['app:checkConfigurationValueStrictly'];
+    expect(definition.envVarName).toBe('CHECK_CONFIGURATION_VALUE_STRICTLY');
+    expect(definition.defaultValue).toBe(true);
+  });
+});

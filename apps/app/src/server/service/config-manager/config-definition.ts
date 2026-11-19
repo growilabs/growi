@@ -77,6 +77,7 @@ export const CONFIG_KEYS = [
   'app:minPasswordLength',
   'app:auditLogEnabled',
   'app:activityExpirationSeconds',
+  'app:checkConfigurationValueStrictly',
   'app:revisionDiffMaxLookbackSeconds',
   'app:auditLogActionGroupSize',
   'app:auditLogAdditionalActions',
@@ -402,23 +403,28 @@ export const CONFIG_DEFINITIONS = {
   // Auto Install Settings
   'autoInstall:adminUsername': defineConfig<string | undefined>({
     envVarName: 'AUTO_INSTALL_ADMIN_USERNAME',
+    envVarType: 'string',
     defaultValue: undefined,
   }),
   'autoInstall:adminName': defineConfig<string | undefined>({
     envVarName: 'AUTO_INSTALL_ADMIN_NAME',
+    envVarType: 'string',
     defaultValue: undefined,
   }),
   'autoInstall:adminEmail': defineConfig<string | undefined>({
     envVarName: 'AUTO_INSTALL_ADMIN_EMAIL',
+    envVarType: 'string',
     defaultValue: undefined,
   }),
   'autoInstall:adminPassword': defineConfig<string | undefined>({
     envVarName: 'AUTO_INSTALL_ADMIN_PASSWORD',
+    envVarType: 'string',
     defaultValue: undefined,
     isSecret: true,
   }),
   'autoInstall:globalLang': defineConfig<Lang | undefined>({
     envVarName: 'AUTO_INSTALL_GLOBAL_LANG',
+    envVarType: 'string',
     defaultValue: undefined,
   }),
   'autoInstall:allowGuestMode': defineConfig<boolean>({
@@ -427,6 +433,7 @@ export const CONFIG_DEFINITIONS = {
   }),
   'autoInstall:serverDate': defineConfig<string | undefined>({
     envVarName: 'AUTO_INSTALL_SERVER_DATE',
+    envVarType: 'string',
     defaultValue: undefined,
   }),
 
@@ -469,10 +476,12 @@ export const CONFIG_DEFINITIONS = {
   }),
   'app:nchanUri': defineConfig<string | undefined>({
     envVarName: 'NCHAN_URI',
+    envVarType: 'string',
     defaultValue: undefined,
   }),
   'app:siteUrl': defineConfig<string | undefined>({
     envVarName: 'APP_SITE_URL',
+    envVarType: 'string',
     defaultValue: undefined,
   }),
   'app:aiEnabled': defineConfig<boolean>({
@@ -501,6 +510,7 @@ export const CONFIG_DEFINITIONS = {
   }),
   'app:elasticsearchUri': defineConfig<string | undefined>({
     envVarName: 'ELASTICSEARCH_URI',
+    envVarType: 'string',
     defaultValue: undefined,
   }),
   'app:elasticsearchRequestTimeout': defineConfig<number>({
@@ -529,14 +539,17 @@ export const CONFIG_DEFINITIONS = {
   }),
   'app:growiCloudUri': defineConfig<string | undefined>({
     envVarName: 'GROWI_CLOUD_URI',
+    envVarType: 'string',
     defaultValue: undefined,
   }),
   'app:growiAppIdForCloud': defineConfig<number | undefined>({
     envVarName: 'GROWI_APP_ID_FOR_GROWI_CLOUD',
+    envVarType: 'number',
     defaultValue: undefined,
   }),
   'app:ogpUri': defineConfig<string | undefined>({
     envVarName: 'OGP_URI',
+    envVarType: 'string',
     defaultValue: undefined,
   }),
   'app:minPasswordLength': defineConfig<number>({
@@ -569,10 +582,12 @@ export const CONFIG_DEFINITIONS = {
   }),
   'app:auditLogAdditionalActions': defineConfig<string | undefined>({
     envVarName: 'AUDIT_LOG_ADDITIONAL_ACTIONS',
+    envVarType: 'string',
     defaultValue: undefined,
   }),
   'app:auditLogExcludeActions': defineConfig<string | undefined>({
     envVarName: 'AUDIT_LOG_EXCLUDE_ACTIONS',
+    envVarType: 'string',
     defaultValue: undefined,
   }),
   'app:serviceType': defineConfig<GrowiServiceType>({
@@ -611,10 +626,12 @@ export const CONFIG_DEFINITIONS = {
   }),
   'app:vaultManagerEndpoint': defineConfig<string | undefined>({
     envVarName: 'VAULT_MANAGER_ENDPOINT',
+    envVarType: 'string',
     defaultValue: undefined,
   }),
   'app:vaultManagerInternalSecret': defineConfig<string | undefined>({
     envVarName: 'VAULT_MANAGER_INTERNAL_SECRET',
+    envVarType: 'string',
     defaultValue: undefined,
     isSecret: true,
   }),
@@ -712,10 +729,12 @@ export const CONFIG_DEFINITIONS = {
   // Security Settings
   'security:wikiMode': defineConfig<string | undefined>({
     envVarName: 'FORCE_WIKI_MODE',
+    envVarType: 'string',
     defaultValue: undefined,
   }),
   'security:sessionMaxAge': defineConfig<number | undefined>({
     envVarName: 'SESSION_MAX_AGE',
+    envVarType: 'number',
     defaultValue: undefined,
     isSecret: true,
   }),
@@ -725,16 +744,19 @@ export const CONFIG_DEFINITIONS = {
   }),
   'security:trustProxyBool': defineConfig<boolean | undefined>({
     envVarName: 'TRUST_PROXY_BOOL',
+    envVarType: 'boolean',
     defaultValue: undefined,
     isSecret: true,
   }),
   'security:trustProxyCsv': defineConfig<string | undefined>({
     envVarName: 'TRUST_PROXY_CSV',
+    envVarType: 'string',
     defaultValue: undefined,
     isSecret: true,
   }),
   'security:trustProxyHops': defineConfig<number | undefined>({
     envVarName: 'TRUST_PROXY_HOPS',
+    envVarType: 'number',
     defaultValue: undefined,
     isSecret: true,
   }),
@@ -760,52 +782,62 @@ export const CONFIG_DEFINITIONS = {
     NonBlankString | undefined
   >({
     envVarName: 'SAML_CALLBACK_URI',
+    envVarType: 'string',
     defaultValue: undefined,
   }),
   'security:passport-saml:attrMapId': defineConfig<NonBlankString | undefined>({
     envVarName: 'SAML_ATTR_MAPPING_ID',
+    envVarType: 'string',
     defaultValue: undefined,
   }),
   'security:passport-saml:attrMapUsername': defineConfig<
     NonBlankString | undefined
   >({
     envVarName: 'SAML_ATTR_MAPPING_USERNAME',
+    envVarType: 'string',
     defaultValue: undefined,
   }),
   'security:passport-saml:attrMapMail': defineConfig<
     NonBlankString | undefined
   >({
     envVarName: 'SAML_ATTR_MAPPING_MAIL',
+    envVarType: 'string',
     defaultValue: undefined,
   }),
   'security:passport-saml:attrMapFirstName': defineConfig<
     NonBlankString | undefined
   >({
     envVarName: 'SAML_ATTR_MAPPING_FIRST_NAME',
+    envVarType: 'string',
     defaultValue: undefined,
   }),
   'security:passport-saml:attrMapLastName': defineConfig<
     NonBlankString | undefined
   >({
     envVarName: 'SAML_ATTR_MAPPING_LAST_NAME',
+    envVarType: 'string',
     defaultValue: undefined,
   }),
   'security:passport-saml:ABLCRule': defineConfig<NonBlankString | undefined>({
     envVarName: 'SAML_ABLC_RULE',
+    envVarType: 'string',
     defaultValue: undefined,
   }),
   'security:passport-saml:entryPoint': defineConfig<NonBlankString | undefined>(
     {
       envVarName: 'SAML_ENTRY_POINT',
+      envVarType: 'string',
       defaultValue: undefined,
     },
   ),
   'security:passport-saml:issuer': defineConfig<NonBlankString | undefined>({
     envVarName: 'SAML_ISSUER',
+    envVarType: 'string',
     defaultValue: undefined,
   }),
   'security:passport-saml:cert': defineConfig<NonBlankString | undefined>({
     envVarName: 'SAML_CERT',
+    envVarType: 'string',
     defaultValue: undefined,
   }),
   'security:passport-oidc:timeoutMultiplier': defineConfig<number>({
@@ -1041,6 +1073,7 @@ export const CONFIG_DEFINITIONS = {
   }),
   'aws:s3ObjectCannedACL': defineConfig<string | undefined>({
     envVarName: 'S3_OBJECT_ACL',
+    envVarType: 'string',
     defaultValue: undefined,
   }),
   'aws:s3Bucket': defineConfig<NonBlankString>({
@@ -1053,25 +1086,30 @@ export const CONFIG_DEFINITIONS = {
   }),
   'aws:s3AccessKeyId': defineConfig<NonBlankString | undefined>({
     envVarName: 'S3_ACCESS_KEY_ID',
+    envVarType: 'string',
     defaultValue: undefined,
   }),
   'aws:s3SecretAccessKey': defineConfig<NonBlankString | undefined>({
     envVarName: 'S3_SECRET_ACCESS_KEY',
+    envVarType: 'string',
     defaultValue: undefined,
     isSecret: true,
   }),
   'aws:s3CustomEndpoint': defineConfig<NonBlankString | undefined>({
     envVarName: 'S3_CUSTOM_ENDPOINT',
+    envVarType: 'string',
     defaultValue: undefined,
   }),
 
   // GCS Settings
   'gcs:apiKeyJsonPath': defineConfig<NonBlankString | undefined>({
     envVarName: 'GCS_API_KEY_JSON_PATH',
+    envVarType: 'string',
     defaultValue: undefined,
   }),
   'gcs:bucket': defineConfig<NonBlankString | undefined>({
     envVarName: 'GCS_BUCKET',
+    envVarType: 'string',
     defaultValue: undefined,
   }),
   'gcs:uploadNamespace': defineConfig<string>({
@@ -1098,29 +1136,35 @@ export const CONFIG_DEFINITIONS = {
   }),
   'azure:tenantId': defineConfig<NonBlankString | undefined>({
     envVarName: 'AZURE_TENANT_ID',
+    envVarType: 'string',
     defaultValue: undefined,
   }),
   'azure:clientId': defineConfig<NonBlankString | undefined>({
     envVarName: 'AZURE_CLIENT_ID',
+    envVarType: 'string',
     defaultValue: undefined,
   }),
   'azure:clientSecret': defineConfig<NonBlankString | undefined>({
     envVarName: 'AZURE_CLIENT_SECRET',
+    envVarType: 'string',
     defaultValue: undefined,
     isSecret: true,
   }),
   'azure:storageAccountName': defineConfig<string | undefined>({
     envVarName: 'AZURE_STORAGE_ACCOUNT_NAME',
+    envVarType: 'string',
     defaultValue: undefined,
   }),
   'azure:storageContainerName': defineConfig<string | undefined>({
     envVarName: 'AZURE_STORAGE_CONTAINER_NAME',
+    envVarType: 'string',
     defaultValue: undefined,
   }),
 
   // GridFS Settings
   'gridfs:totalLimit': defineConfig<number | undefined>({
     envVarName: 'MONGO_GRIDFS_TOTAL_LIMIT',
+    envVarType: 'number',
     defaultValue: undefined,
   }),
 
@@ -1280,30 +1324,36 @@ export const CONFIG_DEFINITIONS = {
   // Slackbot Settings
   'slackbot:currentBotType': defineConfig<string | undefined>({
     envVarName: 'SLACKBOT_TYPE',
+    envVarType: 'string',
     defaultValue: undefined,
   }),
   'slackbot:proxyUri': defineConfig<NonBlankString | undefined>({
     envVarName: 'SLACKBOT_INTEGRATION_PROXY_URI',
+    envVarType: 'string',
     defaultValue: undefined,
   }),
   'slackbot:withoutProxy:signingSecret': defineConfig<string | undefined>({
     envVarName: 'SLACKBOT_WITHOUT_PROXY_SIGNING_SECRET',
+    envVarType: 'string',
     defaultValue: undefined,
     isSecret: true,
   }),
   'slackbot:withoutProxy:botToken': defineConfig<string | undefined>({
     envVarName: 'SLACKBOT_WITHOUT_PROXY_BOT_TOKEN',
+    envVarType: 'string',
     defaultValue: undefined,
     isSecret: true,
   }),
   'slackbot:withoutProxy:commandPermission': defineConfig<string | undefined>({
     envVarName: 'SLACKBOT_WITHOUT_PROXY_COMMAND_PERMISSION',
+    envVarType: 'string',
     defaultValue: undefined,
   }),
   'slackbot:withoutProxy:eventActionsPermission': defineConfig<
     string | undefined
   >({
     envVarName: 'SLACKBOT_WITHOUT_PROXY_EVENT_ACTIONS_PERMISSION',
+    envVarType: 'string',
     defaultValue: undefined,
   }),
   'slackbot:withProxy:saltForGtoP': defineConfig<string>({
@@ -1339,10 +1389,12 @@ export const CONFIG_DEFINITIONS = {
   // shape defensively and treat null as unset.
   'ai:providers': defineConfig<AiProvidersConfig | null>({
     envVarName: 'AI_PROVIDERS',
+    envVarType: 'object',
     defaultValue: null,
   }),
   'ai:providerApiKeys': defineConfig<AiProviderApiKeys | null>({
     envVarName: 'AI_PROVIDER_API_KEYS',
+    envVarType: 'object',
     defaultValue: null,
     isSecret: true,
   }),
@@ -1374,6 +1426,7 @@ export const CONFIG_DEFINITIONS = {
   'ai:providerOptions:suggestPathAgent':
     defineConfig<ModelProviderOptions | null>({
       envVarName: 'AI_SUGGEST_PATH_AGENT_PROVIDER_OPTIONS',
+      envVarType: 'object',
       defaultValue: null,
     }),
 
@@ -1398,10 +1451,12 @@ export const CONFIG_DEFINITIONS = {
   // an opaque reason code.
   'ai:usageBaseModel': defineConfig<string | undefined>({
     envVarName: 'AI_USAGE_BASE_MODEL',
+    envVarType: 'string',
     defaultValue: undefined,
   }),
   'ai:disabledReason': defineConfig<string | undefined>({
     envVarName: 'AI_DISABLED_REASON',
+    envVarType: 'string',
     defaultValue: undefined,
   }),
 
@@ -1439,6 +1494,7 @@ export const CONFIG_DEFINITIONS = {
   }),
   'otel:serviceInstanceId': defineConfig<string | undefined>({
     envVarName: 'OPENTELEMETRY_SERVICE_INSTANCE_ID',
+    envVarType: 'string',
     defaultValue: undefined,
   }),
 
@@ -1450,6 +1506,7 @@ export const CONFIG_DEFINITIONS = {
   // S2S Messaging Pubsub Settings
   's2sMessagingPubsub:serverType': defineConfig<string | undefined>({
     envVarName: 'S2SMSG_PUBSUB_SERVER_TYPE',
+    envVarType: 'string',
     defaultValue: undefined,
   }),
   's2sMessagingPubsub:nchan:publishPath': defineConfig<string>({
@@ -1462,6 +1519,7 @@ export const CONFIG_DEFINITIONS = {
   }),
   's2sMessagingPubsub:nchan:channelId': defineConfig<string | undefined>({
     envVarName: 'S2SMSG_PUBSUB_NCHAN_CHANNEL_ID',
+    envVarType: 'string',
     defaultValue: undefined,
   }),
 
@@ -1618,6 +1676,7 @@ export const CONFIG_DEFINITIONS = {
   }),
   'app:pageBulkExportPdfConverterUri': defineConfig<string | undefined>({
     envVarName: 'BULK_EXPORT_PDF_CONVERTER_URI',
+    envVarType: 'string',
     defaultValue: undefined,
   }),
   'app:isBulkExportPagesEnabled': defineConfig<boolean>({
@@ -1665,6 +1724,7 @@ export const CONFIG_DEFINITIONS = {
   }),
   'changeProposal:maxProposalsPerUserPerDay': defineConfig<number | null>({
     envVarName: 'CHANGE_PROPOSAL_MAX_PROPOSALS_PER_USER_PER_DAY',
+    envVarType: 'number',
     defaultValue: null,
   }),
   'changeProposal:pendingExpirationSeconds': defineConfig<number | null>({

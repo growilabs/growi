@@ -1,34 +1,105 @@
-import type { IConfigLoader, RawConfigData } from '@growi/core/dist/interfaces';
-import { toBoolean } from '@growi/core/dist/utils/env-utils';
+import type {
+  EnvVarType,
+  IConfigLoader,
+  RawConfigData,
+} from '@growi/core/dist/interfaces';
 
 import loggerFactory from '~/utils/logger';
 
 import type { ConfigKey, ConfigValues } from './config-definition';
 import { CONFIG_DEFINITIONS } from './config-definition';
+import { parseEnvValue } from './parse-env-value';
 
 const logger = loggerFactory('growi:service:ConfigLoader');
 
+// The env var of 'app:checkConfigurationValueStrictly'
+const STRICT_MODE_ENV_VAR_NAME = 'CHECK_CONFIGURATION_VALUE_STRICTLY';
+
+type InvalidEnvVar = {
+  readonly envVarName: string;
+  readonly reason: string;
+};
+
+const resolveEnvVarType = (definition: {
+  readonly envVarType?: EnvVarType;
+  readonly defaultValue: unknown;
+}): EnvVarType => {
+  if (definition.envVarType != null) {
+    return definition.envVarType;
+  }
+  const inferred = typeof definition.defaultValue;
+  switch (inferred) {
+    case 'number':
+    case 'boolean':
+    case 'object':
+      return inferred;
+    default:
+      return 'string';
+  }
+};
+
+/**
+ * Read before the main loop because it decides how every other value is parsed.
+ * An invalid value keeps strict mode on so the loop reports it instead of
+ * silently disabling the check.
+ */
+const isStrictMode = (): boolean => {
+  const value = process.env[STRICT_MODE_ENV_VAR_NAME];
+  if (value == null || value === '') {
+    return true;
+  }
+  const result = parseEnvValue(value, 'boolean');
+  return result.ok ? result.value === true : true;
+};
+
+// The value itself is never included: many credentials are not flagged isSecret.
+const formatInvalidEnvVars = (invalidEnvVars: InvalidEnvVar[]): string =>
+  [
+    'Invalid environment variable value(s):',
+    ...invalidEnvVars.map(
+      ({ envVarName, reason }) => `  - ${envVarName}: ${reason}`,
+    ),
+    `Fix the value(s), or set ${STRICT_MODE_ENV_VAR_NAME}=false to fall back to the default values.`,
+  ].join('\n');
+
 export class ConfigLoader implements IConfigLoader<ConfigKey, ConfigValues> {
   async loadFromEnv(): Promise<RawConfigData<ConfigKey, ConfigValues>> {
+    const strict = isStrictMode();
     const envConfig = {} as RawConfigData<ConfigKey, ConfigValues>;
+    const invalidEnvVars: InvalidEnvVar[] = [];
 
     for (const [key, metadata] of Object.entries(CONFIG_DEFINITIONS)) {
-      let configValue = metadata.defaultValue;
+      let configValue: unknown = metadata.defaultValue;
 
-      if (metadata.envVarName != null) {
-        const envVarValue = process.env[metadata.envVarName];
-        if (envVarValue != null) {
-          configValue = this.parseEnvValue(
-            envVarValue,
-            typeof metadata.defaultValue,
-          ) as ConfigValues[ConfigKey];
+      const { envVarName } = metadata;
+      const envVarValue =
+        envVarName != null ? process.env[envVarName] : undefined;
+      const envVarType = resolveEnvVarType(metadata);
+
+      // An empty value cannot be a valid number/boolean/JSON, so it means "unset"
+      const isEmptyNonString = envVarValue === '' && envVarType !== 'string';
+
+      if (envVarName != null && envVarValue != null && !isEmptyNonString) {
+        const result = parseEnvValue(envVarValue, envVarType);
+        if (result.ok) {
+          configValue = result.value;
+        } else {
+          invalidEnvVars.push({ envVarName, reason: result.reason });
         }
       }
 
       envConfig[key as ConfigKey] = {
         definition: metadata,
-        value: configValue,
+        value: configValue as ConfigValues[ConfigKey],
       };
+    }
+
+    if (invalidEnvVars.length > 0) {
+      const message = formatInvalidEnvVars(invalidEnvVars);
+      if (strict) {
+        throw new Error(message);
+      }
+      logger.warn(`${message}\nUsing the default values instead.`);
     }
 
     logger.debug({ envConfig }, 'loadFromEnv');
@@ -64,24 +135,5 @@ export class ConfigLoader implements IConfigLoader<ConfigKey, ConfigValues> {
 
     logger.debug({ dbConfig }, 'loadFromDB');
     return dbConfig;
-  }
-
-  private parseEnvValue(value: string, type: string): unknown {
-    switch (type) {
-      case 'number':
-        return parseInt(value, 10);
-      case 'boolean':
-        return toBoolean(value);
-      case 'string':
-        return value;
-      case 'object':
-        try {
-          return JSON.parse(value);
-        } catch {
-          return null;
-        }
-      default:
-        return value;
-    }
   }
 }
