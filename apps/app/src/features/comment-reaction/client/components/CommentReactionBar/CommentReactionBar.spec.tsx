@@ -16,6 +16,9 @@ const mocks = vi.hoisted(() => ({
   useCanReactToComments: vi.fn(),
 }));
 
+// A device that can hover, so a chip lists who reacted on hover.
+vi.mock('../../hooks/use-can-hover', () => ({ useCanHover: () => true }));
+
 vi.mock('../../hooks/use-comment-reactions', () => ({
   useCommentReactions: mocks.useCommentReactions,
 }));
@@ -118,16 +121,16 @@ describe('CommentReactionBar', () => {
       />,
     );
 
-    expect(screen.getByText('👍')).toBeTruthy();
-    expect(screen.getByText('❤️')).toBeTruthy();
-    expect(
-      screen.getByRole('button', { name: 'comment_reaction.reacted_count:2' })
-        .textContent,
-    ).toContain('2');
-    expect(
-      screen.getByRole('button', { name: 'comment_reaction.reacted_count:1' })
-        .textContent,
-    ).toContain('1');
+    const thumbsUp = screen.getByRole('button', { name: '+1' });
+    const heart = screen.getByRole('button', { name: 'heart' });
+    expect(thumbsUp).toHaveTextContent('👍2');
+    expect(thumbsUp).toHaveAccessibleDescription(
+      'comment_reaction.reacted_count:2',
+    );
+    expect(heart).toHaveTextContent('❤️1');
+    expect(heart).toHaveAccessibleDescription(
+      'comment_reaction.reacted_count:1',
+    );
     expect(addButton()).not.toBeNull();
   });
 
@@ -194,20 +197,21 @@ describe('CommentReactionBar', () => {
     expect(setReaction).toHaveBeenCalledWith(expectedKey, true);
   });
 
-  it('keeps the chips but has no add button when reactions are not allowed, and the count part still opens the users', async () => {
+  it('keeps the chips but has no add button when reactions are not allowed, and hovering a chip still lists the users', async () => {
     const { setReaction } = setup({ chips: [makeChip()], canReact: false });
 
     render(
       <CommentReactionBar pageId="page1" commentId="comment1" isReadOnly />,
     );
 
-    expect(screen.getByText('👍')).toBeTruthy();
+    const chip = screen.getByRole('button', { name: '+1' });
+    expect(chip).toHaveTextContent('👍');
     expect(addButton()).toBeNull();
-    expect(screen.queryByRole('button', { name: '+1' })).toBeNull();
 
-    await userEvent.click(
-      screen.getByRole('button', { name: 'comment_reaction.reacted_count:2' }),
-    );
+    await userEvent.click(chip);
+    expect(setReaction).not.toHaveBeenCalled();
+
+    await userEvent.hover(chip);
 
     await waitFor(() => expect(screen.getByText('Alice A.')).toBeTruthy());
     expect(screen.getByText('bob')).toBeTruthy();
@@ -241,8 +245,8 @@ describe('CommentReactionBar', () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it('disables the chip toggle and the add button while an update is in flight, but not the count part', () => {
-    setup({ chips: [makeChip()], isUpdating: true });
+  it('blocks the chip toggle and disables the add button while an update is in flight', async () => {
+    const { setReaction } = setup({ chips: [makeChip()], isUpdating: true });
 
     render(
       <CommentReactionBar
@@ -252,18 +256,11 @@ describe('CommentReactionBar', () => {
       />,
     );
 
-    expect(
-      (screen.getByRole('button', { name: '+1' }) as HTMLButtonElement)
-        .disabled,
-    ).toBe(true);
-    expect((addButton() as HTMLButtonElement).disabled).toBe(true);
-    expect(
-      (
-        screen.getByRole('button', {
-          name: 'comment_reaction.reacted_count:2',
-        }) as HTMLButtonElement
-      ).disabled,
-    ).toBe(false);
+    const chip = screen.getByRole('button', { name: '+1' });
+    expect(chip).toHaveAttribute('aria-disabled', 'true');
+    await userEvent.click(chip);
+    expect(setReaction).not.toHaveBeenCalled();
+    expect(addButton()).toBeDisabled();
   });
 
   it('removes a chip once an unreact drops it from the chips', () => {

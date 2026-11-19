@@ -1,9 +1,11 @@
-// One bordered frame split into two pressable parts: the emoji part keeps the
-// frame's left padding and the count part its right padding, so the two sit flush.
+// One button holding the emoji and the count, with no divider or gap between them.
 .reaction-chip {
   display: inline-flex;
-  align-items: stretch;
-  overflow: hidden;
+  align-items: center;
+  min-height: 1.5rem;
+  padding: 0 0.5rem;
+  color: inherit;
+  background: transparent;
   border: 1px solid var(--bs-border-color);
   border-radius: 1rem;
 
@@ -12,34 +14,25 @@
     border-color: var(--bs-primary);
   }
 
-  .reaction-chip-emoji,
-  .reaction-chip-count {
-    min-height: 1.5rem;
-    padding: 0;
-    color: inherit;
-    background: transparent;
-    border: 0;
-  }
-
   .reaction-chip-emoji {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding-left: 0.5rem;
   }
 
   .reaction-chip-count {
-    padding-right: 0.5rem;
     font-size: 0.85rem;
   }
 
-  button.reaction-chip-emoji:not(:disabled):hover,
-  .reaction-chip-count:hover {
+  &:not([aria-disabled='true']):hover {
     background-color: var(--bs-secondary-bg);
   }
 
-  button:disabled {
+  &[aria-disabled='true'] {
     cursor: default;
+  }
+
+  &[aria-busy='true'] {
     opacity: 0.6;
   }
 }

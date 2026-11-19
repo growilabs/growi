@@ -1,10 +1,13 @@
 import type { JSX, RefObject } from 'react';
 import { useTranslation } from 'next-i18next';
-import { Popover, PopoverBody, PopoverHeader } from 'reactstrap';
+import { PopoverBody, PopoverHeader, UncontrolledPopover } from 'reactstrap';
 
 import type { ReactionUser } from '../../../interfaces';
 
 import styles from './CommentReactionBar.module.scss';
+
+// Long enough to cross the gap between the chip and the popover, so a long list can be scrolled.
+const DELAY = { show: 0, hide: 200 };
 
 const toDisplayName = (user: ReactionUser): string => {
   if (typeof user === 'string') {
@@ -18,26 +21,23 @@ const toKey = (user: ReactionUser): string =>
 
 type ReactionUsersPopoverProps = {
   readonly target: RefObject<HTMLElement>;
-  readonly isOpen: boolean;
-  readonly toggle: () => void;
   readonly users: readonly ReactionUser[];
 };
 
+/** Lists who reacted while the target is hovered or has focus. */
 export const ReactionUsersPopover = ({
   target,
-  isOpen,
-  toggle,
   users,
 }: ReactionUsersPopoverProps): JSX.Element => {
   const { t } = useTranslation();
 
   return (
-    <Popover
+    <UncontrolledPopover
       target={target}
-      isOpen={isOpen}
-      toggle={toggle}
-      trigger="legacy"
+      trigger="hover focus"
       placement="bottom"
+      delay={DELAY}
+      fade={false}
     >
       <PopoverHeader>{t('comment_reaction.reacted_by')}</PopoverHeader>
       <PopoverBody>
@@ -47,6 +47,6 @@ export const ReactionUsersPopover = ({
           ))}
         </ul>
       </PopoverBody>
-    </Popover>
+    </UncontrolledPopover>
   );
 };
