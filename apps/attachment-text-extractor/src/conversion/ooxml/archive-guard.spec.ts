@@ -92,7 +92,16 @@ const partEndingBeforeItsDeclaredSize = (
   return cut;
 };
 
-describe('inspectArchive passes non-ZIP and unreadable input through', () => {
+// The end record still points at a directory, but 3 bytes past its start.
+const directoryOffsetShifted = (): Buffer => {
+  const data = zip([[PPTX_PART, '<x/>']]);
+  const field =
+    data.length - END_OF_DIRECTORY_SIZE + END_OF_DIRECTORY_OFFSET_FIELD;
+  data.writeUInt32LE(data.readUInt32LE(field) + 3, field);
+  return data;
+};
+
+describe('inspectArchive passes input that is not a ZIP through', () => {
   it('returns the archive open when the required part is there', async () => {
     const data = zip([
       [PPTX_PART, '<x/>'],
@@ -104,12 +113,6 @@ describe('inspectArchive passes non-ZIP and unreadable input through', () => {
     );
 
     expect(part.toString()).toBe('<x/>');
-  });
-
-  it('passes a ZIP without the required part through', async () => {
-    const data = zip([['word/document.xml', '<x/>']]);
-
-    expect(await inspectArchive(data, PPTX_PART, limits())).toBeNull();
   });
 
   it.each([
@@ -129,10 +132,6 @@ describe('inspectArchive passes non-ZIP and unreadable input through', () => {
     ).toBeNull();
   });
 
-  it('passes an empty ZIP through', async () => {
-    expect(await inspectArchive(buildZip([]), PPTX_PART, limits())).toBeNull();
-  });
-
   it.each([
     ['docx', buildEncryptedDocx],
     ['xlsx', buildEncryptedXlsx],
@@ -150,19 +149,25 @@ describe('inspectArchive passes non-ZIP and unreadable input through', () => {
       ),
     ).toBeNull();
   });
+});
 
-  it('passes a ZIP with the required part twice through', async () => {
-    expect(
-      await inspectArchive(buildDuplicateNameZip(), PPTX_PART, limits()),
-    ).toBeNull();
-  });
-
-  // CPython's zipfile refuses these, so Python hands them to anydoc whole.
+describe('inspectArchive refuses a ZIP it cannot check as malformed', () => {
   it.each([
-    ['an entry needing version 10.0 to extract', buildVersionNeeded10xZip],
-    ['a UTF-8-flagged name that is not UTF-8', buildUtf8FlagWithNonUtf8NameZip],
-  ])('passes %s through', async (_, build) => {
-    expect(await inspectArchive(build(), PPTX_PART, limits())).toBeNull();
+    ['without the required part', () => zip([['word/document.xml', '<x/>']])],
+    ['with the required part twice', buildDuplicateNameZip],
+    ['with no entries', () => buildZip([])],
+    ['with an entry needing version 10.0 to extract', buildVersionNeeded10xZip],
+    [
+      'with a UTF-8-flagged name that is not UTF-8',
+      buildUtf8FlagWithNonUtf8NameZip,
+    ],
+    ['whose end record points past its directory', directoryOffsetShifted],
+  ])('refuses a ZIP %s', async (_, build) => {
+    const error = await conversionErrorOf(() =>
+      inspectArchive(build(), PPTX_PART, limits()),
+    );
+
+    expect(error.kind).toBe('malformed');
   });
 });
 

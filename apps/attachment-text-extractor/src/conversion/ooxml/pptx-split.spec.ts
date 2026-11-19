@@ -201,7 +201,7 @@ describe('what each per-slide package contains', () => {
   }, 60_000);
 });
 
-describe('packages that do not pass the ZIP pre-check go to anydoc whole', () => {
+describe('input that is not a ZIP goes to anydoc whole', () => {
   it('hands an encrypted PPTX over whole and reports encrypted', async () => {
     const deck = buildEncryptedPptx();
 
@@ -406,6 +406,19 @@ describe('relationship targets are resolved inside the package only', () => {
 });
 
 describe('limits and malformed packages', () => {
+  it('refuses a ZIP without the presentation part as malformed before anydoc runs', async () => {
+    const deck = buildZip(
+      pptxParts([{ title: 'only slide' }]).filter(
+        (part) => part.name !== PRESENTATION,
+      ),
+    );
+
+    const error = await conversionErrorOf(() => convertPptx(deck, limits()));
+
+    expect(error.kind).toBe('malformed');
+    expect(sentPackages()).toEqual([]);
+  });
+
   it('rejects a slide list longer than the entry limit', async () => {
     const deck = buildZip(
       editPart(pptxParts([{ title: 'only slide' }]), PRESENTATION, (xml) =>

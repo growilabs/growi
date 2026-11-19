@@ -3,8 +3,7 @@
 // before or after the archive, and a central directory read by its size
 // alone (the entry counts, the disk number and a comment cut short by the
 // end of the file are not checked), and entries flagged "strong encryption",
-// which CPython refuses only when they are read. yauzl refuses all of these,
-// and the file would then go to anydoc whole, which refuses most of them too.
+// which CPython refuses only when they are read. yauzl refuses all of these.
 
 const END_SIGNATURE = Buffer.from([0x50, 0x4b, 0x05, 0x06]);
 const CENTRAL_SIGNATURE = 0x02014b50;
@@ -120,8 +119,8 @@ const isCleanForYauzl = (data: Buffer, at: number, entries: number): boolean =>
   at + END_RECORD_BYTES + data.readUInt16LE(at + 20) <= data.length;
 
 /**
- * The bytes for yauzl to read, or null where CPython would not find an
- * archive. Usually the input itself; a slice when the archive sits among
+ * The bytes for yauzl to read, or null when they hold no end-of-central-
+ * directory record. Usually the input itself; a slice when the archive sits among
  * stray bytes; a repaired copy when the end record's counts, disk number or
  * comment length are off, or when an entry is flagged strong encryption.
  */
@@ -147,9 +146,9 @@ export const zipExtent = (bytes: Uint8Array): ZipExtent | null => {
   const directory =
     prepended >= 0 ? readCentralDirectory(data, at - size, size) : null;
   if (directory == null) {
-    // Unlike CPython, a negative offset passes the bytes through unchecked so
-    // the cell limit still applies (research.md 27.4).
-    return prepended < 0 ? unchanged(bytes) : null;
+    // Unlike CPython, a directory not where the end record's size and offset
+    // put it is left to yauzl, so the limits still apply (research.md §3.2).
+    return unchanged(bytes);
   }
   const { entries, strongRecords } = directory;
   if (

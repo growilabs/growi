@@ -6,11 +6,15 @@ import {
   buildEncryptedDocx,
   buildOwnerPasswordOnlyPdf,
   buildUserPasswordPdf,
+  buildZip,
   ENCRYPTED_MARKER,
   JAPANESE_SAMPLE,
   LEGACY_DOC_PATH,
   LEGACY_PPT_PATH,
   PLAIN_DOCUMENTS,
+  pptxParts,
+  xlsxParts,
+  type ZipEntry,
 } from '../../test/fixtures';
 import type {
   ConversionLimits,
@@ -421,6 +425,125 @@ describe('convert', () => {
       const outcome = await fail(buildEncryptedDocx(), 'a.docx');
 
       expect(JSON.stringify(outcome)).not.toContain(ENCRYPTED_MARKER);
+    });
+  });
+
+  describe('PPTX and XLSX ZIPs the archive pre-check cannot read', () => {
+    const END_RECORD_SIZE = 22;
+    const END_RECORD_DIRECTORY_SIZE = 12;
+    const END_RECORD_DIRECTORY_OFFSET = 16;
+    const CENTRAL_VERSION_NEEDED = 6;
+    const CENTRAL_FLAGS = 8;
+    const CENTRAL_NAME = 46;
+    const UTF8_NAME_FLAG = 0x0800;
+
+    // 100,000 cells, over the default cell limit of 70,000.
+    const overCellLimit = xlsxParts([
+      {
+        name: 'Big',
+        rows: Array.from({ length: 50_000 }, (_, r) => [`r${r}a`, `r${r}b`]),
+      },
+    ]);
+    const odd: ZipEntry = { name: 'odd.bin', data: 'x', method: 'stored' };
+    // With them the archive is over the default entry limit of 10,000.
+    const filler = Array.from(
+      { length: 12_000 },
+      (_, i): ZipEntry => ({ name: `f${i}.bin`, data: '', method: 'stored' }),
+    );
+    const deck = pptxParts([{ title: 'Deck title', body: 'deck body' }]);
+
+    /** Patches the first central directory record, found from the end record. */
+    const withFirstEntry = (
+      data: Buffer,
+      patch: (record: number) => void,
+    ): Buffer => {
+      patch(
+        data.readUInt32LE(
+          data.length - END_RECORD_SIZE + END_RECORD_DIRECTORY_OFFSET,
+        ),
+      );
+      return data;
+    };
+
+    const versionNeeded10First = (entries: readonly ZipEntry[]): Buffer => {
+      const data = buildZip([odd, ...entries]);
+      return withFirstEntry(data, (record) => {
+        data.writeUInt16LE(100, record + CENTRAL_VERSION_NEEDED);
+      });
+    };
+
+    const nonUtf8NameFirst = (entries: readonly ZipEntry[]): Buffer => {
+      const data = buildZip([odd, ...entries]);
+      return withFirstEntry(data, (record) => {
+        data.writeUInt16LE(
+          data.readUInt16LE(record + CENTRAL_FLAGS) | UTF8_NAME_FLAG,
+          record + CENTRAL_FLAGS,
+        );
+        data[record + CENTRAL_NAME] = 0xff;
+      });
+    };
+
+    const twice = (parts: readonly ZipEntry[], name: string): Buffer => {
+      const part = parts.find((entry) => entry.name === name);
+      if (part == null) {
+        throw new Error(`fixture lacks ${name}`);
+      }
+      return buildZip([...parts, part]);
+    };
+
+    it.each([
+      [
+        'with xl/workbook.xml twice',
+        () => twice(overCellLimit, 'xl/workbook.xml'),
+      ],
+      [
+        'with an entry needing version 10.0 to extract',
+        () => versionNeeded10First(overCellLimit),
+      ],
+      [
+        'with a UTF-8-flagged name that is not UTF-8',
+        () => nonUtf8NameFirst(overCellLimit),
+      ],
+      [
+        'with 12,000 more entries and one needing version 10.0',
+        () => versionNeeded10First([...overCellLimit, ...filler]),
+      ],
+    ])('refuses a 100,000-cell XLSX %s as malformed', async (_, build) => {
+      const outcome = await fail(build(), 'a.xlsx', null, conversionLimits());
+
+      expect(outcome.failure).toBe('malformed');
+    });
+
+    it('still applies the cell limit when the end record understates the directory size', async () => {
+      const data = buildZip(overCellLimit);
+      const field = data.length - END_RECORD_SIZE + END_RECORD_DIRECTORY_SIZE;
+      data.writeUInt32LE(data.readUInt32LE(field) - 3, field);
+
+      const outcome = await fail(data, 'a.xlsx', null, conversionLimits());
+
+      expect(outcome.failure).toBe('limit_exceeded');
+    });
+
+    it.each([
+      [
+        'with ppt/presentation.xml twice',
+        () => twice(deck, 'ppt/presentation.xml'),
+      ],
+      [
+        'without ppt/presentation.xml',
+        () =>
+          buildZip(
+            deck.map((entry) =>
+              entry.name === 'ppt/presentation.xml'
+                ? { ...entry, name: 'ppt/deck.xml' }
+                : entry,
+            ),
+          ),
+      ],
+    ])('refuses a PPTX %s as malformed', async (_, build) => {
+      const outcome = await fail(build(), 'a.pptx', null, conversionLimits());
+
+      expect(outcome.failure).toBe('malformed');
     });
   });
 

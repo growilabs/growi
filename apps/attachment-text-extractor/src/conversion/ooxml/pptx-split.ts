@@ -7,7 +7,7 @@ import { PRESENTATION, slidePackages } from './pptx-slide-packages';
 /**
  * One element per slide in presentation order. anydoc emits no slide
  * boundaries, so each slide is converted from its own package. A file that
- * fails the ZIP pre-check (legacy PPT, encrypted OOXML) goes to anydoc whole
+ * is not a ZIP (legacy PPT, encrypted OOXML) goes to anydoc whole
  * as one unnumbered element.
  */
 export const convertPptx = async (

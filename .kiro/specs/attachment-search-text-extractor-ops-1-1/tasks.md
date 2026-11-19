@@ -47,7 +47,7 @@
   - 終わった状態: 上のテストと、既存の readiness のテスト (準備未完了から戻ること、ログの行が溢れないこと) が通る
   - _Requirements: 4.1, 4.2, 4.3, 4.4_
   - _Boundary: Readiness_
-- [ ] 3.4 (P) ZIP の検査を通せない PPTX / XLSX を断る
+- [x] 3.4 (P) ZIP の検査を通せない PPTX / XLSX を断る
   - 先に、research.md §3.1 の形でテストを書き、落ちることを確かめる: 10 万セルの XLSX に `xl/workbook.xml` をもう 1 つ足したもの、扱えない版の印のエントリを 1 つ足したもの、UTF-8 の印と合わない名前のエントリを足したもの、12,000 エントリに扱えない版の印のエントリを足したものが、変換されずに `malformed` になる。PPTX でも、必要な部品が 2 つのもの、無いものが `malformed` になる
   - `archive-guard.spec.ts` の「passes … through」のテストのうち、ZIP である形 (必要な部品が無い、2 つある、空の ZIP、扱えない版の印、UTF-8 の印と合わない名前) を「`malformed` で断る」に書き換える。ZIP でない形 (空、テキスト、途中で切れた ZIP、中央の一覧が無い、暗号化された OOXML) は「通す」のまま残す。zip64 の部品を受け付けるテストも残す
   - `inspectArchive` の `null` を「ZIP でない」だけの意味にし、ほかの場合は `malformed` の例外にする。`ErrorCode`・ステータス・OpenAPI の文書は変えない
@@ -144,5 +144,6 @@
 
 ## Implementation Notes
 
+- (zip-extent.ts と archive-guard.ts の「research.md §3」「§3.2」も同様。)
 - コードのコメントが「research.md §N」「research §N.M」でこの spec の research.md の節を指している箇所 (3.1 の `src/http/app-label.ts`: §2.1・§2.5、3.3 の `src/runner/conversion-runner.ts`・`src/runner/readiness.ts`・`src/http/health-routes.ts`・`src/runner/runner-diagnostics.integ.ts`: §4。以降のタスクで増えうる) は、タスク 9.2 で research.md を対象 spec の新しい節として移すときに、移した先の節番号へ書き換える。この spec のディレクトリは 9.5 で消えるので、そのままにすると参照先が消える (`grep -rn "research" apps/attachment-text-extractor/src` で探す)。
 - この worktree では lefthook の pre-commit が完走しないので、biome・テスト・tsgo を手で通したうえで `git commit --no-verify` を使う。

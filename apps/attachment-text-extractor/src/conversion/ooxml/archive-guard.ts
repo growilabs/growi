@@ -3,12 +3,7 @@ import type { ZipFile } from 'yauzl';
 
 import type { ConversionLimits } from '../../contract';
 import { ConversionError } from '../conversion-error';
-import {
-  type ListedEntry,
-  type Listing,
-  listEntries,
-  openZip,
-} from './zip-directory';
+import { type ListedEntry, listEntries, openZip } from './zip-directory';
 import { collectPart, openPartStream, unreadablePart } from './zip-part-stream';
 
 export type ArchiveLimits = Pick<
@@ -32,18 +27,11 @@ export interface OoxmlArchive {
   close(): void;
 }
 
-/** The listed entries, or null when the archive goes to anydoc untouched. */
-const withinLimits = (
-  listing: Listing,
+const enforceDeclaredSize = (
+  listed: readonly ListedEntry[],
   limits: ArchiveLimits,
-): readonly ListedEntry[] | null => {
-  if (listing.kind === 'unreadable') {
-    return null;
-  }
-  if (listing.kind === 'too-many') {
-    throw new ConversionError('limit_exceeded', 'archive has too many entries');
-  }
-  const declared = listing.entries.reduce(
+): void => {
+  const declared = listed.reduce(
     (sum, { raw }) => sum + raw.uncompressedSize,
     0,
   );
@@ -53,7 +41,6 @@ const withinLimits = (
       'archive expands beyond the size limit',
     );
   }
-  return listing.entries;
 };
 
 const toArchive = (
@@ -102,9 +89,11 @@ const toArchive = (
 };
 
 /**
- * Reads only the central directory; part data is read on demand. null when the
- * bytes are not a ZIP holding `requiredPart` exactly once (the caller hands
- * them to anydoc whole). The caller owns and must close the returned archive.
+ * Reads only the central directory; part data is read on demand. null when
+ * the bytes are not a ZIP (the caller hands them to anydoc whole); a ZIP that
+ * cannot be listed, or does not hold `requiredPart` exactly once, is
+ * malformed (research.md §3). The caller owns and must close the returned
+ * archive.
  */
 export const inspectArchive = async (
   bytes: Uint8Array,
@@ -117,18 +106,17 @@ export const inspectArchive = async (
   }
   const { zip } = opened;
   try {
-    const listed = withinLimits(
-      await listEntries(opened, limits.maxArchiveEntries),
-      limits,
-    );
-    // A duplicated name is ambiguous between readers, so it is left to anydoc.
-    if (listed?.filter(({ name }) => name === requiredPart).length === 1) {
-      return toArchive(zip, listed);
+    const listed = await listEntries(opened, limits.maxArchiveEntries);
+    enforceDeclaredSize(listed, limits);
+    if (listed.filter(({ name }) => name === requiredPart).length !== 1) {
+      throw new ConversionError(
+        'malformed',
+        'archive lacks its main part or holds it more than once',
+      );
     }
+    return toArchive(zip, listed);
   } catch (error) {
     zip.close();
     throw error;
   }
-  zip.close();
-  return null;
 };
