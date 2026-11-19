@@ -7,7 +7,7 @@ import type { AppEnv } from './app-env';
 const INFO = {
   title: 'Attachment Text Extractor',
   description: 'Attachment text extraction microservice for GROWI.',
-  version: '1.0.0',
+  version: '1.1.0',
 } as const;
 
 /** The OpenAPI document of the routes registered on `app` (research.md 17.13). */

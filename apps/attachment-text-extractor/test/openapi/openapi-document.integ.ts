@@ -1,3 +1,4 @@
+import { APP_ID_PATTERN } from '../../src/http/app-label';
 import { ERROR_TABLE } from '../../src/http/error-table';
 import {
   type Answer,
@@ -67,6 +68,24 @@ describe('what a client generated from the document keeps', () => {
     expect(fits({ mimeType: 'text/plain' })).not.toEqual([]);
     expect(fits({ file: 'x', mimeType: 1 })).not.toEqual([]);
     expect(fits({ file: 'x', mime_type: 'text/plain' })).not.toEqual([]);
+  });
+
+  it('POST /extract documents one optional header, X-Growi-App-Id, shaped as the log accepts it', async () => {
+    const doc = await served();
+    const parameters = textAt(doc, [...EXTRACT, 'parameters']);
+
+    expect(parameters).toEqual([
+      {
+        in: 'header',
+        name: 'X-Growi-App-Id',
+        required: false,
+        schema: { type: 'string', pattern: APP_ID_PATTERN.source },
+      },
+    ]);
+  });
+
+  it('is version 1.1.0', async () => {
+    expect(textAt(await served(), ['info', 'version'])).toBe('1.1.0');
   });
 
   it('names the schemas the client and apps/app use', async () => {

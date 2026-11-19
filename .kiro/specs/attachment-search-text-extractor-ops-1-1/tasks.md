@@ -35,7 +35,7 @@
   - 形の正規表現は 1 か所に置く (3.2 が OpenAPI の文書で同じものを使う)。ヘッダーは route の最初、宣言された長さの確かめと枠より前に読む
   - 終わった状態: 上のテストがすべて通り、ログの行が `extract format=… size=… duration_ms=… result=… child_peak_rss_mb=… app=…` になる
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6_
-- [ ] 3.2 OpenAPI の文書にヘッダーを載せ、版を 1.1.0 にして、生成クライアントを作り直す
+- [x] 3.2 OpenAPI の文書にヘッダーを載せ、版を 1.1.0 にして、生成クライアントを作り直す
   - `POST /extract` の `describeRoute` に、任意のヘッダー `X-Growi-App-Id` (3.1 の正規表現を `pattern` にした文字列) を足す。文書の `info.version` を `1.1.0` にする
   - 書き出しの手順で `packages/attachment-text-extractor-client/openapi.json` を書き出し直して biome で整え、orval で生成クライアントを作り直す (`apps/attachment-text-extractor/AGENTS.md` の手順)
   - 終わった状態: 書き出した文書に `parameters` が 1 つ加わり、`info.version` が `1.1.0` になっている。`export-openapi.integ.ts` が通る。生成クライアントの差分が先頭のコメントの版の行だけである (関数と型が変わっていない)

@@ -11,7 +11,7 @@ import {
   ExtractResponseSchema,
 } from './api-schemas';
 import type { AppContext, AppEnv } from './app-env';
-import { appLabelOf } from './app-label';
+import { APP_ID_PATTERN, appLabelOf } from './app-label';
 import type { ConcurrencySlots } from './concurrency-slots';
 import { errorAnswer } from './early-answer';
 import {
@@ -215,6 +215,14 @@ const convertAndAnswer = async (
 // (research.md 17.13 3). The answer is built as a stream, so the schemas
 // cannot check it at compile time; the ajv tests check real answers.
 const describeExtract = describeRoute({
+  parameters: [
+    {
+      in: 'header',
+      name: 'X-Growi-App-Id',
+      required: false,
+      schema: { type: 'string', pattern: APP_ID_PATTERN.source },
+    },
+  ],
   requestBody: {
     required: true,
     content: {

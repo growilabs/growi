@@ -1,6 +1,6 @@
 import type { IncomingHttpHeaders } from 'node:http';
 
-const APP_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
+export const APP_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 
 const ABSENT = '-';
 const INVALID = '(invalid)';
