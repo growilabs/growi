@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+
 import { APP_ID_PATTERN } from '../../src/http/app-label';
 import { ERROR_TABLE } from '../../src/http/error-table';
 import {
@@ -34,6 +36,24 @@ const service = useTestService(() => {
 
 const served = async (): Promise<Record<string, unknown>> =>
   jsonOf(await getPath(service.current().url, '/openapi.json'));
+
+/** major.minor.patch only: a pre-release or build suffix fails rather than compares. */
+const versionParts = (version: string): readonly number[] => {
+  if (!/^\d+\.\d+\.\d+$/.test(version)) {
+    throw new Error(`not a major.minor.patch version: ${version}`);
+  }
+  return version.split('.').map(Number);
+};
+
+/** Negative, zero or positive as `a` is older than, the same as or newer than `b`. */
+const compareVersions = (a: string, b: string): number => {
+  const left = versionParts(a);
+  const right = versionParts(b);
+  const differing = left.findIndex((part, i) => part !== right[i]);
+  return differing === -1
+    ? 0
+    : (left[differing] ?? 0) - (right[differing] ?? 0);
+};
 
 const EXTRACT = ['paths', '/extract', 'post'] as const;
 const PAGE = { pageNumber: 1, label: '1', content: 'x' };
@@ -86,6 +106,20 @@ describe('what a client generated from the document keeps', () => {
 
   it('is version 1.1.0', async () => {
     expect(textAt(await served(), ['info', 'version'])).toBe('1.1.0');
+  });
+
+  // At least, not equal: the written version is raised in the PR that adds the
+  // changeset, and package.json catches up only when the release PR merges.
+  it('is not older than the package version', async () => {
+    const documented = textAt(await served(), ['info', 'version']);
+    const packaged: unknown = JSON.parse(
+      readFileSync(new URL('../../package.json', import.meta.url), 'utf8'),
+    ).version;
+    if (typeof documented !== 'string' || typeof packaged !== 'string') {
+      throw new Error('a version is missing');
+    }
+
+    expect(compareVersions(documented, packaged)).toBeGreaterThanOrEqual(0);
   });
 
   it('names the schemas the client and apps/app use', async () => {

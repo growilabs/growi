@@ -622,7 +622,7 @@ interface ConversionRunner {
 
 ログは標準エラーに、`<UTC の ISO 8601 の時刻> <重要度> <本文>` の 1 行ずつで出す。`LOG_LEVEL` で絞る。
 
-- `/extract` の 1 件ごと (認証を通った要求): `extract format=… size=… duration_ms=… result=… child_peak_rss_mb=… app=…` を INFO で 1 行。`format` は拡張子 (英数字 10 字まで)、`result` は成功か失敗の種類 (変換に入る前の `service_busy` / `file_too_large` / `upload_timeout` / `invalid_upload` / `client_disconnected` を含む)、子を起動しなかったときの `child_peak_rss_mb` は `unknown`。`app` は行の最後に置き、`X-Growi-App-Id` の値 (形に合うとき)、`-` (ヘッダーなし)、`(invalid)` (形に合わない) のどれか (§AppLabel)。最後に置くので、`child_peak_rss_mb=(\S+)` までを読む道具は、その後ろに項目があっても読める。ファイル名・中身・形式の手がかり・Authorization ヘッダは出さない
+- `/extract` の 1 件ごと (認証を通った要求): `extract format=… size=… duration_ms=… result=… child_peak_rss_mb=… app=…` を INFO で 1 行。`format` は拡張子 (英数字 10 字まで)、`result` は成功か失敗の種類 (変換に入る前の `service_busy` / `file_too_large` / `upload_timeout` / `invalid_upload` / `client_disconnected` を含む)、子を起動しなかったときの `child_peak_rss_mb` は `unknown`。経路の中の想定外の例外で Hono が 500 を返した要求も、`result=internal` の行を 1 行出す (1 件につき行はちょうど 1 行)。`app` は行の最後に置き、`X-Growi-App-Id` の値 (形に合うとき)、`-` (ヘッダーなし)、`(invalid)` (形に合わない) のどれか (§AppLabel)。最後に置くので、`child_peak_rss_mb=(\S+)` までを読む道具は、その後ろに項目があっても読める。ファイル名・中身・形式の手がかり・Authorization ヘッダは出さない
 - runner が想定外の例外を投げたとき: `extract runner raised format=… size=… error=<例外のクラスの名前>` を ERROR で 1 行
 - 親が書く診断の行 (WARNING / ERROR): 子を起動できない (`launcher=` と errno の名前)、子が結果なしで終わった (終了コード)、シグナルで止まった (シグナルの名前)、結果が決まった形でない、SIGKILL の後も終わらない。親が自分で子を止めた場合 (期限、メモリ、結果の大きさ、切断) は、`extract` の行の `result=` が言うので足さない。値は決まった一覧から選んだものだけで、例外の文は出さない
 - 子の警告: 子が標準エラーに書いた決まった 4 つの符号を、親が持つ固定の文に置き換えて WARNING で出す。それ以外の出力 (Node の警告、`prlimit` 自身のエラーなど) は「見覚えのない出力」の 1 行にまとめる。子が書いたバイトはログに写さない。想定外の失敗の例外の名前も出さない (部品が自由に決める文字列で、決まった一覧と照らせないため)
@@ -646,7 +646,7 @@ interface ConversionRunner {
 
 - `endpoint` の値は 6 つ (`/extract`、`/healthz`、`/readyz`、`/openapi.json`、`/metrics`、`other`)。認証と同じく送られた要求の文字列そのもので決めるので、`/./metrics` は `other` になる。`status` は 3 桁のステータス。`result` の値は、成功の `ok`、変換の後の失敗の種類 (`ERROR_TABLE` のキー)、変換の前に断る理由 (`REFUSAL_TABLE` のキー) で、ログの `result=` と同じ。どのラベルにも、要求が送った自由な文字列 (`X-Growi-App-Id` の値を含む) を入れない (9.7)。自己申告の値をラベルにすると、ラベルの値の種類が際限なく増え、監視システムの記憶と計算の量が増えるため
 - `result` の値は、起動の時点ですべて 0 で作っておく。まだ起きていない結果も、監視の側で増え方を計算できるようにするため
-- 結果ごとの件数と所要時間は、ログの行を書く関数で数える。行を書く場所と結果の値が 1 か所にまとまっているためで、`LOG_LEVEL` で行を出さない場合も数える
+- 結果ごとの件数と所要時間は、ログの行を書く関数で数える。行を書く場所と結果の値が 1 か所にまとまっているためで、`LOG_LEVEL` で行を出さない場合も数える。認証を通った `POST /extract` は 1 件につき行をちょうど 1 行書くので、結果の件数の合計は、`endpoint="/extract"` の応答の数から 401 と 404 を除いた数と同じになる。これは宛先を `/extract` (問い合わせ部分を除く) とそのまま書いた要求について成り立つ。`/./extract` のように別の書き方をした宛先は経路に届くが、応答は `endpoint="other"` で数える
 - 既定の指標は HTTP を受けるプロセス (親) の値で、変換の子の CPU とメモリは含まない。子を含むコンテナ全体の値は、オーケストレーターのコンテナの指標で見る
 - 自動スケールの指標には、Pod ごとの `attachment_extractor_slots_in_use / attachment_extractor_slots_max` を使える。枠がすべて埋まったコンテナは 503 を返すだけで CPU を使わないので、CPU より直接に埋まり具合が分かる
 

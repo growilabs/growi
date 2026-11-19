@@ -257,7 +257,12 @@ export const registerExtractRoute = (
   const { slots } = deps;
   const intake = intakeOf(deps.settings);
   app.post('/extract', describeExtract, async (c) => {
-    const line = deps.log.start(appLabelOf(c.env.incoming.headers));
+    const write = deps.log.start(appLabelOf(c.env.incoming.headers));
+    let written = false;
+    const line: RequestLine = (result, facts) => {
+      written = true;
+      write(result, facts);
+    };
     if (declaredOverCap(c.env.incoming, intake.maxBodyBytes)) {
       line('file_too_large');
       return refusalAnswer(c, {
@@ -279,6 +284,9 @@ export const registerExtractRoute = (
       return await convertAndAnswer(c, deps, received.input, line);
     } finally {
       release();
+      // Hono answers an unexpected throw with a 500; it still gets its line,
+      // so the results add up to the answers.
+      if (!written) line('internal');
     }
   });
 };

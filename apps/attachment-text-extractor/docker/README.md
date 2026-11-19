@@ -229,7 +229,12 @@ token.
 - `result` takes the same values as `result=` on the log line. Every value is
   there from the start with 0, so a rate can be computed for a result that has
   not happened yet. The results are counted whatever `LOG_LEVEL` is, even when
-  the log line itself is not written.
+  the log line itself is not written. A request the route fails on with an
+  unexpected error (a 500) is counted, and logged, as `internal`, so the
+  results add up to the `/extract` answers other than 401 and 404. This holds for
+  requests whose target is written exactly as `/extract` (a query string aside); a
+  target written another way, such as `/./extract`, still reaches the route but is
+  counted as `endpoint="other"`.
 - The process metrics are those of the HTTP process alone; they do not include
   the conversion children's CPU or memory. For the whole container, children
   included, use your orchestrator's container metrics.

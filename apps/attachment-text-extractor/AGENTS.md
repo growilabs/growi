@@ -62,6 +62,11 @@ pnpm exec biome check --write packages/attachment-text-extractor-client/openapi.
 pnpm -F @growi/attachment-text-extractor-client gen
 ```
 
+When you add a changeset for this package, raise `INFO.version` in
+`src/http/openapi-route.ts` to the version that release will carry, regenerate
+`openapi.json` and the client, and commit them in the same PR; a test fails once
+package.json is ahead of it.
+
 Commit `openapi.json` and `src/generated/` together with the service change, and
 fix the caller in `apps/app` when a name or a type changed. Changing the request
 fields, the response shape or the `ErrorCode` values is a breaking change for

@@ -1263,7 +1263,7 @@ open sibling mem: ERROR EACCES
 
 - `assemblePages` は、改行を LF に揃えた `content` の UTF-8 のバイト数を足し、`MAX_RESULT_BYTES` を超えたら `result_too_large` を投げる。`label` は数えない。
 - PPTX の `content` は、anydoc の出力の掃除 (`cleanSlideText`) の後で、まだ CR を含みうる。揃える前のバイト数で数えると、最後の確かめでは通る結果を途中で止めてしまう。
-- **決定**: 数え方を `result-budget.ts` の 1 か所に置き、PDF の繰り返し、PPTX の繰り返し、`assemblePages` が同じものを使う。改行の揃えは PDF の経路ではすでに済んでいるが、同じ関数を通しても結果は変わらない (揃える処理は 2 回かけても同じ)。
+- **決定**: 数え方を `result-budget.ts` の 1 か所に置き、PDF の繰り返し、PPTX の繰り返し、`assemblePages` が同じものを使う。数える関数は改行を揃えず、揃えた後の文字列だけを型 (`LfText`。`normalize.ts` の関数だけが作る) で受け取る。各呼び出し元は自分で 1 回だけ揃える。PPTX は掃除の後に揃える (掃除の行末の判定は Python 版と同じく LF だけを見るので、先に揃えると消すものが変わる)。`PageInfo.content` は普通の文字列なので、`assemblePages` は経路を問わずもう 1 回揃える。揃える処理は文字列を写し直すので、上限に近い大きな PDF で同じ文字列に何度もかけると、CPU と一時的なメモリを無駄に使うためである。
 - 空の要素は 0 バイトなので、数えても数えなくても同じになる。
 - 親の受け取りの上限 (`2 × MAX_RESULT_BYTES + 約 1MiB`) は変えない。
 

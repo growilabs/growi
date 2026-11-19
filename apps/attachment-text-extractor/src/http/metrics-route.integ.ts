@@ -1,4 +1,5 @@
 import { EXTRACT_RESULTS } from './error-table';
+import { receiveUpload } from './receive-upload';
 import {
   callPath,
   getPath,
@@ -19,6 +20,13 @@ import {
   seriesValue,
 } from './spec-support/prometheus-text';
 import { useTestService } from './spec-support/test-service';
+
+// The real receiveUpload unless a test makes it fail in a way the route does
+// not expect; the error classes stay the real ones.
+vi.mock('./receive-upload', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./receive-upload')>();
+  return { ...actual, receiveUpload: vi.fn(actual.receiveUpload) };
+});
 
 // GET /metrics answers without a token in the Prometheus text format: the
 // slots, every answer Hono produced by endpoint and status, each POST /extract
@@ -43,6 +51,22 @@ const scrape = async (url = service.current().url): Promise<Exposition> => {
   expect(answer.status).toBe(200);
   return parseExposition(answer.text);
 };
+
+/** The sum of every series of `name` whose labels include `labels`. */
+const totalOf = (
+  exposition: Exposition,
+  name: string,
+  labels: Readonly<Record<string, string>> = {},
+): number =>
+  exposition.samples
+    .filter(
+      (sample) =>
+        sample.name === name &&
+        Object.entries(labels).every(
+          ([key, value]) => sample.labels[key] === value,
+        ),
+    )
+    .reduce((sum, sample) => sum + sample.value, 0);
 
 const post = (data = 'x') => {
   const { url, token } = service.current();
@@ -299,6 +323,30 @@ describe('the extract results', () => {
     expect(
       seriesValue(metrics, `${DURATION}_count`, { result: 'internal' }),
     ).toBe(1);
+  });
+
+  it('counts a route that threw unexpectedly as internal, with its one line', async () => {
+    vi.mocked(receiveUpload).mockRejectedValueOnce(new Error('unexpected'));
+    expect((await post()).status).toBe(500);
+
+    const metrics = await scrape();
+    expect(seriesValue(metrics, RESULTS, { result: 'internal' })).toBe(1);
+    expect(
+      seriesValue(metrics, `${DURATION}_count`, { result: 'internal' }),
+    ).toBe(1);
+    expect(
+      seriesValue(metrics, RESPONSES, { endpoint: '/extract', status: '500' }),
+    ).toBe(1);
+    expect(totalOf(metrics, RESULTS)).toBe(
+      totalOf(metrics, RESPONSES, { endpoint: '/extract' }),
+    );
+    const lines = service
+      .current()
+      .logs.filter((line) => line.includes('extract format='));
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatch(
+      / result=internal child_peak_rss_mb=unknown app=-$/,
+    );
   });
 
   it.each([

@@ -1,4 +1,5 @@
 import type { ConversionLimits, PageInfo } from '../../contract';
+import { normalizeNewlines } from '../normalize';
 import { convertOffice } from '../office';
 import { spendResultBudget } from '../result-budget';
 import { inspectArchive } from './archive-guard';
@@ -25,7 +26,11 @@ export const convertPptx = async (
     let usedBytes = 0;
     for await (const slidePackage of slidePackages(archive, limits)) {
       const number = pages.length + 1;
-      const content = cleanSlideText(await convertOffice(slidePackage, 'pptx'));
+      // Unified only after the cleanup, whose line ends are LF alone as in
+      // pptx_split.py: unifying first would change what it removes.
+      const content = normalizeNewlines(
+        cleanSlideText(await convertOffice(slidePackage, 'pptx')),
+      );
       usedBytes = spendResultBudget(usedBytes, content, limits.maxResultBytes);
       pages.push({ pageNumber: number, label: String(number), content });
     }
