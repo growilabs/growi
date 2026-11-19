@@ -7,7 +7,7 @@ import { loadPackageManifest } from './deploy-files';
 // This maps Python's test_dependencies.py "production dependencies exclude external
 // binary and removed libraries" (research.md 22.3): the exact list also keeps out
 // every rejected library (OCR, external-command wrappers, other PDF and HTML
-// parsers, the test-only tools). Requirement 8.3.
+// parsers, the test-only tools).
 
 const ALLOWED_PRODUCTION_DEPENDENCIES = [
   '@embedpdf/pdfium',

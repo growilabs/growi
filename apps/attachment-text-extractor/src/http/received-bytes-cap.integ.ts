@@ -7,7 +7,7 @@ import {
 import { chunk, openConnection, requestHead } from './spec-support/raw-http';
 import { useTestService } from './spec-support/test-service';
 
-// Req 3.3: a body that declares no length is capped by the bytes that arrive
+// A body that declares no length is capped by the bytes that arrive
 // (the file limit plus 64 KiB of framing), while it streams in. Refused at the
 // cap, the answer names the request body; were only the file checked after
 // the whole body was read, it would name the file instead (Python's

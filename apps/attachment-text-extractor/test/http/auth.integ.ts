@@ -17,7 +17,7 @@ import {
 } from '../../src/http/spec-support/raw-http';
 import { useBlackboxService } from './blackbox-service';
 
-// Black box (research.md 22.7 `auth`): Req 1.6, only /healthz, /readyz and
+// Black box (research.md 22.7 `auth`): only /healthz, /readyz and
 // /openapi.json answer without a token; every other path, unknown ones
 // included, is 401 before anything else happens. Python test_integration_auth.py
 // and the "missing or invalid token" rows of test_e2e_http.py.
@@ -94,7 +94,7 @@ describe('POST /extract authentication', () => {
   });
 });
 
-describe('paths that answer without a token (Req 1.6)', () => {
+describe('paths that answer without a token', () => {
   it.each([
     '/healthz',
     '/readyz',

@@ -1,5 +1,5 @@
 // What the memory measurement of tasks 6.12 decides from its numbers, and
-// the table it prints (research.md 20.10, 20.12; Req 3.14, 11.2).
+// the table it prints (research.md 20.10, 20.12).
 
 /** The memory limit the service is designed for (2 Gi; docker/README.md). */
 export const CONTAINER_LIMIT_MIB = 2048;

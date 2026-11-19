@@ -10,7 +10,7 @@ import {
   warningsOf,
 } from './report';
 
-// Req 3.14 / 11.2 (tasks 6.12): what the memory measurement decides from its
+// What the memory measurement decides from its
 // numbers. Only the spec's budget fails the check: the container stays within
 // 2 Gi (2,048 MiB) under the heaviest loads. The two baseline files against
 // 0.95 x MAX_CHILD_RSS_MB (304 MB) is a warning: the margin there is smaller

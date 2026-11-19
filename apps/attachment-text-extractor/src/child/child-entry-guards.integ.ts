@@ -152,7 +152,7 @@ describe.skipIf(process.platform !== 'linux')(
       expect(finished.logs).toBe('failed_unexpectedly\n');
     });
 
-    // Without a working watch the child could outlive its parent (Req 3.11),
+    // Without a working watch the child could outlive its parent,
     // so it must not convert at all.
     it.each<[string, () => LivenessSlot]>([
       ['missing', () => 'missing'],

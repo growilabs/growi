@@ -282,7 +282,7 @@ describe('convert', () => {
     });
   });
 
-  describe('normalization: newlines everywhere, Japanese joining only on the PDF route (Req 2.5)', () => {
+  describe('normalization: newlines everywhere, Japanese joining only on the PDF route', () => {
     it('keeps the Japanese line break of plain text and unifies its newlines', async () => {
       const outcome = await succeed(
         Buffer.from('障害対応メモ\r\n本番環境で発生\r別行'),

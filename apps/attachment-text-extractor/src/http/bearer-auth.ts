@@ -5,7 +5,7 @@ import type { AppEnv } from './app-env';
 import { errorAnswer } from './early-answer';
 import { UNAUTHORIZED_ANSWER } from './error-table';
 
-// The only paths answered without a token (Req 1.6); every other one, an
+// The only paths answered without a token; every other one, an
 // unknown one included, needs it, and is checked before anything else runs.
 const OPEN_PATHS: ReadonlySet<string> = new Set([
   '/healthz',

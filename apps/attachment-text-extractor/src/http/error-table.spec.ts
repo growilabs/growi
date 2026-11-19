@@ -6,7 +6,7 @@ import {
 } from './error-table';
 
 // The one table from a failure kind to ErrorCode, HTTP status and the fixed
-// message (Req 1.3, 1.8, 5.5). A missing kind is a type error (Record over
+// message. A missing kind is a type error (Record over
 // FailureKind); this test pins the values: the target spec's design.md
 // §Error Handling, with the Python service's fixed texts (extract_errors.py).
 

@@ -17,8 +17,8 @@ import { useTestService } from '../../src/http/spec-support/test-service';
 import { responseChecker, schemaChecker, textAt } from './openapi-support';
 
 // The document is generated from the route definitions (research.md 17.13).
-// Checked here: (1) what a client generated from it keeps for POST /extract
-// (Req 7.1, 7.2): the request fields and whether they are required, the
+// Checked here: (1) what a client generated from it keeps for POST /extract:
+// the request fields and whether they are required, the
 // answer types, the ErrorCode values; (2) real answers fit the documented
 // schemas, read in the strict view (17.7 2 (iv)): an undocumented field or
 // status fails.
@@ -42,7 +42,7 @@ const EXTRACTED = {
   extractedCharacters: 1,
 };
 
-describe('what a client generated from the document keeps (Req 7.1, 7.2)', () => {
+describe('what a client generated from the document keeps', () => {
   it('documents POST /extract, GET /healthz and GET /readyz', async () => {
     const doc = await served();
 

@@ -1,7 +1,7 @@
 import { createLeveledLog } from '../config/leveled-log';
 import type { LogLevel } from '../config/load-settings';
 
-// One line per POST /extract (Req 1.7), in the target spec's form:
+// One line per POST /extract, in the target spec's form:
 // "extract format=… size=… duration_ms=… result=… child_peak_rss_mb=…".
 // Never the file name, the content or the Authorization header: the format
 // is the cleaned extension only.

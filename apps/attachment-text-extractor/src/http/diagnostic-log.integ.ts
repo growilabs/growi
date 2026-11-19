@@ -11,7 +11,7 @@ import {
 // research.md 7.8, seen from outside: the service's whole log (the request
 // lines and the runner's diagnostic lines in one sink) for requests anyone can
 // send. /readyz needs no token, so asking it again must not add lines; no line
-// carries anything of an upload (Req 1.7, 1.8); a request other than /extract
+// carries anything of an upload; a request other than /extract
 // still leaves no line.
 
 const CONTENT_MARKER = 'SECRET-CONTENT-MARKER-7f3a';

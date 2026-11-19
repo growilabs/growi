@@ -193,7 +193,7 @@ describe('convertPdf', () => {
     });
   });
 
-  describe('Japanese line-break joining (the PDF route only, Req 2.5)', () => {
+  describe('Japanese line-break joining (the PDF route only)', () => {
     it('closes the gap between two Japanese lines', async () => {
       const pages = await convertPdf(
         buildJapaneseLinesPdf(['日本', '語です']),

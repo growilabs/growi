@@ -9,9 +9,9 @@ import {
 } from './spec-support/fake-runner';
 import { useTestService } from './spec-support/test-service';
 
-// Req 1.7: one line per POST /extract with the format, size, duration, result
-// and the child's peak RSS, and never the file name, the content or the token
-// (also Req 1.8 on the log side). The line keeps the target spec's form:
+// One line per POST /extract with the format, size, duration, result
+// and the child's peak RSS, and never the file name, the content or the token.
+// The line keeps the target spec's form:
 // "extract format=… size=… duration_ms=… result=… child_peak_rss_mb=…".
 // Python test_extract_router.py TestLogging, test_live_server.py
 // TestProductionLogging, and the log side of test_e2e_http.py TestHygieneOverHttp.
@@ -192,7 +192,7 @@ describe('the request line', () => {
   });
 });
 
-describe('LOG_LEVEL (Req 1.4)', () => {
+describe('LOG_LEVEL', () => {
   it.each([
     'INFO',
     'DEBUG',

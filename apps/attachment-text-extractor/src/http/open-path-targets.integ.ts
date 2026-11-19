@@ -3,7 +3,7 @@ import { fakeRunner } from './spec-support/fake-runner';
 import { requestHead, sendRaw } from './spec-support/raw-http';
 import { useTestService } from './spec-support/test-service';
 
-// Req 1.6 / 1.13: only the three paths, written exactly so, answer without a
+// Only the three paths, written exactly so, answer without a
 // token. A request target the URL parser resolves to one of them, or to
 // /extract ("/./healthz", "/%68ealthz", "/healthz/../extract"), still needs it.
 

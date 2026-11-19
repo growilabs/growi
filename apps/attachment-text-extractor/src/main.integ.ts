@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-// Req 1.5: the built service (`node dist/main.js`, what the image starts)
+// The built service (`node dist/main.js`, what the image starts)
 // exits before listening when the token is unset or blank, and says which
 // variable is missing. A started service is covered by service.integ.ts; the
 // port is fixed at 8000 as in the FastAPI image, so it is not started here.

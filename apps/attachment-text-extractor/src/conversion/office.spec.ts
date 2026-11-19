@@ -111,7 +111,7 @@ describe('convertOffice', () => {
     });
   });
 
-  describe('no external transmission (Req 4.5)', () => {
+  describe('no external transmission', () => {
     it('calls anydoc once with the explicit format and no ocr option', async () => {
       vi.mocked(toMarkdownBytes).mockResolvedValueOnce('converted');
       const payload = Buffer.from('payload');

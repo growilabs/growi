@@ -13,7 +13,7 @@ import {
   within,
 } from './spec-support';
 
-// Req 8.8 and design.md: ready means prlimit can be started and a probe child,
+// design.md: ready means prlimit can be started and a probe child,
 // started the same way as a conversion child (prlimit, childEntry), loads every
 // conversion component and answers. Python test_forkserver.py: the five cases
 // 22.3 carries over (ready with everything loaded, not ready when a component

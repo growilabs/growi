@@ -21,8 +21,8 @@ import {
 } from './spec-support/test-service';
 
 // The error-table rows that need settings other than the defaults or a child
-// that misbehaves, through the real HTTP layer and the real runner (Req 1.3,
-// 3.4, 3.6). Python test_e2e_http.py TestSizeAndLimitRowsOverHttp,
+// that misbehaves, through the real HTTP layer and the real runner.
+// Python test_e2e_http.py TestSizeAndLimitRowsOverHttp,
 // TestInputSizeCapsOverHttp, TestTimeoutRowOverHttp,
 // TestChildFailureRowsOverHttp and TestServiceBusyOverHttp. A stand-in child
 // (src/runner/spec-support/stand-in-child.mjs, mode in the file's first line)
@@ -137,7 +137,7 @@ describe.skipIf(process.platform !== 'linux')(
       });
     });
 
-    describe('CSV / TSV and HTML size caps (Req 3.6)', () => {
+    describe('CSV / TSV and HTML size caps', () => {
       it.each([
         ['a.csv', undefined, 'MAX_CSV_BYTES'],
         ['a.tsv', undefined, 'MAX_CSV_BYTES'],

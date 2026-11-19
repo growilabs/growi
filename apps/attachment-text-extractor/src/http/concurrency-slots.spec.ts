@@ -1,6 +1,6 @@
 import { createConcurrencySlots } from './concurrency-slots';
 
-// Req 3.2: the slots never make a caller wait. With every slot taken the next
+// The slots never make a caller wait. With every slot taken the next
 // caller is told at once (and answers 503); a released slot is reusable.
 // Python test_limits.py TestAcquireSlot (its exception-path rows are the
 // route's: extract-route.integ.ts checks the slot after a failing run).
