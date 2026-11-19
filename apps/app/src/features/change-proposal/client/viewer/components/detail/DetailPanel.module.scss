@@ -1,7 +1,6 @@
 // Shared by the requester's "not applied" list and the revert result list:
 // a quiet panel of "path — state" rows.
 .panel {
-  container-type: inline-size;
   padding: 1rem 1.25rem;
   border: 1px solid var(--bs-border-color);
   border-radius: var(--bs-border-radius-lg);
@@ -29,10 +28,9 @@
 
 .row {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem 1rem;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 0.25rem;
+  align-items: flex-start;
   padding: 0.5rem 0;
 
   & + & {
@@ -72,12 +70,4 @@
   margin: 0.75rem 0 0;
   font-size: 0.875rem;
   color: var(--bs-secondary-color);
-}
-
-// Narrow panels put the state under the path instead of at the far right.
-@container (max-width: 30rem) {
-  .row {
-    flex-direction: column;
-    align-items: flex-start;
-  }
 }

@@ -77,8 +77,12 @@ export const OperationItem = ({
     if (revertability == null) {
       return null;
     }
+    // The status reason already says it.
+    if (!revertability.revertible && revertability.reason === reason) {
+      return null;
+    }
     return revertability.revertible ? (
-      <span className={`${styles.note} ${styles.revertible}`}>
+      <span className={styles.note}>
         <SymbolIcon name="undo" className={styles['note-icon']} />
         {t('change_proposal_viewer.operation.revertible')}
       </span>
@@ -121,7 +125,10 @@ export const OperationItem = ({
           <span className={styles.note}>
             <SymbolIcon name="undo" className={styles['note-icon']} />
             {t('change_proposal_viewer.operation.reverted_by')}{' '}
-            <Link href={buildProposalHref(revertedByProposalId)}>
+            <Link
+              href={buildProposalHref(revertedByProposalId)}
+              className="text-decoration-underline"
+            >
               {formatProposalShortId(revertedByProposalId)}
             </Link>
           </span>

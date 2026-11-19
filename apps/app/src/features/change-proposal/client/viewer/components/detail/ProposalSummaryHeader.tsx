@@ -32,9 +32,9 @@ const Fact = ({
   readonly label: string;
   readonly children: ReactNode;
 }): JSX.Element => (
-  <div className={styles.fact}>
-    <dt>{label}</dt>
-    <dd>{children}</dd>
+  <div className="col">
+    <dt className="mb-1 small fw-semibold text-body-secondary">{label}</dt>
+    <dd className="mb-0 text-break">{children}</dd>
   </div>
 );
 
@@ -64,14 +64,14 @@ export const ProposalSummaryHeader = ({
         <ProposalProgressLabel view={proposal} />
         <PerPageNotificationsLabel view={proposal} />
       </div>
-      <dl className={styles.facts}>
+      <dl className="row row-cols-auto gx-4 gy-3 mb-0">
         <Fact label={t('change_proposal_viewer.detail.requested_by')}>
           <span className={styles.name}>{requester.name}</span>{' '}
           <span className={styles.username}>{`@${requester.username}`}</span>
         </Fact>
         <Fact label={t('change_proposal_viewer.detail.entry')}>
-          <span className={styles.entry}>
-            <SymbolIcon name={ENTRY_ICONS[entry]} className={styles.icon} />
+          <span className="d-inline-flex align-items-center gap-1 px-2 small bg-body-secondary rounded-1">
+            <SymbolIcon name={ENTRY_ICONS[entry]} className="fs-6" />
             {t(ENTRY_LABEL_KEYS[entry])}
           </span>
         </Fact>
@@ -90,7 +90,10 @@ export const ProposalSummaryHeader = ({
         )}
         {revertOf != null && (
           <Fact label={t('change_proposal_viewer.detail.reverts')}>
-            <Link href={buildProposalHref(revertOf)}>
+            <Link
+              href={buildProposalHref(revertOf)}
+              className="text-decoration-underline"
+            >
               {formatProposalShortId(revertOf)}
             </Link>
           </Fact>

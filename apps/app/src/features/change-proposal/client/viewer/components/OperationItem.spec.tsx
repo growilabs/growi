@@ -360,6 +360,28 @@ describe('OperationItem', () => {
         screen.queryByText('change_proposal_viewer.operation.revertible'),
       ).toBeNull();
     });
+
+    it('says the reason once when the refusal reason repeats the reason of the status', () => {
+      render(
+        <OperationItem
+          proposal={proposal}
+          operation={createOperation({
+            status: 'revert-refused',
+            reason: 'edited-after-apply',
+            revertability: { revertible: false, reason: 'edited-after-apply' },
+          })}
+        />,
+      );
+
+      expect(
+        screen.getByText(OPERATION_REASON_LABEL_KEYS['edited-after-apply']),
+      ).toBeTruthy();
+      expect(
+        screen.queryByText(
+          REVERT_REFUSAL_REASON_LABEL_KEYS['edited-after-apply'],
+        ),
+      ).toBeNull();
+    });
   });
 
   describe('reverted link', () => {

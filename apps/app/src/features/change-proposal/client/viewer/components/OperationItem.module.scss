@@ -96,10 +96,6 @@
   font-size: 1.05rem;
 }
 
-.revertible {
-  color: var(--bs-success-text-emphasis);
-}
-
 // In a narrow card the move turns into a top-to-bottom "from / to" stack.
 @container (max-width: 32rem) {
   .move {

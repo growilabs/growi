@@ -47,7 +47,7 @@ export const OperationDiff = ({
     <div className={styles.diff}>
       <button
         type="button"
-        className={`btn btn-sm btn-outline-secondary ${styles.toggle}`}
+        className={`btn btn-sm btn-outline-neutral-secondary text-body ${styles.toggle}`}
         aria-expanded={isOpen}
         onClick={() => setIsOpen((prev) => !prev)}
       >
