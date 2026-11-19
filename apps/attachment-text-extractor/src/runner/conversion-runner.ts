@@ -31,7 +31,7 @@ import {
 import {
   type ProbeConversion,
   probeConversions,
-  sharedWhileRunning,
+  sharedThenKept,
 } from './readiness';
 import { failed, type RunReading, readReport } from './run-outcome';
 
@@ -51,6 +51,8 @@ export interface ConversionRunnerOptions {
   readonly childEntry?: ChildEntry;
   readonly prlimitPath?: string;
   readonly probeTimeoutS?: number;
+  /** Measures how long a readiness result is kept, in ms; defaults to performance.now. */
+  readonly readinessClock?: () => number;
 }
 
 /** The file as the chunks it arrived in, never joined in the parent (research.md 16.9). */
@@ -79,6 +81,8 @@ const MIB = 1024 * 1024;
 // Python's DEFAULT_PROBE_TIMEOUT_S; a readiness check must wait longer than
 // this for /readyz (docker/README.md gives 15 s; research.md 23.7).
 const DEFAULT_PROBE_TIMEOUT_S = 10;
+// research.md §4: shorter than the operator's probe period, not a setting.
+const READINESS_KEEP_MS = 10_000;
 // research.md 20.6 / 20.12: on the command line, never in NODE_OPTIONS.
 const CHILD_NODE_FLAGS = [
   '--wasm-max-mem-pages=8192',
@@ -226,11 +230,15 @@ export const createConversionRunner = (
       faultReason: fault === null ? null : faultReason(fault, launcher),
     };
   };
-  const checkReadiness = sharedWhileRunning(async (): Promise<Readiness> => {
-    const reason = await probeConversions(probe, PROBE_INPUTS, probeTimeoutS);
-    reportReadiness(reason);
-    return { ready: reason === null };
-  });
+  const checkReadiness = sharedThenKept(
+    async (): Promise<Readiness> => {
+      const reason = await probeConversions(probe, PROBE_INPUTS, probeTimeoutS);
+      reportReadiness(reason);
+      return { ready: reason === null };
+    },
+    READINESS_KEEP_MS,
+    options.readinessClock ?? (() => performance.now()),
+  );
   const run: ConversionRunner['run'] = async (input, signal) => {
     const { outcome, fault, warnings } = await convertInChild(
       options,

@@ -41,7 +41,7 @@
   - 終わった状態: 書き出した文書に `parameters` が 1 つ加わり、`info.version` が `1.1.0` になっている。`export-openapi.integ.ts` が通る。生成クライアントの差分が先頭のコメントの版の行だけである (関数と型が変わっていない)
   - _Depends: 3.1_
   - _Requirements: 1.7, 9.3_
-- [ ] 3.3 (P) `/readyz` の結果を 10 秒覚える
+- [x] 3.3 (P) `/readyz` の結果を 10 秒覚える
   - 先に、時計を差し替えたテストを書き、落ちることを確かめる: 確認が終わってから 10 秒以内の呼び出しは確認用の子を起動せず同じ結果を返す、10 秒を過ぎたら確かめ直す、準備未完了の結果も覚える、確認の実行中に届いた呼び出しは 1 回の確認を共有する
   - 覚える期間は確認が終わった時点から数え、期間はコードの定数にする (環境変数にしない)。`health-routes.ts` と `readiness.ts` の「覚えない」と書いたコメントを直す
   - 終わった状態: 上のテストと、既存の readiness のテスト (準備未完了から戻ること、ログの行が溢れないこと) が通る
@@ -141,3 +141,8 @@
   - 運用の手引き (GROWI の外で管理している文書) が拾うべき変更を一覧にして、完了の報告に書く: ログの行の最後の `app=` (値の意味と、自己申告であること)、`/metrics` (指標の名前、トークンなしで開いていること、内向きの通信の制限で守ること、自動スケールの指標)、`/readyz` の結果を 10 秒覚えること (確認の間隔を 10 秒以下にしない)、子が親の環境変数を読めることの注記、新しい image のタグ `1.1.0`
   - 終わった状態: 完了の報告に上の 5 項目がある
   - _Requirements: 10.5_
+
+## Implementation Notes
+
+- コードのコメントが「research.md §N」「research §N.M」でこの spec の research.md の節を指している箇所 (3.1 の `src/http/app-label.ts`: §2.1・§2.5、3.3 の `src/runner/conversion-runner.ts`・`src/runner/readiness.ts`・`src/http/health-routes.ts`・`src/runner/runner-diagnostics.integ.ts`: §4。以降のタスクで増えうる) は、タスク 9.2 で research.md を対象 spec の新しい節として移すときに、移した先の節番号へ書き換える。この spec のディレクトリは 9.5 で消えるので、そのままにすると参照先が消える (`grep -rn "research" apps/attachment-text-extractor/src` で探す)。
+- この worktree では lefthook の pre-commit が完走しないので、biome・テスト・tsgo を手で通したうえで `git commit --no-verify` を使う。

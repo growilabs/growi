@@ -42,7 +42,8 @@ export const registerHealthRoutes = (
       200: json('OK', HealthSchema),
     }),
   );
-  // Asked afresh every time: a pod that was not ready can come back.
+  // The route keeps nothing itself; the runner keeps a settled check for 10 s
+  // (research.md §4), after which a pod that was not ready can come back.
   app.get(
     '/readyz',
     describeResponse(

@@ -1,5 +1,6 @@
 // Test-only helpers for the runner and child integration tests. Never import from production code.
 export { type HostRun, startHost } from './host';
+export { type ManualClock, manualClock } from './manual-clock';
 export {
   childPids,
   hasEnded,

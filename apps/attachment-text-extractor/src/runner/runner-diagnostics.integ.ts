@@ -19,6 +19,7 @@ import {
 import {
   killStrayChildren,
   MISSING_CHILD,
+  manualClock,
   rawResultInput,
   runnerOptions,
   SILENT_CHILD,
@@ -54,8 +55,13 @@ const SENTENCES: Readonly<Record<string, string>> = {
 const LINE =
   /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z ((?:INFO|WARNING|ERROR) [ -~]+)$/;
 
+// Past the time a settled readiness check is kept (research.md §4).
+const PAST_KEPT_MS = 10_001;
+
 interface Capture {
   readonly runner: ConversionRunner;
+  /** Asks readiness `times` times in turn, each one a fresh probe rather than the kept answer. */
+  readonly ask: (times: number) => Promise<boolean[]>;
   /** Each line without its time stamp; throws on a line of any other shape. */
   readonly lines: () => string[];
   readonly raw: readonly string[];
@@ -66,12 +72,23 @@ const capture = (
   level: LogLevel = 'INFO',
 ): Capture => {
   const raw: string[] = [];
+  const clock = manualClock();
   const runner = createConversionRunner(
-    runnerOptions(overrides),
+    runnerOptions({ readinessClock: clock.now, ...overrides }),
     createLeveledLog(level, (line) => raw.push(line)),
   );
+  const ask = async (times: number) => {
+    const answers: boolean[] = [];
+    for (let asked = 0; asked < times; asked += 1) {
+      clock.advance(PAST_KEPT_MS);
+      // biome-ignore lint/performance/noAwaitInLoops: one probe after the other, as separate /readyz calls
+      answers.push((await within(runner.readiness())).ready);
+    }
+    return answers;
+  };
   return {
     runner,
+    ask,
     raw,
     lines: () =>
       raw.map((line) => {
@@ -97,15 +114,6 @@ const stderrInput = (text: string, repeat = 1): RunInput =>
   standInInput('stderr-echo', {
     argument: `${repeat}x${encodeURIComponent(text)}`,
   });
-
-const ask = async (runner: ConversionRunner, times: number) => {
-  const answers: boolean[] = [];
-  for (let asked = 0; asked < times; asked += 1) {
-    // biome-ignore lint/performance/noAwaitInLoops: one probe after the other, as separate /readyz calls
-    answers.push((await within(runner.readiness())).ready);
-  }
-  return answers;
-};
 
 describe.skipIf(process.platform !== 'linux')(
   'the runner diagnostics',
@@ -274,13 +282,13 @@ describe.skipIf(process.platform !== 'linux')(
 
     describe('LOG_LEVEL', () => {
       it('ERROR leaves the warnings out and changes no outcome', async () => {
-        const { runner, raw } = standIn(
+        const { runner, ask, raw } = standIn(
           { prlimitPath: '/nonexistent/prlimit' },
           'ERROR',
         );
 
         const outcome = await run(runner, standInInput('echo'));
-        const ready = await ask(runner, 1);
+        const ready = await ask(1);
 
         expect(outcome).toMatchObject({ kind: 'failed', failure: 'crashed' });
         expect(ready).toEqual([false]);
@@ -292,82 +300,76 @@ describe.skipIf(process.platform !== 'linux')(
       const NOT_READY = 'WARNING readiness probe failed:';
 
       it('writes nothing while the service is ready', async () => {
-        const { runner, raw } = capture();
+        const { ask, raw } = capture();
 
-        expect(await ask(runner, 2)).toEqual([true, true]);
+        expect(await ask(2)).toEqual([true, true]);
         expect(raw).toEqual([]);
       });
 
       it('says why once per change, not once per call', async () => {
         const prlimitPath = path.join(workDir, 'prlimit');
-        const { runner, lines } = capture({ prlimitPath });
+        const { ask, lines } = capture({ prlimitPath });
         const missing = `${NOT_READY} probe=pdf cause=not_started launcher=prlimit error=ENOENT`;
         const notExecutable = `${NOT_READY} probe=pdf cause=not_started launcher=prlimit error=EACCES`;
         const back = 'INFO readiness probe passed again';
 
-        expect(await ask(runner, 4)).toEqual([false, false, false, false]);
+        expect(await ask(4)).toEqual([false, false, false, false]);
         expect(lines()).toEqual([missing]);
 
         symlinkSync('/usr/bin/prlimit', prlimitPath);
-        expect(await ask(runner, 3)).toEqual([true, true, true]);
+        expect(await ask(3)).toEqual([true, true, true]);
         expect(lines()).toEqual([missing, back]);
 
         rmSync(prlimitPath);
         writeFileSync(prlimitPath, 'not a program');
-        expect(await ask(runner, 3)).toEqual([false, false, false]);
+        expect(await ask(3)).toEqual([false, false, false]);
         expect(lines()).toEqual([missing, back, notExecutable]);
 
         rmSync(prlimitPath);
-        expect(await ask(runner, 2)).toEqual([false, false]);
+        expect(await ask(2)).toEqual([false, false]);
         expect(lines()).toEqual([missing, back, notExecutable, missing]);
       });
 
       it('writes one line for callers that ask at the same time', async () => {
-        const { runner, lines } = capture({
+        const { runner, ask, lines } = capture({
           prlimitPath: '/nonexistent/prlimit',
         });
 
         await within(
           Promise.all(Array.from({ length: 10 }, () => runner.readiness())),
         );
-        await ask(runner, 2);
+        await ask(2);
 
         expect(lines()).toHaveLength(1);
       });
 
       it('names the failure kind when the probe child never answers', async () => {
-        const { runner, lines } = capture({
+        const { ask, lines } = capture({
           childEntry: SILENT_CHILD,
           probeTimeoutS: 1,
         });
 
-        expect(await ask(runner, 2)).toEqual([false, false]);
+        expect(await ask(2)).toEqual([false, false]);
         expect(lines()).toEqual([
           `${NOT_READY} probe=pdf cause=failed result=timeout`,
         ]);
       });
 
       it('says when the probe child answers without the probe text', async () => {
-        const { runner, lines } = capture({
+        const { ask, lines } = capture({
           childEntry: UNRELATED_ANSWER_CHILD,
         });
 
-        expect(await ask(runner, 2)).toEqual([false, false]);
+        expect(await ask(2)).toEqual([false, false]);
         expect(lines()).toEqual([
           `${NOT_READY} probe=pdf cause=unexpected_text`,
         ]);
       });
 
       it('names the exit code when the probe child cannot load its entry, and repeats no child warning', async () => {
-        const { runner, lines } = capture({ childEntry: MISSING_CHILD });
+        const { ask, lines } = capture({ childEntry: MISSING_CHILD });
 
-        expect(await ask(runner, 5)).toEqual([
-          false,
-          false,
-          false,
-          false,
-          false,
-        ]);
+        expect(await ask(5)).toEqual([false, false, false, false, false]);
 
         const written = lines();
         expect(written.filter((line) => line.startsWith(NOT_READY))).toEqual([
@@ -380,11 +382,11 @@ describe.skipIf(process.platform !== 'linux')(
 
       it('leaves the "passed again" line out at WARNING', async () => {
         const prlimitPath = path.join(workDir, 'prlimit-at-warning');
-        const { runner, lines } = capture({ prlimitPath }, 'WARNING');
+        const { ask, lines } = capture({ prlimitPath }, 'WARNING');
 
-        await ask(runner, 1);
+        await ask(1);
         symlinkSync('/usr/bin/prlimit', prlimitPath);
-        expect(await ask(runner, 1)).toEqual([true]);
+        expect(await ask(1)).toEqual([true]);
 
         expect(lines()).toHaveLength(1);
         expect(lines()[0]).toContain(NOT_READY);
