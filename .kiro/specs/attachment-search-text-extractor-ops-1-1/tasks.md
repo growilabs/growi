@@ -76,7 +76,7 @@
   - _Depends: 2.1, 2.2, 3.1, 4.1_
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9_
 
-- [ ] 5. (P) apps/app が app の ID を送る
+- [x] 5. (P) apps/app が app の ID を送る
   - 先に次のテストを書き、落ちることを確かめる: 設定 `app:growiAppIdForCloud` に `'4242'` があると、`postExtract` に渡す axios の `headers` に `X-Growi-App-Id: 4242` と `Authorization` が両方入る。設定が無い・空・空白を含む・改行を含む・非 ASCII を含むときは `X-Growi-App-Id` が入らず、抽出は続く。値は呼ぶたびに読み直される
   - ヘッダーに入れるかどうかの判定は純関数にする (文字列が空でなく、0x21〜0x7E の文字だけでできている)。値は `String(value)` で扱い、数であることを前提にしない (research.md §2.3)
   - このファイルはすでにサーバの処理の中で `configManager.getConfig` を呼んでいるので、同じ読み方に合わせる
@@ -144,6 +144,7 @@
 
 ## Implementation Notes
 
+- (apps/app の growi-app-id-header.ts の「research.md §2.3・§2.4」は attachment-search-indexing の research.md へ移る (9.2)。)
 - (zip-extent.ts と archive-guard.ts の「research.md §3」「§3.2」も同様。)
 - コードのコメントが「research.md §N」「research §N.M」でこの spec の research.md の節を指している箇所 (3.1 の `src/http/app-label.ts`: §2.1・§2.5、3.3 の `src/runner/conversion-runner.ts`・`src/runner/readiness.ts`・`src/http/health-routes.ts`・`src/runner/runner-diagnostics.integ.ts`: §4。以降のタスクで増えうる) は、タスク 9.2 で research.md を対象 spec の新しい節として移すときに、移した先の節番号へ書き換える。この spec のディレクトリは 9.5 で消えるので、そのままにすると参照先が消える (`grep -rn "research" apps/attachment-text-extractor/src` で探す)。
 - この worktree では lefthook の pre-commit が完走しないので、biome・テスト・tsgo を手で通したうえで `git commit --no-verify` を使う。

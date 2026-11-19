@@ -20,6 +20,7 @@ import {
   createConcurrencyLimit,
 } from './concurrency-limit';
 import { buildExtractRequestBody } from './extract-request-body';
+import { toGrowiAppIdHeaderValue } from './growi-app-id-header';
 import { readFileChunks } from './read-file-chunks';
 import {
   isCloudMetadataAddress,
@@ -125,6 +126,8 @@ type CallExtractorOptions = {
   body: PostExtractBody;
   extractorUri: string;
   token: string;
+  /** Already checked by toGrowiAppIdHeaderValue; omitted when not sendable. */
+  appId?: string;
   timeoutMs: number;
   isRetry: boolean;
   /** Aborted once no one waits for the result: cancels the request and the retry. */
@@ -138,13 +141,24 @@ type CallExtractorOptions = {
 async function callExtractor(
   opts: CallExtractorOptions,
 ): Promise<ExtractionOutcome> {
-  const { attachment, body, extractorUri, token, timeoutMs, isRetry, signal } =
-    opts;
+  const {
+    attachment,
+    body,
+    extractorUri,
+    token,
+    appId,
+    timeoutMs,
+    isRetry,
+    signal,
+  } = opts;
 
   try {
     const response = await postExtract(body, {
       baseURL: extractorUri,
-      headers: { Authorization: `Bearer ${token}` },
+      headers: {
+        Authorization: `Bearer ${token}`,
+        ...(appId != null ? { 'X-Growi-App-Id': appId } : {}),
+      },
       timeout: timeoutMs,
       // A redirect could point the request at an internal address (SSRF)
       maxRedirects: 0,
@@ -251,6 +265,10 @@ export class AttachmentTextExtractorService {
         return { kind: 'serviceUnreachable' };
       }
 
+      const appId = toGrowiAppIdHeaderValue(
+        configManager.getConfig('app:growiAppIdForCloud'),
+      );
+
       const timeoutMs = configManager.getConfig(
         'app:attachmentFullTextSearch:timeoutMs',
       ) as number;
@@ -304,6 +322,7 @@ export class AttachmentTextExtractorService {
           : this.readAndExtract(attachment, {
               extractorUri,
               token: extractorToken,
+              appId,
               timeoutMs,
               signal,
             }),
@@ -323,7 +342,7 @@ export class AttachmentTextExtractorService {
     attachment: AttachmentWithComputed,
     settings: Pick<
       CallExtractorOptions,
-      'extractorUri' | 'token' | 'timeoutMs' | 'signal'
+      'extractorUri' | 'token' | 'appId' | 'timeoutMs' | 'signal'
     >,
   ): Promise<ExtractionOutcome> {
     // --- Step 6: Fetch file bytes ---
