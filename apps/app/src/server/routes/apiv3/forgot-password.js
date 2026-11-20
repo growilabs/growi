@@ -5,15 +5,18 @@ import { subSeconds } from 'date-fns/subSeconds';
 import { join } from 'pathe';
 
 import { SupportedAction } from '~/interfaces/activity';
+import { forgotPasswordErrorCode } from '~/interfaces/errors/forgot-password';
 import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
 import injectResetOrderByTokenMiddleware from '~/server/middlewares/inject-reset-order-by-token-middleware';
 import PasswordResetOrder from '~/server/models/password-reset-order';
 import { configManager } from '~/server/service/config-manager';
 import { growiInfoService } from '~/server/service/growi-info';
+import { processPasswordResetRequest } from '~/server/service/password-reset';
 import loggerFactory from '~/utils/logger';
 
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
 import httpErrorHandler from '../../middlewares/http-error-handler';
+import { waitUntil } from '../../util/deadline';
 import { resolveLocalePath } from '../../util/safe-path-utils';
 import { checkForgotPasswordEnabledMiddlewareFactory } from '../forgot-password';
 
@@ -43,6 +46,13 @@ import { body } from 'express-validator';
  */
 
 const router = express.Router();
+
+/**
+ * Every password reset request is answered exactly this long after it was
+ * received, whatever the outcome, so the response time does not reveal
+ * whether the email is registered. Delivery not finished by then is a failure.
+ */
+const PASSWORD_RESET_RESPONSE_DELAY_MS = 18_000;
 
 /**
  * @param {import('~/server/crowi').default} crowi Crowi instance
@@ -142,11 +152,19 @@ export const setup = (crowi) => {
    *                  description: Email address of the user requesting password reset
    *      responses:
    *        '200':
-   *          description: Password reset request processed
+   *          description: >-
+   *            Password reset request accepted. Also returned when the email
+   *            does not belong to an active account. Always returned 18
+   *            seconds after the request was received.
    *          content:
    *            application/json:
    *              schema:
    *                type: object
+   *        '500':
+   *          description: >-
+   *            Sending the password reset email failed or did not finish in
+   *            time (error code `password-reset-request-failed`). Always
+   *            returned 18 seconds after the request was received.
    */
   router.post(
     '/',
@@ -159,50 +177,98 @@ export const setup = (crowi) => {
     validator.email,
     apiV3FormValidator,
     async (req, res) => {
-      const { email } = req.body;
-      const locale = configManager.getConfig('app:globalLang');
-      const appUrl = growiInfoService.getSiteUrl();
+      const receivedAt = Date.now();
+      const respondAt = receivedAt + PASSWORD_RESET_RESPONSE_DELAY_MS;
+      const respondWithFailure = () =>
+        res.apiv3Err(
+          new ErrorV3(
+            'Failed to process the password reset request.',
+            forgotPasswordErrorCode.PASSWORD_RESET_REQUEST_FAILED,
+          ),
+          500,
+        );
 
+      // Express 4 does not turn a rejected async handler into an error
+      // response, so any unexpected error must be handled here; otherwise the
+      // request would hang and the client would never see the failure.
       try {
-        const user = await User.findOne({ email: { $eq: email } });
+        const { email } = req.body;
+        const locale = configManager.getConfig('app:globalLang');
+        const appUrl = growiInfoService.getSiteUrl();
+        // The activity is absent when add-activity failed to create it; it is
+        // only for the audit log, so the reset itself goes on without it.
+        const activityId = res.locals.activity?._id;
 
-        // when the user is not found or active
-        if (user == null || user.status !== 2) {
-          // Do not send emails to non GROWI user
-          // For security reason, do not use error messages like "Email does not exist"
-          return res.apiv3();
-        }
+        const sendPasswordResetMail = async (targetEmail) => {
+          const passwordResetOrderData =
+            await PasswordResetOrder.createPasswordResetOrder(targetEmail);
+          const url = new URL(
+            `/forgot-password/${passwordResetOrderData.token}`,
+            appUrl,
+          );
+          const grwTzoffsetSec = crowi.appService.getTzoffset() * 60;
+          const expiredAt = subSeconds(
+            passwordResetOrderData.expiredAt,
+            grwTzoffsetSec,
+          );
+          const formattedExpiredAt = format(expiredAt, 'yyyy/MM/dd HH:mm');
+          await sendPasswordResetEmail(
+            'passwordReset',
+            locale,
+            targetEmail,
+            url.href,
+            formattedExpiredAt,
+          );
+        };
 
-        const passwordResetOrderData =
-          await PasswordResetOrder.createPasswordResetOrder(email);
-        const url = new URL(
-          `/forgot-password/${passwordResetOrderData.token}`,
-          appUrl,
-        );
-        const oneTimeUrl = url.href;
-        const grwTzoffsetSec = crowi.appService.getTzoffset() * 60;
-        const expiredAt = subSeconds(
-          passwordResetOrderData.expiredAt,
-          grwTzoffsetSec,
-        );
-        const formattedExpiredAt = format(expiredAt, 'yyyy/MM/dd HH:mm');
-        await sendPasswordResetEmail(
-          'passwordReset',
-          locale,
+        const outcome = await processPasswordResetRequest(
           email,
-          oneTimeUrl,
-          formattedExpiredAt,
+          {
+            isResettableAccount: async (targetEmail) => {
+              const user = await User.findOne({ email: { $eq: targetEmail } });
+              // Do not send emails to non GROWI user or inactive user
+              return user != null && user.status === 2;
+            },
+            sendPasswordResetMail,
+            // This route logs nothing on success or for unknown/inactive
+            // accounts. The OAuth 2.0 transport still logs every successful
+            // send (see the oauth2-email-support spec). Errors are logged as
+            // soon as they occur; only the response is held until the fixed
+            // time.
+            onMailSent: () => {
+              if (activityId == null) {
+                return;
+              }
+              activityEvent.emit('update', activityId, {
+                action: SupportedAction.ACTION_USER_FOGOT_PASSWORD,
+              });
+            },
+            onError: (err) => {
+              logger.error(
+                { err },
+                'Error occurred during password reset request procedure.',
+              );
+            },
+            onDeadlineExceeded: () => {
+              logger.error(
+                `Password reset request was not completed within ${PASSWORD_RESET_RESPONSE_DELAY_MS}ms; responding with a failure.`,
+              );
+            },
+          },
+          respondAt,
         );
 
-        activityEvent.emit('update', res.locals.activity._id, {
-          action: SupportedAction.ACTION_USER_FOGOT_PASSWORD,
-        });
-
+        if (outcome === 'failed') {
+          return respondWithFailure();
+        }
         return res.apiv3();
       } catch (err) {
-        const msg = 'Error occurred during password reset request procedure.';
-        logger.error(err);
-        return res.apiv3Err(`${msg} Cause: ${err}`);
+        logger.error(
+          { err },
+          'Unexpected error occurred during password reset request procedure.',
+        );
+        await waitUntil(respondAt);
+        return respondWithFailure();
       }
     },
   );
