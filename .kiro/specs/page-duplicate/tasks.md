@@ -126,7 +126,7 @@
   - _Requirements: 3.1, 3.2, 3.3, 4.1, 4.2, 4.7, 5.1, 5.5_
   - _Depends: 3.1, 3.2_
 
-- [ ] 4.2 メモリと所要時間を計測し、設計書に記録する
+- [x] 4.2 メモリと所要時間を計測し、設計書に記録する
   - 手元で実行する検証用のスクリプトを用意し、本文約15MB の revision を持つページを100件配下に置いた複製で、プロセスのメモリのピークの増加が本文1KB の場合と同じ水準であることを確かめる
   - 同じ構成で、revision の複製1回（10件）が1分以内に終わることを確かめる
   - 配下83ページ・1505版の構成を合成データで再現し、変更前と変更後のメモリの増加と、回復時のサブオペレーションの所要時間を測る。変更前は、この spec の変更を入れる前のコミット（分岐元の master）で、同じ合成データを使って測る
@@ -147,3 +147,4 @@
 - 2.8: 起動関数 `startInterruptedDuplicateRecoveryCronIfEnabled` は `crowi` ではなく `{ duplicateDeps, appService, waitBeforeRun? }` を受け取る。3.2 は、3.1 で作る `duplicateDeps()`（`activityService` が null のときの確認入り）で `DuplicateDeps` を組み立てて渡す。壊れた PageOperation（保存値の欠落）は `CorruptDuplicatePageOperationError` で見分け、2〜3分ごとに引き受け直されてエラーログが出続ける（PageOperation は残り重なる操作を拒否し続ける）。spec-cleanup で design.md の duplicatePageOperation と Error Handling にこの扱いを足す。引き受けのたびに `new Date()` を読む（実行開始時刻の使い回しは不可）。
 - 3.1: `PageService.duplicateDeps()`（`IPageService` にも追加）が `DuplicateDeps` を組み立てる。`activityService` は呼ぶたびに読み、null なら明示的に例外。3.2 は `crowi.pageService.duplicateDeps()` を起動関数に渡す。`duplicate/index.ts`（barrel）は `startInterruptedDuplicateRecoveryCronIfEnabled` も出すので、crowi/index.ts は barrel からの動的 import で呼ぶ（読み込み時期は PageService の静的 import により実質早まる）。v5 の `toPath` と配下の `newPagePath` は XSS 無害化後の値に統一（経路の検証を通ったパスは変わらない）。PageOperation には populated な page と `{ _id }` の user を保存する。`v5.public-page.integ.ts` と `v5.non-public-page.integ.ts` に `duplicateRecursivelyMainOperation` を指す古いコメントが残る（4.1 か spec-cleanup で直す）。
 - 3.2: crowi の `setupCron` 配線（Req 4.3 を本番で成り立たせる唯一の箇所）には自動テストがない（同じ関数の兄弟の cron にもない）。4.1 か kiro-validate-impl で、起動して `Scheduled the interrupted duplicate recovery (cron: ...)` のログが出ることを1度確かめる。
+- 4.2: 計測の結果は design.md の「計測結果」に記録済み。計測スクリプトは `apps/app/tools/page-duplicate-perf/`（`*.perf.ts`、通常のテストは拾わない）。3分30.2秒（回復の最悪時間、83ページ）・10,000ページでも3分37.1秒。計測の制約（全版が同じ大きさ、全文検索の再索引を含まない、止まった複製が1つの場合）は設計書の注意点に記載。
