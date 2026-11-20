@@ -366,6 +366,25 @@ test.describe('Comment reactions', () => {
     await expect(chip).toHaveCount(0);
   });
 
+  // The popover overlaps the centered picker here, so the click reaches the emoji only when
+  // the picker stacks above the popover, and adds it only when the press keeps the popover open.
+  test('In the popover, picking an emoji with the mouse adds a chip and keeps the popover open (Req 3.3, 3.7)', async ({
+    page,
+  }, testInfo) => {
+    await page.goto(pagePath(testInfo));
+    const popover = await openPopoverFromHighlight(page, targetSentence);
+    const origin = popover.getByTestId('inline-comment-preview-popover-origin');
+
+    await pickEmoji(page, origin, THUMBS_UP);
+
+    await expect(popover).toBeVisible();
+    const chip = reactionChip(origin, '+1');
+    await expect(chip).toBeVisible();
+
+    await chip.click();
+    await expect(chip).toHaveCount(0);
+  });
+
   test('The same emoji with a different skin tone becomes a separate chip (Req 1.3, 3.5)', async ({
     page,
   }, testInfo) => {
