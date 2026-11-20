@@ -385,7 +385,7 @@
   - _Requirements: 9.1, 9.3, 9.5_
   - _Boundary: apps/app/src/server/routes/search.ts (と `search.spec.ts`), SearchService (と `search.spec.ts`), AttachmentSearchResultAggregator, `features/search-attachments/server/routes/apiv1/facet-search-contract.ts` (と `.spec.ts`), interfaces/search.ts, `attachment-search-routes.integ.ts`, `attachment-search-permission.integ.ts`_
 
-- [ ] 12.2 `GET /_api/v3/search/attachments` の失敗を、空の結果で隠さずエラーで返す
+- [x] 12.2 `GET /_api/v3/search/attachments` の失敗を、空の結果で隠さずエラーで返す
   - `resolveSecondary` は、権限確認か添付の検索が失敗するか 500ms を超えたら例外を投げる。ルートは 500 を返す
   - `resolveSecondary` の `facet` 引数と、応答の `facet` を消す (応答は `{ enrichments }`)
   - 機能が無効のときなど aggregator が無いとき、`SearchService.resolveAttachmentSecondary` が空の結果を返す分岐も、例外にする。`routes/apiv3/search-attachments.ts` の先頭の説明に 500 を足す

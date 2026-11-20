@@ -386,3 +386,55 @@ describe('SearchService.searchByFacet()', () => {
     );
   });
 });
+
+describe('SearchService.resolveAttachmentSecondary()', () => {
+  const viewer = { user: null, userGroups: null };
+  const input: AttachmentSearchInput = {
+    queryString: 'word',
+    terms: mock<QueryTerms>(),
+    resolvedFilterData: { groupIds: [], notGroupIds: [] },
+    viewer,
+  };
+
+  let service: TestSearchService;
+
+  beforeEach(() => {
+    service = new TestSearchService();
+    vi.spyOn(service, 'createAttachmentSearchInput').mockResolvedValue(input);
+  });
+
+  it('answers the enrichments the aggregator resolves for the client-supplied ids', async () => {
+    const aggregator = mock<AttachmentSearchResultAggregator>();
+    aggregator.resolveSecondary.mockResolvedValue({ enrichments: {} });
+    service.setAttachmentSearchResultAggregator(aggregator);
+
+    const result = await service.resolveAttachmentSecondary('word', viewer, {
+      primaryIds: ['p1'],
+    });
+
+    expect(result).toEqual({ enrichments: {} });
+    expect(aggregator.resolveSecondary).toHaveBeenCalledWith(input, {
+      primaryIds: ['p1'],
+    });
+  });
+
+  it('propagates a failure of the aggregator', async () => {
+    const aggregator = mock<AttachmentSearchResultAggregator>();
+    aggregator.resolveSecondary.mockRejectedValue(new Error('es down'));
+    service.setAttachmentSearchResultAggregator(aggregator);
+
+    await expect(
+      service.resolveAttachmentSecondary('word', viewer, {
+        primaryIds: ['p1'],
+      }),
+    ).rejects.toThrow('es down');
+  });
+
+  it('fails instead of answering an empty result when the attachment search is not initialized', async () => {
+    await expect(
+      service.resolveAttachmentSecondary('word', viewer, {
+        primaryIds: ['p1'],
+      }),
+    ).rejects.toThrow('Attachment search is not initialized');
+  });
+});

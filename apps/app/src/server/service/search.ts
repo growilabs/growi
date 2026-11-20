@@ -642,10 +642,10 @@ class SearchService implements SearchQueryParser, SearchResolver {
   }
 
   /**
-   * Attachment hits for page ids the client got from the page search. Empty
-   * when the attachment search is not initialized.
+   * Attachment hits for page ids the client got from the page search.
    *
    * @throws {RangeError} when more than 20 distinct ids are given
+   * @throws when the attachment search is not initialized or the aggregator fails
    */
   async resolveAttachmentSecondary(
     keyword: string,
@@ -654,10 +654,10 @@ class SearchService implements SearchQueryParser, SearchResolver {
   ): Promise<IResolvedSecondaryResult> {
     const aggregator = this.attachmentSearchResultAggregator;
     if (aggregator == null) {
-      return { facet: 'all', enrichments: {} };
+      throw new Error('Attachment search is not initialized');
     }
     const input = await this.createAttachmentSearchInput(keyword, viewer);
-    return aggregator.resolveSecondary(input, { facet: 'all', primaryIds });
+    return aggregator.resolveSecondary(input, { primaryIds });
   }
 
   async resolveFilterData(

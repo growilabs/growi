@@ -11,6 +11,7 @@ import {
   type AttachmentSearchInput,
   type AttachmentSearchResponse,
   AttachmentSearchResultAggregator,
+  AttachmentSearchTimeoutError,
   type IPrimarySearchResult,
 } from './attachment-search-result-aggregator';
 import { WINDOW_CAP } from './collect-visible-attachment-hits';
@@ -446,17 +447,6 @@ describe('AttachmentSearchResultAggregator', () => {
   });
 
   describe('resolveSecondary', () => {
-    it('is a no-op for facet=attachments', async () => {
-      const result = await makeAggregator().resolveSecondary(inputFor(viewer), {
-        facet: 'attachments',
-        primaryIds: ['page1'],
-      });
-
-      expect(result).toEqual({ facet: 'attachments', enrichments: {} });
-      expect(client.searchAccessiblePages).not.toHaveBeenCalled();
-      expect(client.searchAttachments).not.toHaveBeenCalled();
-    });
-
     it('re-checks the client-supplied ids for the viewer and the operators, and searches attachments only for the visible ones', async () => {
       client.searchAccessiblePages.mockResolvedValue(accessible('page1'));
       client.searchAttachments.mockResolvedValue(
@@ -468,7 +458,6 @@ describe('AttachmentSearchResultAggregator', () => {
       const input = inputFor(guest, { match: ['kw'], tag: ['spec'] });
 
       const result = await makeAggregator().resolveSecondary(input, {
-        facet: 'all',
         primaryIds: ['page1', 'forbidden', 'page1', 'no-such-page'],
       });
 
@@ -491,10 +480,10 @@ describe('AttachmentSearchResultAggregator', () => {
     it('returns nothing for an operator-only query without searching', async () => {
       const result = await makeAggregator().resolveSecondary(
         inputFor(viewer, { tag: ['spec'] }),
-        { facet: 'all', primaryIds: ['page1'] },
+        { primaryIds: ['page1'] },
       );
 
-      expect(result).toEqual({ facet: 'all', enrichments: {} });
+      expect(result).toEqual({ enrichments: {} });
       expect(client.searchAttachments).not.toHaveBeenCalled();
     });
 
@@ -508,7 +497,6 @@ describe('AttachmentSearchResultAggregator', () => {
       );
 
       const result = await makeAggregator().resolveSecondary(inputFor(viewer), {
-        facet: 'all',
         primaryIds: ['page1', 'forbidden'],
       });
 
@@ -519,7 +507,6 @@ describe('AttachmentSearchResultAggregator', () => {
       client.searchAccessiblePages.mockResolvedValue([]);
 
       const result = await makeAggregator().resolveSecondary(inputFor(viewer), {
-        facet: 'all',
         primaryIds: ['forbidden'],
       });
 
@@ -527,36 +514,39 @@ describe('AttachmentSearchResultAggregator', () => {
       expect(client.searchAttachments).not.toHaveBeenCalled();
     });
 
-    it('returns no enrichments when the permission check throws', async () => {
+    it('rejects when the permission check throws, without searching attachments', async () => {
       client.searchAccessiblePages.mockRejectedValue(new Error('es down'));
-      client.searchAttachments.mockResolvedValue(
-        makeAttachmentResponse([{ pageId: 'page1', attachmentId: 'att1' }]),
-      );
 
-      const result = await makeAggregator().resolveSecondary(inputFor(viewer), {
-        facet: 'all',
-        primaryIds: ['page1'],
-      });
-
-      expect(result).toEqual({ facet: 'all', enrichments: {} });
+      await expect(
+        makeAggregator().resolveSecondary(inputFor(viewer), {
+          primaryIds: ['page1'],
+        }),
+      ).rejects.toThrow('es down');
       expect(client.searchAttachments).not.toHaveBeenCalled();
     });
 
-    it('returns no enrichments when the secondary phase exceeds 500ms', async () => {
+    it('rejects when the attachment search throws', async () => {
+      client.searchAccessiblePages.mockResolvedValue(accessible('page1'));
+      client.searchAttachments.mockRejectedValue(new Error('attachments down'));
+
+      await expect(
+        makeAggregator().resolveSecondary(inputFor(viewer), {
+          primaryIds: ['page1'],
+        }),
+      ).rejects.toThrow('attachments down');
+    });
+
+    it('rejects with the timeout error when the secondary phase exceeds its limit', async () => {
       client.searchAccessiblePages.mockImplementation(() =>
-        delayed(accessible('page1'), 700),
+        delayed(accessible('page1'), 200),
       );
+      const aggregator = new AttachmentSearchResultAggregator(client, 800, 50);
 
-      const result = await makeAggregator().resolveSecondary(inputFor(viewer), {
-        facet: 'all',
-        primaryIds: ['page1'],
-      });
-
-      expect(result).toEqual({ facet: 'all', enrichments: {} });
-      expect(loggerWarn).toHaveBeenCalledWith(
-        expect.objectContaining({ failure: 'timeout' }),
-        expect.any(String),
-      );
+      await expect(
+        aggregator.resolveSecondary(inputFor(viewer), {
+          primaryIds: ['page1'],
+        }),
+      ).rejects.toThrow(AttachmentSearchTimeoutError);
     });
 
     it('throws RangeError for more than 20 distinct ids, counting duplicates once', async () => {
@@ -565,16 +555,14 @@ describe('AttachmentSearchResultAggregator', () => {
 
       await expect(
         makeAggregator().resolveSecondary(inputFor(viewer), {
-          facet: 'all',
           primaryIds: many,
         }),
       ).rejects.toThrow(RangeError);
       await expect(
         makeAggregator().resolveSecondary(inputFor(viewer), {
-          facet: 'all',
           primaryIds: [...many.slice(0, 20), 'page0'],
         }),
-      ).resolves.toEqual({ facet: 'all', enrichments: {} });
+      ).resolves.toEqual({ enrichments: {} });
     });
   });
 });

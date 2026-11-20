@@ -9,6 +9,7 @@
  * An attachment hit is returned only when page search would show the same
  * viewer the content of its parent page (searchAccessiblePages for the viewer
  * and the query's operators); any failure there drops the hits (fail-close).
+ * searchPrimary reports such a failure in its result; resolveSecondary throws.
  * Only the keyword part of the query is matched against attachment content.
  */
 
@@ -125,7 +126,6 @@ export interface IPrimarySearchResult {
  * Result of resolveSecondary — enrichment data keyed by pageId.
  */
 export interface IResolvedSecondaryResult {
-  facet: 'all' | 'attachments';
   enrichments: Record<string, { attachmentHits?: IAttachmentHit[] }>;
 }
 
@@ -354,61 +354,39 @@ export class AttachmentSearchResultAggregator {
   // --------------------------------------------------------------------------
 
   /**
-   * Resolves secondary enrichment data for page IDs supplied by the client.
-   *
-   * facet=attachments: primary already applied the permission gate — no-op.
-   *
-   * facet=all: the client-supplied ids are re-checked against the viewer and
-   * the query's operators with searchAccessiblePages, then the attachments
-   * index is searched for the surviving ids only. Any failure or a latency
-   * above 500ms returns empty enrichments.
+   * Resolves the attachment hits for page IDs supplied by the client: the ids
+   * are re-checked against the viewer and the query's operators with
+   * searchAccessiblePages, then the attachments index is searched for the
+   * surviving ids only. A query without a positive keyword has no hits.
    *
    * @throws {RangeError} when the number of distinct primaryIds exceeds
    *   DEFAULT_PAGE_SIZE
+   * @throws when the permission check or the attachment search fails, or the
+   *   whole resolution exceeds the secondary time limit
+   *   (AttachmentSearchTimeoutError); an empty result is never returned for a
+   *   failure
    */
   async resolveSecondary(
     input: AttachmentSearchInput,
-    options: {
-      facet: 'all' | 'attachments';
-      primaryIds: string[];
-    },
+    { primaryIds }: { primaryIds: string[] },
   ): Promise<IResolvedSecondaryResult> {
-    const { facet, primaryIds } = options;
-
-    if (facet === 'attachments') {
-      return { facet: 'attachments', enrichments: {} };
-    }
-
-    return this.resolveSecondaryAll(input, [...new Set(primaryIds)]);
-  }
-
-  private async resolveSecondaryAll(
-    input: AttachmentSearchInput,
-    primaryIds: string[],
-  ): Promise<IResolvedSecondaryResult> {
-    if (primaryIds.length > DEFAULT_PAGE_SIZE) {
+    const distinctIds = [...new Set(primaryIds)];
+    if (distinctIds.length > DEFAULT_PAGE_SIZE) {
       throw new RangeError(
-        `primaryIds.length (${primaryIds.length}) exceeds the maximum allowed page size (${DEFAULT_PAGE_SIZE}). ` +
+        `primaryIds.length (${distinctIds.length}) exceeds the maximum allowed page size (${DEFAULT_PAGE_SIZE}). ` +
           'Split the request into smaller batches.',
       );
     }
 
-    try {
-      const enrichments = await withTimeout(
-        this.doResolveSecondaryAll(splitInput(input), primaryIds),
+    return {
+      enrichments: await withTimeout(
+        this.doResolveSecondary(splitInput(input), distinctIds),
         this.SECONDARY_TIMEOUT_MS,
-      );
-      return { facet: 'all', enrichments };
-    } catch (err) {
-      logger.warn(
-        { err, failure: failureKind(err) },
-        'resolveSecondaryAll: secondary enrichment failed — returning empty enrichments',
-      );
-      return { facet: 'all', enrichments: {} };
-    }
+      ),
+    };
   }
 
-  private async doResolveSecondaryAll(
+  private async doResolveSecondary(
     split: SplitInput,
     primaryIds: string[],
   ): Promise<IResolvedSecondaryResult['enrichments']> {

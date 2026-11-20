@@ -6,7 +6,7 @@
  *   ATTACHMENT_SEARCH_PERF=1 env -u MONGO_URI pnpm vitest run attachment-search-performance.integ
  *
  * The behaviour past the time limits (facet=attachments reporting an
- * incomplete result, the secondary search returning no enrichment) is pinned
+ * incomplete result, the secondary search throwing a timeout error) is pinned
  * in attachment-search-result-aggregator.spec.ts.
  */
 
