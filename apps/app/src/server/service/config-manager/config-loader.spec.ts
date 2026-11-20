@@ -3,6 +3,17 @@ import type { RawConfigData } from '@growi/core/dist/interfaces';
 import type { ConfigKey, ConfigValues } from './config-definition';
 import { ConfigLoader } from './config-loader';
 
+const { loggerWarn } = vi.hoisted(() => ({ loggerWarn: vi.fn() }));
+
+vi.mock('~/utils/logger', () => ({
+  default: () => ({
+    warn: loggerWarn,
+    error: vi.fn(),
+    info: vi.fn(),
+    debug: vi.fn(),
+  }),
+}));
+
 const mockExec = vi.fn();
 const mockFind = vi.fn().mockReturnValue({ exec: mockExec });
 
@@ -96,6 +107,7 @@ describe('ConfigLoader', () => {
     const originals = new Map(ENV_VARS.map((env) => [env, process.env[env]]));
 
     afterEach(() => {
+      vi.unstubAllEnvs();
       for (const env of ENV_VARS) {
         const original = originals.get(env);
         if (original === undefined) {
@@ -135,7 +147,8 @@ describe('ConfigLoader', () => {
       });
     });
 
-    it('falls back to null on malformed JSON (fail-soft, no boot crash)', async () => {
+    it('falls back to the null default on malformed JSON when strict mode is off', async () => {
+      vi.stubEnv('CHECK_CONFIGURATION_VALUE_STRICTLY', 'false');
       process.env.AI_PROVIDERS = '{not valid json';
 
       const config: RawConfigData<ConfigKey, ConfigValues> =
@@ -151,6 +164,106 @@ describe('ConfigLoader', () => {
         await configLoader.loadFromEnv();
 
       expect(config['ai:providers'].value).toBeNull();
+    });
+  });
+
+  describe('loadFromEnv value validation', () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    describe('in strict mode (default)', () => {
+      it('throws listing every invalid env var, without their values', async () => {
+        vi.stubEnv('ELASTICSEARCH_REQUEST_TIMEOUT', '0x1F');
+        vi.stubEnv('TRUST_PROXY_BOOL', 'yes');
+        vi.stubEnv('AI_PROVIDER_API_KEYS', '{"openai":"sk-secret"');
+
+        const error = await configLoader.loadFromEnv().catch((e) => e);
+
+        expect(error).toBeInstanceOf(Error);
+        expect(error.message).toContain('ELASTICSEARCH_REQUEST_TIMEOUT');
+        expect(error.message).toContain('TRUST_PROXY_BOOL');
+        expect(error.message).toContain('AI_PROVIDER_API_KEYS');
+        expect(error.message).not.toContain('0x1F');
+        expect(error.message).not.toContain('sk-secret');
+      });
+
+      it('throws on an invalid number for a config whose default is undefined', async () => {
+        vi.stubEnv('SESSION_MAX_AGE', '3600abc');
+
+        await expect(configLoader.loadFromEnv()).rejects.toThrow(
+          'SESSION_MAX_AGE',
+        );
+      });
+
+      it('throws when the strict mode flag itself is invalid', async () => {
+        vi.stubEnv('CHECK_CONFIGURATION_VALUE_STRICTLY', 'ture');
+
+        await expect(configLoader.loadFromEnv()).rejects.toThrow(
+          'CHECK_CONFIGURATION_VALUE_STRICTLY',
+        );
+      });
+
+      it('parses valid values into their declared types', async () => {
+        vi.stubEnv('ELASTICSEARCH_REQUEST_TIMEOUT', '0.5');
+        vi.stubEnv('SESSION_MAX_AGE', '3600');
+        vi.stubEnv('TRUST_PROXY_BOOL', 'false');
+        vi.stubEnv('CHANGE_PROPOSAL_MAX_PROPOSALS_PER_USER_PER_DAY', '10');
+
+        const config = await configLoader.loadFromEnv();
+
+        expect(config['app:elasticsearchRequestTimeout'].value).toBe(0.5);
+        expect(config['security:sessionMaxAge'].value).toBe(3600);
+        expect(config['security:trustProxyBool'].value).toBe(false);
+        expect(config['changeProposal:maxProposalsPerUserPerDay'].value).toBe(
+          10,
+        );
+      });
+
+      it('treats an empty value of a non-string config as unset', async () => {
+        vi.stubEnv('ELASTICSEARCH_REQUEST_TIMEOUT', '');
+        vi.stubEnv('SESSION_MAX_AGE', '');
+
+        const config = await configLoader.loadFromEnv();
+
+        expect(config['app:elasticsearchRequestTimeout'].value).toBe(8000);
+        expect(config['security:sessionMaxAge'].value).toBeUndefined();
+      });
+    });
+
+    describe('in non-strict mode', () => {
+      beforeEach(() => {
+        vi.stubEnv('CHECK_CONFIGURATION_VALUE_STRICTLY', 'false');
+      });
+
+      it('uses the default value for an invalid env var', async () => {
+        // Inputs a lenient parser would accept (12abc -> 12, yes -> false)
+        vi.stubEnv('ELASTICSEARCH_REQUEST_TIMEOUT', '12abc');
+        vi.stubEnv('CHANGE_PROPOSAL_IS_MOVE_ENABLED', 'yes');
+
+        const config = await configLoader.loadFromEnv();
+
+        expect(config['app:elasticsearchRequestTimeout'].value).toBe(8000);
+        expect(config['changeProposal:isMoveEnabled'].value).toBe(true);
+      });
+
+      it('warns with the invalid env var name, without its value', async () => {
+        vi.stubEnv('ELASTICSEARCH_REQUEST_TIMEOUT', '12abc');
+
+        await configLoader.loadFromEnv();
+
+        const warned = loggerWarn.mock.calls.flat().join('\n');
+        expect(warned).toContain('ELASTICSEARCH_REQUEST_TIMEOUT');
+        expect(warned).not.toContain('12abc');
+      });
+
+      it('still parses valid values', async () => {
+        vi.stubEnv('ELASTICSEARCH_REQUEST_TIMEOUT', '15000');
+
+        const config = await configLoader.loadFromEnv();
+
+        expect(config['app:elasticsearchRequestTimeout'].value).toBe(15000);
+      });
     });
   });
 });

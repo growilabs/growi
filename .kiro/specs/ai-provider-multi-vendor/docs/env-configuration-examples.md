@@ -16,7 +16,7 @@ ai-provider-multi-vendor が導入する 3 つの JSON 環境変数(`AI_PROVIDER
 
 ## 1. 3 つの JSON env var の役割と形式
 
-いずれも **JSON を 1 行の文字列**として env var に設定する。malformed な JSON は fail-soft で「未設定」扱いになり、`(config key, 理由)` の warn ログが出力される(ログゼロで AI 機能が無効化される fail-silent はない — エスケープ誤りはこの warn で観測できる)。
+いずれも **JSON を 1 行の文字列**として env var に設定する。JSON として読めない値は、既定(厳格モード、`CHECK_CONFIGURATION_VALUE_STRICTLY=true`)では起動時のエラーになり、GROWI は起動しない。エラーには env var 名と理由が出る(値は出ない)。`CHECK_CONFIGURATION_VALUE_STRICTLY=false` の場合は「未設定」扱いで起動し、同じ内容が warn ログに出る。JSON としては読めるが形が違う値は、起動したうえで「未設定」扱いになり、`(config key, 理由)` の warn ログが出力される(ログゼロで AI 機能が無効化される fail-silent はない)。
 
 - **`AI_PROVIDERS`**(→ `ai:providers`)— プロバイダ別の非秘匿設定。`{ "<provider>": { "enabled": boolean, "azureOpenaiSettings": {...} } }` の Record。
   - `enabled` 省略時は false(無効)。エントリ自体がないプロバイダは「未設定」。
@@ -127,7 +127,7 @@ AI_ALLOWED_MODELS='[{"provider":"openai","modelId":"gpt-5-mini","isDefault":true
 
 ## 4. JSON エスケープの注意(シェル / dotenv / docker-compose)
 
-JSON 値は `"` を多数含むため、記述環境ごとのクォート規則に注意する。誤エスケープは malformed config warn(→ 未設定扱い)として観測できる(§1)。
+JSON 値は `"` を多数含むため、記述環境ごとのクォート規則に注意する。誤エスケープは JSON として読めない値になり、既定では起動時のエラーとして現れる(§1)。
 
 ### 4.1 シェル(`export`)
 
@@ -197,4 +197,4 @@ AI_ALLOWED_MODELS='[{"provider":"openai","modelId":"gpt-5","isDefault":true},{"p
 node -e 'for (const k of ["AI_PROVIDERS","AI_PROVIDER_API_KEYS","AI_ALLOWED_MODELS"]) { if (process.env[k] != null) JSON.parse(process.env[k]); } console.log("OK")'
 ```
 
-(env を export したシェルで実行。malformed ならこのコマンドが例外で失敗する — アプリ側では同じ値が warn ログ + 未設定扱いになる)
+(env を export したシェルで実行。malformed ならこのコマンドが例外で失敗する — アプリ側では同じ値で起動が止まる。`CHECK_CONFIGURATION_VALUE_STRICTLY=false` の場合は warn ログ + 未設定扱いになる)
