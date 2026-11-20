@@ -38,13 +38,13 @@ import { useCurrentUser } from '~/states/global';
 
 import type { InlineCommentWithReplies } from '../../../interfaces';
 import { INLINE_COMMENT_POPOVER_Z_INDEX } from '../../constants/z-index';
+import { useCloseOnOutsideMouseDown } from '../../hooks/use-close-on-outside-mouse-down';
 import { MentionPickerButton } from '../InlineCommentForm/MentionPickerButton';
 import { MentionAwareCommentInput } from '../MentionAwareCommentInput/MentionAwareCommentInput';
 import { useCommentInputControls } from '../MentionAwareCommentInput/use-comment-input-controls';
 import { rangeToVirtualElement } from '../SelectionPopover/selection-virtual-element';
 import { usePopperPosition } from '../SelectionPopover/use-popper-position';
 import { InlineCommentPopoverEntry } from './InlineCommentPopoverEntry';
-import { useCloseOnOutsideMouseDown } from './use-close-on-outside-mouse-down';
 
 import styles from './InlineCommentPreviewPopover.module.scss';
 
@@ -111,8 +111,7 @@ export const InlineCommentPreviewPopover: FC<
   );
 
   // A state-backed callback ref (not useRef): `usePopperPosition` takes the
-  // popper element as an effect dependency, and the same node also serves as
-  // the outside-click boundary below.
+  // popper element as an effect dependency.
   const [popperElement, setPopperElement] = useState<HTMLDivElement | null>(
     null,
   );
@@ -138,11 +137,7 @@ export const InlineCommentPreviewPopover: FC<
 
   usePopperPosition(virtualElement, popperElement);
 
-  // SelectionPopover has no outside-click-to-close behavior, so this popover adds its own.
-  const { onMouseDownCapture } = useCloseOnOutsideMouseDown(
-    popperElement,
-    onClose,
-  );
+  const { onMouseDownCapture } = useCloseOnOutsideMouseDown(onClose);
 
   const [resolveError, setResolveError] = useState<string>();
   const isResolved = comment.resolvedAt != null;

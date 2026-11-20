@@ -17,6 +17,7 @@ import { useTranslation } from 'react-i18next';
 
 import { useCurrentUser } from '~/states/global';
 
+import { useCloseOnOutsideMouseDown } from '../../hooks/use-close-on-outside-mouse-down';
 import { useSWRxInlineComments } from '../../stores/inline-comment';
 import { MentionAwareCommentInput } from '../MentionAwareCommentInput/MentionAwareCommentInput';
 import { useCommentInputControls } from '../MentionAwareCommentInput/use-comment-input-controls';
@@ -61,6 +62,8 @@ export const InlineCommentForm = (
 
   const formRef = useRef<HTMLDivElement | null>(null);
 
+  const { onMouseDownCapture } = useCloseOnOutsideMouseDown(onCanceled);
+
   useEffect(() => {
     if (onCanceled == null) {
       return;
@@ -77,30 +80,11 @@ export const InlineCommentForm = (
       }
       onCanceled();
     };
-    const handlePointerDown = (event: MouseEvent): void => {
-      const target = event.target as Element | null;
-      if (
-        formRef.current != null &&
-        target != null &&
-        formRef.current.contains(target)
-      ) {
-        return;
-      }
-      // The mention-completion popup is appended to document.body, not nested
-      // in this form, so a click inside it would otherwise read as "outside".
-      if (target?.closest('.cm-tooltip-autocomplete') != null) {
-        return;
-      }
-      onCanceled();
-    };
-
     // Capture phase: reactstrap's Escape handler runs on bubble and flips
     // aria-expanded to false before a bubble-phase listener would see it.
     document.addEventListener('keydown', handleKeyDown, true);
-    document.addEventListener('mousedown', handlePointerDown);
     return () => {
       document.removeEventListener('keydown', handleKeyDown, true);
-      document.removeEventListener('mousedown', handlePointerDown);
     };
   }, [onCanceled]);
 
@@ -119,6 +103,7 @@ export const InlineCommentForm = (
         maxWidth: 'min(40rem, calc(100vw - 2rem))',
       }}
       data-testid="inline-comment-form"
+      onMouseDownCapture={onMouseDownCapture}
     >
       {/* Plain class, not CSS-module: the Playwright suite locates the quote by this selector. */}
       <blockquote className="inline-comment-form-quote visually-hidden">
