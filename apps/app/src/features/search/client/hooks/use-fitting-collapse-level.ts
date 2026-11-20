@@ -5,7 +5,10 @@ import {
   useRef,
   useState,
 } from 'react';
-import { useIsomorphicLayoutEffect, useResizeObserver } from 'usehooks-ts';
+import { useIsomorphicLayoutEffect } from 'usehooks-ts';
+
+import { observeElementWidth } from './shared-resize-observer';
+import { subscribeWebFontsLoaded } from './web-fonts-loaded';
 
 export interface FittingCollapseLevel {
   /** Attach to the path's container (the single-line flex row) */
@@ -113,8 +116,7 @@ export const useFittingCollapseLevel = (
     }
   });
 
-  const onResize = useCallback(({ width }: { width?: number }) => {
-    if (width == null) return;
+  const onResize = useCallback((width: number) => {
     const action = resolveResizeAction(fittedWidthRef.current, width);
     if (action === 'ignore') return;
     fittedWidthRef.current = width;
@@ -125,24 +127,26 @@ export const useFittingCollapseLevel = (
     }));
   }, []);
 
-  useResizeObserver({ ref: containerRef, onResize });
+  useEffect(() => {
+    const container = containerRef.current;
+    if (container == null) return;
+    return observeElementWidth(container, onResize);
+  }, [onResize]);
 
   // A web font that finishes loading after fitting changes the text width but
   // not the container width, so no resize notification arrives. Re-fit from the
   // base form so it works whether the new font is wider or narrower.
-  useEffect(() => {
-    const fonts = typeof document === 'undefined' ? undefined : document.fonts;
-    if (fonts == null) return;
-    const refitFromBase = (): void => {
-      setState((prev) => ({
-        ...prev,
-        level: 0,
-        checkRequest: prev.checkRequest + 1,
-      }));
-    };
-    fonts.addEventListener('loadingdone', refitFromBase);
-    return () => fonts.removeEventListener('loadingdone', refitFromBase);
-  }, []);
+  useEffect(
+    () =>
+      subscribeWebFontsLoaded(() => {
+        setState((prev) => ({
+          ...prev,
+          level: 0,
+          checkRequest: prev.checkRequest + 1,
+        }));
+      }),
+    [],
+  );
 
   return { containerRef, shrinkableRef, collapseLevel };
 };
