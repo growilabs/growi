@@ -1,22 +1,22 @@
 {
   "feature_name": "auditlog-endpoint-search",
   "created_at": "2026-11-13T07:47:37Z",
-  "updated_at": "2026-11-18T07:09:21Z",
+  "updated_at": "2026-11-20T05:40:00Z",
   "language": "ja",
-  "phase": "tasks-generated",
+  "phase": "requirements-generated",
   "approvals": {
     "requirements": {
       "generated": true,
-      "approved": true
+      "approved": false
     },
     "design": {
       "generated": true,
-      "approved": true
+      "approved": false
     },
     "tasks": {
       "generated": true,
-      "approved": true
+      "approved": false
     }
   },
-  "ready_for_implementation": true
+  "ready_for_implementation": false
 }
