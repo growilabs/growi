@@ -230,8 +230,9 @@ export const setup = (crowi) => {
               return user != null && user.status === 2;
             },
             sendPasswordResetMail,
-            // No log on success or for unknown/inactive accounts: both must
-            // leave the same trace (the access log only). Errors are logged as
+            // This route logs nothing on success or for unknown/inactive
+            // accounts. The OAuth 2.0 transport still logs every successful
+            // send (see the oauth2-email-support spec). Errors are logged as
             // soon as they occur; only the response is held until the fixed
             // time.
             onMailSent: () => {
