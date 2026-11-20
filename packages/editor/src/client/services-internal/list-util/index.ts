@@ -1,1 +1,1 @@
-export * from './insert-newline-continue-markup';
+export * from './insert-newline-continue-markup.js';

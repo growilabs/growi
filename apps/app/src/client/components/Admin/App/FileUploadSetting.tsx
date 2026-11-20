@@ -174,6 +174,7 @@ const FileUploadSetting = (): JSX.Element => {
       {fileUploadType === 'aws' && (
         <AwsSettingMolecule
           register={register}
+          awsUseOnlyEnvVars={data.awsUseOnlyEnvVars}
           s3ReferenceFileWithRelayMode={s3RelayModeField.value}
           onChangeS3ReferenceFileWithRelayMode={s3RelayModeField.onChange}
         />
@@ -207,7 +208,7 @@ const FileUploadSetting = (): JSX.Element => {
         />
       )}
 
-      {!isCloud && <AdminUpdateButtonRow type="submit" disabled={isLoading} />}
+      <AdminUpdateButtonRow type="submit" disabled={isLoading} />
     </form>
   );
 };

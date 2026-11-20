@@ -1,8 +1,8 @@
 import type { ParseRangeResult } from '@growi/core/dist/remark-plugins';
 import { mock } from 'vitest-mock-extended';
 
-import { addDepthCondition } from './add-depth-condition';
-import type { PageQuery } from './generate-base-query';
+import { addDepthCondition } from './add-depth-condition.js';
+import type { PageQuery } from './generate-base-query.js';
 
 // mocking modules
 const mocks = vi.hoisted(() => {

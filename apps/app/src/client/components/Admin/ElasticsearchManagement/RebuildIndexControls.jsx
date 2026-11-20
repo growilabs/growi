@@ -1,72 +1,42 @@
 import React from 'react';
-import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
-
-import { useAdminSocket } from '~/features/admin/states/socket-io';
-import { SocketEventName } from '~/interfaces/websocket';
 
 import LabeledProgressBar from '../Common/LabeledProgressBar';
 
 class RebuildIndexControls extends React.Component {
-  constructor(props) {
-    super(props);
-
-    this.state = {
-      total: 0,
-      current: 0,
-    };
-  }
-
-  componentDidMount() {
-    this.initWebSockets();
-  }
-
-  initWebSockets() {
-    const { socket } = this.props;
-
-    if (socket != null) {
-      socket.on(SocketEventName.AddPageProgress, (data) => {
-        this.setState({
-          total: data.totalCount,
-          current: data.count,
-        });
-      });
-
-      socket.on(SocketEventName.FinishAddPage, (data) => {
-        this.setState({
-          total: data.totalCount,
-          current: data.count,
-        });
-      });
-    }
-  }
-
   renderProgressBar() {
-    const { isRebuildingProcessing, isRebuildingCompleted } = this.props;
-    const { total, current } = this.state;
+    const {
+      isRebuildingProcessing,
+      isRebuildingCompleted,
+      currentCount,
+      totalCount,
+      progressHeaderProcessing,
+      progressHeaderCompleted,
+    } = this.props;
     const showProgressBar = isRebuildingProcessing || isRebuildingCompleted;
 
     if (!showProgressBar) {
       return null;
     }
 
-    const header = isRebuildingCompleted ? 'Completed' : 'Processing..';
+    const header = isRebuildingCompleted
+      ? progressHeaderCompleted
+      : progressHeaderProcessing;
 
     return (
       <div className="mb-3">
         <LabeledProgressBar
           header={header}
-          currentCount={current}
-          totalCount={total}
+          currentCount={currentCount}
+          totalCount={totalCount}
+          isInProgress={isRebuildingProcessing}
         />
       </div>
     );
   }
 
   render() {
-    const { t, isNormalized, isRebuildingProcessing } = this.props;
-
-    const isEnabled = isNormalized && !isRebuildingProcessing;
+    const { isEnabled, buttonLabel, descriptionLines } = this.props;
 
     return (
       <>
@@ -80,35 +50,33 @@ class RebuildIndexControls extends React.Component {
           }}
           disabled={!isEnabled}
         >
-          {t('full_text_search_management.rebuild_button')}
+          {buttonLabel}
         </button>
 
         <p className="form-text text-muted">
-          {t('full_text_search_management.rebuild_description_1')}
-          <br />
-          {t('full_text_search_management.rebuild_description_2')}
-          <br />
+          {descriptionLines.map((line) => (
+            <React.Fragment key={line}>
+              {line}
+              <br />
+            </React.Fragment>
+          ))}
         </p>
       </>
     );
   }
 }
 
-const RebuildIndexControlsFC = (props) => {
-  const { t } = useTranslation('admin');
-  const socket = useAdminSocket();
-  return <RebuildIndexControls t={t} socket={socket} {...props} />;
-};
-
 RebuildIndexControls.propTypes = {
-  t: PropTypes.func.isRequired, // i18next
-
+  isEnabled: PropTypes.bool.isRequired,
   isRebuildingProcessing: PropTypes.bool.isRequired,
   isRebuildingCompleted: PropTypes.bool.isRequired,
-
-  isNormalized: PropTypes.bool,
+  currentCount: PropTypes.number.isRequired,
+  totalCount: PropTypes.number.isRequired,
+  progressHeaderProcessing: PropTypes.string.isRequired,
+  progressHeaderCompleted: PropTypes.string.isRequired,
+  buttonLabel: PropTypes.string.isRequired,
+  descriptionLines: PropTypes.arrayOf(PropTypes.string).isRequired,
   onRebuildingRequested: PropTypes.func.isRequired,
-  socket: PropTypes.object,
 };
 
-export default RebuildIndexControlsFC;
+export default RebuildIndexControls;

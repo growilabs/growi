@@ -515,11 +515,12 @@ type FilterType = 'all' | 'news' | 'notifications';
 
 ```
 client/components/Sidebar/InAppNotification/
-├── InAppNotification.tsx                  (フィルタ state を管理し props で配布)
-├── InAppNotificationForms.tsx             (Forms UI のみ)
-├── InAppNotificationContent.tsx           (3 分岐レンダラー)
+├── InAppNotification.tsx                  (フィルタ state + hook 呼び出しの所在地、props で配布)
+├── InAppNotificationForms.tsx             (Forms UI: タブ・トグル・「すべて既読にする」ボタン)
+├── InAppNotificationContent.tsx           (3 分岐レンダラー、merged を prop で受け取る)
+├── types.ts                               (FilterType の中立な置き場・循環依存回避)
 └── hooks/
-    └── useMergedInAppNotifications.ts     (データ層)
+    └── useMergedInAppNotifications.ts     (データ層 + 既読化ハンドラ群)
 ```
 
 **設計原則**:
@@ -530,6 +531,19 @@ client/components/Sidebar/InAppNotification/
 **InAppNotificationForms**:
 - フィルタボタン（「すべて」「通知」「お知らせ」）を Bootstrap `btn-group` で実装
 - 既存「未読のみ」トグルを維持
+- 「未読のみ」トグルの右側に「すべて既読にする」ボタンを並置。`btn btn-sm btn-link text-decoration-none p-0` で控えめなテキストリンク調。未読 0 件時は `disabled` + `opacity-25` ユーティリティで存在感を更に弱め、インラインスタイルは使わない（Bootstrap クラスのみで実現）
+
+**「すべて既読にする」のフィルタ連動**:
+
+ボタンは現在の `activeFilter` に応じて発火する API を切り替える：
+
+| activeFilter | 発火する API |
+|---|---|
+| `'all'` | `POST /apiv3/news/mark-all-read` + `PUT /apiv3/in-app-notification/all-statuses-open`（並列） |
+| `'news'` | `POST /apiv3/news/mark-all-read` のみ |
+| `'notifications'` | `PUT /apiv3/in-app-notification/all-statuses-open` のみ |
+
+API 呼び出しに先立ち SWR キャッシュを楽観的に書き換え（後述）、API 失敗時のみ `mutate()` で再検証してロールバックする。
 
 **InAppNotificationContent (3 分岐)**:
 - `'all'`: `useMergedInAppNotifications.allModeSWRResponse` + `mergedItems` を `InfiniteScroll` に渡し、両ストリームをマージ表示
@@ -546,9 +560,13 @@ client/components/Sidebar/InAppNotification/
   newsResponse, allNewsItems, newsExhausted,
   notificationResponse, allNotificationItems, notifExhausted,
   allModeSWRResponse, mergedItems,
-  handleReadMutate, handleNotificationRead,
+  newsUnreadCount, notifUnreadCount,                 // 「すべて既読にする」ボタンの disable 判定に使用
+  handleNewsRead, handleNotificationRead,            // 単発既読化（id 受け取り、楽観更新）
+  handleMarkAllRead,                                 // 一括既読化（{news?, notifications?} を受け取る）
 }
 ```
+
+**hook の呼び出し位置**: `useMergedInAppNotifications` は `InAppNotification`（panel-root）で呼び、結果オブジェクト `merged` を `InAppNotificationContent` に prop で渡す。`Forms` 側にはボタンの `onMarkAllRead` と `isMarkAllReadDisabled` のみを props として配布する。これにより一覧 (Content) とボタン (Forms) が同じ hook 結果を共有する。
 
 - `'all'` モード用の合成 `SWRInfiniteResponse`: `setSize` は終端に達していないストリームをインクリメント（両方未終端なら両方）、`isValidating` はいずれかが true なら true、両ストリーム終端時に `isReachingEnd = true`
 - `mergedItems` は両ストリームの `flatMap → publishedAt/createdAt 降順 sort`
@@ -569,13 +587,21 @@ collapsed モードで `overflow-auto + maxHeight` を使い、dock/drawer モ�
 
 対策として `InAppNotificationContent` 内で `useSidebarMode()` を呼び、`isCollapsedMode()` が true のときのみ `overflow-auto` クラスと `maxHeight: 60vh` を付与する。dock/drawer モードでは div に何も付与せず、SimpleBar にスクロールを委ねる。
 
-**通知ドット即時消去: SWR mutate による楽観的更新**:
+**ドット即時消去 + 未読カウント即時減算: SWR mutate による楽観的更新**:
 
-`InAppNotificationElm` はクリック時に `apiv3Post('/in-app-notification/open')` でサーバーへ書き込みを行うが、UI への反映は SWR キャッシュの即時書き換えで行う。`useMergedInAppNotifications.handleNotificationRead` 内で `mutateNotifications(updater, { revalidate: false })` を用い、`useSWRInfinite` のページごとに該当 `doc.status` を `STATUS_OPENED` へ書き換える。
+ニュース・通知の両方で、既読化アクションのサーバー応答を待たずに UI 反映する。`useMergedInAppNotifications` 内で以下の関数群が一貫した規約に従って実装される：
+
+| ハンドラ | キャッシュ書換え | 未読カウント書換え | API |
+|---|---|---|---|
+| `handleNotificationRead(id)` | `mutateNotifications(updater, { revalidate: false })` で該当 `doc.status` を `STATUS_OPENED` に | `mutateNotifUnreadCount(c => max(c-1, 0), { revalidate: false })` | `POST /in-app-notification/open`（呼び出し元の Elm 側） |
+| `handleNewsRead(id)` | `mutateNews(updater, { revalidate: false })` で該当 `doc.isRead = true` に | `mutateNewsUnreadCount(c => max(c-1, 0), { revalidate: false })` | `POST /news/mark-read`（呼び出し元の NewsItem 側） |
+| `handleMarkAllRead({news?, notifications?})` | 対象側の全 doc を一括書換え | 対象側のカウントを `0` に固定 | `POST /news/mark-all-read` / `PUT /in-app-notification/all-statuses-open`（並列） |
 
 `useSWRInfinite` のキャッシュは `SWRConfig` プロバイダの Map に保持されるため、同一 React tree のアンマウント／リマウントを跨いで状態が維持され、リマウント後もドットは消えたままとなる。ローカル `useState` を持たずに SWR の標準機能のみで完結させることで、キャッシュ・再検証制御・キー共有といった SWR の利点をそのまま活かせる。
 
-品質改善の経緯: PR #10986 のレビュー FB を受け、当初採用した `useState<Set<string>>` 戦略を SWR `mutate` + `revalidate: false` に差し替えた。さらに PR #11050 で Substance 単一ファイル構造を Forms / Content / data hook の 3 モジュールに分割（凝集度向上）し、ハンドラを `useCallback` 化した。
+**ロールバック戦略**: `handleMarkAllRead` は API を `Promise.all` で並列実行し、いずれかが失敗した場合は `mutateXxx()`（引数なし）でサーバー値を再検証することでキャッシュを真実に戻す。単発既読化（`handleNotificationRead` / `handleNewsRead`）は呼び出し元（Elm / NewsItem）で API 失敗時に try/catch で握り潰す既存方針を維持する（クリック → ページ遷移という導線のため、UX 上のロールバック必要性が低い）。
+
+品質改善の経緯: PR #10986 のレビュー FB を受け、当初採用した `useState<Set<string>>` 戦略を SWR `mutate` + `revalidate: false` に差し替えた。PR #11050 で Substance 単一ファイル構造を Forms / Content / data hook の 3 モジュールに分割（凝集度向上）し、ハンドラを `useCallback` 化した。さらに PR（本ブランチ）で `handleNewsRead` も通知側と同じ楽観更新規約に揃え、未読カウントの楽観的デクリメントと「すべて既読にする」ボタン経由の一括既読化を追加した。
 
 ---
 
@@ -770,3 +796,49 @@ interface INewsItemWithReadStatus {
 
 **フロントエンド再レンダ**:
 - `<NewsItem>` は `React.memo` ラップ。`useMergedInAppNotifications` のハンドラ群は `useCallback` で参照安定化されており、SWR が返す `item` 参照と組み合わせて、変化のないリスト項目は再レンダをスキップする
+
+---
+
+## Addendum: ニュース一覧ページ /_news とページネーション（2026-07 追補）
+
+初期実装（Requirements 1–9）マージ後、`integration/news-improvements` ブランチ上で追加された範囲の設計記録。対応要件: Requirement 10, 11。
+
+### 背景と経緯
+
+1. **/_news ページ新設**（マージ済み: PR #11317 ほか）: サイドバーパネルはタイトルのみの表示で本文が読めないため、予約システムパス `/_news` にフルページのニュース一覧を追加した。同時にサイドバー NewsItem のクリック挙動を「詳細 URL を新タブで開く」から「`/_news#news-<id>` へ遷移」に変更した（Requirement 5.6 改訂）
+2. **アンカーの sticky ヘッダーオフセット**（マージ済み: PR #11373）: `scroll-margin-top`（Wiki 見出しと同じ共通変数 `$grw-scroll-margin-top-in-view`）で対象アイテムがヘッダーに隠れないようにした
+3. **無限スクロール → ページネーション**（PR #11416）: URL ハッシュのアンカー対象が未ロードページにある場合、旧実装は対象が見つかるまでページを追い読みしていた（最大 `MAX_ANCHOR_SCAN_PAGES` = 5）。長いフィードの末尾到達に N-1 ページの読み込みが必要になる問題を、`?page=N` 直接遷移で解消した
+
+### コンポーネント構成（/_news）
+
+| コンポーネント | 責務 |
+|---|---|
+| `client/components/NewsFeed.tsx` | /_news 本体。単一ページ表示 + PaginationWrapper + アンカースクロール |
+| `client/hooks/use-news.ts` `useSWRxNewsPage(page, limit)` | 単一ページ取得（`useSWR` + `keepPreviousData`）。SWRInfinite 版 `useSWRINFxNews`（サイドバー用）と `fetchNewsPage` フェッチャ・`NewsListKey` キー型を共有 |
+| `client/utils/parse-page-query.ts` | `?page` クエリの安全なパース（欠落・非数値・非正値 → 1）。純関数 + 境界テスト |
+| `client/consts.ts` `NEWS_PER_PAGE` | **単一ソースのページサイズ定数（10）**。サイドバー news ストリーム・/_news・use-news デフォルトの3箇所が共有 |
+| `NewsItem.tsx` `pageIndex?: number` prop | サイドバー側ページ index から `?page=${pageIndex + 1}` を導出。`undefined` 時は `?page` を省略 |
+| `InAppNotificationContent.tsx` `newsPageIndexById` | news id → SWRInfinite ページ index のマップ。**未読フィルタ ON 時は空マップ**（下記） |
+
+### 設計上の不変条件・決定
+
+- **ページサイズの一致（Requirement 11.1）**: サイドバーの SWRInfinite ページ index → /_news の `?page=N` というマッピングは、両者のページサイズが等しいときのみ成立する。`NEWS_PER_PAGE` を `consts.ts` に集約し、ドリフト時は誤ページ遷移バグに直結する旨をコメントで明記
+- **未読フィルタ例外（Requirement 11.4）**: サイドバーの news ストリームは `onlyUnread` をサーバーに渡すため、フィルタ ON 時の「N ページ目」は全件フィードの「N ページ目」と別物。誤ったページを指すくらいなら `?page` を省略して 1 ページ目に遷移する（安全側）。ページ探索フォールバック・「該当 id は何ページ目か」API は将来オプションとして見送り
+- **アンカースクロールの once-per-navigation 化（Requirement 11.5）**: `useSWRxNewsPage` は `keepPreviousData: true` のため、ページ遷移直後は前ページの DOM が残る。effect のトリガーを `data`（参照）+ `router.asPath` とし、`scrolledForPathRef` で「asPath ごとに 1 回だけ」を保証。`items.length` トリガーでは新旧ページが同数のとき再発火しない退行があった（レビュー指摘、テストで実証済み）
+- **範囲外 `?page`（例: 総ページ数超え）のクランプは未対応**（既知の軽微 UX、別 PR 予定）
+
+### セキュリティ（/_news 固有）
+
+- body はプレーンテキスト描画（React エスケープ）+ `pre-wrap`。Markdown レンダリングは意図的に不採用（外部フィードを全インスタンスでレンダラに通すと XSS 面が拡大するため）
+- `url` は ingest 時（zod: http(s) のみ）+ 描画時（`isSafeHttpUrl`）の二段検証
+
+### テスト
+
+- `NewsFeed.spec.tsx`（9件）: スピナー / 空表示 / アイテム描画 / ページャ表示条件 / `changePage` の push 引数 / アンカー3種（即時・データ到着後 = 退行ガード・再検証で再スクロールしない）。退行ガードは旧実装（`items.length` 依存）に戻すと fail することを実証済み
+- `parse-page-query.spec.ts`（10件）: 境界値（`undefined`/`'abc'`/`'0'`/`'-1'`/`'2.7'`/配列 等）
+- `NewsItem.spec.tsx`（15件）: `pageIndex=2 → ?page=3`（非ゼロ境界）と `pageIndex` 未指定 → `?page` なし、を含む
+
+### 後続（この spec のスコープ外）
+
+- **ニュースへの画像表示**: 設計は `tmp/news-feature-plan.md`「ニュースへの画像表示（2026-07-14 設計決定）」で確定済み（配信側 `images/` + 相対パス + hotlink + /_news 専用欄）。実装着手時に別 spec として起こす想定
+- 範囲外 `?page` のクランプ、`newsPageIndexById` の純関数抽出（PR #11416 レビューで別 PR 合意）

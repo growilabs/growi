@@ -1,0 +1,7 @@
+2026-09-11T04:12:31.7712004Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/routes/apiv3/g2g-transfer-preflight.integ.ts [ src/server/routes/apiv3/g2g-transfer-preflight.integ.ts ]
+2026-09-11T04:12:31.7713118Z [31m[1mError[22m: getaddrinfo ENOTFOUND mongo[39m
+2026-09-11T04:12:31.7713990Z [90m [2m❯[22m test/setup/migrate-mongo.ts:[2m52:1[22m[39m
+2026-09-11T04:12:31.7714551Z 
+2026-09-11T04:12:31.7714990Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/page-listing/page-listing.integ.ts [ src/server/service/page-listing/page-listing.integ.ts ]
+2026-09-11T04:12:31.7715880Z [31m[1mError[22m: Hook timed out in 20000ms.[39m
+2026-09-11T04:12:31.7716440Z [90m [2m❯[22m test/setup/migrate-mongo.ts:[2m52:1[22m[39m

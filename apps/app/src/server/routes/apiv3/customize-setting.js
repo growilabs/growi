@@ -1,6 +1,7 @@
 import { GrowiPluginType } from '@growi/core';
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
+import { toLegacyAttachmentShape } from '@growi/core/dist/models/serializers';
 import express from 'express';
 import { body } from 'express-validator';
 import multer from 'multer';
@@ -11,9 +12,9 @@ import { AttachmentType } from '~/server/interfaces/attachment';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import adminRequiredFactory from '~/server/middlewares/admin-required';
 import loginRequiredFactory from '~/server/middlewares/login-required';
-import { Attachment } from '~/server/models/attachment';
 import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
@@ -188,8 +189,11 @@ const router = express.Router();
  *            type: boolean
  *            description: The flag whether the logo is default or not.
  */
-/** @param {import('~/server/crowi').default} crowi Crowi instance */
-module.exports = (crowi) => {
+/**
+ * @param {import('~/server/crowi').default} crowi Crowi instance
+ * @returns {import('express').Router} router
+ */
+export const setup = (crowi) => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);
   const adminRequired = adminRequiredFactory(crowi);
   const addActivity = generateAddActivityMiddleware(crowi);
@@ -442,6 +446,9 @@ module.exports = (crowi) => {
    *                      items:
    *                        $ref: '#/components/schemas/ThemesMetadata'
    */
+  // Intentionally not adminRequired: RevisionDiff (page history) reads this for
+  // non-admin viewers too, and the response holds nothing secret — the current
+  // theme is already exposed to every page via its stylesheet and forcedColorScheme.
   router.get(
     '/theme',
     accessTokenParser([SCOPE.READ.ADMIN.CUSTOMIZE]),
@@ -596,9 +603,11 @@ module.exports = (crowi) => {
     accessTokenParser([SCOPE.WRITE.ADMIN.CUSTOMIZE]),
     loginRequiredStrictly,
     adminRequired,
+    // addActivity before the validators: validation failures are audited as
+    // ACTION_UNSETTLED (see apps/app/.claude/rules/activity-recording.md).
+    addActivity,
     validator.sidebar,
     apiV3FormValidator,
-    addActivity,
     async (req, res) => {
       const requestParams = {
         'customize:isSidebarCollapsedMode': req.body.isSidebarCollapsedMode,
@@ -1186,6 +1195,7 @@ module.exports = (crowi) => {
     uploads.single('file'),
     accessTokenParser([SCOPE.WRITE.ADMIN.CUSTOMIZE]),
     loginRequiredStrictly,
+    adminRequired,
     uploads.single('file'),
     validator.logo,
     apiV3FormValidator,
@@ -1212,8 +1222,8 @@ module.exports = (crowi) => {
       }
 
       // Check if previous attachment exists and remove it
-      const attachments = await Attachment.find({
-        attachmentType: AttachmentType.BRAND_LOGO,
+      const attachments = await prisma.attachments.findMany({
+        where: { attachmentType: AttachmentType.BRAND_LOGO },
       });
       if (attachments != null) {
         await attachmentService.removeAllAttachments(attachments);
@@ -1233,8 +1243,9 @@ module.exports = (crowi) => {
           new ErrorV3(err.message, 'upload-brand-logo-failed'),
         );
       }
-      attachment.toObject({ virtuals: true });
-      return res.apiv3({ attachment });
+      return res.apiv3({
+        attachment: toLegacyAttachmentShape(attachment),
+      });
     },
   );
 
@@ -1262,8 +1273,8 @@ module.exports = (crowi) => {
     loginRequiredStrictly,
     adminRequired,
     async (req, res) => {
-      const attachments = await Attachment.find({
-        attachmentType: AttachmentType.BRAND_LOGO,
+      const attachments = await prisma.attachments.findMany({
+        where: { attachmentType: AttachmentType.BRAND_LOGO },
       });
 
       if (attachments == null) {

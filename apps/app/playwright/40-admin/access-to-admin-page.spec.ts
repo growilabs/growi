@@ -101,7 +101,9 @@ test('admin/user-groups is successfully loaded', async ({ page }) => {
 test('admin/search is successfully loaded', async ({ page }) => {
   await page.goto('/admin/search');
 
-  await expect(page.getByTestId('admin-full-text-search')).toBeVisible();
+  await expect(
+    page.getByTestId('admin-elasticsearch-management'),
+  ).toBeVisible();
 
   // Only successful in the local environment.
   // wait for connected

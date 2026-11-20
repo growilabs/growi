@@ -2,21 +2,22 @@ import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import express from 'express';
+import { param, query } from 'express-validator';
 
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import loginRequiredFactory from '~/server/middlewares/login-required';
-import { Revision } from '~/server/models/revision';
 import {
   getAppliedAtForRevisionFilter,
   normalizeLatestRevisionIfBroken,
 } from '~/server/service/revision/normalize-latest-revision-if-broken';
+import { isRevisionOfPage } from '~/server/util/is-revision-of-page';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
+import { setup as certifySharedPageSetup } from '../../middlewares/certify-shared-page';
 
 const logger = loggerFactory('growi:routes:apiv3:pages');
-
-const { query, param } = require('express-validator');
 
 const router = express.Router();
 
@@ -55,11 +56,12 @@ const router = express.Router();
  *           type: integer
  *           description: The version key of the revision
  */
-/** @param {import('~/server/crowi').default} crowi Crowi instance */
-module.exports = (crowi) => {
-  const certifySharedPage = require('../../middlewares/certify-shared-page')(
-    crowi,
-  );
+/**
+ * @param {import('~/server/crowi').default} crowi Crowi instance
+ * @returns {import('express').Router} router
+ */
+export const setup = (crowi) => {
+  const certifySharedPage = certifySharedPageSetup(crowi);
   const loginRequired = loginRequiredFactory(crowi, true);
 
   const { Page, User } = crowi.models;
@@ -167,31 +169,29 @@ module.exports = (crowi) => {
 
         const appliedAt = await getAppliedAtForRevisionFilter();
 
-        const queryOpts = {
-          offset,
-          sort: { createdAt: -1 },
-          populate: 'author',
-          pagination: false,
-        };
+        const paginationOption = {};
 
         if (limit > 0) {
-          queryOpts.limit = limit;
-          queryOpts.pagination = true;
+          // NOTE: prisma does not accept skip without take
+          paginationOption.limit = limit;
+          paginationOption.offset = offset;
         }
 
         const queryCondition = {
-          pageId: page._id,
-          ...(appliedAt != null && { createdAt: { $gt: appliedAt } }),
+          pageId: page._id.toString(),
+          ...(appliedAt != null && { createdAt: { gt: appliedAt } }),
         };
 
         // https://redmine.weseek.co.jp/issues/151652
-        const paginateResult = await Revision.paginate(
-          queryCondition,
-          queryOpts,
-        );
+        const paginateResult = await prisma.revisions.paginate({
+          where: queryCondition,
+          orderBy: { createdAt: 'desc' },
+          include: { author: true },
+          ...paginationOption,
+        });
 
         paginateResult.docs.forEach((doc) => {
-          if (doc.author != null && doc.author instanceof User) {
+          if (doc.author != null) {
             doc.author = serializeUserSecurely(doc.author);
           }
         });
@@ -204,9 +204,9 @@ module.exports = (crowi) => {
 
         return res.apiv3(result);
       } catch (err) {
-        const msg = 'Error occurred in getting revisions by poge id';
+        const msg = 'Error occurred in getting revisions by page` id';
         logger.error('Error', err);
-        return res.apiv3Err(new ErrorV3(msg, 'faild-to-find-revisions'), 500);
+        return res.apiv3Err(new ErrorV3(msg, 'failed-to-find-revisions'), 500);
       }
     },
   );
@@ -242,7 +242,7 @@ module.exports = (crowi) => {
    *                      $ref: '#/components/schemas/Revision'
    */
   router.get(
-    '/:id',
+    '/:id([0-9a-fA-F]{24})',
     certifySharedPage,
     accessTokenParser([SCOPE.READ.FEATURES.PAGE], { acceptLegacy: true }),
     loginRequired,
@@ -268,9 +268,27 @@ module.exports = (crowi) => {
       }
 
       try {
-        const revision = await Revision.findById(revisionId).populate('author');
+        const revision = await prisma.revisions.findUnique({
+          where: { id: revisionId },
+          include: { author: true },
+        });
 
-        if (revision.author != null && revision.author instanceof User) {
+        // The pageId access check above only proves the caller may view the
+        // page identified by the query param — it says nothing about the
+        // revision fetched by the path param. Without this check, a caller
+        // could pair an accessible page's pageId with an arbitrary
+        // revisionId to read another page's revision.
+        if (!isRevisionOfPage(revision, pageId)) {
+          return res.apiv3Err(
+            new ErrorV3(
+              'Current user is not accessible to this page.',
+              'forbidden-page',
+            ),
+            403,
+          );
+        }
+
+        if (revision.author != null) {
           revision.author = serializeUserSecurely(revision.author);
         }
 
@@ -278,7 +296,7 @@ module.exports = (crowi) => {
       } catch (err) {
         const msg = 'Error occurred in getting revision data by id';
         logger.error('Error', err);
-        return res.apiv3Err(new ErrorV3(msg, 'faild-to-find-revision'), 500);
+        return res.apiv3Err(new ErrorV3(msg, 'failed-to-find-revision'), 500);
       }
     },
   );

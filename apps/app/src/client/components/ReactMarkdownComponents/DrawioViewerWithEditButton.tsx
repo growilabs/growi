@@ -82,7 +82,9 @@ export const DrawioViewerWithEditButton = React.memo(
             className="btn btn-sm btn-outline-secondary btn-edit-drawio"
             onClick={editButtonClickHandler}
           >
-            <span className="material-symbols-outlined me-1">edit_square</span>
+            <span className="material-symbols-outlined me-1" aria-hidden="true">
+              edit_square
+            </span>
             {t('Edit')}
           </button>
         )}

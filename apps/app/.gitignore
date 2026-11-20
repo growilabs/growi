@@ -19,6 +19,7 @@ next.config.js
 /public/uploads
 /src/styles/prebuilt
 /src/**/*.vendor-styles.prebuilt.*
+/src/**/bulk-export.generated.ts
 /tmp/
 
 # cache

@@ -9,18 +9,18 @@ import {
   type EditorSettings,
   type GlobalCodeMirrorEditorKey,
   PasteMode,
-} from '../../../consts';
+} from '../../../consts/index.js';
 import {
   adjustPasteData,
   FileDropzoneOverlay,
   getStrFromBol,
   useFileDropzone,
   useShowTableIcon,
-} from '../../services-internal';
-import { useCodeMirrorEditorIsolated } from '../../stores/codemirror-editor';
-import { useDefaultExtensions } from '../../stores/use-default-extensions';
-import { useEditorSettings } from '../../stores/use-editor-settings';
-import { Toolbar } from './Toolbar';
+} from '../../services-internal/index.js';
+import { useCodeMirrorEditorIsolated } from '../../stores/codemirror-editor.js';
+import { useDefaultExtensions } from '../../stores/use-default-extensions.js';
+import { useEditorSettings } from '../../stores/use-editor-settings.js';
+import { Toolbar } from './Toolbar/index.js';
 
 import style from './CodeMirrorEditor.module.scss';
 
@@ -56,12 +56,16 @@ export type CodeMirrorEditorProps = {
   onSave?: () => void;
   onUpload?: (files: File[]) => void;
   onScroll?: () => void;
+  /**
+   * Hide the toolbar (and its reserved space). Used by CodeMirrorEditorReadOnly
+   * and, via this public type, by CodeMirrorEditorComment.
+   */
+  hideToolbar?: boolean;
 };
 
 type Props = CodeMirrorEditorProps & {
   editorKey: string | GlobalCodeMirrorEditorKey;
   className?: string;
-  hideToolbar?: boolean;
 };
 
 export const CodeMirrorEditor = (props: Props): JSX.Element => {
@@ -87,7 +91,7 @@ export const CodeMirrorEditor = (props: Props): JSX.Element => {
     cmProps,
   );
 
-  useDefaultExtensions(codeMirrorEditor);
+  useDefaultExtensions(codeMirrorEditor, editorKey);
   useEditorSettings(codeMirrorEditor, editorSettings, onSave);
 
   useShowTableIcon(codeMirrorEditor);

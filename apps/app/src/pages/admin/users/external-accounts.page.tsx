@@ -20,7 +20,7 @@ const AdminExternalAccountsPage: NextPageWithLayout<Props> = () => (
 );
 
 AdminExternalAccountsPage.getLayout = createAdminPageLayout<Props>({
-  title: (_p, t) => t('user_management.external_account'),
+  title: (_p, t) => t('admin:user_management.external_account'),
   containerFactories: [
     async () => {
       const AdminExternalAccountsContainer =

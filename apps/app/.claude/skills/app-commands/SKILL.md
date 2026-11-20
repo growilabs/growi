@@ -210,7 +210,7 @@ dotenv-flow load order (first definition wins):
 3. `.env.development` ← committed defaults
 4. `.env`
 
-> **Note:** nodemon watches `*.*` but does **not** reliably pick up dotfile changes (files starting with `.`). After editing `.env.development.local`, kill the ts-node process manually so nodemon restarts it with the new env:
+> **Note:** nodemon watches `*.*` but does **not** reliably pick up dotfile changes (files starting with `.`). After editing `.env.development.local`, kill the server process manually so nodemon restarts it with the new env:
 > ```bash
 > kill $(ss -tlnp | grep ':3000' | grep -o 'pid=[0-9]*' | cut -d= -f2)
 > ```
@@ -287,7 +287,89 @@ kill $(pgrep -f "nodemon|src/server/app.ts") 2>/dev/null
 - Feature-flag–gated endpoints return the correct status code for each flag state (404 when disabled, 503 with the right message when bootstrap incomplete, 403 for read-only enforcement)
 - No unhandled exception in server startup logs
 
+## Authorization Regression Check
+
+Three capture tools freeze the apiv3 authorization surface so a refactor can be proven not
+to have moved it. Run them when a change touches middleware order, route registration, the
+auth chain, or after a large merge — a dropped guard is invisible to build, lint and unit
+tests. Baselines are committed under `tools/authz-matrix/baselines/`.
+
+```bash
+cd apps/app                        # requires MongoDB (devcontainer) and a free port 3000
+pnpm run authz:capture-routes      # structural: (method, path, middlewareNames[]) per apiv3 leaf
+pnpm run authz:capture-matrix      # black-box: HTTP status per endpoint × 4 personas
+pnpm run authz:capture-ws          # WebSocket: /yjs + socket.io, 3 session cases each
+```
+
+Each writes to its default baseline path under `tools/authz-matrix/baselines/`; pass
+`-- --out=<path>` to write elsewhere (`authz:capture-matrix` also takes `-- --in=<path>`
+for the structural snapshot it derives its endpoint list from).
+
+**How to use it**: capture on the base commit, apply your change, re-capture, and
+`git diff` the baseline files. **Any difference inside the `entries` / `matrix` arrays is
+a potential authorization change and must be explained**; the envelope metadata
+(`capturedAt`, `git`, `node`) changes on every run and is not signal. Adding
+`-- --verify-determinism` re-runs a capture twice and asserts the output is stable — do
+that before trusting a diff.
+
+Properties worth knowing:
+
+- The structural walker **fails** if any middleware layer is anonymous, because an unnamed
+  handler makes every slot look identical and destroys the diff. Fix the source (name the
+  function the middleware factory returns); do not weaken the tool. The terminal
+  route-body slot is exempt (~260 inline arrow handlers are pinned to their (path, method)
+  slot), so "no anonymous" means no anonymous **chain middleware** slot.
+- The black-box matrix records the observed status code, not business-logic validity — a
+  400 from a missing request body after the auth gate passed is fine and deterministic.
+- Persona injection is mounted where `passport.session()` sits, so the matrix exercises the
+  route-level chain (`accessTokenParser` → `loginRequired` → `adminRequired` → handler) but
+  **not** passport's own cookie parsing. Cover that with E2E.
+- WebSocket endpoints never appear in `app._router.stack`, which is why the third tool
+  exists: the structural snapshot structurally cannot see `/yjs/<pageId>` or the socket.io
+  namespace middleware.
+
+## External Plugin Install Smoke
+
+GROWI installs third-party plugins as **prebuilt assets** (download → validate the
+`growiPlugin` directive → serve `dist/` statically, or scan templates server-side). None of
+that path runs during `build`, `server:ci`, or the usual E2E, so it must be smoke-tested by
+hand whenever a change touches the plugin install route factory, `/static/plugins` serving,
+the `_document` script/stylesheet injection, the Vite manifest reader, or the published
+`@growi/pluginkit` format.
+
+Reference plugins — one per type, and the two manifest formats the reader supports:
+
+| Type | Repository (`growilabs/…`) | Manifest |
+|---|---|---|
+| script | `growi-plugin-datatables` | Vite 4 (`dist/manifest.json`) |
+| theme | `growi-plugin-theme-vivid-internet` | Vite 5 (`dist/.vite/manifest.json`) |
+| template | `growi-plugin-templates-for-marketing` | — (scanned server-side) |
+
+Procedure: boot the production artifact, issue an admin access token with
+`read:admin:plugin` / `write:admin:plugin`, then `POST /_api/v3/plugins` with
+`{ pluginInstallerForm: { url, ghBranch: 'main' } }` for each. It passes when:
+
+1. `GET /_api/v3/plugins` is 200 with a token and 403 without one (the route factory and its
+   auth chain are alive in the production output).
+2. `growiplugins` documents are created with the right `meta.types`; the theme grows
+   `themes[]` metadata and the template grows `templateSummaries[]`.
+3. `retrieveAllPluginResourceEntries()` returns the script's JS/CSS entries and the SSR HTML
+   of a real page contains the matching `<script type="module">` / `<link rel="stylesheet">`.
+4. Those asset URLs return HTTP 200 from `/static/plugins/…` with the right content type.
+
+Clean up afterwards: delete the smoke access token, and the `growiplugins` documents plus
+`tmp/plugins/growilabs/*` if you do not want the installs to persist.
+
 ## Troubleshooting
+
+### Boot Crash Diagnosis
+
+- **pino swallows the last log line.** The async transport can lose a `logger.error(err)`
+  written immediately before `process.exit(1)`, so a boot crash exits silently. Temporarily
+  add `console.error(err)` to the `main()` catch in `src/server/app.ts` to see the stack.
+- **nodemon keeps running after "app crashed"** and restarts on the next file edit, so a
+  stale dev server can answer 200 on :3000 and fake a passing smoke. Confirm the port is
+  free before starting, and attribute every response to the process you actually launched.
 
 ### Migration Issues
 

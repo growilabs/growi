@@ -13,24 +13,25 @@ import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity
 import adminRequiredFactory from '~/server/middlewares/admin-required';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import loginRequiredFactory from '~/server/middlewares/login-required';
-import ShareLink from '~/server/models/share-link';
 import { configManager } from '~/server/service/config-manager';
+import { isValidWhitelistEntry } from '~/utils/email-whitelist';
 import loggerFactory from '~/utils/logger';
 import {
   prepareDeleteConfigValuesForCalc,
   validateDeleteConfigs,
 } from '~/utils/page-delete-config';
+import { prisma } from '~/utils/prisma';
 
 import { checkSetupStrategiesHasAdmin } from './checkSetupStrategiesHasAdmin';
 import { handleSamlUpdate, samlAuthValidator } from './saml';
 
 const logger = loggerFactory('growi:routes:apiv3:security-setting');
 
-const express = require('express');
+import express from 'express';
 
 const router = express.Router();
 
-const { body } = require('express-validator');
+import { body } from 'express-validator';
 
 const validator = {
   generalSetting: [
@@ -77,9 +78,9 @@ const validator = {
     body('registrationWhitelist')
       .if((value) => value != null)
       .isArray()
-      .customSanitizer((value, { req }) => {
-        return value.filter((email) => email !== '');
-      }),
+      .customSanitizer((value) =>
+        value.map((entry) => entry.trim()).filter((entry) => entry !== ''),
+      ),
   ],
   ldapAuth: [
     body('serverUrl')
@@ -418,8 +419,11 @@ const validator = {
  *            type: boolean
  *            description: local account automatically linked the email matched
  */
-/** @param {import('~/server/crowi').default} crowi Crowi instance */
-module.exports = (crowi) => {
+/**
+ * @param {import('~/server/crowi').default} crowi Crowi instance
+ * @returns {import('express').Router} router
+ */
+export const setup = (crowi) => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);
   const adminRequired = adminRequiredFactory(crowi);
   const addActivity = generateAddActivityMiddleware(crowi);
@@ -1195,14 +1199,18 @@ module.exports = (crowi) => {
     async (req, res) => {
       const page = parseInt(req.query.page) || 1;
       const limit = 10;
-      const linkQuery = {};
       try {
-        const paginateResult = await ShareLink.paginate(linkQuery, {
-          page,
+        const paginateResult = await prisma.sharelinks.paginate({
+          offset: (page - 1) * limit,
           limit,
-          populate: {
-            path: 'relatedPage',
-            select: 'path',
+          include: {
+            relatedPage: {
+              select: {
+                _id: true,
+                id: true,
+                path: true,
+              },
+            },
           },
         });
         return res.apiv3({ paginateResult });
@@ -1242,8 +1250,8 @@ module.exports = (crowi) => {
     adminRequired,
     async (req, res) => {
       try {
-        const removedAct = await ShareLink.remove({});
-        const removeTotal = await removedAct.n;
+        const removedAct = await prisma.sharelinks.deleteMany({});
+        const removeTotal = removedAct.count;
         return res.apiv3({ removeTotal });
       } catch (err) {
         const msg = 'Error occured in delete all share links';
@@ -1295,6 +1303,16 @@ module.exports = (crowi) => {
           req.body.registrationWhitelist.map((line) =>
             xss(line, { stripIgnoreTag: true }),
           );
+
+        if (!sanitizedRegistrationWhitelist.every(isValidWhitelistEntry)) {
+          return res.apiv3Err(
+            new ErrorV3(
+              'Each entry must be a valid email address or a domain starting with @',
+              'invalid-registration-whitelist-format',
+            ),
+            400,
+          );
+        }
 
         const requestParams = {
           'security:registrationMode': req.body.registrationMode,

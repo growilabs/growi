@@ -1,0 +1,40 @@
+^[[41m^[[1m FAIL ^[[22m^[[49m ^[[30m^[[45m app-components ^[[49m^[[39m src/client/components/Admin/Common/AdminCodeEditor.spec.tsx^[[2m > ^[[22mAdminCodeEditor^[[2m > ^[[22mtheme following^[[2m > ^[[22mapplies the dark theme when in dark mode
+^[[31m^[[1mError^[[22m: Unrecognized extension value in extension set ([object Object]). This sometimes happens because multiple instances of @codemirror/state are loaded, breaking instanceof checks.^[[39m
+^[[36m ^[[2m❯^[[22m inner ../../node_modules/.pnpm/@codemirror+state@6.7.1/node_modules/@codemirror/state/dist/index.js:^[[2m2016:23^[[22m^[[39m
+
+^[[90m ^[[2m❯^[[22m inner ../../node_modules/.pnpm/@codemirror+state@6.7.1/node_modules/@codemirror/state/dist/index.js:^[[2m1989:17^[[22m^[[39m
+^[[90m ^[[2m❯^[[22m inner ../../node_modules/.pnpm/@codemirror+state@6.7.1/node_modules/@codemirror/state/dist/index.js:^[[2m1989:17^[[22m^[[39m
+^[[90m ^[[2m❯^[[22m inner ../../node_modules/.pnpm/@codemirror+state@6.7.1/node_modules/@codemirror/state/dist/index.js:^[[2m1989:17^[[22m^[[39m
+^[[90m ^[[2m❯^[[22m flatten ../../node_modules/.pnpm/@codemirror+state@6.7.1/node_modules/@codemirror/state/dist/index.js:^[[2m2020:5^[[22m^[[39m
+^[[90m ^[[2m❯^[[22m Configuration.resolve ../../node_modules/.pnpm/@codemirror+state@6.7.1/node_modules/@codemirror/state/dist/index.js:^[[2m1926:25^[[22m^[[39m
+^[[90m ^[[2m❯^[[22m EditorState.create ../../node_modules/.pnpm/@codemirror+state@6.7.1/node_modules/@codemirror/state/dist/index.js:^[[2m2759:43^[[22m^[[39m
+^[[90m ^[[2m❯^[[22m ../../node_modules/.pnpm/@uiw+react-codemirror@4.23.8_@babel+runtime@7.29.7_@codemirror+autocomplete@6.18.4_@cod_bc61e38c16b4d6c6ec98653a35cbfdb9/node_modules/@uiw/react-codemirror/esm/useCodeMirror.js:^[[2m80:124^[[22m^[[39m
+^[[90m ^[[2m❯^[[22m commitHookEffectListMount ../../node_modules/.pnpm/react-dom@18.2.0_react@18.2.0/node_modules/react-dom/cjs/react-dom.development.js:^[[2m23150:26^[[22m^[[39m
+^[[90m ^[[2m❯^[[22m commitPassiveMountOnFiber ../../node_modules/.pnpm/react-dom@18.2.0_react@18.2.0/node_modules/react-dom/cjs/react-dom.development.js:^[[2m24931:11^[[22m^[[39m
+
+^[[31m^[[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/8]⎯^[[22m^[[39m
+
+^[[41m^[[1m FAIL ^[[22m^[[49m ^[[30m^[[45m app-components ^[[49m^[[39m src/client/components/Admin/Common/AdminCodeEditor.spec.tsx^[[2m > ^[[22mAdminCodeEditor^[[2m > ^[[22mtheme following^[[2m > ^[[22mapplies the dark theme when in dark mode
+^[[41m^[[1m FAIL ^[[22m^[[49m ^[[30m^[[45m app-components ^[[49m^[[39m src/client/components/Admin/Common/AdminCodeEditor.spec.tsx^[[2m > ^[[22mAdminCodeEditor^[[2m > ^[[22maccessible label^[[2m > ^[[22mputs aria-label on the focusable content region, not the outer wrapper
+^[[41m^[[1m FAIL ^[[22m^[[49m ^[[30m^[[45m app-components ^[[49m^[[39m src/client/components/Admin/Common/AdminCodeEditor.spec.tsx^[[2m > ^[[22mAdminCodeEditor^[[2m > ^[[22mediting aids^[[2m > ^[[22mrenders the line-number gutter
+^[[41m^[[1m FAIL ^[[22m^[[49m ^[[30m^[[45m app-components ^[[49m^[[39m src/client/components/Admin/Common/AdminCodeEditor.spec.tsx^[[2m > ^[[22mAdminCodeEditor^[[2m > ^[[22mcontrolled value^[[2m > ^[[22mreflects an external value update (e.g. react-hook-form reset) into the editor
+^[[31m^[[1mError^[[22m: Should not already be working.^[[39m
+^[[90m ^[[2m❯^[[22m performConcurrentWorkOnRoot ../../node_modules/.pnpm/react-dom@18.2.0_react@18.2.0/node_modules/react-dom/cjs/react-dom.development.js:^[[2m25703:11^[[22m^[[39m
+^[[90m ^[[2m❯^[[22m flushActQueue ../../node_modules/.pnpm/react@18.2.0/node_modules/react/cjs/react.development.js:^[[2m2667:24^[[22m^[[39m
+^[[90m ^[[2m❯^[[22m act ../../node_modules/.pnpm/react@18.2.0/node_modules/react/cjs/react.development.js:^[[2m2582:11^[[22m^[[39m
+^[[90m ^[[2m❯^[[22m ../../node_modules/.pnpm/@testing-library+react@16.0.1_@testing-library+dom@10.4.1_@types+react-dom@18.3.0/node_modules/@testing-library/react/dist/act-compat.js:^[[2m47:25^[[22m^[[39m
+^[[90m ^[[2m❯^[[22m ../../node_modules/.pnpm/@testing-library+react@16.0.1_@testing-library+dom@10.4.1_@types+react-dom@18.3.0/node_modules/@testing-library/react/dist/pure.js:^[[2m285:28^[[22m^[[39m
+^[[90m ^[[2m❯^[[22m cleanup ../../node_modules/.pnpm/@testing-library+react@16.0.1_@testing-library+dom@10.4.1_@types+react-dom@18.3.0/node_modules/@testing-library/react/dist/pure.js:^[[2m281:22^[[22m^[[39m
+^[[36m ^[[2m❯^[[22m ../../node_modules/.pnpm/@testing-library+react@16.0.1_@testing-library+dom@10.4.1_@types+react-dom@18.3.0/node_modules/@testing-library/react/dist/index.js:^[[2m28:25^[[22m^[[39m
+    ^[[90m 26| ^[[39m  ^[[35mif^[[39m (^[[35mtypeof^[[39m afterEach ^[[33m===^[[39m ^[[32m'function'^[[39m) {
+    ^[[90m 27| ^[[39m    ^[[34mafterEach^[[39m(() ^[[33m=>^[[39m {
+    ^[[90m 28| ^[[39m      (^[[34m0^[[39m^[[33m,^[[39m _pure^[[33m.^[[39mcleanup)()^[[33m;^[[39m
+    ^[[90m   | ^[[39m                        ^[[31m^^[[39m
+    ^[[90m 29| ^[[39m    })^[[33m;^[[39m
+    ^[[90m 30| ^[[39m  } ^[[35melse^[[39m ^[[35mif^[[39m (^[[35mtypeof^[[39m teardown ^[[33m===^[[39m ^[[32m'function'^[[39m) {
+
+^[[31m^[[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/8]⎯^[[22m^[[39m
+
+^[[41m^[[1m FAIL ^[[22m^[[49m ^[[30m^[[45m app-components ^[[49m^[[39m src/client/components/Admin/Common/AdminCodeEditor.spec.tsx^[[2m > ^[[22mAdminCodeEditor^[[2m > ^[[22maccessible label^[[2m > ^[[22mputs aria-label on the focusable content region, not the outer wrapper
+^[[31m^[[1mError^[[22m: Should not already be working.^[[39m
+^[[90m ^[[2m❯^[[22m performConcurrentWorkOnRoot ../../node_modules/.pnpm/react-dom@18.2.0_react@18.2.0/node_modules/react-dom/cjs/react-dom.development.js:^[[2m25703:11^[[22m^[[39m

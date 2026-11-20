@@ -1,12 +1,14 @@
 import type { HasObjectId, IPage, IRevision, IUser, Ref } from '@growi/core';
 
+import type { ICommentCreatorSummary } from '~/features/comment/interfaces';
+
 export type IComment = {
   page: Ref<IPage>;
-  creator: Ref<IUser>;
-  revision: Ref<IRevision>;
+  creator: Ref<IUser> | ICommentCreatorSummary | null;
+  revision: Ref<IRevision> | null;
   comment: string;
   commentPosition: number;
-  replyTo?: string;
+  replyTo?: string | null;
   createdAt: Date;
   updatedAt: Date;
 };

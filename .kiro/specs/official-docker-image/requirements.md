@@ -37,7 +37,9 @@ Modernize and optimize the GROWI official Docker image's Dockerfile (`apps/app/d
 
 **Objective:** As an infrastructure administrator, I want the Dockerfile's base image and syntax to comply with the latest best practices, so that security patch application, performance improvements, and maintainability enhancements are achieved
 
-**Summary**: DHI base images adopted (`dhi.io/node:24-debian13-dev` for build, `dhi.io/node:24-debian13` for release) with up to 95% CVE reduction. Syntax directive updated to auto-follow latest stable. pnpm installed via wget standalone script (corepack not adopted due to planned removal in Node.js 25+). Fixed `---frozen-lockfile` typo and eliminated hardcoded pnpm version.
+**Summary**: DHI base images adopted (`dhi.io/node:24-debian13-dev` for build, `dhi.io/node:24-debian13` for release) with up to 95% CVE reduction. Syntax directive updated to auto-follow latest stable. pnpm activated via `corepack enable` (version pinned by the workspace `packageManager` field). Fixed `---frozen-lockfile` typo and eliminated hardcoded pnpm version.
+
+> **Decision update (2026-06):** The first implementation installed pnpm via the `wget https://get.pnpm.io/install.sh | sh` standalone script to avoid corepack (which is announced for removal in Node.js 25+). In practice that approach caused recurring build problems, so the Dockerfiles (`apps/app`, then `apps/growi-vault-manager`) switched to `corepack enable`. corepack's removal timeline is not certain — it may well survive — and if it is dropped we expect a more robust pnpm bootstrap than the wget script to be established by then. **Treat `corepack enable` as the current standard; do not revert to the wget script based on older wording elsewhere in this spec.**
 
 ### Requirement 2: Memory Management Optimization
 
@@ -69,6 +71,8 @@ Modernize and optimize the GROWI official Docker image's Dockerfile (`apps/app/d
 
 **Summary**: Entrypoint rewritten in TypeScript (`docker-entrypoint.ts`) executed via Node.js 24 native type stripping. Handles: directory setup (`/data/uploads`, `/tmp/page-bulk-export`), heap size calculation (3-tier fallback), privilege drop (`process.setgid` + `process.setuid`), migration execution (`execFileSync`), app process spawn with signal forwarding. Always includes `--expose_gc`. Logs applied flags to stdout.
 
+**Prisma query engine resolution is intentionally NOT an entrypoint responsibility.** The Turbopack-bundled Next.js SSR client cannot resolve the native query engine through `@prisma/client`'s internal search at runtime, so the engine is pinned at **build time** via the public `PRISMA_QUERY_ENGINE_LIBRARY` env var (set per-arch in the release stage — see design.md "Prisma Query Engine Resolution"). The entrypoint does not copy, discover, or otherwise touch the engine.
+
 ### Requirement 7: Backward Compatibility
 
 **Objective:** As an existing Docker image user, I want existing operations to not break when migrating to the new Dockerfile, so that the risk during upgrades is minimized
@@ -80,3 +84,9 @@ Modernize and optimize the GROWI official Docker image's Dockerfile (`apps/app/d
 **Objective:** As an infrastructure administrator, I want the artifacts in the docker-new directory to officially replace the existing docker directory and the CI/CD pipeline to operate with the new Dockerfile, so that DHI-based images are used in production builds
 
 **Summary**: All files moved from `apps/app/docker-new/` to `apps/app/docker/`, old files deleted. Dockerfile self-referencing path updated. `docker login dhi.io` added to buildspec.yml pre_build phase, reusing existing `DOCKER_REGISTRY_PASSWORD` secret. `codebuild/` directory and `README.md` maintained.
+
+### Requirement 9: Native Allocator Optimization (Opt-in jemalloc)
+
+**Objective:** As a GROWI operator running under sustained load, I want an option to swap the native memory allocator to jemalloc, so that memory the application has freed is actually returned to the OS and the container's working set is not inflated indefinitely by glibc's retained heap
+
+**Summary**: Under GROWI's load profile, glibc malloc retains hundreds of MiB of freed memory in its main arena — fragmentation prevents the sbrk heap from being trimmed, so the working set stays inflated indefinitely (this is the native-side RSS retention left open by the memory-leak investigation, not a leak and not arena proliferation). An A/B measurement on the production dist showed ~+468 MiB retention on glibc versus ~+142 MiB with jemalloc (−70%); `MALLOC_ARENA_MAX=2` had no effect. Because the DHI runtime has no package manager, an independent `jemalloc` build stage (`debian:13-slim`, matching the release image's distro so the library is built against the same glibc generation) provides `libjemalloc.so.2`, and the release stage copies that single `.so` to a fixed path. The entrypoint enables it **only when `JEMALLOC_ENABLED=true`**, via `LD_PRELOAD` on the **app process only** (the short-lived migration child keeps glibc). Default remains glibc — deliberately opt-in so GROWI.cloud can soak it per-app (CPU/latency) before any default flip. A missing library logs an error and boots normally on glibc; an operator-supplied `LD_PRELOAD` is preserved (jemalloc is prepended).

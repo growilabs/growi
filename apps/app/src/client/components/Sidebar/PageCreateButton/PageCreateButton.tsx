@@ -13,7 +13,6 @@ import { useCreateNewPage, useCreateTodaysMemo } from './hooks';
 
 export const PageCreateButton = React.memo((): JSX.Element => {
   const [isHovered, setIsHovered] = useState(false);
-
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
   const { open: openPageCreateModal } = usePageCreateModalActions();
@@ -43,10 +42,13 @@ export const PageCreateButton = React.memo((): JSX.Element => {
 
   const onMouseLeaveHandler = () => {
     setIsHovered(false);
-    setDropdownOpen(false);
   };
 
-  const toggle = () => setDropdownOpen(!dropdownOpen);
+  const toggle = () => {
+    setDropdownOpen((v) => !v);
+  };
+
+  const isVisible = isHovered || dropdownOpen;
 
   return (
     <fieldset
@@ -65,27 +67,25 @@ export const PageCreateButton = React.memo((): JSX.Element => {
           }
         />
       </div>
-      {isHovered && (
-        <Dropdown
-          isOpen={dropdownOpen}
-          toggle={toggle}
-          direction="end"
-          className="position-absolute"
-        >
-          <DropendToggle />
-          <DropendMenu
-            onClickCreateNewPage={createNewPageWithToastr}
-            onClickOpenPageCreateModal={() =>
-              openPageCreateModal(currentPagePath)
-            }
-            onClickCreateTodaysMemo={createTodaysMemoWithToastr}
-            onClickCreateTemplate={
-              isTemplatePageCreatable ? createTemplateWithToastr : undefined
-            }
-            todaysPath={todaysPath}
-          />
-        </Dropdown>
-      )}
+      <Dropdown
+        isOpen={dropdownOpen}
+        toggle={toggle}
+        direction="end"
+        className="position-absolute"
+      >
+        <DropendToggle isOpen={dropdownOpen} isVisible={isVisible} />
+        <DropendMenu
+          onClickCreateNewPage={createNewPageWithToastr}
+          onClickOpenPageCreateModal={() =>
+            openPageCreateModal(currentPagePath)
+          }
+          onClickCreateTodaysMemo={createTodaysMemoWithToastr}
+          onClickCreateTemplate={
+            isTemplatePageCreatable ? createTemplateWithToastr : undefined
+          }
+          todaysPath={todaysPath}
+        />
+      </Dropdown>
     </fieldset>
   );
 });

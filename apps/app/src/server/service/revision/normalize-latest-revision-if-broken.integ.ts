@@ -1,10 +1,9 @@
-import { getIdStringForRef } from '@growi/core';
 import type { HydratedDocument } from 'mongoose';
 import mongoose, { connection, Types } from 'mongoose';
 
 import type { PageDocument, PageModel } from '~/server/models/page';
 import PageModelFactory from '~/server/models/page';
-import { Revision } from '~/server/models/revision';
+import { prisma } from '~/utils/prisma';
 
 import {
   __resetCacheForTesting,
@@ -41,35 +40,37 @@ describe('normalizeLatestRevisionIfBroken', () => {
 
     // == Arrange
     const page = await Page.create({ path: '/foo' });
-    const revision = await Revision.create({ pageId: page._id, body: '' });
+    const revision = await prisma.revisions.create({
+      data: { pageId: page._id.toString(), body: '' },
+    });
     // connect the page and the revision
     page.revision = revision._id;
     await page.save();
     // break the revision
-    await Revision.updateOne(
-      { _id: revision._id },
-      { pageId: new Types.ObjectId() },
-    );
-
-    // spy
-    const updateOneSpy = vi.spyOn(Revision, 'updateOne');
+    await prisma.revisions.update({
+      where: { id: revision._id },
+      data: { pageId: new Types.ObjectId().toString() },
+    });
 
     // == Act
     await normalizeLatestRevisionIfBroken(page._id);
 
     // == Assert
-    // assert spy
-    expect(updateOneSpy).toHaveBeenCalled();
-
     // assert revision
-    const revisionById = await Revision.findById(revision._id);
-    const revisionByPageId = await Revision.findOne({ pageId: page._id });
+    const revisionById = await prisma.revisions.findUnique({
+      where: { id: revision._id },
+    });
+    const revisionByPageId = await prisma.revisions.findFirst({
+      where: { pageId: page._id.toString() },
+    });
     expect(revisionById).not.toBeNull();
     expect(revisionByPageId).not.toBeNull();
     assert(revisionById != null);
     assert(revisionByPageId != null);
-    expect(revisionById._id).toEqual(revisionByPageId._id);
-    expect(getIdStringForRef(revisionById.pageId)).toEqual(page._id.toString());
+    expect(revisionById.id).toEqual(revisionByPageId.id);
+    expect(revisionById.pageId).toEqual(page._id.toString());
+    // Assert: update happened
+    expect(revisionById.__v).toBeGreaterThan(revision.__v);
   });
 
   describe('should returns without any operation', () => {
@@ -80,31 +81,36 @@ describe('normalizeLatestRevisionIfBroken', () => {
 
       // Arrange
       const page = await Page.create({ path: '/foo' });
-      await Revision.create({ pageId: page._id, body: '' });
-      // spy
-      const updateOneSpy = vi.spyOn(Revision, 'updateOne');
+      const revision = await prisma.revisions.create({
+        data: { pageId: page._id.toString(), body: '' },
+      });
 
       // Act
       await normalizeLatestRevisionIfBroken(page._id);
 
-      // Assert
-      expect(updateOneSpy).not.toHaveBeenCalled();
+      const revisionAfter = await prisma.revisions.findUniqueOrThrow({
+        where: { id: revision.id },
+      });
+      // Assert: no update happened
+      expect(revisionAfter.__v).toBe(revision.__v);
     });
 
     test('when the page is not found', async () => {
       // Arrange
       const pageIdOfRevision = new Types.ObjectId();
       // create an orphan revision
-      await Revision.create({ pageId: pageIdOfRevision, body: '' });
-
-      // spy
-      const updateOneSpy = vi.spyOn(Revision, 'updateOne');
+      const revision = await prisma.revisions.create({
+        data: { pageId: pageIdOfRevision.toString(), body: '' },
+      });
 
       // Act
       await normalizeLatestRevisionIfBroken(pageIdOfRevision);
 
-      // Assert
-      expect(updateOneSpy).not.toHaveBeenCalled();
+      // Assert: no update happened
+      const revisionAfter = await prisma.revisions.findUniqueOrThrow({
+        where: { id: revision._id },
+      });
+      expect(revisionAfter.__v).toBe(revision.__v);
     });
 
     test('when the page.revision is null', async () => {
@@ -115,16 +121,18 @@ describe('normalizeLatestRevisionIfBroken', () => {
       // Arrange
       const page = await Page.create({ path: '/foo' });
       // create an orphan revision
-      await Revision.create({ pageId: page._id, body: '' });
-
-      // spy
-      const updateOneSpy = vi.spyOn(Revision, 'updateOne');
+      const revision = await prisma.revisions.create({
+        data: { pageId: page._id.toString(), body: '' },
+      });
 
       // Act
       await normalizeLatestRevisionIfBroken(page._id);
 
-      // Assert
-      expect(updateOneSpy).not.toHaveBeenCalled();
+      // Assert: no update happened
+      const revisionAfter = await prisma.revisions.findUniqueOrThrow({
+        where: { id: revision._id },
+      });
+      expect(revisionAfter.__v).toBe(revision.__v);
     });
 
     test('when the page.revision does not exist', async () => {
@@ -139,16 +147,18 @@ describe('normalizeLatestRevisionIfBroken', () => {
         revision: revisionNonExistent,
       });
       // create an orphan revision
-      await Revision.create({ pageId: page._id, body: '' });
-
-      // spy
-      const updateOneSpy = vi.spyOn(Revision, 'updateOne');
+      const revision = await prisma.revisions.create({
+        data: { pageId: page._id.toString(), body: '' },
+      });
 
       // Act
       await normalizeLatestRevisionIfBroken(page._id);
 
-      // Assert
-      expect(updateOneSpy).not.toHaveBeenCalled();
+      // Assert: no update happened
+      const revisionAfter = await prisma.revisions.findUniqueOrThrow({
+        where: { id: revision._id },
+      });
+      expect(revisionAfter.__v).toBe(revision.__v);
     });
   });
 });

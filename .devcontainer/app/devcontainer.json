@@ -11,7 +11,8 @@
       "version": "24",
       "pnpmVersion": "11.1.1"
     },
-    "ghcr.io/devcontainers/features/github-cli:1": {}
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/rapidsai/devcontainers/features/gitlab-cli:26.6.0": {}
   },
 
   // Use 'forwardPorts' to make a list of ports inside the container available locally.
@@ -44,9 +45,6 @@
         "bierner.markdown-mermaid",
         // TypeScript (Native Preview)
         "typescriptteam.native-preview",
-        // Test
-        "vitest.explorer",
-        "ms-playwright.playwright",
         // git/github
         "codeinklingon.git-worktree-menu",
         "github.vscode-pull-request-github",
@@ -56,9 +54,6 @@
         // DB
         "cweijan.vscode-database-client2",
         "mongodb.mongodb-vscode",
-        // Debug
-        "msjsdiag.debugger-for-chrome",
-        "firefox-devtools.vscode-firefox-debug",
         // prisma
         "Prisma.prisma@6.19.0"
       ],

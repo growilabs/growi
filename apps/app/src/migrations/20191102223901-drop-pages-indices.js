@@ -20,19 +20,17 @@ async function dropIndexIfExists(db, collectionName, indexName) {
   }
 }
 
-module.exports = {
-  async up(db) {
-    logger.info('Apply migration');
-    await mongoose.connect(getMongoUri(), mongoOptions);
+export async function up(db) {
+  logger.info('Apply migration');
+  await mongoose.connect(getMongoUri(), mongoOptions);
 
-    await dropIndexIfExists(db, 'pages', 'lastUpdateUser_1');
-    await dropIndexIfExists(db, 'pages', 'liker_1');
-    await dropIndexIfExists(db, 'pages', 'seenUsers_1');
+  await dropIndexIfExists(db, 'pages', 'lastUpdateUser_1');
+  await dropIndexIfExists(db, 'pages', 'liker_1');
+  await dropIndexIfExists(db, 'pages', 'seenUsers_1');
 
-    logger.info('Migration has successfully applied');
-  },
+  logger.info('Migration has successfully applied');
+}
 
-  down(db) {
-    // do not rollback
-  },
-};
+export function down(db) {
+  // do not rollback
+}

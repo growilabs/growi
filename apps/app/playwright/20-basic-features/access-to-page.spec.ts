@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { appendTextToEditorUntilContains } from '../utils/AppendTextToEditorUntilContains';
+import { appendTextToEditorUntilContains } from '../utils/append-text-to-editor-until-contains';
 
 test('has title', async ({ page }) => {
   await page.goto('/Sandbox');
@@ -116,7 +116,7 @@ test.describe
         .getByTestId('open-page-item-control-btn')
         .click();
       await page.getByTestId('open-page-template-modal-btn').click();
-      expect(page.getByTestId('page-template-modal')).toBeVisible();
+      await expect(page.getByTestId('page-template-modal')).toBeVisible();
 
       await page.getByTestId('template-button-children').click();
 
@@ -148,7 +148,7 @@ test.describe
         .getByTestId('open-page-item-control-btn')
         .click();
       await page.getByTestId('open-page-template-modal-btn').click();
-      expect(page.getByTestId('page-template-modal')).toBeVisible();
+      await expect(page.getByTestId('page-template-modal')).toBeVisible();
 
       await page.getByTestId('template-button-descendants').click();
 

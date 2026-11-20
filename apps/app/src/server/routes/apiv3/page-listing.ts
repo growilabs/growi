@@ -19,6 +19,7 @@ import { configManager } from '~/server/service/config-manager';
 import type { IPageGrantService } from '~/server/service/page-grant';
 import { pageListingService } from '~/server/service/page-listing';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import type Crowi from '../../crowi';
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
@@ -232,6 +233,7 @@ const routerFactory = (crowi: Crowi): Router => {
   router.get(
     '/info',
     accessTokenParser([SCOPE.READ.FEATURES.PAGE], { acceptLegacy: true }),
+    loginRequired,
     validator.pageIdsOrPathRequired,
     validator.infoParams,
     apiV3FormValidator,
@@ -249,8 +251,6 @@ const routerFactory = (crowi: Crowi): Router => {
       const Page = mongoose.model<HydratedDocument<PageDocument>, PageModel>(
         'Page',
       );
-      // biome-ignore lint/suspicious/noExplicitAny: ignore
-      const Bookmark = mongoose.model<any, any>('Bookmark');
       const pageService = crowi.pageService;
       const pageGrantService: IPageGrantService = crowi.pageGrantService;
 
@@ -283,9 +283,8 @@ const routerFactory = (crowi: Crowi): Router => {
 
         let bookmarkCountMap: Record<string, number> | undefined;
         if (attachBookmarkCount) {
-          bookmarkCountMap = (await Bookmark.getPageIdToCountMap(
-            foundIds,
-          )) as Record<string, number>;
+          bookmarkCountMap =
+            await prisma.bookmarks.getPageIdToCountMap(foundIds);
         }
 
         const idToPageInfoMap: Record<

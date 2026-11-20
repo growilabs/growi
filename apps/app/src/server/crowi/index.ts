@@ -1,4 +1,4 @@
-import next from 'next';
+import nextPkg from 'next';
 import http from 'node:http';
 import path from 'node:path';
 import { createTerminus } from '@godaddy/terminus';
@@ -6,23 +6,34 @@ import { createHttpLoggerMiddleware } from '@growi/logger';
 import attachmentRoutes from '@growi/remark-attachment-refs/dist/server';
 import lsxRoutes from '@growi/remark-lsx/dist/server/index.cjs';
 import type { Express } from 'express';
+import expressFactory from 'express';
+import expressSession from 'express-session';
 import mongoose from 'mongoose';
 
 import instantiateAuditLogBulkExportJobCleanUpCronService from '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-clean-up-cron';
 import instantiateAuditLogBulkExportJobCronService from '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-cron';
 import { checkAuditLogExportJobInProgressCronService } from '~/features/audit-log-bulk-export/server/service/check-audit-log-bulk-export-job-in-progress-cron';
+import { AuditlogChangeStreamService } from '~/features/auditlog-es-sync/server';
 import { KeycloakUserGroupSyncService } from '~/features/external-user-group/server/service/keycloak-user-group-sync';
 import { LdapUserGroupSyncService } from '~/features/external-user-group/server/service/ldap-user-group-sync';
-import { startCronIfEnabled as startOpenaiCronIfEnabled } from '~/features/openai/server/services/cron';
-import { initializeOpenaiService } from '~/features/openai/server/services/openai';
+import { initializeVaultFeature } from '~/features/growi-vault/server';
+import { isAiReady as resolveIsAiReady } from '~/features/mastra/server/services/is-ai-configured';
+import { modelConfigSync } from '~/features/mastra/server/services/model-config-sync';
 import { checkPageBulkExportJobInProgressCronService } from '~/features/page-bulk-export/server/service/check-page-bulk-export-job-in-progress-cron';
 import instanciatePageBulkExportJobCleanUpCronService from '~/features/page-bulk-export/server/service/page-bulk-export-job-clean-up-cron';
 import instanciatePageBulkExportJobCronService from '~/features/page-bulk-export/server/service/page-bulk-export-job-cron';
+import { initAttachmentFullTextSearch } from '~/features/search-attachments/server';
+import type { AttachmentReindexBatchInterface } from '~/features/search-attachments/server/services/attachment-reindex-batch';
+import type { AttachmentIndexOperations } from '~/features/search-attachments/server/services/attachment-search-delegator-extension';
+import type { AttachmentSearchIndexerInterface } from '~/features/search-attachments/server/services/attachment-search-indexer';
 import type { SessionConfig } from '~/interfaces/session-config';
 import { startCron as startAccessTokenCron } from '~/server/service/access-token';
 import { projectRoot } from '~/server/util/project-dir-utils';
 import { getGrowiVersion } from '~/utils/growi-version';
 import loggerFactory from '~/utils/logger';
+import type { PrismaClient } from '~/utils/prisma';
+import * as prismaUtils from '~/utils/prisma';
+import { connectPrismaAtBoot } from '~/utils/prisma-connect';
 
 import ActivityEvent from '../events/activity';
 import AdminEvent from '../events/admin';
@@ -67,10 +78,18 @@ import UserGroupService from '../service/user-group';
 import { UserNotificationService } from '../service/user-notification';
 import { initializeYjsService } from '../service/yjs';
 import { getMongoUri, mongoOptions } from '../util/mongoose-utils';
+import { setup as setupExpressInit } from './express-init';
+import { createSessionIdGenerator, FIXED_SESSION_ID_PATHS } from './session-id';
 import type { ModelsMapDependentOnCrowi } from './setup-models';
 import { setupModelsDependentOnCrowi } from './setup-models';
 
 const logger = loggerFactory('growi:crowi');
+
+// next's CJS entry self-patches `module.exports` to the createServer function,
+// so the runtime default import IS callable; the shipped d.ts (`export default`
+// in a CJS package) makes NodeNext type it as the module namespace instead.
+// Narrow the binding back to the callable declared as its `default`.
+const next = nextPkg as unknown as typeof import('next').default;
 
 const sep = path.sep;
 
@@ -106,6 +125,12 @@ class Crowi {
 
   loginRequiredFactory: typeof loginRequiredFactory;
 
+  // Read lazily: a module-scope `import { prisma }` would resolve before
+  // test/setup/prisma.ts has MONGO_URI and cache a broken client.
+  get prisma(): PrismaClient {
+    return prismaUtils.prisma;
+  }
+
   nextApp!: ReturnType<typeof next>;
 
   configManager!: ConfigManager;
@@ -133,6 +158,15 @@ class Crowi {
   passportService!: PassportService;
 
   searchService!: SearchService;
+
+  /** Set by initAttachmentFullTextSearch when the search service is configured. */
+  attachmentSearchIndexer?: AttachmentSearchIndexerInterface;
+
+  attachmentReindexBatch?: AttachmentReindexBatchInterface;
+
+  attachmentIndexOperations?: AttachmentIndexOperations;
+
+  auditlogChangeStreamService: AuditlogChangeStreamService | null = null;
 
   slackIntegrationService!: SlackIntegrationService;
 
@@ -188,10 +222,6 @@ class Crowi {
 
   commentService: CommentServiceType | null;
 
-  openaiThreadDeletionCronService: unknown | null;
-
-  openaiVectorStoreFileDeletionCronService: unknown | null;
-
   tokens: unknown | null;
 
   models: ModelsMapDependentOnCrowi;
@@ -216,7 +246,7 @@ class Crowi {
     this.publicDir = path.join(projectRoot, 'public') + sep;
     this.resourceDir = path.join(projectRoot, 'resource') + sep;
     this.localeDir = path.join(this.resourceDir, 'locales') + sep;
-    this.viewsDir = path.resolve(__dirname, '../views') + sep;
+    this.viewsDir = path.resolve(import.meta.dirname, '../views') + sep;
     this.tmpDir = path.join(projectRoot, 'tmp') + sep;
     this.cacheDir = path.join(this.tmpDir, 'cache');
 
@@ -233,8 +263,6 @@ class Crowi {
     this.inAppNotificationService = null;
     this.activityService = null;
     this.commentService = null;
-    this.openaiThreadDeletionCronService = null;
-    this.openaiVectorStoreFileDeletionCronService = null;
 
     this.tokens = null;
 
@@ -257,6 +285,11 @@ class Crowi {
 
   async init(): Promise<void> {
     await this.setupDatabase();
+    // Warm up the Prisma connection right after mongoose connects, so a
+    // Prisma connection problem aborts boot the same way a mongoose failure
+    // does, and the native query engine's memory cost is paid at boot time
+    // instead of being invisible until the first request (see prisma-connect.ts).
+    await connectPrismaAtBoot();
     this.models = await setupModelsDependentOnCrowi(this);
     await this.setupConfigManager();
     await this.setupSessionConfig();
@@ -293,6 +326,9 @@ class Crowi {
       this.setUpCustomize(), // depends on pluginService
     ]);
 
+    // Wire attachment full-text search after searchService + attachmentService are ready.
+    await initAttachmentFullTextSearch(this);
+
     await Promise.all([
       // globalNotification depends on slack and mailer
       this.setUpGlobalNotification(),
@@ -300,9 +336,8 @@ class Crowi {
       // depends on passport service
       this.setupExternalAccountService(),
       this.setupExternalUserGroupSyncService(),
-
-      // depends on AttachmentService
-      this.setupOpenaiService(),
+      // depends on pageService and activityService
+      this.setupVaultFeature(),
     ]);
 
     await this.setupCron();
@@ -314,9 +349,25 @@ class Crowi {
    * Execute functions that should be run after the express server is ready.
    */
   async asyncAfterExpressServerReady(): Promise<void> {
+    // Fire-and-forget so a slow or failed check never delays the steps below.
+    import('~/features/ai-usage/server')
+      .then(({ warnIfUsageBaseModelInvalid }) => warnIfUsageBaseModelInvalid())
+      .catch((err) => {
+        logger.warn('Failed to validate ai:usageBaseModel at startup', err);
+      });
+
     if (this.pageOperationService != null) {
       await this.pageOperationService.afterExpressServerReady();
     }
+
+    // One-shot model-catalog refresh (no-op unless the refresh is allowed: AI
+    // enabled or disabled for catalog_stale, and ai:modelCatalogRefreshOnStartup
+    // is true). Fire-and-forget inside — a
+    // failure only logs and the bundled/last-good catalog stays in effect.
+    const { triggerModelCatalogRefreshOnStartupIfEnabled } = await import(
+      '~/features/mastra/server/services/model-catalog-refresh-jobs'
+    );
+    triggerModelCatalogRefreshOnStartupIfEnabled();
   }
 
   isPageId(pageId: unknown): boolean {
@@ -329,6 +380,18 @@ class Crowi {
     }
 
     return false;
+  }
+
+  // AI usability verdict (enabled && configured) for callers that cannot reach
+  // the module-level config singleton safely — notably getServerSideProps, which
+  // runs in the Next/Turbopack SSR realm where a directly-imported configManager
+  // is a separate, never-loaded instance ("Config is not loaded"). Exposing the
+  // verdict here makes it execute in this (Express) realm, where the singleton is
+  // bootstrapped and loaded, so SSR code only needs the crowi reference it already
+  // has. Mirrors the verdict the mastra route guard uses, keeping UI and API
+  // aligned (Req 7.4).
+  isAiReady(): boolean {
+    return resolveIsAiReady();
   }
 
   setConfig(config: Record<string, unknown>): void {
@@ -352,8 +415,7 @@ class Crowi {
     return await mongoose.connect(mongoUri, mongoOptions);
   }
 
-  setupSessionConfig(): void {
-    const session = require('express-session');
+  async setupSessionConfig(): Promise<void> {
     const sessionMaxAge =
       this.configManager.getConfig('security:sessionMaxAge') || 2592000000; // default: 30days
     const redisUrl =
@@ -361,11 +423,6 @@ class Crowi {
       this.env.REDIS_URI ||
       this.env.REDIS_URL ||
       null;
-    const uid = require('uid-safe').sync;
-
-    // generate pre-defined uid for healthcheck
-    const healthcheckUid = uid(24);
-
     const sessionConfig: SessionConfig = {
       rolling: true,
       secret: this.env.SECRET_TOKEN || 'this is default session secret',
@@ -374,13 +431,7 @@ class Crowi {
       cookie: {
         maxAge: sessionMaxAge,
       },
-      genid(req) {
-        // return pre-defined uid when healthcheck
-        if (req.path === '/_api/v3/healthcheck') {
-          return healthcheckUid;
-        }
-        return uid(24);
-      },
+      genid: createSessionIdGenerator(FIXED_SESSION_ID_PATHS),
     };
 
     if (this.env.SESSION_NAME) {
@@ -388,15 +439,17 @@ class Crowi {
     }
 
     // use Redis for session store
+    // (loaded lazily: the redis stack is only needed when a Redis URL is configured)
     if (redisUrl) {
-      const redis = require('redis');
-      const redisClient = redis.createClient({ url: redisUrl });
-      const RedisStore = require('connect-redis')(session);
+      const { createClient } = await import('redis');
+      const redisClient = createClient({ url: redisUrl });
+      const { default: connectRedis } = await import('connect-redis');
+      const RedisStore = connectRedis(expressSession);
       sessionConfig.store = new RedisStore({ client: redisClient });
     }
     // use MongoDB for session store
     else {
-      const MongoStore = require('connect-mongo');
+      const { default: MongoStore } = await import('connect-mongo');
       sessionConfig.store = MongoStore.create({
         client: mongoose.connection.getClient(),
       });
@@ -410,13 +463,18 @@ class Crowi {
     return await this.configManager.loadConfigs();
   }
 
-  setupS2sMessagingService(): void {
-    const s2sMessagingService = require('../service/s2s-messaging')(this);
+  async setupS2sMessagingService(): Promise<void> {
+    const { setup: setupS2sMessaging } = await import(
+      '../service/s2s-messaging'
+    );
+    const s2sMessagingService = await setupS2sMessaging(this);
     if (s2sMessagingService != null) {
-      s2sMessagingService.subscribe();
+      s2sMessagingService.subscribe(false);
       this.configManager.setS2sMessagingService(s2sMessagingService);
       // add as a message handler
       s2sMessagingService.addMessageHandler(this.configManager);
+      // discard the memoized Mastra model on remote AI settings updates
+      s2sMessagingService.addMessageHandler(modelConfigSync);
 
       this.s2sMessagingService = s2sMessagingService;
     }
@@ -454,7 +512,6 @@ class Crowi {
     }
     auditLogBulkExportJobCleanUpCronService.startCron();
 
-    startOpenaiCronIfEnabled();
     startAccessTokenCron();
 
     // News feed sync cron
@@ -462,6 +519,27 @@ class Crowi {
       '~/features/news/server/services/news-cron-service'
     );
     new NewsCronService().startCron();
+
+    // Expired WIP page cleanup (the schedule defaults to daily and can be disabled
+    // with an empty app:wipPageCleanupCronSchedule)
+    const { startWipPageCleanupCronIfEnabled } = await import(
+      '~/server/service/page/wip-page-cleanup-cron'
+    );
+    startWipPageCleanupCronIfEnabled(this);
+
+    // Periodic model-catalog refresh (no-op unless the refresh is allowed; the schedule
+    // defaults to daily and can be disabled with an empty ai:modelCatalogRefreshCronSchedule)
+    const { startModelCatalogRefreshCronIfEnabled } = await import(
+      '~/features/mastra/server/services/model-catalog-refresh-jobs'
+    );
+    startModelCatalogRefreshCronIfEnabled();
+
+    // Change proposal maintenance (expiry, withdrawal while the feature is disabled,
+    // resuming stopped applies); disabled only by an empty schedule
+    const { startChangeProposalMaintenanceCronIfEnabled } = await import(
+      '~/features/change-proposal/server'
+    );
+    startChangeProposalMaintenanceCronIfEnabled(this);
   }
 
   getSlack(): unknown {
@@ -500,11 +578,43 @@ class Crowi {
 
   async setupSearcher(): Promise<void> {
     this.searchService = await SearchService.create(this);
+
+    if (this.searchService.isConfigured) {
+      // Auditlog rebuild-on-boot is orchestrated here (not in the delegator) so that server-core
+      // stays free of the auditlog-es-sync feature. Whether the rebuild actually succeeded is then
+      // handed to the change-stream service, which reconciles the sync-status flag and resume token
+      // on its first start (a feature concern that belongs in that layer).
+      let didRebuildOnBoot = false;
+      if (
+        this.configManager.getConfig('app:elasticsearchAuditlogReindexOnBoot')
+      ) {
+        // No cross-instance guard (like the page-index reindexOnBoot): concurrent rebuilds race
+        // on the ES alias swap, so enable on a single instance.
+        try {
+          await this.searchService.rebuildAuditlogIndex();
+          didRebuildOnBoot = true;
+        } catch (err) {
+          logger.error('Rebuild auditlog index on boot failed', err);
+        }
+      }
+
+      this.auditlogChangeStreamService = new AuditlogChangeStreamService(
+        this.searchService.fullTextSearchDelegator,
+        didRebuildOnBoot,
+      );
+      void this.auditlogChangeStreamService.startWithRetry();
+    }
   }
 
-  setupMailer(): void {
-    const MailService = require('~/server/service/mail').default;
+  async setupMailer(): Promise<void> {
+    // intentionally lazy: service/mail participates in a require cycle with
+    // this hub module; loading it at import time would surface the cycle
+    const { default: MailService } = await import('~/server/service/mail');
     this.mailService = new MailService(this);
+    // initialize() is async because it lazy-loads the configured transport
+    // (smtp/ses/oauth2) via dynamic import(), so it can no longer run inside
+    // the constructor; await it explicitly before the mailer is used.
+    await this.mailService.initialize();
 
     // add as a message handler
     if (this.s2sMessagingService != null) {
@@ -566,20 +676,24 @@ class Crowi {
     await this.buildServer();
 
     // setup Next.js
-    // Save ts-node's .ts extension hook before Next.js prepare() destroys it.
+    // Save the dev TS runner's .ts extension hook (tsx registers one for CJS
+    // interop) before Next.js prepare() destroys it.
     // Next.js's next.config.ts transpiler registers/deregisters its own require hooks,
     // and deregisterHook() deletes require.extensions['.ts'] instead of restoring the previous hook.
-    const savedTsHook = require.extensions['.ts'];
+    // `typeof require` guards the CJS-only API: under the ESM build `require` is
+    // undefined and no .ts hook exists, so there is nothing to restore.
+    const cjsRequire = typeof require === 'function' ? require : undefined;
+    const savedTsHook = cjsRequire?.extensions['.ts'];
     this.nextApp = next({ dev });
     await this.nextApp.prepare();
-    // Restore ts-node's .ts hook if Next.js removed it
-    if (savedTsHook && !require.extensions['.ts']) {
-      require.extensions['.ts'] = savedTsHook;
+    // Restore the runner's .ts hook if Next.js removed it
+    if (cjsRequire && savedTsHook && !cjsRequire.extensions['.ts']) {
+      cjsRequire.extensions['.ts'] = savedTsHook;
     }
 
-    // setup CrowiDev
+    // setup CrowiDev (loaded lazily: development runtime only)
     if (dev) {
-      const CrowiDev = require('./dev');
+      const { default: CrowiDev } = await import('./dev');
       this.crowiDev = new CrowiDev(this);
       this.crowiDev.init();
     }
@@ -633,9 +747,9 @@ class Crowi {
 
   async buildServer(): Promise<void> {
     const env = this.node_env;
-    const express: Express = require('express')();
+    const express: Express = expressFactory();
 
-    require('./express-init')(this, express);
+    setupExpressInit(this, express);
 
     // HTTP request logging via @growi/logger (encapsulates pino-http)
     const httpLogger = await createHttpLoggerMiddleware({
@@ -657,6 +771,7 @@ class Crowi {
       onSignal: async () => {
         logger.info('Server is starting cleanup');
 
+        await this.auditlogChangeStreamService?.close();
         await mongoose.disconnect();
         return;
       },
@@ -668,7 +783,10 @@ class Crowi {
   }
 
   setupRoutesForPlugins(): void {
-    lsxRoutes(this, this.express);
+    lsxRoutes(this, this.express, {
+      resolveTagPageIds: (tagNames) =>
+        this.prisma.pagetagrelations.findPageIdsWithAllTags(tagNames),
+    });
     attachmentRoutes(this, this.express);
   }
 
@@ -678,10 +796,9 @@ class Crowi {
    */
   async setupRoutesAtLast(): Promise<void> {
     type RoutesSetup = (crowi: Crowi, app: Express) => void;
-    // CommonJS modules are always wrapped in { default } when dynamically imported
-    const { default: setupRoutes } = (await import('../routes')) as unknown as {
-      default: RoutesSetup;
-    };
+    const { setup: setupRoutes }: { setup: RoutesSetup } = await import(
+      '../routes'
+    );
     setupRoutes(this, this.express);
   }
 
@@ -757,17 +874,19 @@ class Crowi {
   /**
    * setup FileUploadService
    */
-  setUpFileUpload(isForceUpdate = false): void {
+  async setUpFileUpload(isForceUpdate = false): Promise<void> {
     if (this.fileUploadService == null || isForceUpdate) {
-      this.fileUploadService = getUploader(this);
+      this.fileUploadService = await getUploader(this);
     }
   }
 
   /**
    * setup FileUploaderSwitchService
    */
-  setUpFileUploaderSwitchService(): void {
-    const FileUploaderSwitchService = require('../service/file-uploader-switch');
+  async setUpFileUploaderSwitchService(): Promise<void> {
+    const { default: FileUploaderSwitchService } = await import(
+      '../service/file-uploader-switch'
+    );
     this.fileUploaderSwitchService = new FileUploaderSwitchService(this);
     // add as a message handler
     if (this.s2sMessagingService != null) {
@@ -829,9 +948,10 @@ class Crowi {
     // initialize after pageGrantService since pageService uses pageGrantService in constructor
     if (this.pageService == null) {
       this.pageService = new PageService(this);
-      await this.pageService.createTtlIndex();
     }
     this.pageOperationService = instanciatePageOperationService(this);
+    // canOperate() ignores expiry, so a record left by an interrupted operation blocks its paths until removed
+    await this.pageOperationService.init();
   }
 
   setupInAppNotificationService(): void {
@@ -906,8 +1026,8 @@ class Crowi {
     );
   }
 
-  setupOpenaiService(): void {
-    initializeOpenaiService(this);
+  async setupVaultFeature(): Promise<void> {
+    await initializeVaultFeature(this);
   }
 }
 

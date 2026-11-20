@@ -33,18 +33,36 @@ export const aggregatePipelineToIndex = (
       },
     },
 
-    // join User
+    // join User (creator)
     {
       $lookup: {
         from: 'users',
         localField: 'creator',
         foreignField: '_id',
+        // Only the fields consumed downstream — avoid hydrating full user docs.
+        pipeline: [{ $project: { username: 1, email: 1 } }],
         as: 'creator',
       },
     },
     {
       $unwind: {
         path: '$creator',
+        preserveNullAndEmptyArrays: true,
+      },
+    },
+    // join User (lastUpdateUser)
+    {
+      $lookup: {
+        from: 'users',
+        localField: 'lastUpdateUser',
+        foreignField: '_id',
+        pipeline: [{ $project: { username: 1 } }],
+        as: 'lastUpdateUser',
+      },
+    },
+    {
+      $unwind: {
+        path: '$lastUpdateUser',
         preserveNullAndEmptyArrays: true,
       },
     },
@@ -135,6 +153,7 @@ export const aggregatePipelineToIndex = (
         seenUsersCount: 1,
         'creator.username': 1,
         'creator.email': 1,
+        'lastUpdateUser.username': 1,
       },
     },
   ];

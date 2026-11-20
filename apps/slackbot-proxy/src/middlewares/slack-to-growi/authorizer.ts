@@ -64,7 +64,9 @@ export class AuthorizeCommandMiddleware implements IMiddleware {
     const { body } = req;
     const teamId = body.team_id;
     const enterpriseId = body.enterprise_id;
-    const isEnterpriseInstall = body.is_enterprise_install === 'true';
+    const isEnterpriseInstall =
+      body.is_enterprise_install === true ||
+      body.is_enterprise_install === 'true';
     const query: InstallationQuery<boolean> = {
       teamId,
       enterpriseId,
@@ -108,7 +110,9 @@ export class AuthorizeInteractionMiddleware implements IMiddleware {
     // extract id from body.payload
     const teamId = payload.team?.id;
     const enterpriseId = payload.enterprise?.id;
-    const isEnterpriseInstall = payload.is_enterprise_install === 'true';
+    const isEnterpriseInstall =
+      payload.is_enterprise_install === true ||
+      payload.is_enterprise_install === 'true';
 
     const query: InstallationQuery<boolean> = {
       teamId,
@@ -145,7 +149,9 @@ export class AuthorizeEventsMiddleware implements IMiddleware {
     const { body } = req;
     const teamId = body.team_id;
     const enterpriseId = body.enterprise_id;
-    const isEnterpriseInstall = body.is_enterprise_install === 'true';
+    const isEnterpriseInstall =
+      body.is_enterprise_install === true ||
+      body.is_enterprise_install === 'true';
     const query: InstallationQuery<boolean> = {
       teamId,
       enterpriseId,

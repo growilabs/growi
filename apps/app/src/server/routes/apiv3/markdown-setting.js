@@ -16,7 +16,7 @@ const logger = loggerFactory('growi:routes:apiv3:markdown-setting');
 
 const router = express.Router();
 
-const { body } = require('express-validator');
+import { body } from 'express-validator';
 
 const validator = {
   lineBreak: [
@@ -120,8 +120,11 @@ const validator = {
  *            type: boolean
  *            description: force indent size
  */
-/** @param {import('~/server/crowi').default} crowi Crowi instance */
-module.exports = (crowi) => {
+/**
+ * @param {import('~/server/crowi').default} crowi Crowi instance
+ * @returns {import('express').Router} router
+ */
+export const setup = (crowi) => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);
   const adminRequired = adminRequiredFactory(crowi);
   const addActivity = generateAddActivityMiddleware(crowi);

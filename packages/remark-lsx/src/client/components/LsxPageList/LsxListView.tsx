@@ -1,8 +1,8 @@
 import React, { type JSX, useMemo } from 'react';
 
-import type { PageNode } from '../../../interfaces/page-node';
-import type { LsxContext } from '../lsx-context';
-import { LsxPage } from './LsxPage';
+import type { PageNode } from '../../../interfaces/page-node.js';
+import type { LsxContext } from '../lsx-context.js';
+import { LsxPage } from './LsxPage.js';
 
 import styles from './LsxListView.module.scss';
 

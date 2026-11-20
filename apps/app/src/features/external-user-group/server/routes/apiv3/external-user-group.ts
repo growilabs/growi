@@ -44,7 +44,7 @@ interface AuthorizedRequest extends Request {
  *          count:
  *            type: number
  */
-module.exports = (crowi: Crowi): Router => {
+export const setup = (crowi: Crowi): Router => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);
   const adminRequired = adminRequiredFactory(crowi);
   const addActivity = generateAddActivityMiddleware();
@@ -961,7 +961,7 @@ module.exports = (crowi: Crowi): Router => {
 
       try {
         await crowi.ldapUserGroupSyncService?.init(
-          req.user.name,
+          req.user.username,
           req.body.password,
         );
       } catch (_e) {

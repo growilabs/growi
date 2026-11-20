@@ -1,7 +1,7 @@
-import type { Ref } from './common';
-import type { HasObjectId } from './has-object-id';
-import type { IPage } from './page';
-import type { IUser } from './user';
+import type { Ref } from './common.js';
+import type { HasObjectId } from './has-object-id.js';
+import type { IPage } from './page.js';
+import type { IUser } from './user.js';
 
 export const Origin = {
   View: 'view',
@@ -12,6 +12,11 @@ export type Origin = (typeof Origin)[keyof typeof Origin];
 
 export const allOrigin = Object.values(Origin);
 
+export type IRevisionProposalMark = {
+  proposalId: string;
+  proposalOperationKey: string;
+};
+
 export type IRevision = {
   pageId: Ref<IPage>;
   body: string;
@@ -19,6 +24,8 @@ export type IRevision = {
   format: string;
   hasDiffToPrev?: boolean;
   origin?: Origin;
+  proposalId?: string;
+  proposalOperationKey?: string;
   createdAt: Date;
   updatedAt: Date;
 };

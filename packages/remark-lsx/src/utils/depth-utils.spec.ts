@@ -1,4 +1,4 @@
-import { getDepthOfPath } from './depth-utils';
+import { getDepthOfPath } from './depth-utils.js';
 
 describe('getDepthOfPath()', () => {
   it('returns 0 when the path does not include slash', () => {

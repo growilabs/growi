@@ -1,12 +1,10 @@
-import type { IPage, IRevisionHasId, IUserHasId } from '@growi/core';
-import { allOrigin, getIdForRef, getIdStringForRef, Origin } from '@growi/core';
+import type { IPage, IUserHasId } from '@growi/core';
+import { allOrigin } from '@growi/core';
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import {
-  isTopPage,
   isUserPage,
-  isUsersProtectedPages,
   isUsersTopPage,
 } from '@growi/core/dist/utils/page-path-utils';
 import type { Request, RequestHandler } from 'express';
@@ -15,30 +13,32 @@ import { body } from 'express-validator';
 import type { HydratedDocument } from 'mongoose';
 import mongoose from 'mongoose';
 
-import { isAiEnabled } from '~/features/openai/server/services';
-import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
+import type { revisions } from '~/generated/prisma/client';
 import {
   type IApiv3PageUpdateParams,
   PageUpdateErrorCode,
 } from '~/interfaces/apiv3';
-import type { IOptionsForUpdate } from '~/interfaces/page';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
 import loginRequiredFactory from '~/server/middlewares/login-required';
-import { GlobalNotificationSettingEvent } from '~/server/models/GlobalNotificationSetting';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import {
   serializePageSecurely,
   serializeRevisionSecurely,
 } from '~/server/models/serializers';
-import { shouldGenerateUpdate } from '~/server/service/activity/update-activity-logic';
 import { configManager } from '~/server/service/config-manager/config-manager';
-import { preNotifyService } from '~/server/service/pre-notify';
+import { isGrantImmutablePath } from '~/server/service/page/grant-immutable-path';
+import {
+  emitPageUpdateActivity,
+  runAfterHumanUpdate,
+  type UpdatePageBodyHumanOptions,
+  updatePageBody,
+} from '~/server/service/page-save';
 import { normalizeLatestRevisionIfBroken } from '~/server/service/revision/normalize-latest-revision-if-broken';
-import { getYjsService } from '~/server/service/yjs';
 import { generalXssFilter } from '~/services/general-xss-filter';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
 import { excludeReadOnlyUser } from '../../../middlewares/exclude-read-only-user';
@@ -55,7 +55,6 @@ interface UpdatePageRequest
 
 export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
   const Page = mongoose.model<IPage, PageModel>('Page');
-  const Revision = mongoose.model<IRevisionHasId>('Revision');
 
   const loginRequiredStrictly = loginRequiredFactory(crowi);
 
@@ -106,112 +105,34 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
     body('wip').optional().isBoolean().withMessage('wip must be boolean'),
   ];
 
-  async function postAction(
-    req: UpdatePageRequest,
+  async function respondConflict(
     res: ApiV3Response,
-    updatedPage: HydratedDocument<PageDocument>,
-    previousRevision: IRevisionHasId | null,
+    latestRevisionId: string | undefined,
   ) {
-    // Reflect the updates in ydoc
-    const origin = req.body.origin;
-    if (origin === Origin.View || origin === undefined) {
-      const yjsService = getYjsService();
-      await yjsService.syncWithTheLatestRevisionForce(req.body.pageId);
-    }
-
-    // Decide if update activity should generate
-    let shouldGenerateUpdateActivity = false;
-    try {
-      const targetPageId = getIdStringForRef(updatedPage);
-      const currentActivityId = getIdStringForRef(res.locals.activity);
-      const currentUserId = req.user ? getIdStringForRef(req.user) : undefined;
-
-      shouldGenerateUpdateActivity = await shouldGenerateUpdate({
-        currentUserId,
-        targetPageId,
-        currentActivityId,
-      });
-    } catch (err) {
-      logger.error(
-        'Failed to determine whether to generate update activity.',
-        err,
-      );
-    }
-
-    if (shouldGenerateUpdateActivity) {
-      try {
-        // persist activity
-        const creator =
-          updatedPage.creator != null
-            ? getIdForRef(updatedPage.creator)
-            : undefined;
-        const parameters = {
-          targetModel: SupportedTargetModel.MODEL_PAGE,
-          target: updatedPage,
-          action: SupportedAction.ACTION_PAGE_UPDATE,
-        };
-        const activityEvent = crowi.events.activity;
-        activityEvent.emit(
-          'update',
-          res.locals.activity._id,
-          parameters,
-          { path: updatedPage.path, creator },
-          preNotifyService.generatePreNotify,
-        );
-      } catch (err) {
-        logger.error('Failed to generate update activity', err);
-      }
-    }
-
-    // global notification
-    try {
-      await crowi.globalNotificationService.fire(
-        GlobalNotificationSettingEvent.PAGE_EDIT,
-        updatedPage,
-        req.user,
-      );
-    } catch (err) {
-      logger.error({ err }, 'Edit notification failed');
-    }
-
-    // user notification
-    const { isSlackEnabled, slackChannels } = req.body;
-    if (isSlackEnabled) {
-      try {
-        const option =
-          previousRevision != null ? { previousRevision } : undefined;
-        const results = await crowi.userNotificationService.fire(
-          updatedPage,
-          req.user,
-          slackChannels,
-          'update',
-          option,
-        );
-        for (const result of results) {
-          if (result.status === 'rejected') {
-            logger.error(
-              { err: result.reason },
-              'Create user notification failed',
-            );
-          }
-        }
-      } catch (err) {
-        logger.error({ err }, 'Create user notification failed');
-      }
-    }
-
-    // Rebuild vector store file
-    if (isAiEnabled()) {
-      const { getOpenaiService } = await import(
-        '~/features/openai/server/services/openai'
-      );
-      try {
-        const openaiService = getOpenaiService();
-        await openaiService?.updateVectorStoreFileOnPageUpdate(updatedPage);
-      } catch (err) {
-        logger.error({ err }, 'Rebuild vector store failed');
-      }
-    }
+    const latestRevision =
+      latestRevisionId != null
+        ? await prisma.revisions.findUnique({
+            where: { id: latestRevisionId },
+            include: { author: true },
+          })
+        : undefined;
+    const returnLatestRevision = {
+      revisionId: latestRevision?._id,
+      revisionBody: latestRevision?.body,
+      createdAt: latestRevision?.createdAt,
+      user: serializeUserSecurely(
+        latestRevision?.author as IUserHasId | undefined,
+      ),
+    };
+    return res.apiv3Err(
+      new ErrorV3(
+        'Posted param "revisionId" is outdated.',
+        PageUpdateErrorCode.CONFLICT,
+        undefined,
+        { returnLatestRevision },
+      ),
+      409,
+    );
   }
 
   const addActivity = generateAddActivityMiddleware();
@@ -264,10 +185,11 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
         return res.apiv3Err('User pages are disabled');
       }
 
-      const isGrantImmutable =
-        isTopPage(currentPage.path) || isUsersProtectedPages(currentPage.path);
-
-      if (grant != null && grant !== currentPage.grant && isGrantImmutable) {
+      if (
+        grant != null &&
+        grant !== currentPage.grant &&
+        isGrantImmutablePath(currentPage.path)
+      ) {
         return res.apiv3Err(
           new ErrorV3(
             'The grant settings for the specified page cannot be modified.',
@@ -286,89 +208,40 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
         }
       }
 
-      if (
-        currentPage != null &&
-        !(await currentPage.isUpdatable(sanitizeRevisionId, origin))
-      ) {
-        const latestRevision = await Revision.findById(
-          currentPage.revision,
-        ).populate('author');
-        const returnLatestRevision = {
-          revisionId: latestRevision?._id.toString(),
-          revisionBody: latestRevision?.body,
-          createdAt: latestRevision?.createdAt,
-          user: serializeUserSecurely(latestRevision?.author),
-        };
-        return res.apiv3Err(
-          new ErrorV3(
-            'Posted param "revisionId" is outdated.',
-            PageUpdateErrorCode.CONFLICT,
-            undefined,
-            { returnLatestRevision },
-          ),
-          409,
-        );
-      }
       let updatedPage: HydratedDocument<PageDocument>;
-      let previousRevision: IRevisionHasId | null;
+      let previousRevision: revisions | null;
       try {
         const {
           userRelatedGrantUserGroupIds,
           overwriteScopesOfDescendants,
           wip,
         } = req.body;
-        const options: IOptionsForUpdate = {
+        const options: UpdatePageBodyHumanOptions = {
           overwriteScopesOfDescendants,
-          origin,
           wip,
+          ...(grant != null ? { grant, userRelatedGrantUserGroupIds } : {}),
         };
-        if (grant != null) {
-          options.grant = grant;
-          options.userRelatedGrantUserGroupIds = userRelatedGrantUserGroupIds;
-        }
-
-        // Priority 1: Use provided revisionId (for conflict detection)
-        previousRevision = null;
-        if (sanitizeRevisionId != null) {
-          try {
-            previousRevision = await Revision.findById(sanitizeRevisionId);
-          } catch (error) {
-            logger.error(
-              {
-                revisionId: sanitizeRevisionId,
-                pageId: currentPage._id,
-                err: error,
-              },
-              'Failed to fetch previousRevision by revisionId',
-            );
-          }
-        }
-
-        // Priority 2: Fallback to currentPage.revision (for diff detection)
-        if (previousRevision == null && currentPage.revision != null) {
-          try {
-            previousRevision = await Revision.findById(currentPage.revision);
-          } catch (error) {
-            logger.error(
-              {
-                pageId: currentPage._id,
-                revisionId: currentPage.revision,
-                err: error,
-              },
-              'Failed to fetch previousRevision by currentPage.revision',
-            );
-          }
-        }
 
         // There are cases where "revisionId" is not required for revision updates
         // See: https://dev.growi.org/651a6f4a008fee2f99187431#origin-%E3%81%AE%E5%BC%B7%E5%BC%B1
-        updatedPage = await crowi.pageService.updatePage(
-          currentPage,
-          body,
-          previousRevision?.body ?? null,
-          req.user,
-          options,
+        const saveResult = await updatePageBody(
+          { pageService: crowi.pageService },
+          {
+            mode: 'human',
+            page: currentPage,
+            body,
+            user: req.user,
+            clientRevisionId: sanitizeRevisionId,
+            origin,
+            options,
+          },
         );
+
+        if (saveResult.type === 'conflict') {
+          return await respondConflict(res, saveResult.latestRevisionId);
+        }
+        updatedPage = saveResult.page;
+        previousRevision = saveResult.previousRevision;
       } catch (err) {
         logger.error({ err }, 'Error occurred while updating a page.');
         return res.apiv3Err(err);
@@ -379,9 +252,27 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
         revision: serializeRevisionSecurely(updatedPage.revision),
       };
 
+      // emit before res.apiv3() — see rules/activity-recording.md
+      const activityId = res.locals.activity?._id;
+      if (activityId != null) {
+        await emitPageUpdateActivity(crowi, {
+          activityId,
+          page: updatedPage,
+          user: req.user,
+        });
+      }
+
       res.apiv3(result, 201);
 
-      postAction(req, res, updatedPage, previousRevision);
+      runAfterHumanUpdate(crowi, {
+        pageId,
+        page: updatedPage,
+        user: req.user,
+        origin,
+        previousRevision,
+        isSlackEnabled: req.body.isSlackEnabled,
+        slackChannels: req.body.slackChannels,
+      });
     },
   ];
 };

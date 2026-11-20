@@ -27,8 +27,11 @@ const logger = loggerFactory('growi:routes:apiv3:user-group');
 
 const router = express.Router();
 
-/** @param {import('~/server/crowi').default} crowi Crowi instance */
-module.exports = (crowi) => {
+/**
+ * @param {import('~/server/crowi').default} crowi Crowi instance
+ * @returns {import('express').Router} router
+ */
+export const setup = (crowi) => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);
   const adminRequired = adminRequiredFactory(crowi);
   const addActivity = generateAddActivityMiddleware(crowi);
@@ -601,9 +604,11 @@ module.exports = (crowi) => {
     accessTokenParser([SCOPE.WRITE.ADMIN.USER_GROUP_MANAGEMENT]),
     loginRequiredStrictly,
     adminRequired,
+    // addActivity before the validators: validation failures are audited as
+    // ACTION_UNSETTLED (see apps/app/.claude/rules/activity-recording.md).
+    addActivity,
     validator.delete,
     apiV3FormValidator,
-    addActivity,
     async (req, res) => {
       const { id: deleteGroupId } = req.params;
       const { actionName, transferToUserGroupId, transferToUserGroupType } =
@@ -694,9 +699,11 @@ module.exports = (crowi) => {
     accessTokenParser([SCOPE.WRITE.ADMIN.USER_GROUP_MANAGEMENT]),
     loginRequiredStrictly,
     adminRequired,
+    // addActivity before the validators: validation failures are audited as
+    // ACTION_UNSETTLED (see apps/app/.claude/rules/activity-recording.md).
+    addActivity,
     validator.update,
     apiV3FormValidator,
-    addActivity,
     async (req, res) => {
       const { id } = req.params;
       const {
@@ -926,9 +933,11 @@ module.exports = (crowi) => {
     accessTokenParser([SCOPE.WRITE.ADMIN.USER_GROUP_MANAGEMENT]),
     loginRequiredStrictly,
     adminRequired,
+    // addActivity before the validators: validation failures are audited as
+    // ACTION_UNSETTLED (see apps/app/.claude/rules/activity-recording.md).
+    addActivity,
     validator.users.post,
     apiV3FormValidator,
-    addActivity,
     async (req, res) => {
       const { id, username } = req.params;
 

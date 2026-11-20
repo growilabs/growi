@@ -17,7 +17,7 @@ export const SidebarContentsType = {
   TAG: 'tag',
   BOOKMARKS: 'bookmarks',
   NOTIFICATION: 'notification',
-  AI_ASSISTANT: 'aiAssistant',
+  AI: 'ai',
 } as const;
 export const AllSidebarContentsType = Object.values(SidebarContentsType);
 export type SidebarContentsType =
@@ -37,7 +37,7 @@ export type OnDeletedFunction = (
   isRecursively: Nullable<true>,
   isCompletely: Nullable<true>,
 ) => void;
-export type OnRenamedFunction = (path: string) => void;
+export type OnRenamedFunction = (path: string, newPath: string) => void;
 export type OnDuplicatedFunction = (fromPath: string, toPath: string) => void;
 export type OnPutBackedFunction = (path: string) => void;
 export type onDeletedBookmarkFolderFunction = (

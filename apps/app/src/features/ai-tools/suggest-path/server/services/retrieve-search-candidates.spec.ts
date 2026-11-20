@@ -27,6 +27,7 @@ function createMockSearchService(
   result: ReturnType<typeof createSearchResult>,
 ) {
   return {
+    isReachable: true,
     searchKeyword: vi.fn().mockResolvedValue([result, 'DEFAULT']),
   };
 }

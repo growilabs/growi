@@ -1,7 +1,12 @@
+import fs from 'node:fs';
+import fsPromises from 'node:fs/promises';
+import path from 'node:path';
+import type { Writable } from 'node:stream';
+import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import type { Response } from 'express';
-import type { Writable } from 'stream';
-import { Readable } from 'stream';
-import { pipeline } from 'stream/promises';
+import mkdir from 'mkdirp';
+import urljoin from 'url-join';
 
 import type Crowi from '~/server/crowi';
 import {
@@ -9,7 +14,10 @@ import {
   type RespondOptions,
   ResponseMode,
 } from '~/server/interfaces/attachment';
-import type { IAttachmentDocument } from '~/server/models/attachment';
+import type {
+  AttachmentDraft,
+  AttachmentWithComputed,
+} from '~/server/models/attachment';
 import loggerFactory from '~/utils/logger';
 
 import { configManager } from '../config-manager';
@@ -18,6 +26,7 @@ import {
   type SaveFileParam,
   type TemporaryUrl,
 } from './file-uploader';
+import { buildLocalStoragePath } from './local-storage-path';
 import {
   applyHeaders,
   createContentHeaders,
@@ -25,13 +34,6 @@ import {
 } from './utils';
 
 const logger = loggerFactory('growi:service:fileUploaderLocal');
-
-const fs = require('fs');
-const fsPromises = require('fs/promises');
-const path = require('path');
-
-const mkdir = require('mkdirp');
-const urljoin = require('url-join');
 
 // TODO: rewrite this module to be a type-safe implementation
 class LocalFileUploader extends AbstractFileUploader {
@@ -59,7 +61,7 @@ class LocalFileUploader extends AbstractFileUploader {
   /**
    * @inheritdoc
    */
-  override async deleteFile(attachment: IAttachmentDocument): Promise<void> {
+  override async deleteFile(attachment: AttachmentWithComputed): Promise<void> {
     const filePath = this.getFilePathOnStorage(attachment);
     return this.deleteFileByFilePath(filePath);
   }
@@ -68,7 +70,7 @@ class LocalFileUploader extends AbstractFileUploader {
    * @inheritdoc
    */
   override async deleteFiles(
-    attachments: IAttachmentDocument[],
+    attachments: AttachmentWithComputed[],
   ): Promise<void> {
     await Promise.all(
       attachments.map((attachment) => {
@@ -91,7 +93,7 @@ class LocalFileUploader extends AbstractFileUploader {
     return fs.unlinkSync(filePath);
   }
 
-  getFilePathOnStorage(_attachment: IAttachmentDocument): string {
+  getFilePathOnStorage(_attachment: AttachmentDraft): string {
     throw new Error('Method not implemented.');
   }
 
@@ -109,7 +111,7 @@ class LocalFileUploader extends AbstractFileUploader {
    */
   override async uploadAttachment(
     readable: Readable,
-    attachment: IAttachmentDocument,
+    attachment: AttachmentDraft,
   ): Promise<void> {
     throw new Error('Method not implemented.');
   }
@@ -119,7 +121,7 @@ class LocalFileUploader extends AbstractFileUploader {
    */
   override respond(
     res: Response,
-    attachment: IAttachmentDocument,
+    attachment: AttachmentWithComputed,
     opts?: RespondOptions,
   ): void {
     throw new Error('Method not implemented.');
@@ -129,7 +131,7 @@ class LocalFileUploader extends AbstractFileUploader {
    * @inheritdoc
    */
   override findDeliveryFile(
-    attachment: IAttachmentDocument,
+    attachment: AttachmentWithComputed,
   ): Promise<NodeJS.ReadableStream> {
     throw new Error('Method not implemented.');
   }
@@ -138,7 +140,7 @@ class LocalFileUploader extends AbstractFileUploader {
    * @inheritDoc
    */
   override async generateTemporaryUrl(
-    attachment: IAttachmentDocument,
+    attachment: AttachmentWithComputed,
     opts?: RespondOptions,
   ): Promise<TemporaryUrl> {
     throw new Error(
@@ -147,19 +149,20 @@ class LocalFileUploader extends AbstractFileUploader {
   }
 }
 
-module.exports = (crowi: Crowi) => {
+export const setup = (crowi: Crowi) => {
   const lib = new LocalFileUploader(crowi);
 
   const basePath = path.posix.join(crowi.publicDir, 'uploads');
 
-  lib.getFilePathOnStorage = (attachment: IAttachmentDocument) => {
+  lib.getFilePathOnStorage = (attachment: AttachmentDraft) => {
     const dirName =
-      attachment.page != null
+      attachment.pageId != null
         ? FilePathOnStoragePrefix.attachment
         : FilePathOnStoragePrefix.user;
-    const filePath = path.posix.join(basePath, dirName, attachment.fileName);
 
-    return filePath;
+    // Guard against path traversal via a crafted fileName (e.g. imported via
+    // g2g transfer). Throws if the resolved path escapes the uploads base.
+    return buildLocalStoragePath(basePath, dirName, attachment.fileName);
   };
 
   async function readdirRecursively(dirPath) {

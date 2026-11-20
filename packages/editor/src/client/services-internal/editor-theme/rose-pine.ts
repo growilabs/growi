@@ -1,16 +1,21 @@
 // Ref: https://github.com/vadimdemedes/thememirror/blob/94a6475a9113ec03d880fcb817aadcc5a16e82e4/source/themes/rose-pine-dawn.ts
 
+import type { Extension } from '@codemirror/state';
+import { EditorView } from '@codemirror/view';
 import { tags as t } from '@lezer/highlight';
 import { createTheme } from '@uiw/codemirror-themes';
 
+const foreground = '#575279';
+const selection = '#6e6a8614';
+
 // Author: Rosé Pine
-export const rosePine = createTheme({
+const rosePineTheme = createTheme({
   theme: 'light',
   settings: {
     background: '#faf4ed',
-    foreground: '#575279',
+    foreground,
     caret: '#575279',
-    selection: '#6e6a8614',
+    selection,
     gutterBackground: '#faf4ed',
     gutterForeground: '#57527970',
     lineHighlight: '#6e6a860d',
@@ -58,3 +63,14 @@ export const rosePine = createTheme({
     },
   ],
 });
+
+// createTheme cannot style the completion tooltip, so define the selected item colors here.
+// Without this, CodeMirror's default (blue background) is used, which is hard to read with dark text.
+const completionTheme = EditorView.theme({
+  '.cm-tooltip-autocomplete > ul > li[aria-selected]': {
+    backgroundColor: selection,
+    color: foreground,
+  },
+});
+
+export const rosePine: Extension = [rosePineTheme, completionTheme];

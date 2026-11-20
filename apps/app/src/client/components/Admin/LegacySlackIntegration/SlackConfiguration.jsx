@@ -37,7 +37,7 @@ const SlackConfiguration = (props) => {
           data.slackToken ?? '',
         );
         await adminSlackIntegrationLegacyContainer.updateSlackAppConfiguration();
-        toastSuccess(t('notification_settings.updated_slackApp'));
+        toastSuccess(t('admin:notification_settings.updated_slackApp'));
       } catch (err) {
         toastError(err);
         logger.error(err);
@@ -97,7 +97,7 @@ const SlackConfiguration = (props) => {
         'Incoming Webhooks' ? (
           <React.Fragment>
             <h2 className="border-bottom mb-5">
-              {t('notification_settings.slack_incoming_configuration')}
+              {t('admin:notification_settings.slack_incoming_configuration')}
             </h2>
 
             <div className="row mb-3">
@@ -136,11 +136,11 @@ const SlackConfiguration = (props) => {
                     className="form-label form-check-label"
                     htmlFor="cbPrioritizeIWH"
                   >
-                    {t('notification_settings.prioritize_webhook')}
+                    {t('admin:notification_settings.prioritize_webhook')}
                   </label>
                 </div>
                 <p className="form-text text-muted">
-                  {t('notification_settings.prioritize_webhook_desc')}
+                  {t('admin:notification_settings.prioritize_webhook_desc')}
                 </p>
               </div>
             </div>
@@ -148,7 +148,7 @@ const SlackConfiguration = (props) => {
         ) : (
           <React.Fragment>
             <h2 className="border-bottom mb-3">
-              {t('notification_settings.slack_app_configuration')}
+              {t('admin:notification_settings.slack_app_configuration')}
             </h2>
 
             <div className="card custom-card bg-danger-subtle">
@@ -161,7 +161,7 @@ const SlackConfiguration = (props) => {
                 // biome-ignore lint/security/noDangerouslySetInnerHtml: translation contains HTML markup
                 dangerouslySetInnerHTML={{
                   __html: t(
-                    'notification_settings.slack_app_configuration_desc',
+                    'admin:notification_settings.slack_app_configuration_desc',
                   ),
                 }}
               />
@@ -177,7 +177,7 @@ const SlackConfiguration = (props) => {
                   )
                 }
               >
-                {t('notification_settings.use_instead')}
+                {t('admin:notification_settings.use_instead')}
               </button>
             </div>
 
@@ -212,7 +212,7 @@ const SlackConfiguration = (props) => {
             help
           </span>{' '}
           <a href="#collapseHelpForIwh" data-bs-toggle="collapse">
-            {t('notification_settings.how_to.header')}
+            {t('admin:notification_settings.how_to.header')}
           </a>
         </h3>
 
@@ -221,25 +221,27 @@ const SlackConfiguration = (props) => {
           className="collapse card custom-card bg-body-tertiary"
         >
           <li className="ms-3">
-            {t('notification_settings.how_to.workspace')}
+            {t('admin:notification_settings.how_to.workspace')}
             <ol>
               <li
                 // biome-ignore lint/security/noDangerouslySetInnerHtml: translation contains HTML markup
                 dangerouslySetInnerHTML={{
-                  __html: t('notification_settings.how_to.workspace_desc1'),
+                  __html: t(
+                    'admin:notification_settings.how_to.workspace_desc1',
+                  ),
                 }}
               />
-              <li>{t('notification_settings.how_to.workspace_desc2')}</li>
-              <li>{t('notification_settings.how_to.workspace_desc3')}</li>
+              <li>{t('admin:notification_settings.how_to.workspace_desc2')}</li>
+              <li>{t('admin:notification_settings.how_to.workspace_desc3')}</li>
             </ol>
           </li>
           <li className="ms-3">
-            {t('notification_settings.how_to.at_growi')}
+            {t('admin:notification_settings.how_to.at_growi')}
             <ol>
               <li
                 // biome-ignore lint/security/noDangerouslySetInnerHtml: translation contains HTML markup
                 dangerouslySetInnerHTML={{
-                  __html: t('notification_settings.how_to.at_growi_desc'),
+                  __html: t('admin:notification_settings.how_to.at_growi_desc'),
                 }}
               />
             </ol>

@@ -1,15 +1,20 @@
 // Ref: https://github.com/uiwjs/react-codemirror/blob/399d127f59a97a64974a65923d477d585d2abee5/themes/eclipse/src/index.ts
+import type { Extension } from '@codemirror/state';
+import { EditorView } from '@codemirror/view';
 import { tags as t } from '@lezer/highlight';
 import { createTheme } from '@uiw/codemirror-themes';
 
-export const eclipse = createTheme({
+const foreground = '#000';
+const selection = '#d7d4f0';
+
+const eclipseTheme = createTheme({
   theme: 'light',
   settings: {
     background: '#fff',
-    foreground: '#000',
+    foreground,
     // Change color
     caret: '#000',
-    selection: '#d7d4f0',
+    selection,
     selectionMatch: '#d7d4f0',
     gutterBackground: '#f7f7f7',
     gutterForeground: '#999',
@@ -32,3 +37,14 @@ export const eclipse = createTheme({
     { tag: t.link, color: '#219' },
   ],
 });
+
+// createTheme cannot style the completion tooltip, so define the selected item colors here.
+// Without this, CodeMirror's default (blue background) is used, which is hard to read with dark text.
+const completionTheme = EditorView.theme({
+  '.cm-tooltip-autocomplete > ul > li[aria-selected]': {
+    backgroundColor: selection,
+    color: foreground,
+  },
+});
+
+export const eclipse: Extension = [eclipseTheme, completionTheme];

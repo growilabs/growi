@@ -360,7 +360,7 @@ const LdapSecuritySettingContents = (props: Props) => {
               className="form-label text-start text-md-end col-md-3 col-form-label"
               htmlFor="attrMapUsername"
             >
-              <strong>{t('username')}</strong>
+              <strong>{t('commons:username')}</strong>
             </label>
             <div className="col-md-9">
               <input
@@ -427,7 +427,7 @@ const LdapSecuritySettingContents = (props: Props) => {
               className="form-label text-start text-md-end col-md-3 col-form-label"
               htmlFor="attrMapMail"
             >
-              <strong>{t('Email')}</strong>
+              <strong>{t('commons:Email')}</strong>
             </label>
             <div className="col-md-9">
               <input
@@ -447,7 +447,7 @@ const LdapSecuritySettingContents = (props: Props) => {
               className="form-label text-start text-md-end col-md-3 col-form-label"
               htmlFor="attrMapName"
             >
-              <strong>{t('Name')}</strong>
+              <strong>{t('commons:Name')}</strong>
             </label>
             <div className="col-md-9">
               <input
@@ -594,7 +594,7 @@ const LdapSecuritySettingContents = (props: Props) => {
                   adminLdapSecurityContainer.state.retrieveError != null
                 }
               >
-                {t('Update')}
+                {t('commons:Update')}
               </button>
               <button
                 type="button"

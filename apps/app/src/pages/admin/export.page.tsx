@@ -21,7 +21,7 @@ const AdminExportDataArchivePage: NextPageWithLayout<Props> = () => (
 );
 
 AdminExportDataArchivePage.getLayout = createAdminPageLayout<Props>({
-  title: (_p, t) => t('export_management.export_archive_data'),
+  title: (_p, t) => t('admin:export_management.export_archive_data'),
   containerFactories: [
     async () => {
       const AdminAppContainer =

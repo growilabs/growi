@@ -6,34 +6,32 @@ const logger = loggerFactory(
   'growi:migrate:remove-presentation-configurations',
 );
 
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
-module.exports = {
-  async up() {
-    logger.info('Apply migration');
-    await mongoose.connect(getMongoUri(), mongoOptions);
+export async function up() {
+  logger.info('Apply migration');
+  await mongoose.connect(getMongoUri(), mongoOptions);
 
-    await Config.findOneAndDelete({
-      key: 'markdown:presentation:pageBreakSeparator',
-    });
-    await Config.findOneAndDelete({
-      key: 'markdown:presentation:pageBreakCustomSeparator',
-    });
+  await Config.findOneAndDelete({
+    key: 'markdown:presentation:pageBreakSeparator',
+  });
+  await Config.findOneAndDelete({
+    key: 'markdown:presentation:pageBreakCustomSeparator',
+  });
 
-    logger.info('Migration has successfully applied');
-  },
+  logger.info('Migration has successfully applied');
+}
 
-  async down() {
-    logger.info('Rollback migration');
-    await mongoose.connect(getMongoUri(), mongoOptions);
+export async function down() {
+  logger.info('Rollback migration');
+  await mongoose.connect(getMongoUri(), mongoOptions);
 
-    const insertConfig = new Config({
-      key: 'markdown:presentation:pageBreakSeparator',
-      value: 2,
-    });
+  const insertConfig = new Config({
+    key: 'markdown:presentation:pageBreakSeparator',
+    value: 2,
+  });
 
-    await insertConfig.save();
+  await insertConfig.save();
 
-    logger.info('Migration has been successfully rollbacked');
-  },
-};
+  logger.info('Migration has been successfully rollbacked');
+}

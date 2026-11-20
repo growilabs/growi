@@ -1,4 +1,4 @@
-export type { OffScreenIndicatorOptions } from './off-screen-indicator';
-export { createOffScreenIndicator } from './off-screen-indicator';
-export { richCursorsTheme } from './theme';
-export { RichCaretWidget } from './widget';
+export type { OffScreenIndicatorOptions } from './off-screen-indicator.js';
+export { createOffScreenIndicator } from './off-screen-indicator.js';
+export { richCursorsTheme } from './theme.js';
+export { RichCaretWidget } from './widget.js';

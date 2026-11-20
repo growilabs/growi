@@ -302,7 +302,7 @@ const TemplateModalSubstance = (
                     return selectedLocalizedTemplate != null &&
                       selectedLocalizedTemplate.isValid
                       ? selectedLocalizedTemplate.title
-                      : t('Select template');
+                      : t('template.modal_label.Select template');
                   })()}
                 </span>
               </DropdownToggle>

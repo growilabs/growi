@@ -149,7 +149,7 @@ export const AccessTokenSettings = React.memo((): JSX.Element => {
           onClick={toggleFormOpen}
           data-testid="btn-accesstoken-toggleform"
         >
-          {isFormOpen ? t('Close') : t('New')}
+          {isFormOpen ? t('Close') : t('commons:New')}
         </button>
         {isFormOpen && <AccessTokenForm submitHandler={submitHandler} />}
       </div>

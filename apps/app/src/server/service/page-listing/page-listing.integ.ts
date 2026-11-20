@@ -429,4 +429,207 @@ describe('page-listing store integration tests', () => {
       });
     });
   });
+
+  describe('viewer-aware limited children for markdown footer', () => {
+    const GRANT_PUBLIC = 1;
+    const GRANT_OWNER = 4;
+
+    let parentPage: HydratedDocument<IPage>;
+    let otherUser: HydratedDocument<IUser>;
+
+    // 5 public children (visible to everyone), lexicographically first
+    const publicChildPaths = [
+      '/parent/aaa-01',
+      '/parent/aaa-02',
+      '/parent/aaa-03',
+      '/parent/aaa-04',
+      '/parent/aaa-05',
+    ];
+    // empty container page (public) — footer navigation must not stop at containers
+    const containerChildPath = '/parent/container';
+    // owner-restricted page visible to testUser only (invisible to guest)
+    const ownedByTestUserPath = '/parent/mmm-own-testuser';
+    // owner-restricted pages owned by another user — invisible to testUser AND guest
+    const ownedByOtherUserPaths = [
+      '/parent/zzz-secret-01',
+      '/parent/zzz-secret-02',
+    ];
+
+    // Visible direct-child totals derived from the seed above:
+    //   testUser: 5 public + 1 container + 1 owned-by-testUser = 7
+    //   guest:    5 public + 1 container                       = 6
+    //   invisible to both: 2 owned-by-otherUser
+    //   total docs under /parent: 9
+    const VISIBLE_TO_TESTUSER = 7;
+    const VISIBLE_TO_GUEST = 6;
+
+    beforeEach(async () => {
+      otherUser = await User.create({
+        name: 'Other User',
+        username: 'otheruser',
+        email: 'other@example.com',
+        lang: 'en_US',
+      });
+
+      parentPage = await Page.create({
+        path: '/parent',
+        revision: new mongoose.Types.ObjectId(),
+        creator: testUser._id,
+        lastUpdateUser: testUser._id,
+        grant: GRANT_PUBLIC,
+        isEmpty: false,
+        descendantCount: 9,
+        parent: rootPage._id,
+      });
+
+      await Page.insertMany(
+        publicChildPaths.map((path) => ({
+          path,
+          revision: new mongoose.Types.ObjectId(),
+          creator: testUser._id,
+          lastUpdateUser: testUser._id,
+          grant: GRANT_PUBLIC,
+          isEmpty: false,
+          descendantCount: 0,
+          parent: parentPage._id,
+        })),
+      );
+
+      // empty container child: no revision, isEmpty true
+      await Page.create({
+        path: containerChildPath,
+        creator: testUser._id,
+        grant: GRANT_PUBLIC,
+        isEmpty: true,
+        descendantCount: 1,
+        parent: parentPage._id,
+      });
+
+      await Page.create({
+        path: ownedByTestUserPath,
+        revision: new mongoose.Types.ObjectId(),
+        creator: testUser._id,
+        lastUpdateUser: testUser._id,
+        grant: GRANT_OWNER,
+        grantedUsers: [testUser._id],
+        isEmpty: false,
+        descendantCount: 0,
+        parent: parentPage._id,
+      });
+
+      await Page.insertMany(
+        ownedByOtherUserPaths.map((path) => ({
+          path,
+          revision: new mongoose.Types.ObjectId(),
+          creator: otherUser._id,
+          lastUpdateUser: otherUser._id,
+          grant: GRANT_OWNER,
+          grantedUsers: [otherUser._id],
+          isEmpty: false,
+          descendantCount: 0,
+          parent: parentPage._id,
+        })),
+      );
+    });
+
+    describe('findLimitedChildrenByParentIdAndViewer', () => {
+      test('should return at most `limit` viewer-visible direct children (invisible ones excluded)', async () => {
+        const limit = 3;
+        const children =
+          await pageListingService.findLimitedChildrenByParentIdAndViewer(
+            parentPage._id.toString(),
+            testUser,
+            limit,
+          );
+
+        // limited to `limit` even though 7 are visible
+        expect(children).toHaveLength(limit);
+
+        const paths = children.map((c) => c.path);
+        // none of the invisible (owner-restricted to otherUser) pages leak
+        ownedByOtherUserPaths.forEach((secret) => {
+          expect(paths).not.toContain(secret);
+        });
+        // deterministic ascending-path order → the lexicographically-first 3
+        expect(paths).toEqual([
+          '/parent/aaa-01',
+          '/parent/aaa-02',
+          '/parent/aaa-03',
+        ]);
+      });
+
+      test('should include empty container children and stay consistent with the count', async () => {
+        // fetch with a generous limit to retrieve every visible child
+        const children =
+          await pageListingService.findLimitedChildrenByParentIdAndViewer(
+            parentPage._id.toString(),
+            testUser,
+            100,
+          );
+        const count = await pageListingService.countChildrenByParentIdAndViewer(
+          parentPage._id.toString(),
+          testUser,
+        );
+
+        expect(children).toHaveLength(VISIBLE_TO_TESTUSER);
+        expect(children).toHaveLength(count);
+
+        const paths = children.map((c) => c.path);
+        // the empty container is a direct child and must be present
+        expect(paths).toContain(containerChildPath);
+
+        children.forEach((child) => {
+          validatePageForTreeItem(child);
+        });
+      });
+
+      test('guest (no user) sees only publicly visible children', async () => {
+        const guestChildren =
+          await pageListingService.findLimitedChildrenByParentIdAndViewer(
+            parentPage._id.toString(),
+            undefined,
+            100,
+          );
+
+        const guestPaths = guestChildren.map((c) => c.path);
+        expect(guestChildren).toHaveLength(VISIBLE_TO_GUEST);
+        // owner-restricted pages (incl. the one owned by testUser) are hidden from guests
+        expect(guestPaths).not.toContain(ownedByTestUserPath);
+        ownedByOtherUserPaths.forEach((secret) => {
+          expect(guestPaths).not.toContain(secret);
+        });
+        // the public container is still visible to guests
+        expect(guestPaths).toContain(containerChildPath);
+      });
+    });
+
+    describe('countChildrenByParentIdAndViewer', () => {
+      test('should return the exact number of viewer-visible direct children, excluding invisible pages and ignoring the link limit', async () => {
+        const count = await pageListingService.countChildrenByParentIdAndViewer(
+          parentPage._id.toString(),
+          testUser,
+        );
+
+        // 7 = 9 total direct children minus the 2 restricted to otherUser.
+        // It is NOT capped by any link limit and NOT the full 9.
+        expect(count).toBe(VISIBLE_TO_TESTUSER);
+      });
+
+      test('should be viewer-aware: a guest counts fewer children than a member', async () => {
+        const memberCount =
+          await pageListingService.countChildrenByParentIdAndViewer(
+            parentPage._id.toString(),
+            testUser,
+          );
+        const guestCount =
+          await pageListingService.countChildrenByParentIdAndViewer(
+            parentPage._id.toString(),
+          );
+
+        expect(memberCount).toBe(VISIBLE_TO_TESTUSER);
+        expect(guestCount).toBe(VISIBLE_TO_GUEST);
+        expect(guestCount).toBeLessThan(memberCount);
+      });
+    });
+  });
 });

@@ -65,7 +65,7 @@ const EditPage = (props: Props): null => {
 
   const handleError = useCallback(
     (path: string) => {
-      toastError(t('toaster.create_failed', { target: path }));
+      toastError(t('commons:toaster.create_failed', { target: path }));
     },
     [t],
   );

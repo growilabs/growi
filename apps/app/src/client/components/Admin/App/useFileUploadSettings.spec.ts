@@ -21,6 +21,7 @@ function buildSettingsData(
     envFileUploadType: appSettingsParams.envFileUploadType,
 
     // AWS S3
+    awsUseOnlyEnvVars: appSettingsParams.awsUseOnlyEnvVars || false,
     s3Region: appSettingsParams.s3Region || '',
     s3CustomEndpoint: appSettingsParams.s3CustomEndpoint || '',
     s3Bucket: appSettingsParams.s3Bucket || '',

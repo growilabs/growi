@@ -1,0 +1,32 @@
+{
+  "feature_name": "growi-vault",
+  "created_at": "2026-04-24T10:07:43Z",
+  "updated_at": "2026-06-05T00:00:00.000Z",
+  "language": "ja",
+  "phase": "umbrella-minimized",
+  "kind": "umbrella",
+  "sub_specs": [
+    "growi-vault-gateway",
+    "growi-vault-manager",
+    "growi-vault-resilience",
+    "growi-vault-reconcile",
+    "growi-vault-ha"
+  ],
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": false,
+      "approved": false,
+      "delegated_to_sub_specs": true
+    }
+  },
+  "ready_for_implementation": false,
+  "cleaned_up_at": "2026-06-05T00:00:00.000Z"
+}

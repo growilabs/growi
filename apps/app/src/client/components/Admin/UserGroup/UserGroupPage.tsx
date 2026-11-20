@@ -137,7 +137,7 @@ export const UserGroupPage: FC = () => {
 
         toastSuccess(
           t('toaster.update_successed', {
-            target: t('UserGroup'),
+            target: t('commons:UserGroup'),
             ns: 'commons',
           }),
         );
@@ -163,7 +163,7 @@ export const UserGroupPage: FC = () => {
 
         toastSuccess(
           t('toaster.update_successed', {
-            target: t('UserGroup'),
+            target: t('commons:UserGroup'),
             ns: 'commons',
           }),
         );
@@ -232,7 +232,7 @@ export const UserGroupPage: FC = () => {
       )}
 
       <UserGroupModal
-        buttonLabel={t('Create')}
+        buttonLabel={t('commons:Create')}
         onClickSubmit={createUserGroup}
         isShow={isCreateModalShown}
         onHide={hideCreateModal}
@@ -240,7 +240,7 @@ export const UserGroupPage: FC = () => {
 
       <UserGroupModal
         userGroup={selectedUserGroup}
-        buttonLabel={t('Update')}
+        buttonLabel={t('commons:Update')}
         onClickSubmit={updateUserGroup}
         isShow={isUpdateModalShown}
         onHide={hideUpdateModal}

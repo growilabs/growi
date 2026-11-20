@@ -27,9 +27,13 @@ autolabeler:
   - label: 'type/feature'
     branch:
       - '/^feat\/.+/'
+    title:
+      - '/^feat/i'
   - label: 'type/improvement'
     branch:
       - '/^imprv\/.+/'
+    title:
+      - '/^imprv/i'
   - label: 'type/bug'
     branch:
       - '/^fix\/.+/'

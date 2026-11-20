@@ -9,7 +9,7 @@ OUT=${OUT:-"${APP_PATH}/tmp/openapi-spec-apiv1.json"}
 
 swagger-jsdoc \
   -o "${OUT}" \
-  -d "${APP_PATH}/bin/openapi/definition-apiv1.js" \
+  -d "${APP_PATH}/bin/openapi/definition-apiv1.cjs" \
   "${APP_PATH}/src/server/routes/*.{js,ts}" \
   "${APP_PATH}/src/server/routes/attachment/**/*.{js,ts}" \
   "${APP_PATH}/src/server/models/openapi/**/*.{js,ts}"

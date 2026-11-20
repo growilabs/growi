@@ -1,0 +1,22 @@
+{
+  "feature_name": "news-markdown-body",
+  "created_at": "2026-07-29T05:09:14Z",
+  "updated_at": "2026-08-27T00:00:00Z",
+  "language": "ja",
+  "phase": "implementation-complete",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true
+    }
+  },
+  "ready_for_implementation": true
+}

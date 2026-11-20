@@ -5,8 +5,8 @@ import { renderHook, waitFor } from '@testing-library/react';
 import axios from 'axios';
 import express from 'express';
 
-import lsxMiddleware from '../../../server';
-import { useSWRxLsx } from './lsx';
+import lsxMiddleware from '../../../server/index.js';
+import { useSWRxLsx } from './lsx.js';
 
 // Mock the generateBaseQuery function
 vi.mock('../../../server/routes/list-pages/generate-base-query', () => ({
@@ -104,7 +104,7 @@ describe('useSWRxLsx integration tests', () => {
     };
 
     // Import and setup the LSX middleware
-    lsxMiddleware(mockCrowi, app);
+    lsxMiddleware(mockCrowi, app, { resolveTagPageIds: vi.fn() });
 
     // Start test server
     return new Promise<void>((resolve) => {

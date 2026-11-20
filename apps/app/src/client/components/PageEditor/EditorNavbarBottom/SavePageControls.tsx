@@ -32,6 +32,7 @@ import {
   useEditorMode,
   useIsSlackEnabled,
   useSelectedGrant,
+  useSyncSelectedGrantWithCurrentPage,
   useWaitingSaveProcessing,
 } from '~/states/ui/editor';
 import { useSWRxSlackChannels } from '~/stores/editor';
@@ -218,6 +219,12 @@ export const SavePageControls = (): JSX.Element | null => {
   const [slackChannels, setSlackChannels] = useState<string>('');
   const [isSavePageControlsModalShown, setIsSavePageControlsModalShown] =
     useState<boolean>(false);
+
+  // Initialize selectedGrantAtom from the current page's grant here, because
+  // SavePageControls is always mounted while editing. GrantSelector — which used
+  // to own this — is rendered inside a closed Modal on mobile and never mounts.
+  // See: https://github.com/growilabs/growi/issues/11272
+  useSyncSelectedGrantWithCurrentPage();
 
   // DO NOT dependent on slackChannelsData directly: https://github.com/growilabs/growi/pull/7332
   const slackChannelsDataString = slackChannelsData?.toString();

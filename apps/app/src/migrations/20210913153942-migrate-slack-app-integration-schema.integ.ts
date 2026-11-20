@@ -7,11 +7,11 @@ describe('migrate-slack-app-integration-schema', () => {
   let migrate: any;
 
   beforeAll(async () => {
-    // Use dynamic import for ESM/CJS interop - Vitest handles the mixed syntax
+    // The migration module exposes named `up` / `down` ESM exports.
     const migrateModule = await import(
-      './20210913153942-migrate-slack-app-integration-schema.js'
+      './20210913153942-migrate-slack-app-integration-schema'
     );
-    migrate = migrateModule.default || migrateModule;
+    migrate = migrateModule;
     collection = mongoose.connection.collection('slackappintegrations');
 
     await collection.insertMany([

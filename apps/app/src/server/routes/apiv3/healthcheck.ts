@@ -1,4 +1,5 @@
 import { ErrorV3 } from '@growi/core/dist/models';
+import type { Router } from 'express';
 import express from 'express';
 import nocache from 'nocache';
 
@@ -76,7 +77,7 @@ const router = express.Router();
  *                format: float
  *                example: 66.66666666666666
  */
-module.exports = (crowi: Crowi) => {
+export const setup = (crowi: Crowi): Router => {
   async function checkMongo(errors, info) {
     try {
       await Config.findOne({});

@@ -1,0 +1,6 @@
+{
+  "sha": "dddddddddddddddddddddddddddddddddddddd",
+  "commit": {
+    "message": "Merge of #100\nMerge of #200\n\nMergify batched two PRs into this queue commit."
+  }
+}

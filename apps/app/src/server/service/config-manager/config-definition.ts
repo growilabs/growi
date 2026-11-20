@@ -5,8 +5,17 @@ import type {
   NonBlankString,
 } from '@growi/core/dist/interfaces';
 import { defineConfig, toNonBlankString } from '@growi/core/dist/interfaces';
-import type OpenAI from 'openai';
 
+import type { AutoApplyPolicy } from '~/features/change-proposal/interfaces';
+import type {
+  AllowedModel,
+  ModelProviderOptions,
+} from '~/features/mastra/interfaces/allowed-model';
+import type {
+  AiProviderApiKeys,
+  AiProvidersConfig,
+} from '~/features/mastra/interfaces/provider-settings';
+import type { PlantumlHttpMethod } from '~/features/plantuml/interfaces/http-method';
 import { ActionGroupSize } from '~/interfaces/activity';
 import { AttachmentMethodType } from '~/interfaces/attachment';
 import type {
@@ -47,6 +56,7 @@ export const CONFIG_KEYS = [
   'app:globalLang',
   'app:fileUploadType',
   'app:plantumlUri',
+  'app:plantumlHttpMethod',
   'app:drawioUri',
   'app:nchanUri',
   'app:siteUrl',
@@ -62,12 +72,18 @@ export const CONFIG_KEYS = [
   'app:elasticsearchMaxBodyLengthToIndex',
   'app:elasticsearchReindexBulkSize',
   'app:elasticsearchReindexOnBoot',
+  'app:attachmentFullTextSearch:extractorUri',
+  'app:attachmentFullTextSearch:extractorToken',
+  'app:attachmentFullTextSearch:timeoutMs',
+  'app:attachmentFullTextSearch:maxFileSizeBytes',
+  'app:elasticsearchAuditlogReindexOnBoot',
   'app:growiCloudUri',
   'app:growiAppIdForCloud',
   'app:ogpUri',
   'app:minPasswordLength',
   'app:auditLogEnabled',
   'app:activityExpirationSeconds',
+  'app:revisionDiffMaxLookbackSeconds',
   'app:auditLogActionGroupSize',
   'app:auditLogAdditionalActions',
   'app:auditLogExcludeActions',
@@ -75,9 +91,29 @@ export const CONFIG_KEYS = [
   'app:deploymentType',
   'app:ssrMaxRevisionBodyLength',
   'app:wipPageExpirationSeconds',
-  'app:openaiThreadDeletionCronMaxMinutesUntilRequest',
-  'app:openaiVectorStoreFileDeletionCronMaxMinutesUntilRequest',
+  'app:wipPageCleanupCronSchedule',
   'app:isReadOnlyForNewUser',
+  'app:vaultEnabled',
+  'app:vaultManagerEndpoint',
+  'app:vaultManagerInternalSecret',
+  'app:vaultBootstrapOnStart',
+  'app:vaultBootstrapRetryMax',
+  'app:vaultBootstrapRetryBaseMs',
+  'app:vaultBootstrapRetryMaxMs',
+  'app:vaultBootstrapHeartbeatIntervalMs',
+  'app:vaultBootstrapHeartbeatStaleMs',
+  'app:vaultBootstrapRetryDisabled',
+  'app:vaultDriftDetectionIntervalMs',
+  'app:vaultDriftMaxPagesPerTick',
+  'app:vaultDriftDetectionDisabled',
+  'app:vaultReconcileMaxPagesPerUserRequest',
+  'app:vaultReconcileMaxPagesPerAdminRequest',
+  'app:vaultReconcileMaxConcurrentPerUser',
+  'app:vaultReconcileMaxConcurrentSystem',
+  'app:vaultReconcileChunkSize',
+  'app:vaultReconcileHistoryRetentionDays',
+  'app:vaultReconcileRejectWhenBootstrapNotDone',
+  'app:vaultReconcileAdminBypassCapacityLimit',
 
   // Content-Disposition settings for MIME types
   'attachments:contentDisposition:inlineMimeTypes',
@@ -261,18 +297,30 @@ export const CONFIG_KEYS = [
   'slackbot:withProxy:saltForGtoP',
   'slackbot:withProxy:saltForPtoG',
 
-  // OpenAI Settings
-  'openai:serviceType',
-  'openai:apiKey',
-  'openai:assistantModel:chat',
-  'openai:assistantModel:edit',
-  'openai:threadDeletionCronExpression',
-  'openai:threadDeletionBarchSize',
-  'openai:threadDeletionApiCallInterval',
-  'openai:vectorStoreFileDeletionCronExpression',
-  'openai:vectorStoreFileDeletionBarchSize',
-  'openai:vectorStoreFileDeletionApiCallInterval',
-  'openai:limitLearnablePageCountPerAssistant',
+  // AI Tools Settings
+  'aiTools:suggestPathAgenticSearchLimit',
+  'aiTools:suggestPathAgenticChildListingLimit',
+  'aiTools:suggestPathAgenticTimeoutMs',
+
+  // Mastra LLM Settings (multi-provider: several providers configurable at once).
+  // Non-secret per-provider settings (enable flag + Azure connection settings),
+  // stored as a single JSON Record keyed by provider. Replaces the former
+  // single-provider ai:provider / ai:azureOpenaiSettings keys (no auto-migration).
+  'ai:providers',
+  // Per-provider API keys (secret), stored as a single JSON Record keyed by
+  // provider. Replaces the former single ai:apiKey key (no auto-migration).
+  'ai:providerApiKeys',
+  // Allow-list of selectable models (provider + modelId + per-model
+  // providerOptions + isDefault flag), stored as a single JSON array.
+  'ai:allowedModels',
+  // Suggest-path-specific providerOptions overlay (provider-agnostic),
+  // deep-merged onto the effective model's catalog-declared providerOptions.
+  'ai:providerOptions:suggestPathAgent',
+  'ai:usageBaseModel',
+  'ai:disabledReason',
+  // Refresh paths for the vendored model catalog (startup refresh defaults ON)
+  'ai:modelCatalogRefreshOnStartup',
+  'ai:modelCatalogRefreshCronSchedule',
 
   // OpenTelemetry Settings
   'otel:enabled',
@@ -317,12 +365,15 @@ export const CONFIG_KEYS = [
   'external-user-group:keycloak:groupDescriptionAttribute',
 
   // Control Flags for using only env vars
+  'env:useOnlyEnvVars:app:attachmentFullTextSearch',
   'env:useOnlyEnvVars:app:siteUrl',
   'env:useOnlyEnvVars:app:fileUploadType',
   'env:useOnlyEnvVars:security:passport-local',
   'env:useOnlyEnvVars:security:passport-saml',
+  'env:useOnlyEnvVars:aws',
   'env:useOnlyEnvVars:gcs',
   'env:useOnlyEnvVars:azure',
+  'env:useOnlyEnvVars:ai',
 
   // Page Bulk Export Settings
   'app:bulkExportJobExpirationSeconds',
@@ -337,6 +388,20 @@ export const CONFIG_KEYS = [
 
   // Access Token Settings
   'accessToken:deletionCronExpression',
+
+  // Change Proposal Settings
+  'app:changeProposalEnabled',
+  'app:changeProposalReviewersEnabled',
+  'changeProposal:isEditEnabled',
+  'changeProposal:isCreateEnabled',
+  'changeProposal:isMoveEnabled',
+  'changeProposal:autoApplyPolicy',
+  'changeProposal:maxOperationsPerProposal',
+  'changeProposal:maxProposalsPerUserPerDay',
+  'changeProposal:pendingExpirationSeconds',
+  'changeProposal:maintenanceCronSchedule',
+  'changeProposal:perPageNotificationsEnabled',
+  'env:useOnlyEnvVars:changeProposal',
 ] as const;
 
 export type ConfigKey = (typeof CONFIG_KEYS)[number];
@@ -406,6 +471,10 @@ export const CONFIG_DEFINITIONS = {
     envVarName: 'PLANTUML_URI',
     defaultValue: 'https://www.plantuml.com/plantuml',
   }),
+  'app:plantumlHttpMethod': defineConfig<PlantumlHttpMethod | undefined>({
+    envVarName: 'PLANTUML_HTTP_METHOD',
+    defaultValue: undefined,
+  }),
   'app:drawioUri': defineConfig<string>({
     envVarName: 'DRAWIO_URI',
     defaultValue: 'https://embed.diagrams.net/',
@@ -438,7 +507,7 @@ export const CONFIG_DEFINITIONS = {
     envVarName: 'FILE_UPLOAD_TOTAL_LIMIT',
     defaultValue: Infinity,
   }),
-  'app:elasticsearchVersion': defineConfig<7 | 8 | 9>({
+  'app:elasticsearchVersion': defineConfig<8 | 9>({
     envVarName: 'ELASTICSEARCH_VERSION',
     defaultValue: 9,
   }),
@@ -466,6 +535,35 @@ export const CONFIG_DEFINITIONS = {
     envVarName: 'ELASTICSEARCH_REINDEX_ON_BOOT',
     defaultValue: false,
   }),
+  'app:elasticsearchAuditlogReindexOnBoot': defineConfig<boolean>({
+    envVarName: 'ELASTICSEARCH_AUDITLOG_REINDEX_ON_BOOT',
+    defaultValue: false,
+  }),
+
+  // Attachment Full-Text Search Settings
+  'app:attachmentFullTextSearch:extractorUri': defineConfig<string | undefined>(
+    {
+      envVarName: 'GROWI_ATTACHMENT_EXTRACTOR_URI',
+      defaultValue: undefined,
+    },
+  ),
+  'app:attachmentFullTextSearch:extractorToken': defineConfig<
+    string | undefined
+  >({
+    envVarName: 'GROWI_ATTACHMENT_EXTRACTOR_SERVICE_TOKEN',
+    defaultValue: undefined,
+    isSecret: true,
+  }),
+  'app:attachmentFullTextSearch:timeoutMs': defineConfig<number>({
+    envVarName: 'GROWI_ATTACHMENT_EXTRACTOR_TIMEOUT_MS',
+    // Worst case on the extractor side is upload (15s) + conversion (55s) + cleanup (~4s); stay above it.
+    defaultValue: 90000,
+  }),
+  'app:attachmentFullTextSearch:maxFileSizeBytes': defineConfig<number>({
+    envVarName: 'GROWI_ATTACHMENT_EXTRACTOR_MAX_FILE_SIZE_BYTES',
+    defaultValue: 52428800, // 50 MB
+  }),
+
   'app:growiCloudUri': defineConfig<string | undefined>({
     envVarName: 'GROWI_CLOUD_URI',
     defaultValue: undefined,
@@ -488,6 +586,13 @@ export const CONFIG_DEFINITIONS = {
   }),
   'app:activityExpirationSeconds': defineConfig<number>({
     envVarName: 'ACTIVITY_EXPIRATION_SECONDS',
+    defaultValue: 2592000,
+  }),
+  // Changes Index API: how far back (seconds from now) a request may look. Each cursor
+  // page recomputes runs over the window, so this bounds the worst-case scan. Finite by
+  // default (30 days); operators may tune it via the env var.
+  'app:revisionDiffMaxLookbackSeconds': defineConfig<number>({
+    envVarName: 'REVISION_DIFF_MAX_LOOKBACK_SECONDS',
     defaultValue: 2592000,
   }),
   'app:auditLogActionGroupSize': defineConfig<ActionGroupSize>({
@@ -518,18 +623,104 @@ export const CONFIG_DEFINITIONS = {
     envVarName: 'WIP_PAGE_EXPIRATION_SECONDS',
     defaultValue: 172800,
   }),
-  'app:openaiThreadDeletionCronMaxMinutesUntilRequest': defineConfig<number>({
-    envVarName: 'OPENAI_THREAD_DELETION_CRON_MAX_MINUTES_UNTIL_REQUEST',
-    defaultValue: 30,
+  // Sweep that deletes expired WIP pages. An empty value disables it, which an
+  // operator needs when the sweep is too heavy for their wiki or must be run
+  // out-of-band; the pages then simply keep their (unenforced) expiry.
+  'app:wipPageCleanupCronSchedule': defineConfig<string>({
+    envVarName: 'WIP_PAGE_CLEANUP_CRON_SCHEDULE',
+    defaultValue: '0 3 * * *',
   }),
-  'app:openaiVectorStoreFileDeletionCronMaxMinutesUntilRequest':
-    defineConfig<number>({
-      envVarName:
-        'OPENAI_VECTOR_STORE_FILE_DELETION_CRON_MAX_MINUTES_UNTIL_REQUEST',
-      defaultValue: 30,
-    }),
   'app:isReadOnlyForNewUser': defineConfig<boolean>({
     envVarName: 'DEFAULT_USER_READONLY',
+    defaultValue: false,
+  }),
+  // Vault Settings
+  // Note: app:vaultManagerEndpoint and app:vaultManagerInternalSecret are read
+  // from environment variables only — the VaultSettingsService must use ConfigSource.env.
+  'app:vaultEnabled': defineConfig<boolean>({
+    envVarName: 'VAULT_ENABLED',
+    defaultValue: false,
+  }),
+  'app:vaultManagerEndpoint': defineConfig<string | undefined>({
+    envVarName: 'VAULT_MANAGER_ENDPOINT',
+    defaultValue: undefined,
+  }),
+  'app:vaultManagerInternalSecret': defineConfig<string | undefined>({
+    envVarName: 'VAULT_MANAGER_INTERNAL_SECRET',
+    defaultValue: undefined,
+    isSecret: true,
+  }),
+  'app:vaultBootstrapOnStart': defineConfig<'true' | 'false' | 'force'>({
+    envVarName: 'VAULT_BOOTSTRAP_ON_START',
+    defaultValue: 'false',
+    isSecret: false,
+  }),
+  'app:vaultBootstrapRetryMax': defineConfig<number>({
+    envVarName: 'VAULT_BOOTSTRAP_RETRY_MAX',
+    defaultValue: 5,
+  }),
+  'app:vaultBootstrapRetryBaseMs': defineConfig<number>({
+    envVarName: 'VAULT_BOOTSTRAP_RETRY_BASE_MS',
+    defaultValue: 30_000,
+  }),
+  'app:vaultBootstrapRetryMaxMs': defineConfig<number>({
+    envVarName: 'VAULT_BOOTSTRAP_RETRY_MAX_MS',
+    defaultValue: 1_800_000, // 30 * 60_000
+  }),
+  'app:vaultBootstrapHeartbeatIntervalMs': defineConfig<number>({
+    envVarName: 'VAULT_BOOTSTRAP_HEARTBEAT_INTERVAL_MS',
+    defaultValue: 10_000,
+  }),
+  'app:vaultBootstrapHeartbeatStaleMs': defineConfig<number>({
+    envVarName: 'VAULT_BOOTSTRAP_HEARTBEAT_STALE_MS',
+    defaultValue: 60_000,
+  }),
+  'app:vaultBootstrapRetryDisabled': defineConfig<boolean>({
+    envVarName: 'VAULT_BOOTSTRAP_RETRY_DISABLED',
+    defaultValue: false,
+  }),
+  'app:vaultDriftDetectionIntervalMs': defineConfig<number>({
+    envVarName: 'VAULT_DRIFT_DETECTION_INTERVAL_MS',
+    defaultValue: 300_000, // 5 * 60_000
+  }),
+  'app:vaultDriftMaxPagesPerTick': defineConfig<number>({
+    envVarName: 'VAULT_DRIFT_MAX_PAGES_PER_TICK',
+    defaultValue: 10_000,
+  }),
+  'app:vaultDriftDetectionDisabled': defineConfig<boolean>({
+    envVarName: 'VAULT_DRIFT_DETECTION_DISABLED',
+    defaultValue: false,
+  }),
+  'app:vaultReconcileMaxPagesPerUserRequest': defineConfig<number>({
+    envVarName: 'VAULT_RECONCILE_MAX_PAGES_PER_USER_REQUEST',
+    defaultValue: 1000,
+  }),
+  'app:vaultReconcileMaxPagesPerAdminRequest': defineConfig<number>({
+    envVarName: 'VAULT_RECONCILE_MAX_PAGES_PER_ADMIN_REQUEST',
+    defaultValue: 1000,
+  }),
+  'app:vaultReconcileMaxConcurrentPerUser': defineConfig<number>({
+    envVarName: 'VAULT_RECONCILE_MAX_CONCURRENT_PER_USER',
+    defaultValue: 1,
+  }),
+  'app:vaultReconcileMaxConcurrentSystem': defineConfig<number>({
+    envVarName: 'VAULT_RECONCILE_MAX_CONCURRENT_SYSTEM',
+    defaultValue: 3,
+  }),
+  'app:vaultReconcileChunkSize': defineConfig<number>({
+    envVarName: 'VAULT_RECONCILE_CHUNK_SIZE',
+    defaultValue: 100,
+  }),
+  'app:vaultReconcileHistoryRetentionDays': defineConfig<number>({
+    envVarName: 'VAULT_RECONCILE_HISTORY_RETENTION_DAYS',
+    defaultValue: 30,
+  }),
+  'app:vaultReconcileRejectWhenBootstrapNotDone': defineConfig<boolean>({
+    envVarName: 'VAULT_RECONCILE_REJECT_WHEN_BOOTSTRAP_NOT_DONE',
+    defaultValue: true,
+  }),
+  'app:vaultReconcileAdminBypassCapacityLimit': defineConfig<boolean>({
+    envVarName: 'VAULT_RECONCILE_ADMIN_BYPASS_CAPACITY_LIMIT',
     defaultValue: false,
   }),
 
@@ -885,19 +1076,24 @@ export const CONFIG_DEFINITIONS = {
     defaultValue: undefined,
   }),
   'aws:s3Bucket': defineConfig<NonBlankString>({
+    envVarName: 'S3_BUCKET',
     defaultValue: toNonBlankString('growi'),
   }),
   'aws:s3Region': defineConfig<NonBlankString>({
+    envVarName: 'S3_REGION',
     defaultValue: toNonBlankString('ap-northeast-1'),
   }),
   'aws:s3AccessKeyId': defineConfig<NonBlankString | undefined>({
+    envVarName: 'S3_ACCESS_KEY_ID',
     defaultValue: undefined,
   }),
   'aws:s3SecretAccessKey': defineConfig<NonBlankString | undefined>({
+    envVarName: 'S3_SECRET_ACCESS_KEY',
     defaultValue: undefined,
     isSecret: true,
   }),
   'aws:s3CustomEndpoint': defineConfig<NonBlankString | undefined>({
+    envVarName: 'S3_CUSTOM_ENDPOINT',
     defaultValue: undefined,
   }),
 
@@ -1153,51 +1349,111 @@ export const CONFIG_DEFINITIONS = {
     isSecret: true,
   }),
 
-  // OpenAI Settings
-  'openai:serviceType': defineConfig<'openai' | 'azure-openai'>({
-    envVarName: 'OPENAI_SERVICE_TYPE',
-    defaultValue: 'openai',
+  // AI chat (Mastra) Settings — multi-provider: several providers can be
+  // configured at once, one fixed slot per supported provider.
+  //
+  // The provider configuration is split into two Record keys along the
+  // secret/non-secret boundary, so the admin API can return the non-secret
+  // part as-is while the secret part stays maskable:
+  //  - ai:providers       — per-provider settings (enable flag + Azure
+  //                         connection settings). NOT secret.
+  //  - ai:providerApiKeys — per-provider API keys. Secret.
+  // They replace the former single-provider ai:provider / ai:apiKey /
+  // ai:azureOpenaiSettings keys (deliberately no auto-migration — pre-release
+  // replacement: an install that only has old-format values resolves these to
+  // null and is treated as "AI not configured").
+  //
+  // Stored/loaded as JSON: the DB value is the serialized Record, and the
+  // AI_PROVIDERS / AI_PROVIDER_API_KEYS env vars are JSON strings. The default
+  // is null (NOT {}) so "never configured" stays observable; typeof null is
+  // 'object', so the loader still selects its JSON-parse branch for the env
+  // vars. A malformed env var fails soft to null as well — accessors guard the
+  // shape defensively and treat null as unset.
+  'ai:providers': defineConfig<AiProvidersConfig | null>({
+    envVarName: 'AI_PROVIDERS',
+    defaultValue: null,
   }),
-  'openai:apiKey': defineConfig<string | undefined>({
-    envVarName: 'OPENAI_API_KEY',
-    defaultValue: undefined,
+  'ai:providerApiKeys': defineConfig<AiProviderApiKeys | null>({
+    envVarName: 'AI_PROVIDER_API_KEYS',
+    defaultValue: null,
     isSecret: true,
   }),
-  'openai:assistantModel:chat': defineConfig<OpenAI.Chat.ChatModel>({
-    envVarName: 'OPENAI_CHAT_ASSISTANT_MODEL',
-    defaultValue: 'gpt-4.1-mini',
+  // Allow-list of selectable models. Each entry bundles the owning provider
+  // (required — a model is identified by the (provider, modelId) pair), the
+  // model id (the Azure *deployment name* for the azure-openai provider),
+  // optional per-model AI SDK `providerOptions` (provider-namespaced), and an
+  // `isDefault` flag marking the single global default across all providers.
+  //
+  // Stored/loaded as JSON: the DB value is the serialized array, and the
+  // AI_ALLOWED_MODELS env var is a JSON string. defaultValue is an array ([]) so
+  // the loader treats env/DB values as JSON (typeof defaultValue === 'object')
+  // and getConfig falls back to [] when unset (= AI not configured).
+  'ai:allowedModels': defineConfig<AllowedModel[] | undefined>({
+    envVarName: 'AI_ALLOWED_MODELS',
+    defaultValue: [],
   }),
-  'openai:assistantModel:edit': defineConfig<OpenAI.Chat.ChatModel>({
-    envVarName: 'OPENAI_EDITOR_ASSISTANT_MODEL',
-    defaultValue: 'gpt-4.1-mini',
+
+  // Suggest-path-specific providerOptions overlay. Same provider-namespaced
+  // ModelProviderOptions shape as ai:allowedModels[].providerOptions (e.g.
+  // {"openai":{"reasoningEffort":"minimal"}}); the agentic engine deep-merges
+  // it (per provider namespace) onto the effective model's catalog-declared
+  // options. null means "unset": catalog options pass through unchanged.
+  // Option validity per model is left to the provider, not pinned here.
+  //
+  // Stored/loaded as JSON: the DB value is the serialized Record, and the env
+  // var is a JSON string. typeof null is 'object', so the loader still
+  // selects its JSON-parse branch for the env var.
+  'ai:providerOptions:suggestPathAgent':
+    defineConfig<ModelProviderOptions | null>({
+      envVarName: 'AI_SUGGEST_PATH_AGENT_PROVIDER_OPTIONS',
+      defaultValue: null,
+    }),
+
+  // AI Tools Settings
+  'aiTools:suggestPathAgenticSearchLimit': defineConfig<number>({
+    envVarName: 'AI_TOOLS_SUGGEST_PATH_AGENTIC_SEARCH_LIMIT',
+    defaultValue: 5,
   }),
-  'openai:threadDeletionCronExpression': defineConfig<string>({
-    envVarName: 'OPENAI_THREAD_DELETION_CRON_EXPRESSION',
-    defaultValue: '0 * * * *',
+  'aiTools:suggestPathAgenticChildListingLimit': defineConfig<number>({
+    envVarName: 'AI_TOOLS_SUGGEST_PATH_AGENTIC_CHILD_LISTING_LIMIT',
+    defaultValue: 5,
   }),
-  'openai:threadDeletionBarchSize': defineConfig<number>({
-    envVarName: 'OPENAI_THREAD_DELETION_BARCH_SIZE',
-    defaultValue: 100,
+  'aiTools:suggestPathAgenticTimeoutMs': defineConfig<number>({
+    envVarName: 'AI_TOOLS_SUGGEST_PATH_AGENTIC_TIMEOUT_MS',
+    defaultValue: 60_000,
   }),
-  'openai:threadDeletionApiCallInterval': defineConfig<number>({
-    envVarName: 'OPENAI_THREAD_DELETION_API_CALL_INTERVAL',
-    defaultValue: 36000,
+
+  // Usage-metering inputs injected by the deployment (e.g. GROWI.cloud). Both
+  // are in the env:useOnlyEnvVars:ai group and are read with ConfigSource.env,
+  // so a DB value is never used. They have no admin-form counterpart.
+  // ai:usageBaseModel is a model key (`provider/modelId`); ai:disabledReason is
+  // an opaque reason code.
+  'ai:usageBaseModel': defineConfig<string | undefined>({
+    envVarName: 'AI_USAGE_BASE_MODEL',
+    defaultValue: undefined,
   }),
-  'openai:vectorStoreFileDeletionCronExpression': defineConfig<string>({
-    envVarName: 'OPENAI_VECTOR_STORE_FILE_DELETION_CRON_EXPRESSION',
-    defaultValue: '0 * * * *',
+  'ai:disabledReason': defineConfig<string | undefined>({
+    envVarName: 'AI_DISABLED_REASON',
+    defaultValue: undefined,
   }),
-  'openai:vectorStoreFileDeletionBarchSize': defineConfig<number>({
-    envVarName: 'OPENAI_VECTOR_STORE_FILE_DELETION_BARCH_SIZE',
-    defaultValue: 100,
+
+  // Refresh paths for the vendored model catalog (Req 9). These are deployment
+  // options (env-driven), not admin-form settings, so they are intentionally NOT
+  // part of the env:useOnlyEnvVars:ai target keys. The refresh jobs run ONLY when
+  // the AI feature is enabled (app:aiEnabled) or ai:disabledReason is
+  // catalog_stale, so a default (AI-off) install still performs zero external
+  // communication.
+  'ai:modelCatalogRefreshOnStartup': defineConfig<boolean>({
+    envVarName: 'AI_MODEL_CATALOG_REFRESH_ON_STARTUP',
+    defaultValue: true,
   }),
-  'openai:vectorStoreFileDeletionApiCallInterval': defineConfig<number>({
-    envVarName: 'OPENAI_VECTOR_STORE_FILE_DELETION_API_CALL_INTERVAL',
-    defaultValue: 36000,
-  }),
-  'openai:limitLearnablePageCountPerAssistant': defineConfig<number>({
-    envVarName: 'OPENAI_LIMIT_LEARNABLE_PAGE_COUNT_PER_ASSISTANT',
-    defaultValue: 3000,
+  // node-cron schedule expression. Defaults to a daily refresh so that once an
+  // admin enables AI the catalog stays fresh automatically; set the env var to an
+  // empty string to opt back out (e.g. air-gapped AI deployments). Gated like
+  // the startup refresh, so this default never fires in a default (AI-off) install.
+  'ai:modelCatalogRefreshCronSchedule': defineConfig<string>({
+    envVarName: 'AI_MODEL_CATALOG_REFRESH_CRON_SCHEDULE',
+    defaultValue: '0 4 * * *',
   }),
 
   // OpenTelemetry Settings
@@ -1336,6 +1592,10 @@ export const CONFIG_DEFINITIONS = {
   }),
 
   // Control Flags for Env Vars
+  'env:useOnlyEnvVars:app:attachmentFullTextSearch': defineConfig<boolean>({
+    envVarName: 'ATTACHMENT_EXTRACTOR_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS',
+    defaultValue: false,
+  }),
   'env:useOnlyEnvVars:app:siteUrl': defineConfig<boolean>({
     envVarName: 'APP_SITE_URL_USES_ONLY_ENV_VARS',
     defaultValue: false,
@@ -1352,12 +1612,20 @@ export const CONFIG_DEFINITIONS = {
     envVarName: 'SAML_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS',
     defaultValue: false,
   }),
+  'env:useOnlyEnvVars:aws': defineConfig<boolean>({
+    envVarName: 'AWS_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS',
+    defaultValue: false,
+  }),
   'env:useOnlyEnvVars:gcs': defineConfig<boolean>({
     envVarName: 'GCS_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS',
     defaultValue: false,
   }),
   'env:useOnlyEnvVars:azure': defineConfig<boolean>({
     envVarName: 'AZURE_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS',
+    defaultValue: false,
+  }),
+  'env:useOnlyEnvVars:ai': defineConfig<boolean>({
+    envVarName: 'AI_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS',
     defaultValue: false,
   }),
   'app:bulkExportJobExpirationSeconds': defineConfig<number>({
@@ -1402,6 +1670,59 @@ export const CONFIG_DEFINITIONS = {
     envVarName: 'ACCESS_TOKEN_DELETION_CRON_EXPRESSION',
     defaultValue: '0 15 * * *',
   }),
+
+  // Change Proposal Settings
+  // null means "not checked" / "never expires". The settings screen stores 0
+  // (not null) to clear a limit, because a stored null falls back to the
+  // default here and would bring the operation cap back.
+  'app:changeProposalEnabled': defineConfig<boolean>({
+    envVarName: 'CHANGE_PROPOSAL_ENABLED',
+    defaultValue: false,
+  }),
+  'app:changeProposalReviewersEnabled': defineConfig<boolean>({
+    envVarName: 'CHANGE_PROPOSAL_REVIEWERS_ENABLED',
+    defaultValue: false,
+  }),
+  'changeProposal:isEditEnabled': defineConfig<boolean>({
+    envVarName: 'CHANGE_PROPOSAL_IS_EDIT_ENABLED',
+    defaultValue: true,
+  }),
+  'changeProposal:isCreateEnabled': defineConfig<boolean>({
+    envVarName: 'CHANGE_PROPOSAL_IS_CREATE_ENABLED',
+    defaultValue: true,
+  }),
+  'changeProposal:isMoveEnabled': defineConfig<boolean>({
+    envVarName: 'CHANGE_PROPOSAL_IS_MOVE_ENABLED',
+    defaultValue: true,
+  }),
+  'changeProposal:autoApplyPolicy': defineConfig<AutoApplyPolicy>({
+    envVarName: 'CHANGE_PROPOSAL_AUTO_APPLY_POLICY',
+    defaultValue: 'none',
+  }),
+  'changeProposal:maxOperationsPerProposal': defineConfig<number | null>({
+    envVarName: 'CHANGE_PROPOSAL_MAX_OPERATIONS_PER_PROPOSAL',
+    defaultValue: 50,
+  }),
+  'changeProposal:maxProposalsPerUserPerDay': defineConfig<number | null>({
+    envVarName: 'CHANGE_PROPOSAL_MAX_PROPOSALS_PER_USER_PER_DAY',
+    defaultValue: null,
+  }),
+  'changeProposal:pendingExpirationSeconds': defineConfig<number | null>({
+    envVarName: 'CHANGE_PROPOSAL_PENDING_EXPIRATION_SECONDS',
+    defaultValue: 30 * 24 * 60 * 60,
+  }),
+  'changeProposal:maintenanceCronSchedule': defineConfig<string>({
+    envVarName: 'CHANGE_PROPOSAL_MAINTENANCE_CRON_SCHEDULE',
+    defaultValue: '*/10 * * * *',
+  }),
+  'changeProposal:perPageNotificationsEnabled': defineConfig<boolean>({
+    envVarName: 'CHANGE_PROPOSAL_PER_PAGE_NOTIFICATIONS_ENABLED',
+    defaultValue: false,
+  }),
+  'env:useOnlyEnvVars:changeProposal': defineConfig<boolean>({
+    envVarName: 'CHANGE_PROPOSAL_USES_ONLY_ENV_VARS',
+    defaultValue: false,
+  }),
 } as const;
 
 export type ConfigValues = {
@@ -1419,6 +1740,15 @@ export interface EnvOnlyGroup {
 }
 
 export const ENV_ONLY_GROUPS: EnvOnlyGroup[] = [
+  {
+    controlKey: 'env:useOnlyEnvVars:app:attachmentFullTextSearch',
+    targetKeys: [
+      'app:attachmentFullTextSearch:extractorUri',
+      'app:attachmentFullTextSearch:extractorToken',
+      'app:attachmentFullTextSearch:timeoutMs',
+      'app:attachmentFullTextSearch:maxFileSizeBytes',
+    ],
+  },
   {
     controlKey: 'env:useOnlyEnvVars:app:siteUrl',
     targetKeys: ['app:siteUrl'],
@@ -1441,8 +1771,27 @@ export const ENV_ONLY_GROUPS: EnvOnlyGroup[] = [
     ],
   },
   {
+    controlKey: 'env:useOnlyEnvVars:aws',
+    targetKeys: [
+      'aws:s3Bucket',
+      'aws:s3Region',
+      'aws:s3AccessKeyId',
+      'aws:s3SecretAccessKey',
+      'aws:s3CustomEndpoint',
+      'aws:referenceFileWithRelayMode',
+      'aws:lifetimeSecForTemporaryUrl',
+      'aws:s3ObjectCannedACL',
+    ],
+  },
+  {
     controlKey: 'env:useOnlyEnvVars:gcs',
-    targetKeys: ['gcs:apiKeyJsonPath', 'gcs:bucket', 'gcs:uploadNamespace'],
+    targetKeys: [
+      'gcs:apiKeyJsonPath',
+      'gcs:bucket',
+      'gcs:uploadNamespace',
+      'gcs:referenceFileWithRelayMode',
+      'gcs:lifetimeSecForTemporaryUrl',
+    ],
   },
   {
     controlKey: 'env:useOnlyEnvVars:azure',
@@ -1452,6 +1801,40 @@ export const ENV_ONLY_GROUPS: EnvOnlyGroup[] = [
       'azure:clientSecret',
       'azure:storageAccountName',
       'azure:storageContainerName',
+      'azure:referenceFileWithRelayMode',
+      'azure:lifetimeSecForTemporaryUrl',
+    ],
+  },
+  {
+    // AI settings: the enable toggle, the two provider connection keys and the
+    // two usage-metering keys. app:aiEnabled uses the app: prefix but is fixed
+    // together with the ai:* keys as a single AI configuration unit.
+    //
+    // ai:allowedModels is deliberately NOT in this group: env-only mode locks
+    // only the connection settings (credentials / endpoints / enable state),
+    // while model settings stay editable from the admin UI (R5.2 / R5.3).
+    controlKey: 'env:useOnlyEnvVars:ai',
+    targetKeys: [
+      'app:aiEnabled',
+      'ai:providers',
+      'ai:providerApiKeys',
+      'ai:usageBaseModel',
+      'ai:disabledReason',
+    ],
+  },
+  {
+    // The keys the admin settings screen edits. The expiry and the cron
+    // schedule are left out: no screen writes them.
+    controlKey: 'env:useOnlyEnvVars:changeProposal',
+    targetKeys: [
+      'app:changeProposalEnabled',
+      'changeProposal:isEditEnabled',
+      'changeProposal:isCreateEnabled',
+      'changeProposal:isMoveEnabled',
+      'changeProposal:autoApplyPolicy',
+      'changeProposal:maxOperationsPerProposal',
+      'changeProposal:maxProposalsPerUserPerDay',
+      'changeProposal:perPageNotificationsEnabled',
     ],
   },
 ];

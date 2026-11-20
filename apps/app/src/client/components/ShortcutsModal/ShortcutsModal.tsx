@@ -189,6 +189,19 @@ const ShortcutsModalSubstance = (): React.JSX.Element => {
               <strong>{t('modal_shortcuts.editor.title')}</strong>
             </h6>
             <ul className="list-unstyled m-0">
+              {/* Slash Command */}
+              <li className="d-flex align-items-center p-3 border-bottom">
+                <div className="flex-grow-1">
+                  {t('modal_shortcuts.editor.Slash Command')}
+                  <br />
+                  <span className="small text-secondary">
+                    {t('modal_shortcuts.editor.Slash Command Desc')}
+                  </span>
+                </div>
+                <div>
+                  <span className="key">/</span>
+                </div>
+              </li>
               {/* Search in Editor */}
               <li className="d-flex align-items-center p-3 border-bottom">
                 <div className="flex-grow-1">

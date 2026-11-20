@@ -3,8 +3,8 @@ import type { Delta } from '@growi/editor';
 import type { WSSharedDoc } from 'y-websocket/bin/utils';
 
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
-import { Revision } from '../../models/revision';
 import { normalizeLatestRevisionIfBroken } from '../revision/normalize-latest-revision-if-broken';
 import type { MongodbPersistence } from './extended/mongodb-persistence';
 
@@ -30,14 +30,11 @@ export const syncYDoc = async (
   // Normalize the latest revision which was borken by the migration script '20211227060705-revision-path-to-page-id-schema-migration--fixed-7549.js' provided by v6.1.0 - v7.0.15
   await normalizeLatestRevisionIfBroken(pageId);
 
-  const revision = await Revision.findOne(
-    // filter
-    { pageId },
-    // projection
-    { body: 1, createdAt: 1, origin: 1 },
-    // options
-    { sort: { createdAt: -1 } },
-  ).lean();
+  const revision = await prisma.revisions.findFirst({
+    where: { pageId },
+    select: { body: true, createdAt: true, origin: true },
+    orderBy: { createdAt: 'desc' },
+  });
 
   if (revision == null) {
     logger.warn(

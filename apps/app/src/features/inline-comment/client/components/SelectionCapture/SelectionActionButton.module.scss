@@ -1,0 +1,16 @@
+.selection-action-button {
+  // Only properties every theme is guaranteed to output.
+  // --bs-body-bg / --bs-body-color / --bs-border-color / --bs-secondary-bg are
+  // emitted by core-styles/scss/bootstrap/theming/_root-light.scss and
+  // _root-dark.scss for all 16 themes (not gated by the primary/secondary
+  // filter that --bs-warning-* and similar tokens are subject to).
+  --bs-btn-bg: var(--bs-body-bg);
+  --bs-btn-color: var(--bs-body-color);
+  --bs-btn-border-color: var(--bs-border-color);
+  --bs-btn-hover-bg: var(--bs-secondary-bg);
+  --bs-btn-hover-color: var(--bs-body-color);
+  --bs-btn-hover-border-color: var(--bs-border-color);
+  --bs-btn-active-bg: var(--bs-tertiary-bg);
+  --bs-btn-active-color: var(--bs-body-color);
+  --bs-btn-active-border-color: var(--bs-border-color);
+}

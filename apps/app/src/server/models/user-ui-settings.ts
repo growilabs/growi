@@ -21,6 +21,8 @@ const schema = new Schema<UserUISettingsDocument, UserUISettingsModel>({
   },
   currentProductNavWidth: { type: Number },
   preferCollapsedModeByUser: { type: Boolean, default: false },
+  aiChatSelectedModelKey: { type: String },
+  aiChatSidebarWidth: { type: Number },
 });
 
 export default getOrCreateModel<UserUISettingsDocument, UserUISettingsModel>(

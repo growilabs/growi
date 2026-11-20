@@ -24,11 +24,11 @@ const ReconnectControls = (props: Props): JSX.Element => {
         disabled={!isEnabled}
       >
         {isProcessing && <LoadingSpinner className="me-2" />}
-        {t('full_text_search_management.reconnect_button')}
+        {t('page_data_index_management.reconnect_button')}
       </button>
 
       <p className="form-text text-muted">
-        {t('full_text_search_management.reconnect_description')}
+        {t('page_data_index_management.reconnect_description')}
         <br />
       </p>
     </>

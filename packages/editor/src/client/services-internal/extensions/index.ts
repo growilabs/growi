@@ -1,3 +1,3 @@
-export * from './emojiAutocompletionSettings';
-export * from './setDataLine';
-export * from './y-rich-cursors/index';
+export * from './emojiAutocompletionSettings.js';
+export * from './setDataLine.js';
+export * from './y-rich-cursors/index.js';

@@ -1,12 +1,11 @@
 import { SupportedAction } from '~/interfaces/activity';
-import Tag from '~/server/models/tag';
+import { prisma } from '~/utils/prisma';
 
-import PageTagRelation from '../models/page-tag-relation';
-import { Revision } from '../models/revision';
 import ApiResponse from '../util/apiResponse';
+import { isRevisionOfPage } from '../util/is-revision-of-page';
 
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
-module.exports = (crowi, _app) => {
+export const setup = (crowi, _app) => {
   const actions = {};
   const api = {};
 
@@ -60,12 +59,11 @@ module.exports = (crowi, _app) => {
     // Search for regular expressions as normal characters
     // e.g. user*$ -> user\*\$ (escape a regular expression)
     const escapeRegExp = req.query.q.replace(/[\\^$/.*+?()[\]{}|]/g, '\\$&');
-    let tags = await Tag.find({ name: new RegExp(`^${escapeRegExp}`) }).select(
-      '_id name',
-    );
-    tags = tags.map((tag) => {
-      return tag.name;
+    const matchedTags = await prisma.tags.findMany({
+      where: { name: { startsWith: escapeRegExp } },
+      select: { name: true },
     });
+    const tags = matchedTags.map((tag) => tag.name);
     return res.json(ApiResponse.success({ tags }));
   };
 
@@ -136,17 +134,22 @@ module.exports = (crowi, _app) => {
         );
       }
 
-      const previousRevision = await Revision.findOne({
-        _id: { $eq: revisionId },
+      const previousRevision = await prisma.revisions.findUnique({
+        where: { id: revisionId },
       });
+      if (!isRevisionOfPage(previousRevision, page._id)) {
+        return res.json(
+          ApiResponse.error('The revision does not belong to this page.'),
+        );
+      }
       result.savedPage = await crowi.pageService.updatePage(
         page,
         previousRevision.body,
         previousRevision.body,
         req.user,
       );
-      await PageTagRelation.updatePageTags(pageId, tags);
-      result.tags = await PageTagRelation.listTagNamesByPage(pageId);
+      await prisma.pagetagrelations.updatePageTags(pageId, tags);
+      result.tags = await prisma.pagetagrelations.listTagNamesByPage(pageId);
 
       tagEvent.emit('update', page, tags);
     } catch (err) {
@@ -215,7 +218,7 @@ module.exports = (crowi, _app) => {
     try {
       // get tag list contains id name and count properties
       const tagsWithCount =
-        await PageTagRelation.createTagListWithCount(queryOptions);
+        await prisma.pagetagrelations.createTagListWithCount(queryOptions);
 
       return res.json(ApiResponse.success(tagsWithCount));
     } catch (err) {

@@ -14,7 +14,9 @@ type ConfirmModalProps = {
   cancelButtonTitle?: string;
   headerClassName?: string;
   iconName?: string;
-  onConfirm?: () => Promise<void>;
+  // The modal ignores the return value, so sync handlers are fine too —
+  // demanding a Promise would force callers into no-await async functions.
+  onConfirm?: () => void | Promise<void>;
   onCancel?: () => void;
 };
 
@@ -46,7 +48,7 @@ export const ConfirmModal: FC<ConfirmModalProps> = (
     <Modal isOpen={props.isModalOpen} toggle={onCancel}>
       <ModalHeader tag="h4" toggle={onCancel} className={headerClassName}>
         <span className="material-symbols-outlined me-1">{iconName}</span>
-        {title ?? t('Warning')}
+        {title ?? t('commons:Warning')}
       </ModalHeader>
       <ModalBody>
         {props.warningMessage}
@@ -69,14 +71,14 @@ export const ConfirmModal: FC<ConfirmModalProps> = (
           className="btn btn-outline-secondary"
           onClick={onCancel}
         >
-          {cancelButtonTitle ?? t('Cancel')}
+          {cancelButtonTitle ?? t('commons:Cancel')}
         </button>
         <button
           type="button"
           className="btn btn-outline-primary ms-3"
           onClick={onConfirm}
         >
-          {props.confirmButtonTitle ?? t('Confirm')}
+          {props.confirmButtonTitle ?? t('commons:Confirm')}
         </button>
       </ModalFooter>
     </Modal>

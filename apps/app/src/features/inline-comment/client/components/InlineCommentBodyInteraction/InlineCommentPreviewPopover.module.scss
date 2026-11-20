@@ -1,0 +1,107 @@
+// Popover-only counterpart to InlineCommentItem.module.scss. The popover
+// never had a CSS Module of its own before this file -- it relied entirely
+// on Bootstrap utilities plus one inline style (the 2-line quote clamp).
+// Minor duplication of the `%bg-comment`/`%user-picture`/`%comment-section`
+// extends and the status-dot/quote-border rules against
+// InlineCommentItem.module.scss is intentional and accepted by design.md's
+// "New Files" section -- each rule is a few lines, not worth a shared file.
+//
+// `next.config.ts` sets `loadPaths: [<app>/src]`, which is what lets this
+// `@use` be written from anywhere under `src`.
+@use 'client/components/PageComment/comment-inheritance';
+
+.inline-comment-preview-popover-styles {
+  // A fixed width. Without one the popover has no width constraint at all,
+  // so it sized itself to whichever content it happened to hold: 602px with
+  // a reply thread and 566px in edit mode — the same popover visibly
+  // changing width as the user worked in it.
+  //
+  // 36rem, not the mockup's own 340px: the header row has to hold an avatar,
+  // a username, a relative timestamp, the edit icon, the resolve toggle and
+  // the close button, and at GROWI's 16px base font that content measures
+  // ~470px. Below ~34rem the row silently overflows and clips the resolve
+  // toggle and the close button (measured — 26rem was tried first and did
+  // exactly that).
+  //
+  // Those ~470px were measured while the row still carried a status pill,
+  // which the 2026-09-11 redesign removed. The width stays at the
+  // user-approved 576px rather than being re-derived.
+  //
+  // `max-width` keeps it inside a phone-width viewport, where a fixed 36rem
+  // would otherwise overflow. Neither is expressible as a Bootstrap utility:
+  // the `w-*`/`mw-*` scales are percentages of a sized parent, and this
+  // element is positioned against a text range instead.
+  width: 36rem;
+  max-width: calc(100vw - 2rem);
+
+  // Applies to every avatar in the popover, not just those inside a comment
+  // card: the reply form's own avatar sits outside `.page-comment`, so when
+  // this extend was nested under that class the reply form kept
+  // `UserPicture`'s larger default and was the single odd size on screen.
+  :global(.user-picture) { @extend %user-picture; }
+
+  :global(.wiki) {
+    p {
+      margin: 8px 0;
+    }
+  }
+
+  // Same left-border accent as InlineCommentItem.module.scss's own
+  // `.inline-comment-quote` rule (Requirement 1.7: unify the quote block
+  // between the list item and the popover).
+  :global(.inline-comment-quote) {
+    border-left: 3px solid var(--grw-inline-comment-marker-bg);
+  }
+}
+
+// The reply form's send button: a 2rem square, matching the icon buttons
+// below (the popover has no `rounded-circle` buttons anywhere). The equal
+// width/height pair is not expressible as Bootstrap utilities -- this
+// replaces the inline `style={{ width: '2rem', height: '2rem' }}` the button
+// used to carry (Requirement 3.3).
+.inline-comment-preview-popover-send-button {
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+}
+
+// Same oversized-button fix as InlineCommentItem.module.scss's
+// `.icon-button`: `btn btn-link p-2` alone renders a 42px square. 32px with
+// no rounding, matching the list item's own icon buttons. Shared by every
+// entry's edit and delete
+// buttons -- `InlineCommentPopoverEntry.tsx` reads it from this same module,
+// so the hashed class name lines up. Duplicated rather than imported across
+// the module boundary against InlineCommentItem's module -- see the top of
+// this file for why this popover accepts that.
+.inline-comment-preview-popover-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  // Same base/hover opacity as Bootstrap's own `.btn-close`
+  // ($btn-close-opacity: .5 / $btn-close-hover-opacity: .75) -- see
+  // InlineCommentItem.module.scss's `.icon-button` for the full rationale
+  // (no generic Bootstrap utility for a hover-driven opacity change; owned
+  // here instead of split against the `opacity-50` utility's `!important` to
+  // avoid a specificity/importance race). These buttons stay always-visible
+  // (not hover-revealed like the list item's -- design.md「Popover
+  // 再設計」), so only the darken-on-hover interaction is new here, not a
+  // show/hide behavior (user request, 2026-09-11).
+  opacity: 0.5;
+
+  &:hover {
+    opacity: 0.75;
+  }
+}
+
+// The 2-line clamp cannot be expressed with a Bootstrap utility class, so it
+// stays as a CSS Modules rule instead of the inline style it replaces
+// (Requirement 3.3).
+.inline-comment-preview-popover-quote-clamp {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}

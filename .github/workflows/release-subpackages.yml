@@ -49,11 +49,15 @@ jobs:
       id: changesets-status
       run: |
         pnpm changeset status --output status.json
-        echo "CHANGESETS_LENGTH=$(jq -r '.changesets | length' status.json)" >> $GITHUB_OUTPUT
+        # Gate on the number of packages that will actually be bumped, not on the number
+        # of changeset files. A changeset that only targets an ignored package produces
+        # no release, and snapshotting it would republish the versions currently in the
+        # tree under the 'next' dist-tag.
+        echo "RELEASES_LENGTH=$(jq -r '[.releases[] | select(.type != "none")] | length' status.json)" >> $GITHUB_OUTPUT
         rm status.json
 
     - name: Snapshot release to npm
-      if: steps.changesets-status.outputs.CHANGESETS_LENGTH > 0
+      if: steps.changesets-status.outputs.RELEASES_LENGTH > 0
       run: |
         pnpm run release-subpackages:snapshot
       env:

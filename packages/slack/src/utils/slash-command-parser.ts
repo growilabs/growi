@@ -1,5 +1,5 @@
-import type { GrowiCommand } from '../interfaces/growi-command';
-import { InvalidGrowiCommandError } from '../models/errors';
+import type { GrowiCommand } from '../interfaces/growi-command.js';
+import { InvalidGrowiCommandError } from '../models/errors.js';
 
 export const parseSlashCommand = (slashCommand: {
   [key: string]: string;

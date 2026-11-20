@@ -1,6 +1,6 @@
 import type { GrowiPluginType, GrowiThemeMetadata } from '@growi/core';
 
-import type { GrowiPluginDirective } from './growi-plugin-package-data';
+import type { GrowiPluginDirective } from './growi-plugin-package-data.js';
 
 export type GrowiPluginValidationData = {
   projectDirRoot: string;

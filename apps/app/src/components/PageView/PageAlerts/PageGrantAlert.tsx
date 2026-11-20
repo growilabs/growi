@@ -49,7 +49,7 @@ export const PageGrantAlert = (): JSX.Element => {
     };
     return (
       <>
-        {getGrantLabel()} ({t('Browsing of this page is restricted')})
+        {getGrantLabel()} ({t('page_page.notice.restricted')})
       </>
     );
   };

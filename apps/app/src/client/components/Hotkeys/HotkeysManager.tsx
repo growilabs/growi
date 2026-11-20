@@ -71,16 +71,15 @@ const HotkeysManager = (): JSX.Element => {
 
   useEffect(() => {
     const createHandler =
-      (component: SubscriberComponent, category: HotkeyCategory) =>
-      (event: KeyboardEvent) => {
-        if (category === 'single' && isEditableTarget(event)) return;
+      (component: SubscriberComponent) => (event: KeyboardEvent) => {
+        if (isEditableTarget(event)) return;
         event.preventDefault();
         addView(component);
       };
 
     const bindingMap: Record<string, (event: KeyboardEvent) => void> = {};
     for (const { component, bindings } of subscribers) {
-      const handler = createHandler(component, bindings.category);
+      const handler = createHandler(component);
       const keys = Array.isArray(bindings.keys)
         ? bindings.keys
         : [bindings.keys];

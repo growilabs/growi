@@ -6,11 +6,11 @@ import type { CrowiRequest } from '~/interfaces/crowi-request';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import type Crowi from '../../crowi';
 import { AttachmentType } from '../../interfaces/attachment';
 import { generateCertifyBrandLogoMiddleware } from '../../middlewares/certify-brand-logo';
-import { Attachment } from '../../models/attachment';
 import ApiResponse from '../../util/apiResponse';
 import { getActionFactory } from './get';
 
@@ -28,8 +28,8 @@ export const getBrandLogoRouterFactory = (crowi: Crowi): Router => {
     accessTokenParser([SCOPE.READ.FEATURES.ATTACHMENT]),
     loginRequired,
     async (req: CrowiRequest, res: Response) => {
-      const brandLogoAttachment = await Attachment.findOne({
-        attachmentType: AttachmentType.BRAND_LOGO,
+      const brandLogoAttachment = await prisma.attachments.findFirst({
+        where: { attachmentType: AttachmentType.BRAND_LOGO },
       });
 
       if (brandLogoAttachment == null) {

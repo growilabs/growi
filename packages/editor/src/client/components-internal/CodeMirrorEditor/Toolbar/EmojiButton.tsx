@@ -10,8 +10,8 @@ import {
 import { useTranslation } from 'react-i18next';
 import { Modal, UncontrolledTooltip } from 'reactstrap';
 
-import { useResolvedTheme } from '../../../../states/ui/resolved-theme';
-import { useCodeMirrorEditorIsolated } from '../../../stores/codemirror-editor';
+import { useResolvedTheme } from '../../../../states/ui/resolved-theme.js';
+import { useCodeMirrorEditorIsolated } from '../../../stores/codemirror-editor.js';
 
 type PickerProps = {
   onEmojiSelect: (emoji: { shortcodes: string }) => void;

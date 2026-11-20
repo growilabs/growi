@@ -6,19 +6,20 @@ import mongoose from 'mongoose';
 import loggerFactory from '~/utils/logger';
 
 import type Crowi from '../../crowi';
+import { setup as applicationInstalledSetup } from '../../middlewares/application-installed';
 import {
   invitedRules,
   invitedValidation,
 } from '../../middlewares/invited-form-validator';
+import { UserStatus } from '../../models/user/conts';
 import type { ApiV3Response } from './interfaces/apiv3-response';
 
 const logger = loggerFactory('growi:routes:login');
 
 type InvitedFormRequest = Request & { form: any; user: any };
 
-module.exports = (crowi: Crowi): Router => {
-  const applicationInstalled =
-    require('../../middlewares/application-installed')(crowi);
+export const setup = (crowi: Crowi): Router => {
+  const applicationInstalled = applicationInstalledSetup(crowi);
   const router = express.Router();
 
   /**
@@ -70,6 +71,12 @@ module.exports = (crowi: Crowi): Router => {
     async (req: InvitedFormRequest, res: ApiV3Response) => {
       if (!req.user) {
         return res.apiv3({ redirectTo: '/login' });
+      }
+
+      // Any session (e.g. a REGISTERED or SUSPENDED user) can reach here, and
+      // activation rewrites status, password, username and readOnly unconditionally.
+      if (req.user.status !== UserStatus.STATUS_INVITED) {
+        return res.apiv3Err('message.only_invited_user_can_activate', 403);
       }
 
       if (!req.form.isValid) {

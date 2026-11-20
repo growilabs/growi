@@ -47,9 +47,10 @@ export const AzureSettingMolecule = (
               className="btn btn-outline-secondary dropdown-toggle"
               type="button"
               id="ddAzureReferenceFileWithRelayMode"
-              data-toggle="dropdown"
+              data-bs-toggle="dropdown"
               aria-haspopup="true"
               aria-expanded="true"
+              disabled={azureUseOnlyEnvVars}
             >
               {azureReferenceFileWithRelayMode &&
                 t('admin:app_setting.file_delivery_method_relay')}
@@ -59,6 +60,7 @@ export const AzureSettingMolecule = (
             <div className="dropdown-menu">
               <button
                 className="dropdown-item"
+                disabled={azureUseOnlyEnvVars}
                 type="button"
                 onClick={() => {
                   props.onChangeAzureReferenceFileWithRelayMode(true);
@@ -68,6 +70,7 @@ export const AzureSettingMolecule = (
               </button>
               <button
                 className="dropdown-item"
+                disabled={azureUseOnlyEnvVars}
                 type="button"
                 onClick={() => {
                   props.onChangeAzureReferenceFileWithRelayMode(false);

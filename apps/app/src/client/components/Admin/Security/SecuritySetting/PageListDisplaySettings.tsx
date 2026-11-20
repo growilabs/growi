@@ -1,21 +1,24 @@
 import type React from 'react';
+import { useTranslation } from 'next-i18next';
 
 import type AdminGeneralSecurityContainer from '~/client/services/AdminGeneralSecurityContainer';
 
 type Props = {
   adminGeneralSecurityContainer: AdminGeneralSecurityContainer;
-  t: (key: string) => string;
 };
 
 export const PageListDisplaySettings: React.FC<Props> = ({
   adminGeneralSecurityContainer,
-  t,
 }) => {
+  const { t } = useTranslation('admin');
   return (
     <>
       <h4 className="alert-anchor">
         {t('security_settings.page_list_and_search_results')}
       </h4>
+      <p className="form-text text-muted small">
+        {t('security_settings.page_list_and_search_results_desc')}
+      </p>
       <div className="row mb-4">
         <div className="col-md-10">
           <div className="row">

@@ -83,7 +83,7 @@ export const UpdateParentConfirmModal: FC = () => {
                 closeModal();
               }}
             >
-              {t('Confirm')}
+              {t('commons:Confirm')}
             </button>
           </ModalFooter>
         </>
@@ -102,7 +102,7 @@ export const UpdateParentConfirmModal: FC = () => {
               onClick={() => closeModal()}
               className="btn btn-sm btn-secondary"
             >
-              {t('Cancel')}
+              {t('commons:Cancel')}
             </button>
           </ModalFooter>
         </>

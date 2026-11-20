@@ -2,5 +2,21 @@
   "extends": "../../.stylelintrc.json",
   "ignoreFiles": [
     "src/styles/prebuilt/*.css"
-  ]
+  ],
+  "rules": {
+    "no-invalid-position-at-import-rule": null,
+    "scss/operator-no-unspaced": null,
+    "scss/at-rule-no-unknown": [
+      true,
+      {
+        "ignoreAtRules": ["source", "plugin", "theme", "custom-variant", "utility", "variant"]
+      }
+    ],
+    "property-no-unknown": [
+      true,
+      {
+        "ignoreProperties": ["isolationStrategy"]
+      }
+    ]
+  }
 }

@@ -1,7 +1,15 @@
 import type { SWRResponse } from 'swr';
 import useSWR, { mutate } from 'swr';
+import type { SWRInfiniteResponse } from 'swr/infinite';
+import useSWRInfinite from 'swr/infinite';
 
 import { apiGet } from '~/client/util/apiv1-client';
+import {
+  buildSearchQuery,
+  createEmptyFilterState,
+  isFilterStateEmpty,
+  type SearchFilterState,
+} from '~/features/search/client/utils/search-query';
 import type { IFormattedSearchResult } from '~/interfaces/search';
 import { SORT_AXIS, SORT_ORDER } from '~/interfaces/search';
 
@@ -12,6 +20,7 @@ export type ISearchConfigurations = {
   order?: SORT_ORDER;
   includeTrashPages?: boolean;
   includeUserPages?: boolean;
+  filters?: SearchFilterState;
 };
 
 type ISearchConfigurationsFixed = {
@@ -21,6 +30,7 @@ type ISearchConfigurationsFixed = {
   order: SORT_ORDER;
   includeTrashPages: boolean;
   includeUserPages: boolean;
+  filters: SearchFilterState;
 };
 
 export type ISearchConditions = ISearchConfigurationsFixed & {
@@ -30,10 +40,13 @@ export type ISearchConditions = ISearchConfigurationsFixed & {
 
 const createSearchQuery = (
   keyword: string,
+  filters: SearchFilterState,
   includeTrashPages: boolean,
   includeUserPages: boolean,
 ): string => {
-  let query = keyword;
+  // Negations are appended below rather than via buildSearchQuery, which owns
+  // only the positive filter operators (author/editor/group/tag), not negation.
+  let query = buildSearchQuery(keyword, filters);
 
   // pages included in specific path are not retrived when prefix is added
   if (!includeTrashPages) {
@@ -46,6 +59,10 @@ const createSearchQuery = (
   return query;
 };
 
+// Revalidates the paginated ('/search') caches only. It does NOT refresh the
+// infinite-scroll list: SWR's filtered `mutate` skips the `$inf$`-prefixed key
+// that `useSWRInfinite` subscribes to, so the infinite-scroll caller must update
+// its own response itself (see `SearchPage`'s `onItemMutated`).
 export const mutateSearching = async (): Promise<void[]> => {
   return mutate((key) => Array.isArray(key) && key[0] === '/search');
 };
@@ -57,8 +74,15 @@ export const useSWRxSearch = (
 ): SWRResponse<IFormattedSearchResult, Error> & {
   conditions: ISearchConditions;
 } => {
-  const { limit, offset, sort, order, includeTrashPages, includeUserPages } =
-    configurations;
+  const {
+    limit,
+    offset,
+    sort,
+    order,
+    includeTrashPages,
+    includeUserPages,
+    filters,
+  } = configurations;
 
   const fixedConfigurations: ISearchConfigurationsFixed = {
     limit,
@@ -67,17 +91,23 @@ export const useSWRxSearch = (
     order: order ?? SORT_ORDER.DESC,
     includeTrashPages: includeTrashPages ?? false,
     includeUserPages: includeUserPages ?? false,
+    filters: filters ?? createEmptyFilterState(),
   };
   const rawQuery = createSearchQuery(
     keyword ?? '',
+    fixedConfigurations.filters,
     fixedConfigurations.includeTrashPages,
     fixedConfigurations.includeUserPages,
   );
 
-  const isKeywordValid = keyword != null && keyword.length > 0;
+  const hasKeyword = keyword != null && keyword.length > 0;
+  // A filter-only query (author/editor/group/tag with no keyword) is still a
+  // valid search, so run it whenever the keyword OR any filter is present.
+  const shouldSearch =
+    hasKeyword || !isFilterStateEmpty(fixedConfigurations.filters);
 
   const swrResult = useSWR(
-    isKeywordValid ? ['/search', keyword, fixedConfigurations] : null,
+    shouldSearch ? ['/search', keyword, fixedConfigurations] : null,
     ([endpoint, , fixedConfigurations]) => {
       const { limit, offset, sort, order } = fixedConfigurations;
 
@@ -98,10 +128,149 @@ export const useSWRxSearch = (
 
   return {
     ...swrResult,
+    // When there is nothing to search the SWR key is null; `keepPreviousData`
+    // would otherwise retain the last results, leaving the list out of sync with
+    // the now-empty query (a cleared keyword, or cleared filter chips). Drop the
+    // retained data so results always reflect the current query.
+    data: shouldSearch ? swrResult.data : undefined,
     conditions: {
       keyword,
       rawQuery,
       ...fixedConfigurations,
     },
   };
+};
+
+// Default chunk size used when a caller does not supply a positive limit.
+// Single source of truth for the initial paging size, shared with SearchPage.
+export const DEFAULT_SEARCH_CHUNK_SIZE = 20;
+
+// Configuration carried in the infinite-scroll SWR key. Includes `limit`
+// (chunk size) and `nqName` because the fetcher's response depends on them —
+// every value the fetcher reads must be part of the key so different values
+// never share a cache entry. Only `offset` is excluded (derived per page).
+type ISearchInfiniteConfigurations = Omit<
+  ISearchConfigurationsFixed,
+  'offset'
+> & {
+  nqName: string | null;
+};
+
+/**
+ * Pure key generator for the infinite-scroll search fetch.
+ *
+ * Uses the '/search/infinite' namespace so it never collides with useSWRxSearch ('/search').
+ * Returns null (stops fetching) when the keyword is empty, or when the previous page
+ * returned fewer items than the chunk size (end of results reached).
+ */
+export const getSearchInfiniteKey = (
+  pageIndex: number,
+  previousPageData: IFormattedSearchResult | null,
+  keyword: string | null,
+  configurations: ISearchInfiniteConfigurations,
+):
+  | readonly ['/search/infinite', string, number, ISearchInfiniteConfigurations]
+  | null => {
+  if (keyword == null || keyword.length === 0) {
+    return null;
+  }
+
+  const chunkSize = configurations.limit;
+
+  // Stop once the previous chunk returned fewer hits than requested (no more
+  // results). Use `meta.hitsCount` (the count Elasticsearch actually returned)
+  // rather than `data.length`, because the server drops pages missing from
+  // MongoDB, so `data.length` can be below `chunkSize` mid-results and would
+  // stop the fetch prematurely.
+  if (previousPageData != null && previousPageData.meta.hitsCount < chunkSize) {
+    return null;
+  }
+
+  const offset = pageIndex * chunkSize;
+  return ['/search/infinite', keyword, offset, configurations] as const;
+};
+
+/**
+ * Rewrite the cached infinite-scroll chunks in place, without re-fetching.
+ *
+ * `useSWRInfinite` keeps each chunk in its own per-page cache besides the
+ * combined `$inf$` cache that `infiniteMutate` (the bound `mutate`) writes.
+ * Rewriting only the combined cache leaves the two disagreeing, and on the next
+ * load SWR re-fetches every chunk whose per-page cache differs — so both are
+ * rewritten here. The per-page rewrite reaches every '/search/infinite' chunk,
+ * which is also correct for other cached searches showing the same page.
+ */
+export const mutateSearchInfiniteChunks = async (
+  infiniteMutate: SWRInfiniteResponse<IFormattedSearchResult, Error>['mutate'],
+  updater: (chunk: IFormattedSearchResult) => IFormattedSearchResult,
+): Promise<void> => {
+  await Promise.all([
+    mutate(
+      (key) => Array.isArray(key) && key[0] === '/search/infinite',
+      (chunk: IFormattedSearchResult | undefined) =>
+        chunk == null ? chunk : updater(chunk),
+      { revalidate: false },
+    ),
+    infiniteMutate((chunks) => chunks?.map(updater), { revalidate: false }),
+  ]);
+};
+
+export const useSWRINFxSearch = (
+  keyword: string | null,
+  nqName: string | null,
+  configurations: Omit<ISearchConfigurations, 'offset'>,
+): SWRInfiniteResponse<IFormattedSearchResult, Error> => {
+  const { limit, sort, order, includeTrashPages, includeUserPages, filters } =
+    configurations;
+
+  // Chunk size is fixed for the whole search session (no user-facing selector).
+  const chunkSize = limit > 0 ? limit : DEFAULT_SEARCH_CHUNK_SIZE;
+
+  // Every value the fetcher reads (chunk size, nqName, sort/order/filters) is
+  // carried here so it becomes part of the SWR key.
+  const fixedConfigurations: ISearchInfiniteConfigurations = {
+    limit: chunkSize,
+    sort: sort ?? SORT_AXIS.RELATION_SCORE,
+    order: order ?? SORT_ORDER.DESC,
+    includeTrashPages: includeTrashPages ?? false,
+    includeUserPages: includeUserPages ?? false,
+    filters: filters ?? createEmptyFilterState(),
+    nqName,
+  };
+
+  const rawQuery = createSearchQuery(
+    keyword ?? '',
+    fixedConfigurations.filters,
+    fixedConfigurations.includeTrashPages,
+    fixedConfigurations.includeUserPages,
+  );
+
+  return useSWRInfinite(
+    (pageIndex, previousPageData: IFormattedSearchResult | null) =>
+      getSearchInfiniteKey(
+        pageIndex,
+        previousPageData,
+        keyword,
+        fixedConfigurations,
+      ),
+    ([, , offset]) => {
+      // The key head ('/search/infinite') is only a cache namespace;
+      // the actual apiv1 endpoint is '/search' (shared with useSWRxSearch).
+      return apiGet('/search', {
+        q: encodeURIComponent(rawQuery),
+        nq:
+          typeof fixedConfigurations.nqName === 'string'
+            ? encodeURIComponent(fixedConfigurations.nqName)
+            : null,
+        limit: fixedConfigurations.limit,
+        offset,
+        sort: fixedConfigurations.sort,
+        order: fixedConfigurations.order,
+      }).then((result) => result as IFormattedSearchResult);
+    },
+    {
+      revalidateFirstPage: false,
+      revalidateOnFocus: false,
+    },
+  );
 };

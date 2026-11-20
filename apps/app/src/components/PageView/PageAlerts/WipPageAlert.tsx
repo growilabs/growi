@@ -1,12 +1,14 @@
 import React, { type JSX, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useIsReadOnlyUser } from '~/states/context';
 import { useCurrentPageData, useFetchCurrentPage } from '~/states/page';
 
 export const WipPageAlert = (): JSX.Element => {
   const { t } = useTranslation();
   const currentPage = useCurrentPageData();
   const { fetchCurrentPage } = useFetchCurrentPage();
+  const isReadOnlyUser = useIsReadOnlyUser();
 
   const clickPagePublishButton = useCallback(async () => {
     const pageId = currentPage?._id;
@@ -41,7 +43,7 @@ export const WipPageAlert = (): JSX.Element => {
     }
   }, [currentPage?._id, fetchCurrentPage, t]);
 
-  if (!currentPage?.wip) {
+  if (!currentPage?.wip || !!isReadOnlyUser) {
     return <></>;
   }
 

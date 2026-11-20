@@ -1,5 +1,79 @@
 # @growi/core
 
+## 3.2.0
+
+### Minor Changes
+
+- [#12222](https://github.com/growilabs/growi/pull/12222) [`c1ebe52`](https://github.com/growilabs/growi/commit/c1ebe5235a58296d4e55ea03b8348d870dcac00c) Thanks [@yuki-takei](https://github.com/yuki-takei)! - Add `IRevisionProposalMark` and the optional `proposalId` / `proposalOperationKey` fields on `IRevision`, which mark a revision created by a Change Proposal operation
+
+## 3.1.3
+
+### Patch Changes
+
+- [#12176](https://github.com/growilabs/growi/pull/12176) [`2f37b50`](https://github.com/growilabs/growi/commit/2f37b50bfbdc475db2c8644a545e57881b909863) Thanks [@yuki-takei](https://github.com/yuki-takei)! - Make `omitDuplicateAreaPathFromPaths` and `omitDuplicateAreaPageFromPages` treat each path literally. They used to build a regular expression from the raw path, so a path containing a character such as `+` or `(` threw a `SyntaxError`, and a `.` in a path matched any character, which could drop an unrelated path.
+
+## 3.1.2
+
+### Patch Changes
+
+- [#12159](https://github.com/growilabs/growi/pull/12159) [`c0e2f63`](https://github.com/growilabs/growi/commit/c0e2f63b0d5c5993362ee74a8a4b21873900494f) Thanks [@yuki-takei](https://github.com/yuki-takei)! - Make `isCreatablePage` run in linear time. The page depth limit (130 levels) is now checked by counting path segments instead of a regular expression whose time grew exponentially with the number of slashes, and the trailing `/edit` / `.md` and spaces-around-slash checks no longer slow down quadratically on long paths. The depth check is exported from `page-path-utils` as `exceedsMaxPageDepth`.
+
+## 3.1.1
+
+### Patch Changes
+
+- [#11893](https://github.com/growilabs/growi/pull/11893) [`7d3c061`](https://github.com/growilabs/growi/commit/7d3c06199d8267bcf651b167b3bfbcdc6752d02d) Thanks [@Ryosei-Fukushima](https://github.com/Ryosei-Fukushima)! - Add callout variant constants (`AllCallout` / `Callout`) to `@growi/core` as the single source of truth, shared by the callout renderer and the editor slash commands.
+
+## 3.1.0
+
+### Minor Changes
+
+- [#11961](https://github.com/growilabs/growi/pull/11961) [`e50350f`](https://github.com/growilabs/growi/commit/e50350fc349e14ff6f8984d753676e62bac73920) Thanks [@mizozobu](https://github.com/mizozobu)! - Add `toLegacyAttachmentShape` and `toLegacyUserShape` to `@growi/core/dist/models/serializers`. They restore the Mongoose-era field names on Prisma rows.
+
+## 3.0.1
+
+### Patch Changes
+
+- [#12081](https://github.com/growilabs/growi/pull/12081) [`fd3a693`](https://github.com/growilabs/growi/commit/fd3a69339f65a4062fab8852b02e8a5c7110f751) Thanks [@yotatameguchi-boop](https://github.com/yotatameguchi-boop)! - Fix deep equality incorrectly treating objects with different own keys as equal when their values are undefined or inherited.
+
+## 3.0.0
+
+### Major Changes
+
+- [#11513](https://github.com/growilabs/growi/pull/11513) [`211f493`](https://github.com/growilabs/growi/commit/211f49330240ecac27442790416ab20e5ea4e2ab) Thanks [@arvid-e](https://github.com/arvid-e)! - Rename `IPage.ttlTimestamp` to `IPage.wipExpiredAt` and change its meaning
+
+  WIP page expiry is no longer enforced by a MongoDB TTL index (which deleted pages without running application code, leaving `descendantCount` inflated and empty placeholder pages orphaned). It is now application-driven, so the stored value changed meaning as well as name:
+
+  - old `ttlTimestamp` — the instant the page was made WIP; the TTL index supplied the duration via `expireAfterSeconds`.
+  - new `wipExpiredAt` — the absolute instant the page expires, computed up front.
+
+  BREAKING: consumers reading or writing `IPage.ttlTimestamp` must switch to `wipExpiredAt` and must not treat it as "when the page became WIP". A GROWI-side migration converts existing stored values.
+
+## 2.5.0
+
+### Minor Changes
+
+- [#11267](https://github.com/growilabs/growi/pull/11267) [`659c93d`](https://github.com/growilabs/growi/commit/659c93d31d24fe90b0edc777c2e586f9efdd0195) Thanks [@miya](https://github.com/miya)! - Rename and prune AI-related access token scopes
+
+  - Renamed the user-feature scope `features:ai_assistant` → `features:ai` (read/write). The constants `SCOPE.READ/WRITE.FEATURES.AI_ASSISTANT` are now `SCOPE.READ/WRITE.FEATURES.AI`, and the scope strings are `read:features:ai` / `write:features:ai`.
+  - Removed the now-unused admin scope `admin:ai_integration` (read/write); the admin AI integration screen has been removed.
+
+  BREAKING: access tokens previously granted `read|write:features:ai_assistant` no longer match the renamed scope and will lose access to AI endpoints until re-granted (or remapped via migration). Tokens carrying `read|write:admin:ai_integration` retain a now-meaningless scope string.
+
+- [#11092](https://github.com/growilabs/growi/pull/11092) [`e2375eb`](https://github.com/growilabs/growi/commit/e2375ebb787062ad20f4f982d94a2768fb9a3ec1) Thanks [@yuki-takei](https://github.com/yuki-takei)! - Add interfaces for growi-vault
+
+## 2.4.0
+
+### Minor Changes
+
+- [#11320](https://github.com/growilabs/growi/pull/11320) [`5e8f105`](https://github.com/growilabs/growi/commit/5e8f1054c01771275682dcdbcb2fc3488e1c0be3) Thanks [@Ryosei-Fukushima](https://github.com/Ryosei-Fukushima)! - Add `features:user` and `features:user_group` access-token scopes (read/write). These separate "reading other users'/groups' directory information" from the self-oriented `user_settings:info` scope, which previously over-granted such reads.
+
+## 2.3.2
+
+### Patch Changes
+
+- [#11317](https://github.com/growilabs/growi/pull/11317) [`4a0bf1d`](https://github.com/growilabs/growi/commit/4a0bf1dac5954f9ae7756a574970a3968a4ae8b9) Thanks [@ryotaro-nagahara](https://github.com/ryotaro-nagahara)! - Reserve the `/_news` path (in-app news feed page) in `isCreatablePage` so it cannot be created as a wiki page.
+
 ## 2.3.1
 
 ### Patch Changes

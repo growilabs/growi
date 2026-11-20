@@ -1,52 +1,97 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pipeline, Readable, Writable } from 'node:stream';
-import { dynamicImport } from '@cspell/dynamic-import';
-import { isPopulated } from '@growi/core';
 import {
   getParentPath,
   normalizePath,
 } from '@growi/core/dist/utils/path-utils';
-import type { Root } from 'mdast';
-import type * as RemarkHtml from 'remark-html';
-import type * as RemarkParse from 'remark-parse';
-import type * as Unified from 'unified';
+import mongoose from 'mongoose';
 
 import {
+  isPageBulkExportFormat,
   PageBulkExportFormat,
   PageBulkExportJobStatus,
 } from '~/features/page-bulk-export/interfaces/page-bulk-export';
+import type { Prisma, pagebulkexportjobs } from '~/generated/prisma/client';
+import { configManager } from '~/server/service/config-manager';
+import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
-import type { PageBulkExportJobDocument } from '../../../models/page-bulk-export-job';
-import type { PageBulkExportPageSnapshotDocument } from '../../../models/page-bulk-export-page-snapshot';
-import PageBulkExportPageSnapshot from '../../../models/page-bulk-export-page-snapshot';
 import type { IPageBulkExportJobCronService } from '..';
 import { BulkExportJobStreamDestroyedByCleanupError } from '../errors';
+import { createBulkExportMarkdownRenderer } from '../markdown';
+import { embedAttachmentImages } from './embed-images';
+import { toRelativeHref } from './to-relative-href';
 
-async function convertMdToHtml(
-  md: string,
-  htmlConverter: Unified.Processor<Root, undefined, undefined, Root, string>,
-): Promise<string> {
-  const htmlString = (await htmlConverter.process(md)).toString();
+const logger = loggerFactory(
+  'growi:features:page-bulk-export:export-pages-to-fs-async',
+);
 
-  return htmlString;
+/**
+ * Filename of the shared stylesheet written once per job into the html output
+ * dir. Every page links to it relatively, so the CSS is not duplicated per page.
+ * The leading underscore keeps it out of the page namespace; pdf-converter only
+ * scans `*.html`, so this file is never mistaken for a page to convert.
+ */
+const SHARED_CSS_FILENAME = '_bulk-export.css';
+
+type PageSnapshot = Prisma.pagebulkexportpagesnapshotsGetPayload<{
+  include: { revision: true };
+}>;
+
+// Keyset pagination keeps memory bounded by batchSize. `id` breaks ties between
+// snapshots sharing a path (`pages.path` is not unique), so a batch boundary
+// that splits them never skips one.
+async function* streamPageSnapshots(
+  jobId: string,
+  lastExportedPagePath: string | null,
+  batchSize: number,
+): AsyncGenerator<PageSnapshot> {
+  let cursorId: string | null = null;
+  for (;;) {
+    const batch: PageSnapshot[] =
+      await prisma.pagebulkexportpagesnapshots.findMany({
+        where: {
+          pageBulkExportJobId: jobId,
+          ...(lastExportedPagePath != null && {
+            path: { gt: lastExportedPagePath },
+          }),
+        },
+        include: { revision: true },
+        orderBy: [{ path: 'asc' }, { id: 'asc' }],
+        take: batchSize,
+        ...(cursorId != null && { cursor: { id: cursorId }, skip: 1 }),
+      });
+    if (batch.length === 0) return;
+    yield* batch;
+    cursorId = batch[batch.length - 1].id;
+  }
 }
 
 /**
- * Get a Writable that writes the page body temporarily to fs
+ * Get a Writable that writes the page body temporarily to fs.
+ *
+ * For pdf format: Markdown is rendered to a sanitized HTML document that links
+ * the shared stylesheet (written once per job here) and wraps the content in a
+ * `.wiki` container (Requirements 5.1, 2.1, 2.2).
+ *
+ * For md format: Markdown is written as-is without any HTML rendering
+ * (Requirement 5.2).
+ *
+ * Resume logic (lastExportedPagePath) and error-callback behaviour are
+ * preserved unchanged (Requirements 5.3, 3.2).
  */
-async function getPageWritable(
+export async function getPageWritable(
   this: IPageBulkExportJobCronService,
-  pageBulkExportJob: PageBulkExportJobDocument,
+  pageBulkExportJob: pagebulkexportjobs,
 ): Promise<Writable> {
-  const unified = (await dynamicImport<typeof Unified>('unified', __dirname))
-    .unified;
-  const remarkParse = (
-    await dynamicImport<typeof RemarkParse>('remark-parse', __dirname)
-  ).default;
-  const remarkHtml = (
-    await dynamicImport<typeof RemarkHtml>('remark-html', __dirname)
-  ).default;
+  // `format` becomes a file extension in the output path, so a value written
+  // to the DB by any route other than the validated API must not reach it.
+  if (!isPageBulkExportFormat(pageBulkExportJob.format)) {
+    throw new Error(
+      `Unsupported page bulk export format: ${pageBulkExportJob.format}`,
+    );
+  }
 
   const isHtmlPath = pageBulkExportJob.format === PageBulkExportFormat.pdf;
   const format =
@@ -54,53 +99,101 @@ async function getPageWritable(
       ? 'html'
       : pageBulkExportJob.format;
   const outputDir = this.getTmpOutputDir(pageBulkExportJob, isHtmlPath);
-  // define before the stream starts to avoid creating multiple instances
-  const htmlConverter = unified()
-    .use(remarkParse)
-    // !!! DO NOT DISABLE HTML ESCAPING WHILE --no-sandbox IS PASSED TO PUPPETEER INSIDE pdf-converter !!!
-    .use(remarkHtml);
+
+  // Build renderer once — reused for every page in the job.
+  // BulkExportMarkdownRenderer caches the unified pipeline at module level.
+  const renderer = createBulkExportMarkdownRenderer();
+
+  // Resolved once per job (not per page): the user embedAttachmentImages
+  // runs its per-attachment permission check as.
+  const User = mongoose.model('User');
+  const exportingUser = await User.findById(pageBulkExportJob.userId);
+  // Downloading an attachment is the read-side counterpart of uploading it,
+  // so it shares the storage transfer timeout operators already tune.
+  const downloadTimeoutMs = configManager.getConfig('app:fileUploadTimeout');
+
+  // For pdf format, write the shared stylesheet once per job. Every page links
+  // to it relatively, so the (~MB) CSS is not duplicated into each page's HTML.
+  const cssFilePath = path.join(outputDir, SHARED_CSS_FILENAME);
+  if (isHtmlPath) {
+    await fs.promises.mkdir(outputDir, { recursive: true });
+    await fs.promises.writeFile(cssFilePath, renderer.getCss());
+  }
+
+  const exportPage = async (page: PageSnapshot): Promise<void> => {
+    const revision = page.revision;
+    if (revision == null) {
+      return;
+    }
+
+    const markdownBody = revision.body;
+    const pathNormalized = `${normalizePath(page.path)}.${format}`;
+    const fileOutputPath = path.join(outputDir, pathNormalized);
+    const fileOutputParentPath = getParentPath(fileOutputPath);
+
+    await fs.promises.mkdir(fileOutputParentPath, { recursive: true });
+    if (pageBulkExportJob.format === PageBulkExportFormat.md) {
+      await fs.promises.writeFile(fileOutputPath, markdownBody);
+    } else {
+      // Render Markdown → sanitized HTML document linking the shared
+      // stylesheet (relative to this page) and wrapped in a .wiki container.
+      // If renderToHtml rejects, the error propagates to the write callback,
+      // letting the existing error-handling path update the job state (Req 3.2).
+      const cssHref = toRelativeHref(fileOutputPath, cssFilePath);
+      let htmlString: string;
+      try {
+        htmlString = await renderer.renderToHtml(markdownBody, cssHref);
+      } catch (renderErr) {
+        logger.warn(
+          'BulkExportMarkdownRenderer failed for page %s: %o',
+          page.path,
+          renderErr,
+        );
+        throw renderErr;
+      }
+      htmlString = await embedAttachmentImages(htmlString, {
+        fileOutputPath,
+        outputDir,
+        crowi: this.crowi,
+        exportingUser,
+        downloadTimeoutMs,
+        signal: abortController.signal,
+      });
+      await fs.promises.writeFile(fileOutputPath, htmlString);
+    }
+    await prisma.pagebulkexportjobs.update({
+      where: { id: pageBulkExportJob.id },
+      data: { lastExportedPagePath: page.path },
+    });
+  };
+
+  // Aborted when the Writable is destroyed (job cleanup), so a page still
+  // downloading attachment images stops instead of running on.
+  const abortController = new AbortController();
+  let pageInProgress: Promise<void> = Promise.resolve();
+
   return new Writable({
     objectMode: true,
-    write: async (
-      page: PageBulkExportPageSnapshotDocument,
-      encoding,
-      callback,
-    ) => {
-      try {
-        const revision = page.revision;
-
-        if (revision != null && isPopulated(revision)) {
-          const markdownBody = revision.body;
-          const pathNormalized = `${normalizePath(page.path)}.${format}`;
-          const fileOutputPath = path.join(outputDir, pathNormalized);
-          const fileOutputParentPath = getParentPath(fileOutputPath);
-
-          await fs.promises.mkdir(fileOutputParentPath, { recursive: true });
-          if (pageBulkExportJob.format === PageBulkExportFormat.md) {
-            await fs.promises.writeFile(fileOutputPath, markdownBody);
-          } else {
-            const htmlString = await convertMdToHtml(
-              markdownBody,
-              htmlConverter,
-            );
-            await fs.promises.writeFile(fileOutputPath, htmlString);
-          }
-          pageBulkExportJob.lastExportedPagePath = page.path;
-          await pageBulkExportJob.save();
-        }
-      } catch (err) {
-        callback(err);
-        return;
-      }
-      callback();
+    write: (page: PageSnapshot, _encoding, callback) => {
+      pageInProgress = exportPage(page);
+      pageInProgress.then(() => callback(), callback);
+    },
+    destroy: (err, callback) => {
+      abortController.abort(err ?? undefined);
+      // cleanUpExportJobResources removes the output dir once this stream
+      // emits 'close'; holding 'close' until the page in progress settles
+      // keeps a download that is winding down from writing into it again.
+      Promise.allSettled([pageInProgress]).then(() => callback(err));
     },
     final: async (callback) => {
       try {
         // If the format is md, the export process ends here.
         // If the format is pdf, pdf conversion in pdf-converter has to finish.
         if (pageBulkExportJob.format === PageBulkExportFormat.md) {
-          pageBulkExportJob.status = PageBulkExportJobStatus.uploading;
-          await pageBulkExportJob.save();
+          await prisma.pagebulkexportjobs.update({
+            where: { id: pageBulkExportJob.id },
+            data: { status: PageBulkExportJobStatus.uploading },
+          });
         }
       } catch (err) {
         callback(err);
@@ -117,27 +210,20 @@ async function getPageWritable(
  */
 export async function exportPagesToFsAsync(
   this: IPageBulkExportJobCronService,
-  pageBulkExportJob: PageBulkExportJobDocument,
+  pageBulkExportJob: pagebulkexportjobs,
 ): Promise<void> {
-  const findQuery =
-    pageBulkExportJob.lastExportedPagePath != null
-      ? {
-          pageBulkExportJob,
-          path: { $gt: pageBulkExportJob.lastExportedPagePath },
-        }
-      : { pageBulkExportJob };
-  const pageSnapshotsCursor = PageBulkExportPageSnapshot.find(findQuery)
-    .populate('revision')
-    .sort({ path: 1 })
-    .lean()
-    .cursor({ batchSize: this.pageBatchSize });
-  // Wrap Mongoose Cursor with Readable.from() for proper type compatibility
-  const pageSnapshotsReadable = Readable.from(pageSnapshotsCursor);
+  const pageSnapshotsReadable = Readable.from(
+    streamPageSnapshots(
+      pageBulkExportJob.id,
+      pageBulkExportJob.lastExportedPagePath,
+      this.pageBatchSize,
+    ),
+  );
 
   const pagesWritable = await getPageWritable.bind(this)(pageBulkExportJob);
 
   this.setStreamsInExecution(
-    pageBulkExportJob._id,
+    pageBulkExportJob.id,
     pageSnapshotsReadable,
     pagesWritable,
   );

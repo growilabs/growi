@@ -9,9 +9,9 @@ import {
   UncontrolledTooltip,
 } from 'reactstrap';
 
-import type { GlobalCodeMirrorEditorKey } from '../../../../consts';
-import { AttachmentsDropdownItem } from './AttachmentsDropdownItem';
-import { LinkEditButton } from './LinkEditButton';
+import type { GlobalCodeMirrorEditorKey } from '../../../../consts/index.js';
+import { AttachmentsDropdownItem } from './AttachmentsDropdownItem.js';
+import { LinkEditButton } from './LinkEditButton.js';
 
 import styles from './AttachmentsDropup.module.scss';
 

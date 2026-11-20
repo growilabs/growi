@@ -1,2 +1,2 @@
-export * from './insert-new-row-to-table-markdown';
-export * from './use-show-table-icon';
+export * from './insert-new-row-to-table-markdown.js';
+export * from './use-show-table-icon.js';

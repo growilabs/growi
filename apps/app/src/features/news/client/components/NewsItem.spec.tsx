@@ -4,12 +4,17 @@ import mongoose from 'mongoose';
 const mocks = vi.hoisted(() => {
   const apiv3Post = vi.fn().mockResolvedValue({});
   const mutate = vi.fn();
+  const routerPush = vi.fn();
   const i18nLanguage = { current: 'ja_JP' };
-  return { apiv3Post, mutate, i18nLanguage };
+  return { apiv3Post, mutate, routerPush, i18nLanguage };
 });
 
 vi.mock('~/client/util/apiv3-client', () => ({
   apiv3Post: mocks.apiv3Post,
+}));
+
+vi.mock('next/router', () => ({
+  useRouter: () => ({ push: mocks.routerPush }),
 }));
 
 vi.mock('next-i18next', () => ({
@@ -22,10 +27,6 @@ vi.mock('next-i18next', () => ({
     },
   }),
 }));
-
-// Mock window.open
-const mockOpen = vi.fn();
-vi.stubGlobal('open', mockOpen);
 
 import type { INewsItemWithReadStatus } from '../../interfaces/news-item';
 import { NewsItem } from './NewsItem';
@@ -53,13 +54,17 @@ describe('NewsItem', () => {
   describe('emoji display', () => {
     test('should display emoji when provided', () => {
       const item = makeNewsItem({ emoji: '🚀' });
-      render(<NewsItem item={item} onReadMutate={onReadMutate} />);
+      render(
+        <NewsItem item={item} pageIndex={0} onReadMutate={onReadMutate} />,
+      );
       expect(screen.getByText('🚀')).toBeTruthy();
     });
 
     test('should display 📢 fallback when emoji is not set', () => {
       const item = makeNewsItem({ emoji: undefined });
-      render(<NewsItem item={item} onReadMutate={onReadMutate} />);
+      render(
+        <NewsItem item={item} pageIndex={0} onReadMutate={onReadMutate} />,
+      );
       expect(screen.getByText('📢')).toBeTruthy();
     });
   });
@@ -70,7 +75,9 @@ describe('NewsItem', () => {
       const item = makeNewsItem({
         title: { ja_JP: '日本語タイトル', en_US: 'English Title' },
       });
-      render(<NewsItem item={item} onReadMutate={onReadMutate} />);
+      render(
+        <NewsItem item={item} pageIndex={0} onReadMutate={onReadMutate} />,
+      );
       expect(screen.getByText('日本語タイトル')).toBeTruthy();
     });
 
@@ -79,21 +86,27 @@ describe('NewsItem', () => {
       const item = makeNewsItem({
         title: { ja_JP: '日本語タイトル', en_US: 'English Title' },
       });
-      render(<NewsItem item={item} onReadMutate={onReadMutate} />);
+      render(
+        <NewsItem item={item} pageIndex={0} onReadMutate={onReadMutate} />,
+      );
       expect(screen.getByText('日本語タイトル')).toBeTruthy();
     });
 
     test('should fallback to en_US when ja_JP is not available', () => {
       mocks.i18nLanguage.current = 'de_DE';
       const item = makeNewsItem({ title: { en_US: 'English Only' } });
-      render(<NewsItem item={item} onReadMutate={onReadMutate} />);
+      render(
+        <NewsItem item={item} pageIndex={0} onReadMutate={onReadMutate} />,
+      );
       expect(screen.getByText('English Only')).toBeTruthy();
     });
 
     test('should fallback to first available key when neither ja_JP nor en_US', () => {
       mocks.i18nLanguage.current = 'de_DE';
       const item = makeNewsItem({ title: { fr_FR: 'Titre Français' } });
-      render(<NewsItem item={item} onReadMutate={onReadMutate} />);
+      render(
+        <NewsItem item={item} pageIndex={0} onReadMutate={onReadMutate} />,
+      );
       expect(screen.getByText('Titre Français')).toBeTruthy();
     });
   });
@@ -102,7 +115,7 @@ describe('NewsItem', () => {
     test('should apply fw-bold class for unread items', () => {
       const item = makeNewsItem({ isRead: false });
       const { container } = render(
-        <NewsItem item={item} onReadMutate={onReadMutate} />,
+        <NewsItem item={item} pageIndex={0} onReadMutate={onReadMutate} />,
       );
       // Title should have fw-bold
       const title = container.querySelector('.fw-bold');
@@ -112,7 +125,7 @@ describe('NewsItem', () => {
     test('should apply fw-normal class for read items', () => {
       const item = makeNewsItem({ isRead: true });
       const { container } = render(
-        <NewsItem item={item} onReadMutate={onReadMutate} />,
+        <NewsItem item={item} pageIndex={0} onReadMutate={onReadMutate} />,
       );
       const title = container.querySelector('.fw-normal');
       expect(title).not.toBeNull();
@@ -121,7 +134,7 @@ describe('NewsItem', () => {
     test('should show unread dot for unread items', () => {
       const item = makeNewsItem({ isRead: false });
       const { container } = render(
-        <NewsItem item={item} onReadMutate={onReadMutate} />,
+        <NewsItem item={item} pageIndex={0} onReadMutate={onReadMutate} />,
       );
       const dot = container.querySelector('.bg-primary.rounded-circle');
       expect(dot).not.toBeNull();
@@ -131,7 +144,9 @@ describe('NewsItem', () => {
   describe('click handling', () => {
     test('should call mark-read API when clicked', async () => {
       const item = makeNewsItem({ isRead: false });
-      render(<NewsItem item={item} onReadMutate={onReadMutate} />);
+      render(
+        <NewsItem item={item} pageIndex={0} onReadMutate={onReadMutate} />,
+      );
 
       const element = screen.getByRole('button');
       fireEvent.click(element);
@@ -145,46 +160,88 @@ describe('NewsItem', () => {
       });
     });
 
-    test('should open URL in new tab when url is set', async () => {
-      const item = makeNewsItem({
-        url: 'https://github.com/growi',
-        isRead: false,
-      });
-      render(<NewsItem item={item} onReadMutate={onReadMutate} />);
+    test('should navigate to the news feed page anchored to the clicked item', async () => {
+      const item = makeNewsItem({ isRead: false });
+      render(
+        <NewsItem item={item} pageIndex={0} onReadMutate={onReadMutate} />,
+      );
 
-      const element = screen.getByRole('button');
-      fireEvent.click(element);
+      fireEvent.click(screen.getByRole('button'));
 
       await vi.waitFor(() => {
-        expect(mockOpen).toHaveBeenCalledWith(
-          'https://github.com/growi',
-          '_blank',
-          'noopener,noreferrer',
+        expect(mocks.routerPush).toHaveBeenCalledWith(
+          `/_news?page=1#news-${item._id.toString()}`,
+          undefined,
+          { scroll: false },
         );
       });
     });
 
-    test('should NOT open URL when url is not set', async () => {
-      const item = makeNewsItem({ url: undefined, isRead: false });
-      render(<NewsItem item={item} onReadMutate={onReadMutate} />);
+    // Guards the `page = pageIndex + 1` contract with a non-zero index:
+    // an implementation that hardcodes `?page=1` or drops the `+1` would
+    // still pass the pageIndex=0 tests above.
+    test('should navigate to the page derived from a non-zero pageIndex', async () => {
+      const item = makeNewsItem({ isRead: false });
+      render(
+        <NewsItem item={item} pageIndex={2} onReadMutate={onReadMutate} />,
+      );
 
-      const element = screen.getByRole('button');
-      fireEvent.click(element);
+      fireEvent.click(screen.getByRole('button'));
 
       await vi.waitFor(() => {
-        expect(mocks.apiv3Post).toHaveBeenCalled();
+        expect(mocks.routerPush).toHaveBeenCalledWith(
+          `/_news?page=3#news-${item._id.toString()}`,
+          undefined,
+          { scroll: false },
+        );
       });
-      expect(mockOpen).not.toHaveBeenCalled();
     });
 
-    test('should call onReadMutate after marking as read', async () => {
+    // When no valid page mapping exists (e.g. the sidebar unread-only filter
+    // is active), the `?page` query must be omitted instead of pointing at a
+    // possibly wrong page.
+    test('should navigate without a page query when pageIndex is not provided', async () => {
       const item = makeNewsItem({ isRead: false });
       render(<NewsItem item={item} onReadMutate={onReadMutate} />);
 
       fireEvent.click(screen.getByRole('button'));
 
       await vi.waitFor(() => {
-        expect(onReadMutate).toHaveBeenCalled();
+        expect(mocks.routerPush).toHaveBeenCalledWith(
+          `/_news#news-${item._id.toString()}`,
+          undefined,
+          { scroll: false },
+        );
+      });
+    });
+
+    test('should navigate even when url is not set', async () => {
+      const item = makeNewsItem({ url: undefined, isRead: false });
+      render(
+        <NewsItem item={item} pageIndex={0} onReadMutate={onReadMutate} />,
+      );
+
+      fireEvent.click(screen.getByRole('button'));
+
+      await vi.waitFor(() => {
+        expect(mocks.routerPush).toHaveBeenCalledWith(
+          `/_news?page=1#news-${item._id.toString()}`,
+          undefined,
+          { scroll: false },
+        );
+      });
+    });
+
+    test('should call onReadMutate with the news item id after marking as read', async () => {
+      const item = makeNewsItem({ isRead: false });
+      render(
+        <NewsItem item={item} pageIndex={0} onReadMutate={onReadMutate} />,
+      );
+
+      fireEvent.click(screen.getByRole('button'));
+
+      await vi.waitFor(() => {
+        expect(onReadMutate).toHaveBeenCalledWith(item._id.toString());
       });
     });
   });

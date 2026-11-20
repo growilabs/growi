@@ -4,6 +4,7 @@ import {
   toNonBlankStringOrUndefined,
 } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
+import type { Router } from 'express';
 import express from 'express';
 import { body } from 'express-validator';
 
@@ -136,7 +137,7 @@ const validator = {
  *                      type: object
  *                      $ref: '#/components/schemas/FileUploadSettingParams'
  */
-module.exports = (crowi: Crowi) => {
+export const setup = (crowi: Crowi): Router => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);
   const adminRequired = adminRequiredFactory(crowi);
   const addActivity = generateAddActivityMiddleware();
@@ -154,7 +155,19 @@ module.exports = (crowi: Crowi) => {
     async (req, res) => {
       const { fileUploadType } = req.body;
 
-      if (fileUploadType === 'local' || fileUploadType === 'gridfs') {
+      const isEnvOnlyStorage =
+        (fileUploadType === 'aws' &&
+          configManager.getConfig('env:useOnlyEnvVars:aws')) ||
+        (fileUploadType === 'gcs' &&
+          configManager.getConfig('env:useOnlyEnvVars:gcs')) ||
+        (fileUploadType === 'azure' &&
+          configManager.getConfig('env:useOnlyEnvVars:azure'));
+
+      if (
+        fileUploadType === 'local' ||
+        fileUploadType === 'gridfs' ||
+        isEnvOnlyStorage
+      ) {
         try {
           await configManager.updateConfigs(
             {
@@ -169,7 +182,7 @@ module.exports = (crowi: Crowi) => {
         }
       }
 
-      if (fileUploadType === 'aws') {
+      if (fileUploadType === 'aws' && !isEnvOnlyStorage) {
         try {
           try {
             toNonBlankString(req.body.s3Bucket);
@@ -240,7 +253,7 @@ module.exports = (crowi: Crowi) => {
         }
       }
 
-      if (fileUploadType === 'gcs') {
+      if (fileUploadType === 'gcs' && !isEnvOnlyStorage) {
         try {
           await configManager.updateConfigs(
             {
@@ -280,7 +293,7 @@ module.exports = (crowi: Crowi) => {
         }
       }
 
-      if (fileUploadType === 'azure') {
+      if (fileUploadType === 'azure' && !isEnvOnlyStorage) {
         try {
           await configManager.updateConfigs(
             {

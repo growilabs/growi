@@ -1,3 +1,4 @@
+import passport from 'passport';
 import type { MockInstance } from 'vitest';
 import { mock } from 'vitest-mock-extended';
 
@@ -91,5 +92,190 @@ describe('PassportService test', () => {
         });
       },
     );
+  });
+});
+
+describe('strategy setup — lazy SDK loading contract', () => {
+  let crowiMock: Crowi;
+  let passportService: PassportService;
+  let useSpy: MockInstance<typeof passport.use>;
+  let getConfigSpy: MockInstance<typeof configManager.getConfig>;
+
+  beforeEach(() => {
+    // In production `crowi.configManager` IS the module-level configManager
+    // singleton; wiring the mock to the real one lets a single getConfig spy
+    // drive every strategy (LDAP reads crowi.configManager; the others read
+    // the module import directly).
+    crowiMock = mock<Crowi>({ configManager });
+    passportService = new PassportService(crowiMock);
+
+    // Isolate from the real passport singleton: assert on registration without
+    // mutating global strategy state. `new XStrategy(...)` (the argument) is
+    // still constructed, so the enabled-path tests still exercise the real
+    // lazy import() and the SDK's runtime export shape.
+    useSpy = vi.spyOn(passport, 'use').mockReturnValue(passport);
+    vi.spyOn(passport, 'unuse').mockReturnValue(passport);
+
+    getConfigSpy = vi.spyOn(configManager, 'getConfig');
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  describe('when the provider is disabled', () => {
+    beforeEach(() => {
+      // every "...:isEnabled" lookup resolves falsy
+      getConfigSpy.mockReturnValue(undefined);
+    });
+
+    it.each`
+      method                   | flag
+      ${'setupLdapStrategy'}   | ${'isLdapStrategySetup'}
+      ${'setupSamlStrategy'}   | ${'isSamlStrategySetup'}
+      ${'setupOidcStrategy'}   | ${'isOidcStrategySetup'}
+      ${'setupGoogleStrategy'} | ${'isGoogleStrategySetup'}
+      ${'setupGitHubStrategy'} | ${'isGitHubStrategySetup'}
+    `(
+      '$method registers no strategy and leaves $flag false',
+      async ({ method, flag }) => {
+        await passportService[method]();
+
+        expect(useSpy).not.toHaveBeenCalled();
+        expect(passportService[flag]).toBe(false);
+      },
+    );
+  });
+
+  describe('when the provider is enabled', () => {
+    it('setupLdapStrategy lazy-loads passport-ldapauth (default export) and registers', async () => {
+      getConfigSpy.mockImplementation((key) => {
+        if (key === 'security:passport-ldap:isEnabled') return true;
+        if (key === 'security:passport-ldap:serverUrl')
+          return 'ldap://localhost:389/dc=example,dc=org';
+        return undefined;
+      });
+
+      await passportService.setupLdapStrategy();
+
+      expect(useSpy).toHaveBeenCalledTimes(1);
+      expect(passportService.isLdapStrategySetup).toBe(true);
+    });
+
+    it('setupSamlStrategy lazy-loads passport-saml and registers', async () => {
+      getConfigSpy.mockImplementation((key) => {
+        switch (key) {
+          case 'security:passport-saml:isEnabled':
+            return true;
+          case 'security:passport-saml:cert':
+            return 'dummy-cert';
+          case 'security:passport-saml:entryPoint':
+            return 'https://idp.example.com/sso';
+          case 'security:passport-saml:issuer':
+            return 'growi';
+          case 'security:passport-saml:callbackUrl':
+            return 'http://localhost:3000/passport/saml/callback';
+          default:
+            return undefined; // app:siteUrl null -> uses callbackUrl above
+        }
+      });
+
+      await passportService.setupSamlStrategy();
+
+      expect(useSpy).toHaveBeenCalledTimes(1);
+      expect(passportService.isSamlStrategySetup).toBe(true);
+    });
+
+    it.each`
+      provider    | method                   | flag
+      ${'google'} | ${'setupGoogleStrategy'} | ${'isGoogleStrategySetup'}
+      ${'github'} | ${'setupGitHubStrategy'} | ${'isGitHubStrategySetup'}
+    `(
+      '$method lazy-loads its OAuth SDK and registers',
+      async ({ provider, method, flag }) => {
+        getConfigSpy.mockImplementation((key) => {
+          switch (key) {
+            case `security:passport-${provider}:isEnabled`:
+              return true;
+            case `security:passport-${provider}:clientId`:
+              return 'test-client-id';
+            case `security:passport-${provider}:clientSecret`:
+              return 'test-client-secret';
+            default:
+              return undefined; // app:siteUrl null -> uses legacy callbackUrl
+          }
+        });
+        vi.spyOn(configManager, 'getConfigLegacy').mockReturnValue(
+          `http://localhost:3000/passport/${provider}/callback`,
+        );
+
+        await passportService[method]();
+
+        expect(useSpy).toHaveBeenCalledTimes(1);
+        expect(passportService[flag]).toBe(true);
+      },
+    );
+
+    it('setupOidcStrategy lazy-loads openid-client without throwing and does not register when the issuer is unreachable', async () => {
+      // enabled, but issuerHost is unset so getOIDCIssuerInstance returns early
+      // (no network). This still executes the openid-client import() and the
+      // `custom.setHttpOptionsDefaults` call, so it proves the named-export
+      // shape at runtime; if the import shape were wrong it would throw here.
+      getConfigSpy.mockImplementation((key) => {
+        if (key === 'security:passport-oidc:isEnabled') return true;
+        if (key === 'security:passport-oidc:oidcIssuerTimeoutOption')
+          return 5000;
+        return undefined; // issuerHost undefined -> early return, no network
+      });
+      vi.spyOn(configManager, 'getConfigLegacy').mockReturnValue(undefined);
+
+      await expect(
+        passportService.setupOidcStrategy(),
+      ).resolves.toBeUndefined();
+
+      expect(useSpy).not.toHaveBeenCalled();
+      expect(passportService.isOidcStrategySetup).toBe(false);
+    });
+  });
+});
+
+describe('setupStrategyById — dispatch and unknown-id boundary', () => {
+  let crowiMock: Crowi;
+  let passportService: PassportService;
+  let useSpy: MockInstance<typeof passport.use>;
+
+  beforeEach(() => {
+    crowiMock = mock<Crowi>({ configManager });
+    passportService = new PassportService(crowiMock);
+    useSpy = vi.spyOn(passport, 'use').mockReturnValue(passport);
+    vi.spyOn(passport, 'unuse').mockReturnValue(passport);
+    // every "...:isEnabled" lookup resolves falsy -> no strategy registered
+    vi.spyOn(configManager, 'getConfig').mockReturnValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('dispatches a known id through the method table and records lastLoadedAt', async () => {
+    await expect(
+      passportService.setupStrategyById('github'),
+    ).resolves.toBeUndefined();
+
+    // github is disabled above, so nothing is registered, but the happy path
+    // ran to completion and stamped lastLoadedAt.
+    expect(useSpy).not.toHaveBeenCalled();
+    expect(passportService.lastLoadedAt).toBeInstanceOf(Date);
+  });
+
+  it('skips an unknown id without throwing, registering, or recording lastLoadedAt', async () => {
+    // Before the typed guard an unknown id crashed on a missing dispatch entry
+    // (a TypeError that escaped the un-awaited S2s path); now it is skipped.
+    await expect(
+      passportService.setupStrategyById('nonexistent'),
+    ).resolves.toBeUndefined();
+
+    expect(useSpy).not.toHaveBeenCalled();
+    expect(passportService.lastLoadedAt).toBeUndefined();
   });
 });

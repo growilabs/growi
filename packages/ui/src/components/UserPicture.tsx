@@ -25,6 +25,17 @@ const UncontrolledTooltip = dynamic<UncontrolledTooltipProps>(
 
 const DEFAULT_IMAGE = '/images/icons/user.svg';
 
+/**
+ * A user as a Prisma row carries it: `name` and `imageUrlCached` may be null.
+ */
+type UserPictureUserRow = {
+  username?: string;
+  name?: string | null;
+  imageUrlCached?: string | null;
+};
+
+type UserPictureUser = Partial<IUser> | UserPictureUserRow | Ref<IUser>;
+
 type UserPictureSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 
 type BaseUserPictureRootProps = {
@@ -121,7 +132,7 @@ const UserPictureRootWithLink = forwardRef<
  * type guard to determine whether the specified object is IUser
  */
 const hasUsername = (
-  obj: Partial<IUser> | Ref<IUser> | null | undefined,
+  obj: UserPictureUser | null | undefined,
 ): obj is { username: string } => {
   return obj != null && typeof obj !== 'string' && 'username' in obj;
 };
@@ -130,7 +141,7 @@ const hasUsername = (
  * Type guard to determine whether tooltip should be shown
  */
 const hasName = (
-  obj: Partial<IUser> | Ref<IUser> | null | undefined,
+  obj: UserPictureUser | null | undefined,
 ): obj is { name: string } => {
   return obj != null && typeof obj === 'object' && 'name' in obj;
 };
@@ -139,13 +150,13 @@ const hasName = (
  * type guard to determine whether the specified object is IUser
  */
 const hasProfileImage = (
-  obj: Partial<IUser> | Ref<IUser> | null | undefined,
+  obj: UserPictureUser | null | undefined,
 ): obj is { imageUrlCached: string } => {
   return obj != null && typeof obj === 'object' && 'imageUrlCached' in obj;
 };
 
 type Props = {
-  user?: Partial<IUser> | Ref<IUser> | null;
+  user?: UserPictureUser | null;
   size?: UserPictureSize;
   noLink?: boolean;
   noTooltip?: boolean;

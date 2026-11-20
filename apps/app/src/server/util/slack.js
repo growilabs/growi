@@ -1,3 +1,4 @@
+import * as diff from 'diff';
 import urljoin from 'url-join';
 
 import loggerFactory from '~/utils/logger';
@@ -28,14 +29,13 @@ const prepareAttachmentTextForCreate = (page, siteUrl) => {
  * Return diff with latest revisionBody
  * @param {IPageHasId} page
  * @param {string} siteUrl
- * @param {IRevisionHasId} previousRevision
+ * @param {{ body: string }} previousRevision
  */
 const prepareAttachmentTextForUpdate = (page, siteUrl, previousRevision) => {
   if (previousRevision == null) {
     return;
   }
 
-  const diff = require('diff');
   let diffText = '';
 
   diff.diffLines(previousRevision.body, page.revision.body).forEach((line) => {

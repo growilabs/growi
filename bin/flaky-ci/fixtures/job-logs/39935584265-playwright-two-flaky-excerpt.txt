@@ -1,0 +1,19 @@
+2026-10-23T10:09:27.4871652Z ##[error]  1) [firefox] › playwright/20-basic-features/create-page-button.spec.ts:23:3 › Create page button dropdown menu › open and create today page 
+    Error: locator.click: Test timeout of 30000ms exceeded.
+2026-10-23T10:12:48.1946762Z     Error Context: playwright/output/20-basic-features-inline-c-a1022-with-no-further-interaction-firefox/error-context.md
+2026-10-23T10:12:48.1947410Z 
+2026-10-23T10:12:48.1947772Z     Error Context: playwright/output/20-basic-features-inline-c-a1022-with-no-further-interaction-firefox/error-context.md
+2026-10-23T10:12:48.1948297Z 
+2026-10-23T10:12:48.1948410Z   2 flaky
+2026-10-23T10:12:48.1949078Z     [firefox] › playwright/20-basic-features/create-page-button.spec.ts:23:3 › Create page button dropdown menu › open and create today page 
+2026-10-23T10:12:48.1950692Z     [firefox] › playwright/20-basic-features/inline-comment.spec.ts:2317:3 › Inline comment - hover-to-popover transit and popover-lock timing (Req 15.7-15.9); resolve from the popover and click-path regression (Req 15.10, 4.6) › Req 15.1, 15.4: clicking the highlight still opens the popover immediately, with no visible delay, and it stays open with no further interaction 
+2026-10-23T10:12:48.1951711Z   118 passed (5.8m)
+2026-10-23T10:12:48.1960661Z ##[notice]  2 flaky
+    [firefox] › playwright/20-basic-features/create-page-button.spec.ts:23:3 › Create page button dropdown menu › open and create today page 
+    [firefox] › playwright/20-basic-features/inline-comment.spec.ts:2317:3 › Inline comment - hover-to-popover transit and popover-lock timing (Req 15.7-15.9); resolve from the popover and click-path regression (Req 15.10, 4.6) › Req 15.1, 15.4: clicking the highlight still opens the popover immediately, with no visible delay, and it stays open with no further interaction 
+  118 passed (5.8m)
+2026-10-23T10:13:03.4318215Z   [38;5;45;1mpw:api [0m=> browser.close started [38;5;45m+5ms[0m
+2026-10-23T10:13:03.4548136Z   [38;5;45;1mpw:api [0m<= browser.close succeeded [38;5;45m+23ms[0m
+2026-10-23T10:13:03.5162244Z ···
+2026-10-23T10:13:03.5162599Z   3 passed (13.5s)
+2026-10-23T10:13:03.5165751Z ##[notice]  3 passed (13.5s)

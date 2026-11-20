@@ -4,7 +4,7 @@ import type { Property } from 'csstype';
 
 // import Carousel, { Modal, ModalGateway } from 'react-images';
 
-import type { RefsContext } from './util/refs-context';
+import type { RefsContext } from './util/refs-context.js';
 
 type Props = {
   attachments: IAttachmentHasId[];

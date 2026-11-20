@@ -4,25 +4,44 @@ import mongoose from 'mongoose';
 import { FilterXSS } from 'xss';
 
 import { CommentEvent, commentEvent } from '~/features/comment/server';
-import {
-  isIncludeAiMenthion,
-  removeAiMenthion,
-} from '~/features/search/utils/ai';
+import ExternalUserGroup from '~/features/external-user-group/server/models/external-user-group';
 import { excludeUserPagesFromQuery } from '~/features/search/utils/disable-user-pages';
+import {
+  FILTER_FIELDS,
+  SEARCH_FILTER_PREFIXES,
+} from '~/features/search/utils/filter-fields';
+import { DEFAULT_PAGE_SIZE as MAX_SECONDARY_PAGE_IDS } from '~/features/search-attachments/server/queries';
+import type {
+  AttachmentSearchInput,
+  AttachmentSearchResultAggregator,
+  IPrimarySearchResult,
+  IResolvedSecondaryResult,
+} from '~/features/search-attachments/server/services/attachment-search-result-aggregator';
+import type { AttachmentSearchViewer } from '~/features/search-attachments/server/services/search-accessible-pages';
+import type {
+  AuditlogSuggestionField,
+  AuditlogSuggestionsResponse,
+} from '~/interfaces/activity';
 import { SearchDelegatorName } from '~/interfaces/named-query';
 import type {
   IFormattedSearchResult,
   IPageWithSearchMeta,
   ISearchResult,
 } from '~/interfaces/search';
-import { USER_FIELDS_EXCEPT_CONFIDENTIAL } from '~/server/models/user/conts';
+import {
+  USER_FIELDS_EXCEPT_CONFIDENTIAL,
+  UserStatus,
+} from '~/server/models/user/conts';
+import UserGroup from '~/server/models/user-group';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import type Crowi from '../crowi';
 import type { ObjectIdLike } from '../interfaces/mongoose-utils';
 import type {
   ParsedQuery,
   QueryTerms,
+  ResolvedFilterData,
   SearchableData,
   SearchDelegator,
   SearchQueryParser,
@@ -31,8 +50,8 @@ import type {
 import NamedQuery from '../models/named-query';
 import type { PageModel } from '../models/page';
 import { SearchError } from '../models/vo/search-error';
-import { hasIntersection } from '../util/compare-objectId';
 import { configManager } from './config-manager';
+import { canShowSnippetOfPage } from './search/can-show-snippet';
 import ElasticsearchDelegator from './search-delegator/elasticsearch';
 import PrivateLegacyPagesDelegator from './search-delegator/private-legacy-pages';
 
@@ -50,9 +69,28 @@ const filterXssOptions = {
 
 const filterXss = new FilterXSS(filterXssOptions);
 
+// The shared UI operators plus the server-only `prefix:` path filter.
+const FILTER_PREFIXES = ['prefix:', ...SEARCH_FILTER_PREFIXES] as const;
+
+// New-filter operators (author/editor/group) typed with no value (e.g. `author:`,
+// `-group:`) are ignored rather than captured as full-text match terms. `tag:` is
+// excluded because prefix:/tag: keep their legacy behavior. Filtered by field name
+// so a prefix-string rename in the shared vocabulary propagates automatically.
+const VALUELESS_IGNORED_PREFIXES: readonly string[] = FILTER_FIELDS.filter(
+  ([field]) => field !== 'tags',
+).map(([, prefix]) => prefix);
+
+// https://regex101.com/r/pN9XfK/2
+const NEGATIVE_TERM_REGEXP = new RegExp(
+  `^-(${FILTER_PREFIXES.join('|')})?(.+)$`,
+);
+// https://regex101.com/r/3qw9FQ/2
+const POSITIVE_TERM_REGEXP = new RegExp(
+  `^(${FILTER_PREFIXES.join('|')})?(.+)$`,
+);
+
 const normalizeQueryString = (_queryString: string): string => {
-  let queryString = _queryString.trim();
-  queryString = removeAiMenthion(queryString).replace(/\s+/g, ' ');
+  const queryString = _queryString.trim().replace(/\s+/g, ' ');
 
   return queryString;
 };
@@ -98,6 +136,9 @@ class SearchService implements SearchQueryParser, SearchResolver {
   fullTextSearchDelegator: ElasticsearchDelegator;
 
   nqDelegators: { [key in SearchDelegatorName]: SearchDelegator };
+
+  private attachmentSearchResultAggregator: AttachmentSearchResultAggregator | null =
+    null;
 
   static async create(crowi: Crowi) {
     const instance = new SearchService();
@@ -289,14 +330,10 @@ class SearchService implements SearchQueryParser, SearchResolver {
     logger.info('Try to reconnect...');
     this.fullTextSearchDelegator.initClient();
 
-    try {
-      await this.getInfoForHealth();
+    await this.getInfoForHealth();
 
-      logger.info('Reconnecting succeeded.');
-      this.resetErrorStatus();
-    } catch (err) {
-      throw err;
-    }
+    logger.info('Reconnecting succeeded.');
+    this.resetErrorStatus();
   }
 
   async getInfo() {
@@ -327,12 +364,89 @@ class SearchService implements SearchQueryParser, SearchResolver {
     return this.fullTextSearchDelegator.getInfoForAdmin();
   }
 
+  async getAuditlogInfoForAdmin() {
+    return this.fullTextSearchDelegator.getAuditlogInfoForAdmin();
+  }
+
   async normalizeIndices() {
     return this.fullTextSearchDelegator.normalizeIndices();
   }
 
+  async normalizeAuditlogIndices() {
+    return this.fullTextSearchDelegator.normalizeAuditlogIndices();
+  }
+
   async rebuildIndex(shouldEmitProgress = false) {
     return this.fullTextSearchDelegator.rebuildIndex({ shouldEmitProgress });
+  }
+
+  async rebuildAuditlogIndex(
+    option: { shouldEmitProgress: boolean } = { shouldEmitProgress: false },
+  ) {
+    return this.fullTextSearchDelegator.rebuildAuditlogIndex(option);
+  }
+
+  private async searchAuditlogUsernames(
+    q: string,
+    limit: number,
+  ): Promise<string[]> {
+    if (this.isReachable) {
+      try {
+        return await this.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard(
+          'username',
+          q,
+          limit,
+        );
+      } catch (err) {
+        logger.error(
+          'Failed to search auditlog suggestions on Elasticsearch. Falling back to MongoDB.',
+          err,
+        );
+      }
+    }
+    return prisma.activities.findSnapshotUsernamesByUsernameRegex(q, {
+      offset: 0,
+      limit,
+    });
+  }
+
+  async searchAuditlogSuggestions(
+    fields: AuditlogSuggestionField[],
+    q: string,
+    limit: number,
+  ): Promise<AuditlogSuggestionsResponse> {
+    if (q === '') return {};
+
+    const response: AuditlogSuggestionsResponse = {};
+
+    if (fields.includes('username')) {
+      const usernames = await this.searchAuditlogUsernames(q, limit);
+
+      const User = mongoose.model<IUser>('User');
+      const users =
+        usernames.length === 0
+          ? []
+          : await User.find({ username: { $in: usernames } })
+              .select('username status')
+              .lean();
+
+      const activeUsernames = new Set(
+        users
+          .filter((u) => u.status === UserStatus.STATUS_ACTIVE)
+          .map((u) => u.username),
+      );
+
+      // A username with no live User match (e.g. deleted -- statusDelete()
+      // renames the User doc's username to `deleted_at_*`) must still be
+      // searchable in the audit trail, so anything not proven active is
+      // treated as inactive rather than silently dropped.
+      response.username = {
+        activeUsernames: usernames.filter((u) => activeUsernames.has(u)),
+        inactiveUsernames: usernames.filter((u) => !activeUsernames.has(u)),
+      };
+    }
+
+    return response;
   }
 
   async parseSearchQuery(
@@ -416,13 +530,15 @@ class SearchService implements SearchQueryParser, SearchResolver {
     );
   }
 
-  async searchKeyword(
+  /**
+   * Parses and resolves a query string once: the delegator to run it with and
+   * the searchable data (terms, resolved filter data) to run.
+   */
+  private async prepareSearch(
     keyword: string,
     nqName: string | null,
-    user,
-    userGroups,
-    searchOpts,
-  ): Promise<[ISearchResult<unknown>, string | null]> {
+    userGroups: ObjectIdLike[] | null,
+  ): Promise<[SearchDelegator, SearchableData]> {
     let parsedQuery: ParsedQuery;
     // parse
     try {
@@ -430,10 +546,6 @@ class SearchService implements SearchQueryParser, SearchResolver {
     } catch (err) {
       logger.error('Error occurred while parseSearchQuery', err);
       throw err;
-    }
-
-    if (isIncludeAiMenthion(keyword)) {
-      searchOpts.vector = true;
     }
 
     let delegator: SearchDelegator;
@@ -446,13 +558,230 @@ class SearchService implements SearchQueryParser, SearchResolver {
       throw err;
     }
 
-    // throws
     this.validateSearchableData(delegator, data);
+
+    data.resolvedFilterData = await this.resolveFilterData(
+      data.terms,
+      userGroups,
+    );
+
+    return [delegator, data];
+  }
+
+  async searchKeyword(
+    keyword: string,
+    nqName: string | null,
+    user,
+    userGroups: ObjectIdLike[] | null,
+    searchOpts,
+  ): Promise<[ISearchResult<unknown>, SearchDelegatorName | null]> {
+    const [delegator, data] = await this.prepareSearch(
+      keyword,
+      nqName,
+      userGroups,
+    );
 
     return [
       await delegator.search(data, user, userGroups, searchOpts),
       delegator.name ?? null,
     ];
+  }
+
+  /**
+   * Parses a query for the full-text search delegator, once, into what both
+   * the page side and the attachment side of a faceted search run with.
+   */
+  async createAttachmentSearchInput(
+    keyword: string,
+    viewer: AttachmentSearchViewer,
+  ): Promise<AttachmentSearchInput> {
+    const [, data] = await this.prepareSearch(keyword, null, viewer.userGroups);
+    return {
+      queryString: data.queryString,
+      terms: data.terms as QueryTerms,
+      resolvedFilterData: data.resolvedFilterData ?? {
+        groupIds: [],
+        notGroupIds: [],
+      },
+      viewer,
+    };
+  }
+
+  /**
+   * Page search for a parsed query, formatted exactly as `/_api/search`
+   * formats it (snippet rule, XSS filtering, page data from MongoDB).
+   */
+  async searchFormattedPages(
+    input: AttachmentSearchInput,
+    { from, size }: { from: number; size: number },
+  ): Promise<IFormattedSearchResult> {
+    const { queryString, terms, resolvedFilterData, viewer } = input;
+    const delegator = this.fullTextSearchDelegator;
+    const result = await delegator.search(
+      { queryString, terms, resolvedFilterData },
+      viewer.user,
+      viewer.userGroups,
+      { offset: from, limit: size },
+    );
+    return this.formatSearchResult(
+      result,
+      delegator.name ?? null,
+      viewer.user,
+      viewer.userGroups,
+    );
+  }
+
+  /**
+   * Register an AttachmentSearchResultAggregator for faceted search routing.
+   * Called by initAttachmentFullTextSearch.
+   */
+  setAttachmentSearchResultAggregator(
+    agg: AttachmentSearchResultAggregator,
+  ): void {
+    this.attachmentSearchResultAggregator = agg;
+  }
+
+  /**
+   * Facet-aware search entry point, routed through the
+   * AttachmentSearchResultAggregator. Callers check
+   * isAttachmentFullTextSearchEnabled first.
+   *
+   * `viewer` is resolved the same way the page search route resolves it; a
+   * null user means guest.
+   *
+   * resolve=full (facet=all): pages that came back without attachment hits
+   * (every page after the first result page) are enriched in the same call,
+   * as the secondary endpoint would.
+   */
+  async searchByFacet(
+    keyword: string,
+    viewer: AttachmentSearchViewer,
+    options: {
+      facet: 'all' | 'attachments';
+      from?: number;
+      size?: number;
+      resolve?: 'primary' | 'full';
+    },
+  ): Promise<IPrimarySearchResult> {
+    const { facet } = options;
+    const from = options.from ?? 0;
+    const size = options.size ?? 20;
+
+    const aggregator = this.attachmentSearchResultAggregator;
+    if (aggregator == null) {
+      throw new Error('Attachment search is not initialized');
+    }
+
+    const input = await this.createAttachmentSearchInput(keyword, viewer);
+    const primary = await aggregator.searchPrimary(input, {
+      facet,
+      from,
+      size,
+    });
+    if (facet !== 'all' || options.resolve !== 'full') {
+      return primary;
+    }
+    return {
+      ...primary,
+      items: await this.attachSecondaryHits(aggregator, input, primary.items),
+    };
+  }
+
+  private async attachSecondaryHits(
+    aggregator: AttachmentSearchResultAggregator,
+    input: AttachmentSearchInput,
+    items: IPrimarySearchResult['items'],
+  ): Promise<IPrimarySearchResult['items']> {
+    const missing = items
+      .filter((item) => item.meta?.attachmentHits == null)
+      .map((item) => item.data._id.toString());
+    const chunks: string[][] = [];
+    for (let i = 0; i < missing.length; i += MAX_SECONDARY_PAGE_IDS) {
+      chunks.push(missing.slice(i, i + MAX_SECONDARY_PAGE_IDS));
+    }
+    const results = await Promise.all(
+      chunks.map((primaryIds) =>
+        aggregator.resolveSecondary(input, { facet: 'all', primaryIds }),
+      ),
+    );
+    const enrichments = Object.assign(
+      {},
+      ...results.map((r) => r.enrichments),
+    ) as IResolvedSecondaryResult['enrichments'];
+
+    return items.map((item) => {
+      const hits = enrichments[item.data._id.toString()]?.attachmentHits;
+      return hits == null || item.meta?.attachmentHits != null
+        ? item
+        : { ...item, meta: { ...item.meta, attachmentHits: hits } };
+    });
+  }
+
+  /**
+   * Attachment hits for page ids the client got from a facet=all primary
+   * result. Empty when the attachment search is not initialized.
+   *
+   * @throws {RangeError} when more than 20 distinct ids are given
+   */
+  async resolveAttachmentSecondary(
+    keyword: string,
+    viewer: AttachmentSearchViewer,
+    { primaryIds }: { primaryIds: string[] },
+  ): Promise<IResolvedSecondaryResult> {
+    const aggregator = this.attachmentSearchResultAggregator;
+    if (aggregator == null) {
+      return { facet: 'all', enrichments: {} };
+    }
+    const input = await this.createAttachmentSearchInput(keyword, viewer);
+    return aggregator.resolveSecondary(input, { facet: 'all', primaryIds });
+  }
+
+  async resolveFilterData(
+    terms: Partial<QueryTerms>,
+    userGroups: ObjectIdLike[] | null,
+  ): Promise<ResolvedFilterData> {
+    const groupTerms = terms.group ?? [];
+    const notGroupTerms = terms.not_group ?? [];
+
+    // Early-return (no MongoDB query) for guests or when no group operator was typed.
+    if (
+      userGroups == null ||
+      userGroups.length < 1 ||
+      (groupTerms.length === 0 && notGroupTerms.length === 0)
+    ) {
+      const emptyFilterData: ResolvedFilterData = {
+        groupIds: [],
+        notGroupIds: [],
+      };
+      return emptyFilterData;
+    }
+
+    const [internal, external] = await Promise.all([
+      UserGroup.find({ _id: { $in: userGroups } })
+        .select('_id name')
+        .exec(),
+      ExternalUserGroup.find({ _id: { $in: userGroups } })
+        .select('_id name')
+        .exec(),
+    ]);
+    const myGroups = [...internal, ...external];
+    const namesToIds = new Map<string, string[]>();
+
+    // Save all the user's group names and their ids
+    for (const group of myGroups) {
+      const id = group.id;
+      namesToIds.set(group.name, [...(namesToIds.get(group.name) ?? []), id]);
+    }
+
+    const resolve = (names: string[] = []) =>
+      names.flatMap((name) => namesToIds.get(name) ?? []);
+
+    const resolvedFilterData: ResolvedFilterData = {
+      groupIds: resolve(groupTerms),
+      notGroupIds: resolve(notGroupTerms),
+    };
+
+    return resolvedFilterData;
   }
 
   parseQueryString(_queryString: string): QueryTerms {
@@ -467,8 +796,45 @@ class SearchService implements SearchQueryParser, SearchResolver {
     const notPrefixPaths: string[] = [];
     const tags: string[] = [];
     const notTags: string[] = [];
+    const authors: string[] = [];
+    const notAuthors: string[] = [];
+    const editors: string[] = [];
+    const notEditors: string[] = [];
+    const groups: string[] = [];
+    const notGroups: string[] = [];
 
-    // First: Parse phrase keywords
+    // First: Parse quoted filter values (e.g. `group:"My Group"`, `-editor:"Jane Doe"`).
+    // This must run before the phrase pass below, otherwise the phrase regex would strip
+    // the `"..."` part into a full-text phrase and leave a bare, valueless operator behind.
+    // The quotes let a filter value contain spaces despite the later space-based tokenizing.
+    const positiveBuckets: Record<string, string[]> = {
+      'prefix:': prefixPaths,
+      'tag:': tags,
+      'author:': authors,
+      'editor:': editors,
+      'group:': groups,
+    };
+    const negativeBuckets: Record<string, string[]> = {
+      'prefix:': notPrefixPaths,
+      'tag:': notTags,
+      'author:': notAuthors,
+      'editor:': notEditors,
+      'group:': notGroups,
+    };
+    const quotedFilterRegExp = new RegExp(
+      `(-?)(${FILTER_PREFIXES.join('|')})"([^"]+)"`,
+      'g',
+    );
+    queryString = queryString.replace(
+      quotedFilterRegExp,
+      (_match, negation, prefix, value) => {
+        const buckets = negation === '-' ? negativeBuckets : positiveBuckets;
+        buckets[prefix].push(value);
+        return '';
+      },
+    );
+
+    // Second: Parse phrase keywords
     const phraseRegExp = new RegExp(/(-?"[^"]+")/g);
     const phrases = queryString.match(phraseRegExp);
 
@@ -485,22 +851,36 @@ class SearchService implements SearchQueryParser, SearchResolver {
       });
     }
 
-    // Second: Parse other keywords (include minus keywords)
+    // Any unpaired quotes are removed
+    queryString = queryString.replace(/"/g, '');
+
+    // Third: Parse other keywords (include minus keywords)
     queryString.split(' ').forEach((word) => {
       if (word === '') {
         return;
       }
 
-      // https://regex101.com/r/pN9XfK/1
-      const matchNegative = word.match(/^-(prefix:|tag:)?(.+)$/);
-      // https://regex101.com/r/3qw9FQ/1
-      const matchPositive = word.match(/^(prefix:|tag:)?(.+)$/);
+      // Ignore a bare new-filter operator with no value (positive or negated) so it
+      // does not leak into full-text match terms
+      const wordWithoutNegation = word.startsWith('-') ? word.slice(1) : word;
+      if (VALUELESS_IGNORED_PREFIXES.includes(wordWithoutNegation)) {
+        return;
+      }
+
+      const matchNegative = word.match(NEGATIVE_TERM_REGEXP);
+      const matchPositive = word.match(POSITIVE_TERM_REGEXP);
 
       if (matchNegative != null) {
         if (matchNegative[1] === 'prefix:') {
           notPrefixPaths.push(matchNegative[2]);
         } else if (matchNegative[1] === 'tag:') {
           notTags.push(matchNegative[2]);
+        } else if (matchNegative[1] === 'author:') {
+          notAuthors.push(matchNegative[2]);
+        } else if (matchNegative[1] === 'editor:') {
+          notEditors.push(matchNegative[2]);
+        } else if (matchNegative[1] === 'group:') {
+          notGroups.push(matchNegative[2]);
         } else {
           notMatchWords.push(matchNegative[2]);
         }
@@ -509,6 +889,12 @@ class SearchService implements SearchQueryParser, SearchResolver {
           prefixPaths.push(matchPositive[2]);
         } else if (matchPositive[1] === 'tag:') {
           tags.push(matchPositive[2]);
+        } else if (matchPositive[1] === 'author:') {
+          authors.push(matchPositive[2]);
+        } else if (matchPositive[1] === 'editor:') {
+          editors.push(matchPositive[2]);
+        } else if (matchPositive[1] === 'group:') {
+          groups.push(matchPositive[2]);
         } else {
           matchWords.push(matchPositive[2]);
         }
@@ -524,6 +910,12 @@ class SearchService implements SearchQueryParser, SearchResolver {
       not_prefix: notPrefixPaths,
       tag: tags,
       not_tag: notTags,
+      author: authors,
+      not_author: notAuthors,
+      editor: editors,
+      not_editor: notEditors,
+      group: groups,
+      not_group: notGroups,
     };
 
     return terms;
@@ -533,7 +925,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
   // So far, it determines by delegatorName passed by searchService.searchKeyword
   checkIsFormattable(
     searchResult,
-    delegatorName: SearchDelegatorName,
+    delegatorName: SearchDelegatorName | null,
   ): boolean {
     return delegatorName === SearchDelegatorName.DEFAULT;
   }
@@ -543,7 +935,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
    */
   async formatSearchResult(
     searchResult: ISearchResult<any>,
-    delegatorName: SearchDelegatorName,
+    delegatorName: SearchDelegatorName | null,
     user,
     userGroups,
   ): Promise<IFormattedSearchResult> {
@@ -651,32 +1043,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
   }
 
   canShowSnippet(pageData, user, userGroups): boolean {
-    const Page = mongoose.model('Page') as unknown as PageModel;
-
-    const testGrant = pageData.grant;
-    const testGrantedUser = pageData.grantedUsers?.[0];
-    const testGrantedGroups = pageData.grantedGroups;
-
-    if (testGrant === Page.GRANT_RESTRICTED) {
-      return false;
-    }
-
-    if (testGrant === Page.GRANT_OWNER) {
-      if (user == null) return false;
-
-      return user._id.toString() === testGrantedUser.toString();
-    }
-
-    if (testGrant === Page.GRANT_USER_GROUP) {
-      if (userGroups == null) return false;
-
-      return hasIntersection(
-        userGroups.map((id) => id.toString()),
-        testGrantedGroups,
-      );
-    }
-
-    return true;
+    return canShowSnippetOfPage(pageData, user, userGroups);
   }
 }
 

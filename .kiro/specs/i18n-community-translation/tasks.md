@@ -1,0 +1,187 @@
+# Implementation Plan
+
+## 1. Foundation: 同期の共有部品
+
+- [x] 1.1 (P) namespaceとPOEditorプロジェクトIDの対応関係を宣言する
+  - `admin` / `translation` / `commons` の3 namespaceそれぞれに対応するPOEditorプロジェクトIDと、対応するロケールファイルパスを解決する仕組みを宣言データとして用意する
+  - 宣言された3 namespaceが、実際に存在する3つのロケールファイル名（`admin.json`/`translation.json`/`commons.json`）と一致することを検証するテストを書く
+  - 宣言に `translation` namespaceが含まれることを確認し、`packages/editor`が依存する`toolbar.*`キーが同じ同期範囲に含まれることを明示する
+  - 観測可能な完了状態: 宣言データを読み込むテストが、3件のプロジェクトID対応をエラーなく返す
+  - _Requirements: 2.1, 6.1_
+  - _Boundary: SyncConfig_
+
+- [x] 1.2 (P) POEditor API v2 の呼び出しを薄いクライアントとして実装する
+  - upload・export・languages/list の3操作を、成功時の戻り値とエラー種別（レート制限・not found・不正リクエスト・通信エラー）を区別する形で実装する
+  - upload呼び出し1回ごとに20秒以上の間隔を空ける仕組みを組み込む
+  - APIトークンは呼び出し元から注入された値を使い、環境変数を直接読まない
+  - レート制限・not found・不正リクエストそれぞれのエラーレスポンスをモックし、対応するエラー種別が返ることを検証する単体テストを書く
+  - 観測可能な完了状態: モックしたAPIレスポンスに対し、成功時は戻り値、失敗時は対応するエラー種別を返すテストが通る
+  - _Requirements: 2.1, 3.1_
+  - _Boundary: PoeditorClient_
+
+- [x] 1.3 (P) 取り込み前後のキー集合を比較して変更の種類を判定する処理を実装する
+  - 2つのJSON（取り込み前/後）のネストしたリーフキーパスを比較し、「変更なし」「訳文のみの変更」「構造変更（キーの追加・削除を含む）」のいずれかを返す純粋関数として実装する
+  - 入出力のみに依存し、ファイル読み込みやAPI呼び出しを行わない
+  - キー集合が同一で値のみ変わるケース、キー追加のケース、キー削除のケース、キーのリネーム（追加+削除として判定されるケース）、無変化のケースの5パターンを検証する単体テストを書く
+  - 観測可能な完了状態: 上記5パターンそれぞれで期待した判定結果が返ることをテストが確認する
+  - _Requirements: 3.1, 3.2_
+  - _Boundary: DiffClassifier_
+
+- [x] 1.4 (P) 実行時にPOEditorへ依存しないことを保証する継続的なテストを追加する
+  - `apps/app/src/` 配下のソースコードにPOEditorのドメイン文字列やAPIエンドポイントへの参照が存在しないことを検証するテストを書く
+  - 観測可能な完了状態: このテストが現在のリポジトリ状態に対して通過し、将来 `apps/app/src/` にPOEditor呼び出しが追加された場合は失敗するようになる
+  - _Requirements: 4.1, 4.2_
+  - _Boundary: no-runtime-dependency test_
+
+## 2. Core: ソース言語のpush同期
+
+- [x] 2. (P) en_US翻訳ファイルをnamespaceごとにPOEditorへpushするCLIを実装する
+  - 宣言された3 namespace分のen_USファイルを読み込み、`sync_terms`を有効にした状態で順にPOEditorへアップロードする
+  - いずれかのnamespaceファイルの読み込みに失敗した場合、他のnamespaceへのpushも行わずに処理全体を中止し、非ゼロ終了コードで終了する
+  - 3件のアップロード呼び出しの間に必要な待機を入れる
+  - あるnamespaceのファイルが読み込めないケースを模した統合テストを書き、他のnamespaceへのアップロードが実行されないことを確認する
+  - 観測可能な完了状態: 3 namespace分のテスト用JSONを与えた統合テストが、POEditorクライアントへの呼び出しが3回・想定した間隔で行われたことを確認する
+  - _Requirements: 2.1, 2.2, 2.3, 8.1_
+  - _Depends: 1.1, 1.2_
+  - _Boundary: PushSourceSync_
+
+## 3. Core: 翻訳の取り込みと分岐
+
+- [x] 3.1 (P) POEditorから翻訳をexportし、変更の種類ごとに集計する
+  - 3 namespace × 4非ソース言語（最大12通り）それぞれについてexportし、変更判定処理にかけて結果を集める
+  - 判定結果を「訳文のみの変更をまとめたグループ」と「構造変更をまとめたグループ」の最大2グループに分類する
+  - 同一グループの中に異なる判定結果（訳文のみと構造変更）を混在させないことを検証する単体テストを書く
+  - 観測可能な完了状態: 12通りの判定結果を混在させた入力を与えたテストが、訳文のみのグループと構造変更のグループを正しく分離して返す
+  - _Requirements: 3.1, 3.2_
+  - _Depends: 1.2, 1.3_
+  - _Boundary: PullTranslationSync_
+
+- [x] 3.2 訳文のみの変更を、既存のi18n CIゲート通過を条件に自動反映する
+  - 「訳文のみの変更」グループをまとめた1本の変更提案（PR）を作成する。既に同じ差分に対する未マージの変更提案が残っている場合は、新しく作らずその変更提案を更新する（重複した変更提案を作らない）
+  - 既存の`lint:i18n`を実行し、通過した場合のみ、変更提案の作成者とは別の承認ボットIDで承認レビューを送る
+  - `lint:i18n`が失敗した場合は承認を送らず、失敗をワークフローの失敗として表面化する
+  - `lint:i18n`が失敗するケースを模した統合テストを書き、承認レビューが送られないことを確認する
+  - 同じ差分に対して2回実行しても、変更提案が2本に増えず、既存の1本が更新されることを確認する統合テストを書く
+  - 観測可能な完了状態: `lint:i18n`合格を模したケースで承認レビュー送信が1回呼ばれ、失敗を模したケースで0回であること、および同じ差分の2回実行で変更提案が1本のまま保たれることをテストが確認する
+  - _Requirements: 3.3, 3.4, 8.1_
+  - _Depends: 3.1_
+  - _Boundary: PullTranslationSync_
+
+- [x] 3.3 構造変更を、人レビュー必須の変更提案として作成し、pull CLIのエントリポイントで束ねる
+  - 「構造変更」グループをまとめた1本の変更提案（PR）を、承認ボットを関与させずに作成する。既に同じ差分に対する未マージの変更提案が残っている場合は、新しく作らずその変更提案を更新する（重複した変更提案を作らない）
+  - 訳文のみのグループが空でも構造変更のグループが存在する場合は、構造変更側の変更提案だけが作られることを検証する統合テストを書く
+  - `pull-translations.ts` に `main()` エントリポイント（`push-source.ts` の `main()` を手本にする）を追加し、3.1の`collectClassifications`・3.2の`applyTranslationOnlyChanges`・本タスクの構造変更PR作成を順に呼び出し、いずれかが失敗した場合に非ゼロ終了コードで終了する形にまとめる（3.2のレビューで「8.1の失敗表面化がこの層で未完結」「main()の置き場所が3タスクとも空白」と指摘された分を回収する）
+  - 観測可能な完了状態: 構造変更のみを含む入力に対し、承認ボット呼び出しが一度も発生せず、レビュー必須の変更提案が1本作られることをテストが確認する。`main()`経由の失敗が非ゼロ終了コードになることも確認する
+  - _Requirements: 3.2, 8.1_
+  - _Depends: 3.1, 3.2_
+  - _Boundary: PullTranslationSync_
+
+## 4. 貢献者向けガイドと運用環境の準備
+
+- [x] 4.1 (P) 貢献者向けガイドを作成する
+  - GitHubアカウントなしでPOEditorプロジェクトに参加する方法、POEditor上で翻訳を投稿する方法、言語ごとの翻訳進捗（POEditor自体の画面）の見方を記載する
+  - リポジトリのREADMEから、このガイドへのリンクを追加する
+  - 観測可能な完了状態: ガイドを読んだ人が、GitHubの知識なしに参加から翻訳投稿までの手順を実行できる内容が揃っている
+  - _Requirements: 1.3, 5.1, 5.2_
+
+- [x] 4.2 (P) メンテナー向け運用手順書を作成し、その手順を実行して実運用環境を準備する
+  - [x] POEditor OSSプランの申請手順、単一の共有プロジェクトを作成する手順、そのプロジェクトでpublic join pageを有効化する手順を記載する（`docs/i18n-community-translation-setup.md` として作成・レビュー承認済み。当初は「namespaceごとに専用プロジェクトを作成する」内容だったが、後日の見直しで単一の共有プロジェクトを全namespaceで使う方式に書き改めた）
+  - [x] PR作成者とは別に承認レビューを送るための承認ボットアカウント（GitHub Appのインストール、または専用ボットアカウントの発行）を用意し、変更提案への承認レビューのみに限定した権限のトークンを発行する手順を記載する（同上ドキュメントに記載済み）
+  - [x] OSSプランが承認されるまで本番運用（実際の同期起動）を進めないという条件を明記する（同上ドキュメント冒頭に明記済み）
+  - [x] 手順書に沿って、単一の共有プロジェクト（839626, "GROWI"）と承認ボットアカウント（GitHub App）を実際に用意した。シークレット・変数も登録済み
+  - 観測可能な完了状態: 手順書に記載された順序通りに作業すれば、プロジェクトと承認ボットアカウントが用意され、貢献者が参加可能な状態に至る
+  - _Requirements: 1.1, 1.2, 7.1, 7.2_
+
+## 5. Integration: ワークフローの配線
+
+- [x] 5.1 pushワークフローを配線する
+  - `apps/app/public/static/locales/en_US/**` の変更をトリガーに、pushのCLIを実行するGitHub Actionsワークフローを追加する
+  - 同一ブランチでの多重実行を防ぐ排他制御を設定する
+  - POEditor APIトークンをシークレット経由で注入する
+  - `apps/app/package.json` にpush用のCLIを呼び出すスクリプトを追加する
+  - 観測可能な完了状態: en_USのテスト用ファイル変更をトリガーにワークフローが起動し、pushのCLIが実行されるまでの一連の設定が揃う
+  - _Requirements: 2.1, 2.2, 2.3, 8.1_
+  - _Depends: 2, 4.2_
+
+- [x] 5.2 pullワークフローを配線し、GitHub操作の実アダプタを実装する
+  - 3.2/3.3が注入インターフェースとしてのみ定義した `TranslationOnlyPrPublisher` / `ApprovalReviewer` / `StructuralPrPublisher`（3.3の構造変更PR用インターフェース）の実装を、`gh` CLIまたはGitHub REST APIへの実呼び出しとして作成する（3.2のレビューで「アダプタの実装がどのタスクにも属していない」と指摘された分を回収する）
+  - `I18nLintGate` の実アダプタ（`pnpm run lint:i18n` を実行して合否を返す）も同様に作成する（3.2・3.3のレビューで2回続けて「このインターフェースを実装するタスクがどこにも無い」と指摘された分を回収する）
+  - 定期実行と手動実行の両方をトリガーに、pullのCLIを実行するGitHub Actionsワークフローを追加する
+  - 同一ブランチでの多重実行を防ぐ排他制御を設定する
+  - POEditor APIトークンと、承認ボット専用のトークンをそれぞれ別のシークレットとして注入する
+  - 承認ボット用トークンに付与する権限を、変更提案への承認レビューのみに限定する
+  - `apps/app/package.json` にpull用のCLIを呼び出すスクリプトを追加する
+  - 観測可能な完了状態: 手動実行トリガーでワークフローが起動し、pullのCLIが実行されるまでの一連の設定が揃う
+  - _Requirements: 3.1, 3.2, 3.3, 3.4, 8.1_
+  - _Depends: 3.1, 3.2, 3.3, 4.2_
+
+- [x] 5.3 pullワークフローのGitHub認証を「2つのGitHub App + runtime発行トークン」方式へ移行する
+  - `docs/i18n-community-translation-setup.md` §4の方針（publish用・approval用の2つのGitHub Appを用意し、それぞれのprivate keyのみをrepository secretに長期保存し、App IDはrepository variablesに保存する）に合わせ、`.github/workflows/i18n-sync-pull.yml` の認証配線を更新する
+  - `actions/create-github-app-token@v3.2.0`（実装時点の最新版を確認して固定）を2回呼び、publish用App・approval用Appそれぞれのinstallation tokenをジョブ実行のたびに発行する。installation IDはrepository secretとして保存しない（actionが対象リポジトリへのインストールから自動解決する）
+  - `actions/checkout` に渡すtokenはpublish用App発行分のみとし、`|| secrets.GITHUB_TOKEN` のようなフォールバックは書かない（private keyの登録漏れはtoken発行ステップ自体をその場で失敗させ、CIが付かずキューに残り続ける分かりにくい失敗を避ける）
+  - `pnpm run i18n:sync:pull` に渡す `I18N_SYNC_PUBLISH_TOKEN` / `I18N_SYNC_APPROVAL_TOKEN`（CLI側の環境変数名はこのまま維持する）には、それぞれpublish用・approval用App発行分のtokenを渡し、同一実行内で2つが同じ値にならないことを保証する
+  - PAT運用を残す場合は、GitHub App運用との排他的な分岐条件（どのsecretがあるときにどの経路を使うか）をworkflow内で明示し、どちらの経路でも自己承認防止要件（publish identityとapproval identityの分離）を満たす
+  - 観測可能な完了状態: 2つのApp（private key / App ID）のみを設定した手動実行で、pull workflowが開始され、publish用・approval用それぞれで異なるtokenがCLIへ渡る
+  - _Requirements: 3.3, 3.4, 8.1_
+  - _Depends: 4.2, 5.2_
+
+- [x] 5.5 非ソース言語の既存翻訳をPOEditorへ初回投入するツールを作る（6.2の実環境確認で発見した必要性への対応）
+  - [x] `apps/app/tools/i18n-sync/seed-existing-translations.ts`（`pnpm run i18n:sync:seed`）を新設する。指定した非ソース言語1つについて、全namespaceの現在のリポジトリ内容をen_USの既存キー集合へ絞り込んだ上で統合し、`syncTerms: false`・タグ無しのアップロードを1回行う（タグ付けはPushSourceSyncの責務のまま変更しない。term作成の絞り込みが必要になった経緯は`research.md`のDecision参照）
+  - [x] `docs/i18n-community-translation-setup.md` §2.3に、4言語それぞれについて1回ずつ実行する手順（環境変数 `I18N_SYNC_SEED_LANGUAGE` で対象言語を指定）を記載する
+  - [x] 実プロジェクト（839626）に対して ja_JP / zh_CN / fr_FR / ko_KR の4言語分を実行する
+  - 観測可能な完了状態: 実プロジェクトに対して4言語分実行し、POEditor上でja_JP/zh_CN/fr_FR/ko_KRの翻訳進捗が実際のリポジトリの翻訳状況を反映した値になる（0%のまま残らない）
+  - _Requirements: 1.1_
+  - _Depends: 5.1_
+
+## 6. Validation: 実環境での動作確認と回帰確認
+
+- [x] 6.1 push経路を実際のPOEditorテストプロジェクトに対して確認する
+  - en_USのテスト用変更（キー追加・キー削除・文言変更）を含むファイルを用意し、push経路を実行する
+  - POEditor側のテストプロジェクトに、追加・削除・文言変更が反映されていることを確認する
+  - 3 namespace分の実データ相当の内容で、全namespace統合アップロードとnamespaceごとのタグ付けアップロードを実行し、キー構成・値・タグが意図通り反映されていることを確認する
+  - namespaceごとのタグ付けアップロード（削除無効化）が、他namespaceの用語を`obsolete`扱いにしないことを確認する
+  - 観測可能な完了状態: POEditorのテストプロジェクトを確認し、実行前後でキー構成と文言が意図通り変化していること、および3 namespace分のキー構成・タグ付与状況が実プロジェクト上で意図通りであることが確認できる
+  - _Requirements: 2.1, 2.2, 2.3, 9.1_
+  - _Depends: 5.1_
+
+- [x] 6.2 pull経路を実際のPOEditorテストプロジェクトに対して確認する
+  - テストプロジェクト側で訳文のみを変更したケースと、キー構成を変更したケースをそれぞれ用意し、pull経路を実行する
+  - 訳文のみの変更ではCIゲート通過後に承認レビューが送られた変更提案が、構造変更ではレビュー必須の変更提案がそれぞれ作られることを確認する
+  - 観測可能な完了状態: 2種類のテストケースそれぞれについて、意図した種類の変更提案が実際のリポジトリ上に作られている
+  - _Requirements: 3.1, 3.2, 3.3, 3.4_
+  - _Depends: 5.2_
+
+- [x] 6.3 リポジトリ全体のlint・test・buildが green であることを確認する
+  - 新規追加したツール・ワークフローが、既存の `turbo run lint` / `turbo run test` / `turbo run build`（`@growi/app`）に悪影響を与えていないことを確認する
+  - 既存の i18n CI ゲート（`i18n-key-audit` で実装済み）が、本機能追加後も引き続き正しく合否判定を行うことを確認する
+  - `poeditor-client.spec.ts`（タスク1.2）の20秒スロットルテストが実時間ベースで間欠的に失敗する（3.2のレビューで6回中2回の失敗を確認済み）ため、フェイクタイマー化するか許容誤差を広げて安定させる
+  - 観測可能な完了状態: `turbo run lint --filter @growi/app` / `turbo run test --filter @growi/app` / `turbo run build --filter @growi/app` がすべて成功する（`--repeat` 等で複数回実行しても poeditor-client のスロットルテストが安定して通ることを含む）
+  - _Requirements: 3.3, 3.4, 8.1_
+  - _Depends: 5.1, 5.2_
+
+## Implementation Notes
+
+- (1.3) `DiffClassifier` は葉の値を厳密等価（`!==`）で比較している。現在のロケールJSONは葉が全て文字列なので問題ないが、将来どこかの namespace に配列やオブジェクトを値に持つキーが増えた場合、参照比較になり毎回`translation_only`と誤判定する。3.1（export集計）でPOEditorから取得したJSONを渡す際、葉が文字列以外になり得ないか一応確認すること。
+- (2, レビューで発見) `poeditor-client.spec.ts`（タスク1.2、実時間ベースの20秒スロットルテスト）が、5回に1回程度 `expected 19999 to be greater than or equal to 20000` の1ミリ秒未満の誤差で間欠的に失敗する（flaky）。今回のタスクの差分が原因ではないが、別途 flaky test として起票し、実時間計測でなくフェイクタイマー等に置き換えることを検討すること。
+- (2) アップロード失敗時は読み込み失敗時と対称に「即座に中断し以降のnamespaceへは何もしない」形に統一した。読み込み失敗・アップロード失敗のどちらも部分反映を作らない。
+- (3.1) `collectClassifications` の戻り値は `{ ok: true, translationOnly, structural, skipped }` の形。`read_failed`/`export_failed` は全体中断（`{ ok: false, failures }`）、`invalid_json`（POEditor側の不正なexport）だけは該当1組み合わせを`skipped`に入れて除外し、残りは通常通り処理する（design.mdのError Handlingの例外規定通り）。3.2/3.3でこの関数を呼ぶ側は`skipped`の存在を意識すること（無視してよいが、黙って握りつぶさず何らかの形でログ等に残すのが望ましい）。
+- (3.2) `applyTranslationOnlyChanges` は `TranslationOnlyPrPublisher`（書き込み・PR作成/更新）と `ApprovalReviewer`（承認レビューのみ、内容を書けるメソッドを持たない）を別インターフェースとして注入する形で実装した。両方とも実装（GitHub操作の実アダプタ）はこのタスクの範囲外とし、5.2に回収した（5.2のタスク文を更新済み）。`TranslationOnlyCombination` に `absoluteFilePath`/`content` を追加したが `StructuralCombination` には追加していない（型で「構造変更がtranslationOnly経路に混入できない」壁を作るため、意図的な非対称）。3.3で構造変更PRを作る際、同じフィールドが必要なら独自に追加すること（`TranslationOnlyCombination` と混同しないよう別名にする）。
+- (3.2) `pull-translations.ts` にはまだ `main()` エントリポイントが無い（`push-source.ts` の `main()` が手本）。3.3で `collectClassifications` → `applyTranslationOnlyChanges` → 構造変更PR作成 → 非ゼロ終了コード、まで束ねること（3.3のタスク文を更新済み）。
+- (3.2) ゲート（`lint:i18n`）はCLI側（`I18nLintGate`注入）で実行する設計にした。design.mdのPull Flow図は「PR上でci-app-lintが走ってから承認」だが、tasks.mdの文言（「既存のlint:i18nを実行し」）に従った。`.github/mergify.yml`の`queue_conditions`/`merge_conditions`は両方とも`check-success ~= ci-app-lint`を要求するため、CLI側ゲート通過後にボットが承認しても、PR上のCIが落ちればキューに乗らずマージされない（要件3.4は守られる）。ただしCLI側ゲートが作業ツリーを読むため、同一実行内で3.3が構造変更ファイルを書き出した後にゲートを回すと、無関係な理由でtranslation-onlyのlintが落ちうる（安全側だが`main()`の実行順序を制約する — 3.3で対応時に留意）。
+- (3.3) `applyStructuralChanges` は承認ボット関連のパラメータを一切持たない（型として承認を渡す口が無い）。`StructuralCombination` には `filePath`/`exportedContent` を追加した（`TranslationOnlyCombination` の `absoluteFilePath`/`content` とはあえて別名にし、取り違えを型で防止）。`pull-translations.ts` に `main()` を実装し、`collectClassifications` → `applyTranslationOnlyChanges` → `applyStructuralChanges` の順で呼び、いずれかの失敗で非ゼロ終了コードにする。`collectClassifications` の `skipped`（invalid_json）は成功時も `console.error` で警告表示するようにした（終了コードは変えない）。`main()` は4種の協力者（`TranslationOnlyPrPublisher`/`ApprovalReviewer`/`StructuralPrPublisher`/`I18nLintGate`）のうち実装があるのは無し（すべて5.2で実装予定の「未実装」スタブ。呼ばれると分かりやすいエラーで落ちる）。変更が無い実行では一切呼ばれないため、"何もすることが無い" run は現状でも成功する。`I18nLintGate` の実アダプタもどのタスクにも属していなかったため、5.2のタスク文に追加した。
+- (3.3) `main()` の成功ログ「Pull sync completed: no failures.」は、`skipped` が非空でも変わらず出る（レビューでFYI指摘。ブロッカーではないが、5.2以降でCLIのログ文言を見直す際は「一部スキップあり」の場合に文言を分けることを検討するとよい）。
+- (4.2) `docs/i18n-community-translation-setup.md` を作成（レビュー承認済み）。文書作成の3項目は完了、「実際に用意する」の1項目のみ人手待ちで`_Blocked:_`にした。あわせて design.md 44行目（Boundary Commitments > Allowed Dependencies）の `.github/mergify.yml`「Automatic queue to merge」ルールの引用が `#review-requested = 0` の条件を省略していることがレビューで判明（実ファイルには存在する条件）。手順書側はdesign.mdの記述をそのまま踏襲しているだけで手順書固有の誤りではないが、5.2で実アダプタを実装する際はdesign.mdでなく`.github/mergify.yml`の実物を見て条件を漏らさないこと。
+- (5.2) `readGitHubRunConfig`（`pull-translations.ts`）が使う秘密情報は `I18N_SYNC_PUBLISH_TOKEN` / `GITHUB_TOKEN` / `I18N_SYNC_APPROVAL_TOKEN` の3つで、うち `I18N_SYNC_PUBLISH_TOKEN` は design.md の Security Considerations にも `docs/i18n-community-translation-setup.md`（4.2で作成した手順書）にも載っていない3つ目のシークレットである（手順書は POEDITOR_API_TOKEN と I18N_SYNC_APPROVAL_TOKEN の2つしか登録手順を示していない）。実際に本番用シークレットを登録する6.2のタスクでは、この `I18N_SYNC_PUBLISH_TOKEN` も忘れず登録すること。design.md 側への反映は `kiro-spec-cleanup` 実行時に吸収する。なお、GitHub Actions は登録されていないシークレットを `env:` へ渡すと空文字列としてエクスポートする（未設定にはならない）ため、`I18N_SYNC_PUBLISH_TOKEN ?? GITHUB_TOKEN` のような `??` によるフォールバックは効かず、実運用のワークフロー（`I18N_SYNC_PUBLISH_TOKEN` 未登録・`GITHUB_TOKEN` のみ利用可能なケース）で毎回失敗する不具合がレビューで見つかった。`||` によるフォールバックに修正済み（本人による自己承認を防ぐ等値チェックは変更していない）。
+
+なおこのフォールバックにより、`I18N_SYNC_PUBLISH_TOKEN` を登録せず `GITHUB_TOKEN` のみで運用した場合、ワークフローは失敗せず実行できてしまうが、既定の `GITHUB_TOKEN` が作成したPRイベントは他のワークフロー実行を起動しないため `ci-app-lint` が付かず、承認されてもマージキューに永遠に留まる（早期の分かりやすい失敗が、後段の分かりにくい失敗に置き換わる）。6.2で実際にシークレットを揃える際、`I18N_SYNC_PUBLISH_TOKEN` の登録漏れがないか特に確認すること。
+- (6.3) `poeditor-client.spec.ts` の20秒スロットルテストを `vi.useFakeTimers()` で時計を凍結する形に書き換え、実時間ジッターによる間欠失敗を解消した（負荷をかけた状態で修正前は20回中4回失敗、修正後は20回中0回失敗を実測）。`turbo run lint/test/build --filter @growi/app` はすべて成功。ただしレビューで `turbo run test --filter @growi/app --force`（キャッシュ無視）を実行すると `src/features/growi-vault/__tests__/clone-e2e.integ.ts` が4件失敗することが分かった。今回の差分（`poeditor-client.spec.ts` 1ファイルのみ）とは無関係で、一時gitサーバーへの接続前提が整っていない環境依存の既知の失敗（本spec外、growi-vault機能側の話）。i18n-community-translation の完了判定には影響しない。
+- (amend spec `i18n-community-translation-single-project` タスク1.1〜3.1、後日の見直しで判明) タスク1.1（namespaceごとのPOEditorプロジェクトID宣言）・タスク2（namespaceごとの個別push）・タスク3.1（namespace×言語ごとの個別export、最大12通り）は、いずれもnamespaceごとに専用のPOEditorプロジェクトを持つ当初の3プロジェクト構成を前提に実装・完了したものであり、その時点では正しかった。後日、単一の共有プロジェクトを全namespaceで使う構成（単一の`SHARED_POEDITOR_PROJECT_ID`、全namespace統合アップロード1回＋namespaceごとの非破壊的タグ付けアップロードの2段階push、言語ごとの統合exportをnamespaceへ分割するpull）に置き換えられ、これらのタスクが実装したコード自体はその後書き換わっている。3プロジェクト構成の記述を持つ現在のタスク本文は、完了当時の実装内容の記録としてそのまま残す（書き換えない）。現在の正しいアーキテクチャは`design.md`を参照すること。
+- (5.3, レビューで発見) `.github/workflows/i18n-sync-pull.yml` に、削除したはずの `GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}`（CLIへの直接受け渡し）が残っており、「フォールバックは意図的に置かない」という同ファイル内のコメントと矛盾していた。この行を削除して修正済み。あわせて、2つのApp発行トークンに一本化したことで workflow 自身の `GITHUB_TOKEN` を書き込みに使う箇所が無くなったため、`permissions` を `contents: write` / `pull-requests: write` から `contents: read` へ縮小した。さらに、6.2の `_Blocked:_` 注記が `I18N_SYNC_PUBLISH_TOKEN` / `I18N_SYNC_APPROVAL_TOKEN` を repository secret として登録するよう指示しており、`docs/i18n-community-translation-setup.md` §4.3（この2つを secret として保存しないと明記）と食い違っていたため、6.2の注記を private key / App ID の登録手順に書き換えた。
+- (amend spec `i18n-community-translation-single-project` タスク5.1実施時の発見) push CLI（タスク2）・pull CLI（タスク3.1）は、当初はGROWIの生のロケールコード（`en_US`等）をそのままPOEditor APIへ渡していた。実際にPOEditorへリクエストすると`en_US`は`"Wrong language code"`エラーで拒否され、正しくは`en`であることが実際のPOEditor APIに対するテストで判明した。これは3プロジェクト構成とは無関係な、既存のマージ済み実装の不具合であり、修正するまでは実運用のpushが毎回失敗する状態だった。`LanguageCodeMap`（GROWIロケールコード→POEditor言語コードの対応表）を新設し、push・pull双方のPOEditor API呼び出し直前でこの変換をかけることで解消した。現在の正しい対応関係はRequirement 10と`design.md`の`LanguageCodeMap`節を参照すること。タスク2・3.1自体は完了当時に正しく動作するものとして実装・レビューされたものであり、この発見によって再度やり直す必要はない（該当箇所は既に修正済み・コミット済み）。
+- (6.1/6.2, 実環境確認で発見) `workflow_dispatch`（5.3で追加）で `i18n-sync-push` を実プロジェクト（839626）に対して実行し、"Pushed en_US to the shared POEditor project: 1 combined upload covering 3 namespace(s), then 3 tagging upload(s)." のログでエラー無く完了することを確認した（3 namespaceが実際に同時存在する状態での実行）。ただし「他namespaceの用語をobsolete扱いにしないこと」自体はPOEditor側のタグ表示を個別確認するまでは未確認のまま残る。続けて `i18n-sync-pull` を実行したところ、構造変更PR（#11925）が作られたが、中身を見るとja/zh/fr/koの既存の正しい翻訳が軒並みEnglishに置き換わる致命的な差分だった。原因はPOEditorプロジェクトのFallback Language設定（未翻訳キーをフォールバック言語の文言で埋める仕様）で、これに加えてPOEditorがそもそもja/zh/fr/koの既存翻訳を1件も持っていない（pushがen_USしかアップロードしないため）ことが根本要因。#11925はマージせずcloseした。Fallback Languageを「未設定」にすると未翻訳キーはexport上で省略されず空文字列 `""` になることを実測で確認し、`DiffClassifier.classify`が空文字列のleafを「情報なし」として無視する（追加・削除・変更いずれにも数えない）よう修正した（`research.md`のDecision、design.mdのDiffClassifier節参照）。**この最初の修正は独立レビューでREJECTEDだった**: `classify`は「何を報告するか」を直しただけで、`PullTranslationSync`が分類結果に添えて実際にファイルへ書き込む内容（`TranslationOnlyCombination.content`/`StructuralCombination.exportedContent`）は生の`after`（空文字列を含む）のままだったため、同じファイル内の別キーが1件でも実際に変更されると、未翻訳キーがtranslation_only（人レビュー不要の自動反映）経路で空文字列に書き換わってしまう、より発見しにくい形の同じ不具合が残っていた。`mergeTranslations(before, after)`（`before`を土台に`after`の非空leafだけを上書きする純粋関数、diff-classifier.ts）を追加し、分類結果に添えるコンテンツをこの関数の戻り値に統一して修正済み（回帰テスト追加、mutation checkで新テストが修正前は実際に落ちることを確認済み）。この修正により同様の誤上書きは防げるが、6.1のタグ確認と6.2自体はまだ完了条件を満たしていないため、いずれも `[ ]` のまま残す。ja/zh/fr/koの既存翻訳が1件もPOEditorに無い問題への対応として5.5（`seed-existing-translations.ts`）を新設した。
+- (5.5, ja_JP実行後の安全確認で発見) ja_JPを実プロジェクトへ投入した直後、POEditor上のterm数が想定より43件多いことが判明した。原因は`syncTerms: false`の誤解: `sync_terms`が制御するのは既存キーの削除のみで、ファイルに新しく含まれるキーの追加は`sync_terms`の値に関わらず常に行われる。ja_JPの翻訳ファイルにはen_USに存在しないキーが44件（admin 8・translation 36・commons 0）あり、これらが新規termとしてPOEditorに作成されてしまっていた（実測の43件との1件の差は原因未特定）。`runSeed`を、対象言語のファイルに加えてen_USのファイルも読み込み、`DiffClassifier.filterToKnownKeys`（新設）でen_USの既存キーだけへ絞り込んでからアップロードするよう修正した（回帰テスト追加、mutation checkで修正前は実際に落ちることを確認済み）。既に作成された44件の孤立termは、実プロジェクトからAPI経由の一括削除で対応済み。`zh_CN`/`fr_FR`/`ko_KR`はこの修正後のツールで実行すること。
+- (5.5, 修正後ツールでの4言語実行完了) 修正済みツールで `zh_CN`/`fr_FR`/`ko_KR` を実プロジェクトへ投入した。ログ上の除外キー数（en_USに存在しないため投入対象から外れたキー数）は事前の試算通り `zh_CN` 25件・`fr_FR` 5件・`ko_KR` 0件で一致し、孤立termは新たに作られなかった。`ja_JP`と合わせて4言語すべての既存翻訳投入が完了し、5.5全体を完了とする。
+- (5.5, 上記「4言語実行完了」の訂正) `fr_FR`/`ko_KR`はCLI上「成功」と表示されていたが、実際にはPOEditor上0%のまま何も書き込まれていなかったことが後から判明した。原因調査のため、同じペイロードを直接アップロードする診断スクリプトを実行したところ、`{"response":{"status":"success",...},"result":{"translations":{"added":2253,...}}}`という正常なレスポンスが返り、そのペイロード自体は正しく書き込めることを確認した。一方 `PoeditorClient.uploadTerms`/`exportTranslations`/`listLanguages` はいずれもHTTPステータス（2xx）しか見ておらず、POEditorがHTTP 200のまま論理的な失敗を返すケースを検知できていなかったことが判明したため、`parseSuccessBody`を新設してレスポンス本文の`response.status`も確認するよう修正した（回帰テスト追加、mutation checkで修正前は実際に落ちることを確認済み）。実際に失敗した時のレスポンス本文そのものは取得できておらず、原因がPOEditor側のレート制限（手順書が`zh_CN`→`fr_FR`→`ko_KR`を別プロセスの連続実行として案内しており、アップロードの20秒スロットルがプロセス内stateにしか依存しないため、プロセスをまたいだ間隔は未保証）だったのかは推測の域を出ない（`research.md`のDecision参照）。5.5の「4言語分を実行する」チェックボックスは`[ ]`へ差し戻した。`fr_FR`/`ko_KR`は修正後のツールで再実行し、POEditor上の進捗が実際に反映されることを確認すること。
+- (5.5, `PoeditorClient`修正後の再実行で完了) `PoeditorClient`のHTTP 200誤判定バグ修正後、`fr_FR`/`ko_KR`を実プロジェクトへ再実行した（今回は各コマンドの間を20秒以上空けて実行）。CLIの成功表示だけでなく、POEditorの画面上でも全言語（ja_JP/zh_CN/fr_FR/ko_KR）が90%以上の翻訳進捗を示すことを確認し、5.5を完了とする。
+- (6.1/6.2, 実プロジェクトでの実環境確認完了) 使い捨てのテスト用キー（`_task61_probe.*`）を専用のテストブランチにだけコミットし、`workflow_dispatch`の`--ref`でそのブランチを指定してpushワークフローを実行する方式で、masterに一切触れずに検証した。確認できたこと: (1) キー追加・削除がpushで正しく反映される、(2) namespaceごとのタグ付けアップロードは、POEditorのTagsフィルターに`obsolete`という項目自体が存在せず、`admin`タグで絞り込んでも他namespaceのtermが混ざらないことを目視で確認した（他namespaceを`obsolete`扱いにする問題は無いと判断）、(3) pull経路は、同一の pull 実行内で構造変更（キー追加）と翻訳のみの変更（値のみの変更）を正しく別々のPRに分離し、翻訳のみ変更PRには承認ボットの自動承認が付くことを確認した（構造変更PR #11935、翻訳のみ変更PR #11943）。**この過程で新たな不具合を発見**: en_USの既存キーの文言を変更してpushしても、POEditor側の値が更新されないことが判明した。原因はPOEditor API `projects/upload`の`overwrite`パラメータの既定値が0（上書きしない）であるにもかかわらず、`PoeditorClient.uploadTerms`がこのパラメータを一度も送っていなかったこと（Web検索でPOEditor公式ドキュメント・KBの記述を確認済み）。pushの統合アップロード（en_USが権威を持つソース）にだけ`overwrite: true`を追加し、タグ付けアップロード・seedツールは既存の非上書き挙動のまま変更していない（回帰テスト追加、mutation checkで修正前は実際に落ちることを確認済み）。修正後、実プロジェクトに対する再pushで文言変更が正しく反映されることを確認した。翻訳のみ変更PR #11943は承認ボットとmerge queueにより実際に自動マージされ、テスト用の値が一時的に本番の`ko_KR/translation.json`（`Loading`キー）に入った。ただしこれはpull経路の自動反映が正しく機能した結果そのものであり、POEditor側の値をテスト前の値に戻して再度pullを実行することで、同じ自動マージ経路により正しく修正された（PR #11945）。テスト用キーはpushでの削除により実プロジェクトから完全に除去済み。
+- (feature-level validate-impl, MANUAL_VERIFY_REQUIRED) `/kiro-validate-impl` を独立subagent（Opus）で実行。結論はGO/NO-GOではなくMANUAL_VERIFY_REQUIRED — 実装済みタスクは全て健全（承認ボット分離・PRの粒度不変条件・境界・依存方向とも問題なし）だが、4.2/6.1/6.2が人手待ちのままのため要件1.1/1.2/7.1/7.2が未充足、かつ2.x/3.x系もモック検証のみで実POEditor/実GitHub APIに対する検証が一度もない。検証で新たに1点判明: `I18N_SYNC_PUBLISH_TOKEN`未登録時のフォールバック（`||`）が警告を一切出さずGITHUB_TOKENへ切り替わっていたため、手順書通りに2つしか登録しないと「一見成功するが承認済みPRがキューに永遠に残る」という分かりにくい失敗になっていた。`readGitHubRunConfig`にフォールバック発生時の`console.error`警告を追加して修正済み（対応するテストも追加）。6.2で実シークレットを揃える前に、この警告が出ないこと（＝3つとも正しく登録されていること）を確認すること。

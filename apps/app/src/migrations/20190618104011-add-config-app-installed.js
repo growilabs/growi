@@ -7,54 +7,44 @@ import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:migrate:add-config-app-installed');
 
-/**
- * BEFORE
- *   - Config document { key: 'app:installed' } does not exist
- * AFTER
- *   - Config document { key: 'app:installed' } is created
- *     - value will be true if one or more users exist
- *     - value will be false if no users exist
- */
-module.exports = {
-  async up(db) {
-    logger.info('Apply migration');
-    await mongoose.connect(getMongoUri(), mongoOptions);
+export async function up(db) {
+  logger.info('Apply migration');
+  await mongoose.connect(getMongoUri(), mongoOptions);
 
-    const User = userModelFactory();
+  const User = userModelFactory();
 
-    // find 'app:installed'
-    const appInstalled = await Config.findOne({
+  // find 'app:installed'
+  const appInstalled = await Config.findOne({
+    key: 'app:installed',
+  });
+  // exit if exists
+  if (appInstalled != null) {
+    logger.info(
+      "'app:appInstalled' is already exists. This migration terminates without any changes.",
+    );
+    return;
+  }
+
+  const userCount = await User.count();
+
+  if (userCount > 0) {
+    await Config.create({
       key: 'app:installed',
+      value: true,
     });
-    // exit if exists
-    if (appInstalled != null) {
-      logger.info(
-        "'app:appInstalled' is already exists. This migration terminates without any changes.",
-      );
-      return;
-    }
+  }
 
-    const userCount = await User.count();
+  logger.info('Migration has successfully applied');
+}
 
-    if (userCount > 0) {
-      await Config.create({
-        key: 'app:installed',
-        value: true,
-      });
-    }
+export async function down(db) {
+  logger.info('Rollback migration');
+  await mongoose.connect(getMongoUri(), mongoOptions);
 
-    logger.info('Migration has successfully applied');
-  },
+  // remote 'app:siteUrl'
+  await Config.findOneAndDelete({
+    key: 'app:installed',
+  });
 
-  async down(db) {
-    logger.info('Rollback migration');
-    await mongoose.connect(getMongoUri(), mongoOptions);
-
-    // remote 'app:siteUrl'
-    await Config.findOneAndDelete({
-      key: 'app:installed',
-    });
-
-    logger.info('Migration has been successfully rollbacked');
-  },
-};
+  logger.info('Migration has been successfully rollbacked');
+}

@@ -1,9 +1,6 @@
-import type {
-  ShareLinkDocument,
-  ShareLinkModel,
-} from '~/server/models/share-link';
-import { getModelSafely } from '~/server/util/mongoose-utils';
+import type { sharelinks } from '~/generated/prisma/client';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import type { ValidReferer } from './interfaces';
 
@@ -13,20 +10,10 @@ const logger = loggerFactory(
 
 export const retrieveValidShareLinkByReferer = async (
   referer: ValidReferer,
-): Promise<ShareLinkDocument | null> => {
-  const ShareLink = getModelSafely<ShareLinkDocument, ShareLinkModel>(
-    'ShareLink',
-  );
-  if (ShareLink == null) {
-    logger.warn(
-      'Could not get ShareLink model. next() will be called without processing anything.',
-    );
-    return null;
-  }
-
+): Promise<sharelinks | null> => {
   const { shareLinkId } = referer;
-  const shareLink = await ShareLink.findOne({
-    _id: shareLinkId,
+  const shareLink = await prisma.sharelinks.findUnique({
+    where: { id: shareLinkId },
   });
   if (shareLink == null || shareLink.isExpired()) {
     logger.info(

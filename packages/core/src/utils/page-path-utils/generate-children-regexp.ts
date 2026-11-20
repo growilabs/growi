@@ -1,5 +1,5 @@
-import { escapeStringForMongoRegex } from '../escape-string-for-regex';
-import { isTopPage } from './is-top-page';
+import { escapeStringForMongoRegex } from '../escape-string-for-regex.js';
+import { isTopPage } from './is-top-page.js';
 
 /**
  * Generate RegExp instance for one level lower path

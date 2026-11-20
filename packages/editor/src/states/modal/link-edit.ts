@@ -1,6 +1,6 @@
 import { atom, useAtomValue, useSetAtom } from 'jotai';
 
-import type { Linker } from '../../models';
+import type { Linker } from '../../models/index.js';
 
 type LinkEditModalState = {
   isOpened: boolean;

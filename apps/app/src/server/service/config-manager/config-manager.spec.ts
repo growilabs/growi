@@ -2,7 +2,11 @@ import type { RawConfigData } from '@growi/core/dist/interfaces';
 import { mock } from 'vitest-mock-extended';
 
 import type { S2sMessagingService } from '../s2s-messaging/base';
-import type { ConfigKey, ConfigValues } from './config-definition';
+import {
+  CONFIG_DEFINITIONS,
+  type ConfigKey,
+  type ConfigValues,
+} from './config-definition';
 import { configManager } from './config-manager';
 
 // Test helper type for setting configs
@@ -264,6 +268,51 @@ describe('ConfigManager test', () => {
     });
   });
 
+  describe('app:attachmentFullTextSearch config keys', () => {
+    // Load from env so all keys get their default values populated in envConfig.
+    // Also set dbConfig to an empty object so getConfig does not throw "Config is not loaded".
+    beforeAll(async () => {
+      await configManager.loadConfigs({ source: 'env' });
+      Object.defineProperty(configManager, 'dbConfig', {
+        value: {},
+        configurable: true,
+      });
+    });
+
+    test('extractorUri returns undefined by default', () => {
+      expect(
+        configManager.getConfig('app:attachmentFullTextSearch:extractorUri'),
+      ).toBeUndefined();
+    });
+
+    test('extractorToken returns undefined by default', () => {
+      expect(
+        configManager.getConfig('app:attachmentFullTextSearch:extractorToken'),
+      ).toBeUndefined();
+    });
+
+    test('timeoutMs returns 90000 by default', () => {
+      expect(
+        configManager.getConfig('app:attachmentFullTextSearch:timeoutMs'),
+      ).toBe(90000);
+    });
+
+    test('maxFileSizeBytes returns 52428800 by default', () => {
+      expect(
+        configManager.getConfig(
+          'app:attachmentFullTextSearch:maxFileSizeBytes',
+        ),
+      ).toBe(52428800);
+    });
+
+    test('extractorToken has isSecret: true', () => {
+      expect(
+        CONFIG_DEFINITIONS['app:attachmentFullTextSearch:extractorToken']
+          .isSecret,
+      ).toBe(true);
+    });
+  });
+
   describe('getConfig()', () => {
     // Helper function to set configs with proper typing
     const setTestConfigs = (
@@ -321,6 +370,175 @@ describe('ConfigManager test', () => {
         'https://example.com',
       ); // Should fallback to env when db value is undefined
       expect(configManager.getConfig('app:fileUploadType')).toBe('gridfs'); // Should use db value when valid
+    });
+
+    describe('env-only mode for AI settings (env:useOnlyEnvVars:ai)', () => {
+      // The 3 connection keys fixed by the env:useOnlyEnvVars:ai control key:
+      // the AI enable toggle + the two provider connection keys (multi-provider
+      // settings and per-provider API keys). The two usage-metering keys are
+      // also in the group but are covered by their own readers. ai:allowedModels is deliberately
+      // NOT part of the group: model settings stay editable from the admin UI
+      // even in env-only mode (R5.3).
+      const aiEnvOnlyKeys = [
+        'app:aiEnabled',
+        'ai:providers',
+        'ai:providerApiKeys',
+      ] as const;
+
+      // Distinct db/env values per key so a resolution that picks the wrong
+      // source is observable. Booleans use opposite values across db/env; the
+      // Record-typed keys differ by provider entry across db/env.
+      const dbValues: Partial<TestConfigData> = {
+        'app:aiEnabled': { value: true },
+        'ai:providers': {
+          value: {
+            openai: { enabled: true },
+            'azure-openai': {
+              enabled: true,
+              azureOpenaiSettings: { resourceName: 'db-resource' },
+            },
+          },
+        },
+        'ai:providerApiKeys': { value: { openai: 'db-api-key' } },
+        'ai:allowedModels': {
+          value: [
+            {
+              provider: 'openai',
+              modelId: 'db-model',
+              providerOptions: { openai: { db: true } },
+              isDefault: true,
+            },
+          ],
+        },
+      };
+      const envValues: Partial<TestConfigData> = {
+        'app:aiEnabled': { value: false },
+        'ai:providers': {
+          value: { anthropic: { enabled: true } },
+        },
+        'ai:providerApiKeys': { value: { anthropic: 'env-api-key' } },
+        'ai:allowedModels': {
+          value: [
+            {
+              provider: 'anthropic',
+              modelId: 'env-model',
+              providerOptions: { anthropic: { env: true } },
+              isDefault: true,
+            },
+          ],
+        },
+      };
+
+      test('returns env value only (ignoring db) for the 3 connection keys when control key is true', () => {
+        setTestConfigs(dbValues, {
+          ...envValues,
+          'env:useOnlyEnvVars:ai': { value: true },
+        });
+
+        for (const key of aiEnvOnlyKeys) {
+          expect(configManager.getConfig(key)).toEqual(envValues[key]?.value);
+        }
+      });
+
+      test('keeps db-first resolution for ai:allowedModels even when control key is true (R5.3)', () => {
+        setTestConfigs(dbValues, {
+          ...envValues,
+          'env:useOnlyEnvVars:ai': { value: true },
+        });
+
+        expect(configManager.getConfig('ai:allowedModels')).toEqual(
+          dbValues['ai:allowedModels']?.value,
+        );
+      });
+
+      test('returns db value (env as fallback default) for all AI keys when control key is false', () => {
+        setTestConfigs(dbValues, {
+          ...envValues,
+          'env:useOnlyEnvVars:ai': { value: false },
+        });
+
+        for (const key of [...aiEnvOnlyKeys, 'ai:allowedModels'] as const) {
+          expect(configManager.getConfig(key)).toEqual(dbValues[key]?.value);
+        }
+      });
+
+      test('falls back to env value when db value is undefined and control key is false', () => {
+        setTestConfigs(
+          { 'ai:providers': { value: undefined } },
+          {
+            'ai:providers': { value: { anthropic: { enabled: true } } },
+            'env:useOnlyEnvVars:ai': { value: false },
+          },
+        );
+
+        expect(configManager.getConfig('ai:providers')).toEqual({
+          anthropic: { enabled: true },
+        });
+      });
+
+      test('does not change resolution of unrelated keys when control key is true', () => {
+        // app:title is not part of the ai env-only group, so it must keep the
+        // default db ?? env resolution regardless of env:useOnlyEnvVars:ai.
+        setTestConfigs(
+          { 'app:title': { value: 'db-title' } },
+          {
+            'app:title': { value: 'env-title' },
+            'env:useOnlyEnvVars:ai': { value: true },
+          },
+        );
+
+        expect(configManager.getConfig('app:title')).toBe('db-title');
+      });
+    });
+
+    describe('env-only mode for GCS settings (env:useOnlyEnvVars:gcs)', () => {
+      // GROWI.cloud's hosted GCS tenants set this control key so the
+      // infra-provided GCS settings (credentials, bucket, and — since this
+      // fix — the file-delivery relay/redirect mode) cannot be overridden
+      // from the admin UI. gcs:referenceFileWithRelayMode was missing from
+      // this group before this fix, so a hosted-GCS admin could still
+      // persist a DB value that getConfig would then honor.
+      const gcsEnvOnlyKeys = [
+        'gcs:apiKeyJsonPath',
+        'gcs:bucket',
+        'gcs:uploadNamespace',
+        'gcs:referenceFileWithRelayMode',
+      ] as const;
+
+      const dbValues: Partial<TestConfigData> = {
+        'gcs:apiKeyJsonPath': { value: 'db-key-path' },
+        'gcs:bucket': { value: 'db-bucket' },
+        'gcs:uploadNamespace': { value: 'db-namespace' },
+        'gcs:referenceFileWithRelayMode': { value: true },
+      };
+      const envValues: Partial<TestConfigData> = {
+        'gcs:apiKeyJsonPath': { value: 'env-key-path' },
+        'gcs:bucket': { value: 'env-bucket' },
+        'gcs:uploadNamespace': { value: 'env-namespace' },
+        'gcs:referenceFileWithRelayMode': { value: false },
+      };
+
+      test('returns env value only (ignoring db) for every GCS key when control key is true', () => {
+        setTestConfigs(dbValues, {
+          ...envValues,
+          'env:useOnlyEnvVars:gcs': { value: true },
+        });
+
+        for (const key of gcsEnvOnlyKeys) {
+          expect(configManager.getConfig(key)).toEqual(envValues[key]?.value);
+        }
+      });
+
+      test('returns db value (env as fallback default) for every GCS key when control key is false', () => {
+        setTestConfigs(dbValues, {
+          ...envValues,
+          'env:useOnlyEnvVars:gcs': { value: false },
+        });
+
+        for (const key of gcsEnvOnlyKeys) {
+          expect(configManager.getConfig(key)).toEqual(dbValues[key]?.value);
+        }
+      });
     });
   });
 });

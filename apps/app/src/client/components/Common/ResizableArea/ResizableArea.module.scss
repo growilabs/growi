@@ -1,0 +1,58 @@
+.grw-resizable-area {
+  will-change: width;
+}
+
+.grw-resizable-area:not(:global(.dragging)) {
+  transition: width 100ms cubic-bezier(0.2, 0, 0, 1) 0s;
+}
+
+
+// Positioned against the nearest positioned ancestor, so that ancestor must
+// not clip overflow or the hit area outside the panel becomes unreachable.
+.grw-navigation-draggable {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 100%;
+
+  :global(.grw-navigation-draggable-hitarea) {
+    position: absolute;
+    left: -4px;
+    width: 24px;
+    height: 100%;
+    padding: 0;
+    appearance: none;
+    cursor: ew-resize;
+    background: transparent;
+    border: 0;
+  }
+  :global(.grw-navigation-draggable-line) {
+    position: absolute;
+    left: -1px;
+    display: none;
+    width: 3px;
+    height: 100%;
+    background-color: rgb(76, 154, 255);
+  }
+}
+
+// Mirrored for an area attached to the right viewport edge
+.grw-navigation-draggable-right {
+  right: 100%;
+  left: auto;
+
+  :global(.grw-navigation-draggable-hitarea) {
+    right: -4px;
+    left: auto;
+  }
+  :global(.grw-navigation-draggable-line) {
+    right: -1px;
+    left: auto;
+  }
+}
+
+.grw-navigation-draggable:hover {
+  :global(.grw-navigation-draggable-line) {
+    display: block;
+  }
+}

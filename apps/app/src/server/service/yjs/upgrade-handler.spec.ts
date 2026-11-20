@@ -1,8 +1,10 @@
-import type { IncomingMessage } from 'node:http';
+import { IncomingMessage } from 'node:http';
+import { Socket } from 'node:net';
 import type { Duplex } from 'node:stream';
 import type { IUserHasId } from '@growi/core';
 import { mock } from 'vitest-mock-extended';
 
+import { UserStatus } from '../../models/user/conts';
 import { createUpgradeHandler } from './upgrade-handler';
 
 type AuthenticatedIncomingMessage = IncomingMessage & { user?: IUserHasId };
@@ -53,7 +55,9 @@ const createMockRequest = (
   url: string,
   user?: IUserHasId,
 ): AuthenticatedIncomingMessage => {
-  const req = mock<AuthenticatedIncomingMessage>();
+  // A real IncomingMessage: a deep mock would answer truthy for properties the
+  // auth middlewares probe (e.g. isBrandLogo) and hide guest rejections.
+  const req: AuthenticatedIncomingMessage = new IncomingMessage(new Socket());
   req.url = url;
   req.headers = { cookie: 'connect.sid=test-session' };
   req.user = user;
@@ -67,16 +71,25 @@ const createMockSocket = (): Duplex & MockSocket => {
   } as unknown as Duplex & MockSocket;
 };
 
+const createUser = (overrides: Partial<IUserHasId> = {}): IUserHasId =>
+  ({
+    _id: 'user1',
+    name: 'Test User',
+    status: UserStatus.STATUS_ACTIVE,
+    readOnly: false,
+    ...overrides,
+  }) as unknown as IUserHasId;
+
 describe('UpgradeHandler', () => {
   const handleUpgrade = createUpgradeHandler(sessionConfig);
 
   it('should authorize a valid user with page access', async () => {
     isAccessibleMock.mockResolvedValue(true);
 
-    const request = createMockRequest('/yjs/507f1f77bcf86cd799439011', {
-      _id: 'user1',
-      name: 'Test User',
-    } as unknown as IUserHasId);
+    const request = createMockRequest(
+      '/yjs/507f1f77bcf86cd799439011',
+      createUser(),
+    );
     const socket = createMockSocket();
     const head = Buffer.alloc(0);
 
@@ -106,10 +119,10 @@ describe('UpgradeHandler', () => {
   it('should reject with 403 when user has no page access', async () => {
     isAccessibleMock.mockResolvedValue(false);
 
-    const request = createMockRequest('/yjs/507f1f77bcf86cd799439011', {
-      _id: 'user1',
-      name: 'Test User',
-    } as unknown as IUserHasId);
+    const request = createMockRequest(
+      '/yjs/507f1f77bcf86cd799439011',
+      createUser(),
+    );
     const socket = createMockSocket();
     const head = Buffer.alloc(0);
 
@@ -140,7 +153,7 @@ describe('UpgradeHandler', () => {
     expect(socket.destroy).not.toHaveBeenCalled();
   });
 
-  it('should allow guest user when page allows guest access', async () => {
+  it('should reject guest with 401 even when the page is viewable by guests', async () => {
     isAccessibleMock.mockResolvedValue(true);
 
     const request = createMockRequest('/yjs/507f1f77bcf86cd799439011');
@@ -149,10 +162,54 @@ describe('UpgradeHandler', () => {
 
     const result = await handleUpgrade(request, socket, head);
 
-    expect(result.authorized).toBe(true);
-    if (result.authorized) {
-      expect(result.pageId).toBe('507f1f77bcf86cd799439011');
+    expect(result.authorized).toBe(false);
+    if (!result.authorized) {
+      expect(result.statusCode).toBe(401);
     }
+    expect(socket.write).toHaveBeenCalledWith(expect.stringContaining('401'));
+  });
+
+  it('should reject read-only user with 403 even when the page is viewable', async () => {
+    isAccessibleMock.mockResolvedValue(true);
+
+    const request = createMockRequest(
+      '/yjs/507f1f77bcf86cd799439011',
+      createUser({ readOnly: true }),
+    );
+    const socket = createMockSocket();
+    const head = Buffer.alloc(0);
+
+    const result = await handleUpgrade(request, socket, head);
+
+    expect(result.authorized).toBe(false);
+    if (!result.authorized) {
+      expect(result.statusCode).toBe(403);
+    }
+    expect(socket.write).toHaveBeenCalledWith(expect.stringContaining('403'));
+  });
+
+  it.each([
+    ['registered', UserStatus.STATUS_REGISTERED],
+    ['suspended', UserStatus.STATUS_SUSPENDED],
+    ['invited', UserStatus.STATUS_INVITED],
+    ['deleted', UserStatus.STATUS_DELETED],
+  ])('should reject %s (non-active) user with 403 even when the page is viewable', async (_label, status) => {
+    isAccessibleMock.mockResolvedValue(true);
+
+    const request = createMockRequest(
+      '/yjs/507f1f77bcf86cd799439011',
+      createUser({ status }),
+    );
+    const socket = createMockSocket();
+    const head = Buffer.alloc(0);
+
+    const result = await handleUpgrade(request, socket, head);
+
+    expect(result.authorized).toBe(false);
+    if (!result.authorized) {
+      expect(result.statusCode).toBe(403);
+    }
+    expect(socket.write).toHaveBeenCalledWith(expect.stringContaining('403'));
   });
 
   it('should reject with 401 when session middleware fails', async () => {

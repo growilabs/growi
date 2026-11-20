@@ -1,0 +1,6 @@
+2026-09-14T09:41:02.5512334Z ::error file=apps/app/playwright/20-basic-features/comments.spec.ts,title=[webkit] › playwright/20-basic-features/comments.spec.ts:31:3 › Successfully add comments,line=44,col=29::  1) [webkit] › playwright/20-basic-features/comments.spec.ts:31:3 › Successfully add comments
+2026-09-14T09:41:02.5513991Z     Error: expect(locator).toBeVisible() failed
+2026-09-14T09:41:02.5514872Z     playwright/output/20-basic-features-comments-Successfully-add-comments-webkit/test-failed-1.png
+2026-09-14T09:41:02.5515533Z   1 failed
+2026-09-14T09:41:02.5516104Z     [webkit] › playwright/20-basic-features/comments.spec.ts:31:3 › Successfully add comments 
+2026-09-14T09:41:02.5516770Z   105 passed (5.9m)

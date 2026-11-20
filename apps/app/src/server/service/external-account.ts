@@ -3,10 +3,9 @@ import { ErrorV3 } from '@growi/core/dist/models';
 import { LoginErrorCode } from '~/interfaces/errors/login-error';
 import type { IExternalAuthProviderType } from '~/interfaces/external-auth-provider';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import { NullUsernameToBeRegisteredError } from '../models/errors';
-import type { ExternalAccountDocument } from '../models/external-account';
-import ExternalAccount from '../models/external-account';
 import type PassportService from './passport';
 
 const logger = loggerFactory('growi:service:external-account-service');
@@ -21,7 +20,7 @@ class ExternalAccountService {
   async getOrCreateUser(
     userInfo: { id: string; username: string; name?: string; email?: string },
     providerId: IExternalAuthProviderType,
-  ): Promise<ExternalAccountDocument | undefined> {
+  ) {
     // get option
     const isSameUsernameTreatedAsIdenticalUser =
       this.passportService.isSameUsernameTreatedAsIdenticalUser(providerId);
@@ -32,7 +31,7 @@ class ExternalAccountService {
 
     try {
       // find or register(create) user
-      const externalAccount = await ExternalAccount.findOrRegister(
+      const externalAccount = await prisma.externalaccounts.findOrRegister(
         isSameUsernameTreatedAsIdenticalUser,
         isSameEmailTreatedAsIdenticalUser,
         providerId,
@@ -55,7 +54,11 @@ class ExternalAccountService {
           logger.debug(
             `ExternalAccount '${userInfo.username}' will be created and bound to the exisiting User account`,
           );
-          return ExternalAccount.associate(providerId, userInfo.id, err.user);
+          return prisma.externalaccounts.associate(
+            providerId,
+            userInfo.id,
+            err.user,
+          );
         }
         logger.error({ providerId }, 'provider-DuplicatedUsernameException');
 

@@ -1,6 +1,6 @@
 import type { EditorView } from '@codemirror/view';
 
-import { MarkdownTable } from '../../../models';
+import { MarkdownTable } from '../../../models/index.js';
 
 // https://regex101.com/r/7BN2fR/10
 const linePartOfTableRE = /^([^\r\n|]*)\|(([^\r\n|]*\|)+)$/;

@@ -64,7 +64,7 @@ const MePage: NextPageWithLayout<Props> = (props: Props) => {
         component: <PersonalSettings />,
       },
       // drafts: {
-      //   title: t('My Drafts'),
+      //   title: t('List Drafts'),
       //   component: <MyDraftList />,
       // },
       'all-in-app-notifications': {

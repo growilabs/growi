@@ -217,7 +217,7 @@ export const handleSamlUpdate = (
       } catch (_err) {
         return res.apiv3Err(
           t('input_validation.message.invalid_syntax', {
-            syntax: t('security_settings.form_item_name.ABLCRule'),
+            syntax: t('admin:security_settings.form_item_name.ABLCRule'),
           }),
           400,
         );

@@ -75,7 +75,7 @@ export async function respondWithSinglePage(
   // Populate page data with revision information
   if (page != null) {
     try {
-      page.initLatestRevisionField(revisionId);
+      await page.initLatestRevisionField(revisionId);
 
       // populate
       page = await page.populateDataToShowRevision();

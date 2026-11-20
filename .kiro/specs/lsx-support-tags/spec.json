@@ -1,0 +1,22 @@
+{
+  "feature_name": "lsx-support-tags",
+  "created_at": "2026-09-09T12:07:56+00:00",
+  "updated_at": "2026-09-09T13:00:00+00:00",
+  "language": "ja",
+  "phase": "tasks-generated",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true
+    }
+  },
+  "ready_for_implementation": true
+}

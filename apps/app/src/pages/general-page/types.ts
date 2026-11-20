@@ -19,8 +19,6 @@ export type RendererConfigProps = {
 
 export type ServerConfigurationProps = {
   serverConfig: {
-    aiEnabled: boolean;
-    limitLearnablePageCountPerAssistant: number;
     isUsersHomepageDeletionEnabled: boolean;
     adminPreferredIndentSize: number;
     elasticsearchMaxBodyLengthToIndex: number;

@@ -73,7 +73,7 @@ const SmtpSetting = (props: Props): JSX.Element => {
             className="text-start text-md-end col-md-3 col-form-label"
             htmlFor="admin-smtp-password"
           >
-            {t('Password')}
+            {t('commons:Password')}
           </label>
           <div className="col-md-6">
             <input

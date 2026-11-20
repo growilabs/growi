@@ -25,7 +25,7 @@ const GuideRow = ({
       await navigator.clipboard.writeText(code);
       toastSuccess(t('editor_guide.textstyle.copy_done'));
     } catch (_err) {
-      toastError(t('common:failed_to_copy'));
+      toastError(t('editor_guide.textstyle.copy_failed'));
     }
   }, [code, t]);
 

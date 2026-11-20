@@ -38,7 +38,7 @@ const AdminCustomizeSettingsPage: NextPageWithLayout<Props> = (
 };
 
 AdminCustomizeSettingsPage.getLayout = createAdminPageLayout<Props>({
-  title: (_p, t) => t('customize_settings.customize_settings'),
+  title: (_p, t) => t('admin:customize_settings.customize_settings'),
   containerFactories: [
     async () => {
       // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import

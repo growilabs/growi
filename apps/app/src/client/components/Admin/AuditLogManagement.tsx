@@ -21,8 +21,9 @@ import { ActivityTable } from './AuditLog/ActivityTable';
 import { AuditLogDisableMode } from './AuditLog/AuditLogDisableMode';
 import { AuditLogExportModal } from './AuditLog/AuditLogExportModal';
 import { AuditLogSettings } from './AuditLog/AuditLogSettings';
+import { AuditLogUsernameTypeahead } from './AuditLog/AuditLogUsernameTypeahead';
+import { buildActivitySearchFilter } from './AuditLog/build-search-filter';
 import { DateRangePicker } from './AuditLog/DateRangePicker';
-import { SearchUsernameTypeahead } from './AuditLog/SearchUsernameTypeahead';
 import { SelectActionDropdown } from './AuditLog/SelectActionDropdown';
 
 const formatDate = (date: Date | null) => {
@@ -76,11 +77,12 @@ export const AuditLogManagement: FC = () => {
   const selectedActionList = Array.from(actionMap.entries())
     .filter((v) => v[1])
     .map((v) => v[0]);
-  const searchFilter = {
-    actions: selectedActionList,
+  const searchFilter = buildActivitySearchFilter({
+    selectedActions: selectedActionList,
+    availableActions: auditLogAvailableActionsData ?? [],
     dates: selectedDate,
     usernames: selectedUsernames,
-  };
+  });
 
   const {
     data: activityData,
@@ -254,7 +256,7 @@ export const AuditLogManagement: FC = () => {
         <>
           <div className="row row-cols-lg-auto mb-3 g-3">
             <div className="col-12">
-              <SearchUsernameTypeahead
+              <AuditLogUsernameTypeahead
                 ref={typeaheadRef}
                 onChange={setUsernamesHandler}
               />

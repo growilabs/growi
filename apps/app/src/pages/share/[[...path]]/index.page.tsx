@@ -7,7 +7,6 @@ import { useAtomValue } from 'jotai';
 import { ShareLinkLayout } from '~/components/Layout/ShareLinkLayout';
 import { DrawioViewerScript } from '~/components/Script/DrawioViewerScript';
 import { ShareLinkPageView } from '~/components/ShareLinkPageView';
-import type { CommonEachProps } from '~/pages/common-props';
 import { getServerSideCommonEachProps } from '~/pages/common-props';
 import { NextjsRoutingType } from '~/pages/utils/nextjs-routing-utils';
 import { useCustomTitleForPage } from '~/pages/utils/page-title-customization';
@@ -20,12 +19,15 @@ import {
 } from '~/states/server-configurations';
 
 import type { NextPageWithLayout } from '../../_app.page';
-import { useInitialCSRFetch } from '../../general-page';
 import { useHydrateGeneralPageConfigurationAtoms } from '../../general-page/hydrate';
 import { registerPageToShowRevisionWithMeta } from '../../general-page/superjson';
 import { NEXT_JS_ROUTING_PAGE } from './consts';
-import { getServerSidePropsForInitial } from './server-side-props';
-import type { InitialProps } from './types';
+import {
+  getServerSidePropsForInitial,
+  getServerSidePropsForSameRoute,
+} from './server-side-props';
+import type { EachProps, InitialProps } from './types';
+import { useSharedPageNavigation } from './use-shared-page-navigation';
 
 // call superjson custom register
 registerPageToShowRevisionWithMeta();
@@ -36,19 +38,16 @@ const GrowiContextualSubNavigation = dynamic(
   { ssr: false },
 );
 
-type Props = CommonEachProps | InitialProps;
+type Props = EachProps | InitialProps;
 
 const isInitialProps = (props: Props): props is InitialProps =>
-  props.nextjsRoutingType === NextjsRoutingType.INITIAL;
+  props.nextjsRoutingType !== NextjsRoutingType.SAME_ROUTE;
 
 const SharedPage: NextPageWithLayout<Props> = (props: Props) => {
-  // Initialize Jotai atoms with initial data - must be called unconditionally
-  const pageData = isInitialProps(props) ? props.pageWithMeta?.data : undefined;
-  const pageMeta = isInitialProps(props) ? props.pageWithMeta?.meta : undefined;
-  const shareLink = isInitialProps(props) ? props.shareLink : undefined;
-  const isExpired = isInitialProps(props) ? props.isExpired : undefined;
+  const { pageWithMeta, shareLink, isExpired } = props;
 
-  useHydratePageAtoms(pageData, pageMeta, {
+  // Initialize Jotai atoms with initial data - must be called unconditionally
+  useHydratePageAtoms(pageWithMeta?.data ?? undefined, pageWithMeta?.meta, {
     shareLinkId: shareLink?._id,
   });
 
@@ -57,13 +56,13 @@ const SharedPage: NextPageWithLayout<Props> = (props: Props) => {
   const rendererConfig = useRendererConfig();
   const isLinkSharingDisabled = useAtomValue(disableLinkSharingAtom);
 
-  // Use custom hooks for navigation and routing
-  // useSameRouteNavigation();
-
-  // Fetch page data on client-side when SSR is skipped
-  useInitialCSRFetch({
+  // Apply the navigated-to page, and fetch page data when SSR is skipped
+  useSharedPageNavigation({
     nextjsRoutingType: props.nextjsRoutingType,
-    skipSSR: isInitialProps(props) ? props.skipSSR : false,
+    currentPathname: props.currentPathname,
+    pageWithMeta,
+    isExpired,
+    skipSSR: props.skipSSR,
   });
 
   // If the data on the page changes without router.push, pageWithMeta remains old because getServerSideProps() is not executed
@@ -108,10 +107,16 @@ const Layout = ({ children, ...props }: LayoutProps): JSX.Element => {
   return <ShareLinkLayout>{children}</ShareLinkLayout>;
 };
 
+// props.rendererConfig is absent on SAME_ROUTE navigation, so read the hydrated atom
+const DrawioViewerScriptWithAtom = (): JSX.Element => {
+  const rendererConfig = useRendererConfig();
+  return <DrawioViewerScript drawioUri={rendererConfig.drawioUri} />;
+};
+
 SharedPage.getLayout = function getLayout(page) {
   return (
     <>
-      <DrawioViewerScript drawioUri={page.props.rendererConfig.drawioUri} />
+      <DrawioViewerScriptWithAtom />
       <Layout {...page.props}>{page}</Layout>
     </>
   );
@@ -131,10 +136,6 @@ SharedPage.getLayout = function getLayout(page) {
 
 //   return action;
 // }
-
-const emptyProps = {
-  props: {},
-};
 
 export const getServerSideProps: GetServerSideProps<Props> = async (
   context: GetServerSidePropsContext,
@@ -164,9 +165,9 @@ export const getServerSideProps: GetServerSideProps<Props> = async (
   // Merge all results in a type-safe manner (using sequential merging)
   return mergeGetServerSidePropsResults(
     commonEachPropsResult,
-    commonEachProps.nextjsRoutingType === NextjsRoutingType.INITIAL
-      ? await getServerSidePropsForInitial(context)
-      : emptyProps,
+    commonEachProps.nextjsRoutingType === NextjsRoutingType.SAME_ROUTE
+      ? await getServerSidePropsForSameRoute(context)
+      : await getServerSidePropsForInitial(context),
   );
 };
 

@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Custom icons builder project for GROWI",
   "license": "MIT",
+  "type": "module",
   "private": true,
   "scripts": {
     "build": "svgtofont --sources ./svg --output ./dist",

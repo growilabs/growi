@@ -1,7 +1,7 @@
 import type { Response } from 'express';
 
 import type { ExpressHttpHeader } from '~/server/interfaces/attachment';
-import type { IAttachmentDocument } from '~/server/models/attachment';
+import type { AttachmentDraft } from '~/server/models/attachment';
 
 import { configManager } from '../../config-manager';
 import { defaultContentDispositionSettings } from './security';
@@ -52,7 +52,7 @@ export const determineDisposition = (
  * This approach avoids creating a class instance for each call, improving memory efficiency.
  */
 export const createContentHeaders = (
-  attachment: IAttachmentDocument,
+  attachment: AttachmentDraft,
   opts?: { forceAttachment?: boolean },
 ): ContentHeader[] => {
   const headers: ContentHeader[] = [];
@@ -76,7 +76,7 @@ export const createContentHeaders = (
     : determineDisposition(attachment.fileFormat);
   headers.push({
     field: 'Content-Disposition',
-    value: `${disposition};filename*=UTF-8''${encodeURIComponent(attachment.originalName)}`,
+    value: `${disposition};filename*=UTF-8''${encodeURIComponent(attachment.originalName ?? '')}`,
   });
 
   // Content-Length

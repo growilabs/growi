@@ -3,7 +3,6 @@ import {
   GroupType,
   getIdForRef,
   type IGrantedGroup,
-  type IRevision,
   type IUser,
   PageGrant,
 } from '@growi/core/dist/interfaces';
@@ -11,14 +10,10 @@ import mongoose, { type HydratedDocument, type Model } from 'mongoose';
 
 import { getInstance } from '^/test/setup/crowi';
 
-import type { CommentModel } from '~/features/comment/server';
 import { ExternalGroupProviderType } from '~/features/external-user-group/interfaces/external-user-group';
 import ExternalUserGroup from '~/features/external-user-group/server/models/external-user-group';
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
-import type { IBookmark } from '~/interfaces/bookmark-info';
-import type { IComment } from '~/interfaces/comment';
 import { PageActionType } from '~/interfaces/page-operation';
-import type { IShareLink } from '~/interfaces/share-link';
 import type Crowi from '~/server/crowi';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import type {
@@ -29,21 +24,13 @@ import UserGroup from '~/server/models/user-group';
 import UserGroupRelation from '~/server/models/user-group-relation';
 
 import type { IPageService } from '../service/page';
-import type { BookmarkModel } from './bookmark';
-import type { IPageRedirect, PageRedirectModel } from './page-redirect';
-import type { ShareLinkModel } from './share-link';
 
 describe('Page', () => {
   let crowi: Crowi;
   let pageService: IPageService;
 
   let Page: PageModel;
-  let Revision: Model<IRevision>;
-  let Bookmark: BookmarkModel;
-  let Comment: CommentModel;
   let User: Model<IUser>;
-  let ShareLink: ShareLinkModel;
-  let PageRedirect: PageRedirectModel;
   let PageOperation: PageOperationModel;
 
   let rootPage: PageDocument;
@@ -566,13 +553,6 @@ describe('Page', () => {
     vi.restoreAllMocks();
     User = mongoose.model('User');
     Page = mongoose.model('Page') as PageModel;
-    Revision = mongoose.model('Revision');
-    Bookmark = mongoose.model<IBookmark, BookmarkModel>('Bookmark');
-    Comment = mongoose.model<IComment, CommentModel>('Comment');
-    ShareLink = mongoose.model<IShareLink, ShareLinkModel>('ShareLink');
-    PageRedirect = mongoose.model<IPageRedirect, PageRedirectModel>(
-      'PageRedirect',
-    );
     PageOperation = mongoose.model<IPageOperation, PageOperationModel>(
       'PageOperation',
     );

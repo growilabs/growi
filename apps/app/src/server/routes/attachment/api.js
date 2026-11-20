@@ -1,13 +1,18 @@
-import { SupportedAction } from '~/interfaces/activity';
-import { AttachmentType } from '~/server/interfaces/attachment';
-import loggerFactory from '~/utils/logger';
+import { toLegacyAttachmentShape } from '@growi/core/dist/models/serializers';
+import { objectIdUtils } from '@growi/core/dist/utils';
 
-import { Attachment } from '../../models/attachment';
+import { MODEL_ATTACHMENT, SupportedAction } from '~/interfaces/activity';
+import { AttachmentType } from '~/server/interfaces/attachment';
+import { buildAttachmentRemoveSnapshot } from '~/server/service/attachment/attachment-removal-snapshot';
+import { resolveAttachmentPagePath } from '~/server/service/attachment/attachment-snapshot';
+import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
+
 import { validateImageContentType } from './image-content-type-validator';
 
 const logger = loggerFactory('growi:routes:attachment');
 
-const ApiResponse = require('../../util/apiResponse');
+import ApiResponse from '../../util/apiResponse';
 
 /**
  * @swagger
@@ -144,17 +149,16 @@ export const routesFactory = (crowi) => {
    */
   async function isDeletableByUser(user, attachment) {
     // deletable if creator is null
-    if (attachment.creator == null) {
+    if (attachment.creatorId == null) {
       return true;
     }
 
-    const ownerId = attachment.creator._id || attachment.creator;
-    if (attachment.page == null) {
+    if (attachment.pageId == null) {
       // when profile image
-      return user.id === ownerId.toString();
+      return user.id === attachment.creatorId;
     }
 
-    return await Page.isAccessiblePageByViewer(attachment.page, user);
+    return await Page.isAccessiblePageByViewer(attachment.pageId, user);
   }
 
   const actions = {};
@@ -267,7 +271,7 @@ export const routesFactory = (crowi) => {
     }
 
     const result = {
-      attachment: attachment.toObject({ virtuals: true }),
+      attachment: toLegacyAttachmentShape(attachment),
     };
 
     return res.json(ApiResponse.success(result));
@@ -313,7 +317,10 @@ export const routesFactory = (crowi) => {
   api.remove = async (req, res) => {
     const id = req.body.attachment_id;
 
-    const attachment = await Attachment.findOne({ _id: { $eq: id } });
+    // Prisma throws on a non-24-hex ObjectId instead of returning null
+    const attachment = objectIdUtils.isValidObjectId(id)
+      ? await prisma.attachments.findUnique({ where: { id } })
+      : null;
 
     if (attachment == null) {
       return res.json(ApiResponse.error('attachment not found'));
@@ -328,8 +335,27 @@ export const routesFactory = (crowi) => {
       );
     }
 
+    // Build the activity snapshot BEFORE removeAttachment,
+    // because the attachment document is deleted afterwards (requirements 2.1, 2.2).
+    // The shared resolver warns and yields undefined when the page cannot be
+    // resolved, so the snapshot is recorded without pagePath (requirement 2.3).
+    const pagePath = await resolveAttachmentPagePath(
+      attachment.pageId ?? undefined,
+      { attachmentId: attachment.id },
+    );
+    const snapshot = buildAttachmentRemoveSnapshot(
+      {
+        _id: attachment.id,
+        originalName: attachment.originalName ?? undefined,
+        fileSize: attachment.fileSize,
+        pageId: attachment.pageId ?? undefined,
+      },
+      pagePath,
+      req.user.username,
+    );
+
     try {
-      await attachmentService.removeAttachment(attachment);
+      await attachmentService.removeAttachment(attachment.id);
     } catch (err) {
       logger.error(err);
       return res
@@ -339,6 +365,9 @@ export const routesFactory = (crowi) => {
 
     activityEvent.emit('update', res.locals.activity._id, {
       action: SupportedAction.ACTION_ATTACHMENT_REMOVE,
+      target: attachment._id,
+      targetModel: MODEL_ATTACHMENT,
+      snapshot,
     });
 
     return res.json(ApiResponse.success({}));
@@ -380,7 +409,12 @@ export const routesFactory = (crowi) => {
    */
   api.removeProfileImage = async (req, res) => {
     const user = req.user;
-    const attachment = await Attachment.findById(user.imageAttachment);
+    const attachment =
+      user.imageAttachment != null
+        ? await prisma.attachments.findUnique({
+            where: { id: user.imageAttachment.toString() },
+          })
+        : null;
 
     if (attachment == null) {
       return res.json(ApiResponse.error('attachment not found'));

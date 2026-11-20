@@ -39,7 +39,7 @@ class GlobalNotificationList extends React.Component {
         },
       );
       toastSuccess(
-        t('notification_settings.toggle_notification', {
+        t('admin:notification_settings.toggle_notification', {
           path: notification.triggerPath,
         }),
       );
@@ -73,7 +73,7 @@ class GlobalNotificationList extends React.Component {
           this.state.notificationForConfiguration._id,
         );
       toastSuccess(
-        t('notification_settings.delete_notification_pattern', {
+        t('admin:notification_settings.delete_notification_pattern', {
           path: deletedNotificaton.triggerPath,
         }),
       );
@@ -106,7 +106,7 @@ class GlobalNotificationList extends React.Component {
                     className="form-label form-check-label"
                     htmlFor={notification._id}
                   >
-                    <span className="visually-hidden">{t('Enable')}</span>
+                    <span className="visually-hidden">{t('admin:Enable')}</span>
                   </label>
                 </div>
               </td>
@@ -186,7 +186,7 @@ class GlobalNotificationList extends React.Component {
                       )}
                     >
                       <span className="material-symbols-outlined">note</span>{' '}
-                      {t('Edit')}
+                      {t('commons:table_action.edit')}
                     </a>
                     <button
                       className="dropdown-item"

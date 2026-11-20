@@ -76,7 +76,7 @@ export const RevisionComparer = (props: RevisionComparerProps): JSX.Element => {
       : sourceRevision._id === targetRevision._id;
 
   if (currentPageId == null || currentPagePath == null) {
-    return <>{t('not_found_page.page_not_exist')}</>;
+    return <>{t('commons:not_found_page.page_not_exist')}</>;
   }
 
   return (
@@ -97,7 +97,7 @@ export const RevisionComparer = (props: RevisionComparerProps): JSX.Element => {
             </DropdownToggle>
             <DropdownMenu strategy="fixed" end>
               {/* Page path URL */}
-              <CopyToClipboard text={generateURL(currentPagePath)}>
+              <CopyToClipboard text={generateURL(currentPagePath) ?? ''}>
                 <DropdownItem className="px-3">
                   <DropdownItemContents
                     title={t('copy_to_clipboard.Page URL', { ns: 'commons' })}
@@ -106,7 +106,7 @@ export const RevisionComparer = (props: RevisionComparerProps): JSX.Element => {
                 </DropdownItem>
               </CopyToClipboard>
               {/* Permanent Link URL */}
-              <CopyToClipboard text={generateURL(currentPageId)}>
+              <CopyToClipboard text={generateURL(currentPageId) ?? ''}>
                 <DropdownItem className="px-3">
                   <DropdownItemContents
                     title={t('copy_to_clipboard.Permanent link', {

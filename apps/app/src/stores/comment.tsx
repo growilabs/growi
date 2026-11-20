@@ -1,19 +1,14 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import type { Nullable } from '@growi/core';
 import type { SWRResponse } from 'swr';
-import useSWR from 'swr';
 
-import { apiGet, apiPost } from '~/client/util/apiv1-client';
+import { apiPost } from '~/client/util/apiv1-client';
+import { useSWRxCommentList } from '~/features/comment/client/stores/comment-list';
 
 import type {
   ICommentHasIdList,
   ICommentPostArgs,
 } from '../interfaces/comment';
-
-type IResponseComment = {
-  comments: ICommentHasIdList;
-  ok: boolean;
-};
 
 type CommentOperation = {
   update(comment: string, revisionId: string, commentId: string): Promise<void>;
@@ -23,17 +18,16 @@ type CommentOperation = {
 export const useSWRxPageComment = (
   pageId: Nullable<string>,
 ): SWRResponse<ICommentHasIdList, Error> & CommentOperation => {
-  const shouldFetch: boolean = pageId != null;
+  const swrResponse = useSWRxCommentList(pageId);
 
-  const swrResponse = useSWR(
-    shouldFetch ? ['/comments.get', pageId] : null,
-    ([endpoint, pageId]) =>
-      apiGet(endpoint, { page_id: pageId }).then(
-        (response: IResponseComment) => response.comments,
-      ),
+  const { data: commentList, mutate } = swrResponse;
+
+  // Excluding inline rows here is also what keeps them off the share-link
+  // view and the search-result preview, which render only this list.
+  const normalComments = useMemo(
+    () => commentList?.filter((comment) => !comment.isInline),
+    [commentList],
   );
-
-  const { mutate } = swrResponse;
 
   const update = useCallback(
     async (comment: string, revisionId: string, commentId: string) => {
@@ -74,6 +68,7 @@ export const useSWRxPageComment = (
 
   return {
     ...swrResponse,
+    data: normalComments,
     update,
     post,
   };
