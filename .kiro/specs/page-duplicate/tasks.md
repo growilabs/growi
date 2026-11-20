@@ -83,7 +83,7 @@
   - _Requirements: 3.2, 4.1, 4.4_
   - _Depends: 2.1, 2.5_
 
-- [ ] 2.7 (P) v4 のページの配下の複製を、複製のモジュールに新しく作る
+- [x] 2.7 (P) v4 のページの配下の複製を、複製のモジュールに新しく作る
   - 読み出しは今と同じにし、1回分の複製には 2.1 の部品を使う。閲覧できるページだけを選ぶ選択肢は今と同じく使わない
   - PageOperation・サブオペレーション・回復は持たない。例外はログに出して終わる
   - ページサービスの既存の v4 の処理はまだ消さず、3.1 でつなぎ替える
@@ -143,3 +143,4 @@
 - 2.1: タグは「実際に挿入できたページ」の分だけ写す（変更前は空・閲覧不可のページ ID 分の関連も作っていた）。写しのページに付くタグは同じ。「自分が閲覧可能なページのみ」で本人の GRANT_OWNER ページが外れる挙動は変更前から同じで、この spec の範囲外（別 issue 扱い）。
 - 2.2: 成功時の祖先の「足す」書き込みの直前にも `onBatchStart` を呼ぶ（書き込みの規則「各書き込みの直前に進捗を記録」を優先。設計書の手順3の文面は recount だけに渡すと読めるが、足す側にも渡す）。呼び出し元は写しの先頭ページが `toPath` に存在することを前提にしてよい（なければ例外）。`syncDescendantsUpdate` の第2引数は `{ _id }`（受け取り側は user を読まない）。
 - 2.5: `recoverInterruptedDuplicate` は `OwnershipLostError` 以外の例外（PageOperation の削除後に起きた通知の失敗を含む）を呼び出し元へ返す。2.6（run）と 2.8（cron）は、それを受け止めてログに出し、握りつぶさず・待たない Promise に再送出もしない。「本人がいない」は User のドキュメントがない、または `STATUS_DELETED`（GROWI の削除はドキュメントを残して status を書き換える）。User モデルの参照は design.md の Allowed Dependencies に未記載で、spec-cleanup のときに1行足す。
+- 2.7: v4 の複製も全文検索への通知（`syncDescendantsUpdate`、`{ path: newPagePath }`）を最後に1回出す。設計書の「PageOperation・サブオペレーションは持たない」は通知を除く意味（設計書を訂正済み）。3.1 は (1) `newPagePath` に XSS 無害化（`generalXssFilter.process`）後の値を渡す、(2) v4 の入力は `{ sourcePath: page.path, newPagePath, user }`、deps は `pageGrantService` と `pageEvent`、(3) 今の v4 は1回分の例外後も次の回へ進むが新しい処理はそこで止まる（設計どおり）。

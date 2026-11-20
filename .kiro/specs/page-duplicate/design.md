@@ -417,7 +417,7 @@ export function runDescendantDuplication(
 
 - 読み出しは今と同じ（`parent: null` かつ配下、編集できる人で絞り込む）。
 - 1回分の複製は `copyDescendantBatch` を使う。`recordProgress` には何もしない関数を渡す（PageOperation がないため）。今の v4 は `onlyDuplicateUserRelatedResources` を無視しているので、その挙動を保つため、v4 からは常に `false` を渡す（6.3）。
-- PageOperation・サブオペレーション・回復は持たない（v4 の写しはもともとページツリーの外にある。要件4・5の対象外）。例外はログに出して終わる。
+- PageOperation・サブオペレーション・回復は持たない（v4 の写しはもともとページツリーの外にある。要件4・5の対象外）。例外はログに出して終わる。ただし全文検索への通知（`pageEvent 'syncDescendantsUpdate'`、引数は `{ path: newPagePath }` と本人）だけは、今の v4 と同じく、成功でも失敗でも最後に1回発行する（`finally`。発行の失敗はログに出すだけ）。
 
 #### recoverInterruptedDuplicate
 
