@@ -1,20 +1,19 @@
 import pako from 'pako';
+import { SaxesParser, type SaxesTagPlain } from 'saxes';
 
-const MXFILE = /^<mxfile[\s>]/;
-const MXGRAPH_MODEL = /<mxGraphModel[\s>]/;
-const DIAGRAM_ELEMENT = /<diagram\b[^>]*>([\s\S]*?)<\/diagram>/g;
+import { cutText } from './cut-text';
+
 // A shape with custom properties wraps its <mxCell> in <UserObject>/<object>
-// and keeps its text in `label` instead of the cell's `value`. Quoted
-// attribute values may contain a literal '>', so they are consumed whole.
-const LABELLED_TAG =
-  /<(mxCell|UserObject|object)\b((?:[^>"']|"[^"]*"|'[^']*')*)>/g;
-const LABEL_ATTRIBUTE: Readonly<Record<string, RegExp>> = {
-  mxCell: /\svalue\s*=\s*(?:"([^"]*)"|'([^']*)')/,
-  UserObject: /\slabel\s*=\s*(?:"([^"]*)"|'([^']*)')/,
-  object: /\slabel\s*=\s*(?:"([^"]*)"|'([^']*)')/,
-};
+// and keeps its text in `label` instead of the cell's `value`.
+const LABEL_ATTRIBUTE: ReadonlyMap<string, string> = new Map([
+  ['mxCell', 'value'],
+  ['UserObject', 'label'],
+  ['object', 'label'],
+]);
+const MAX_TEXT_LENGTH = 2_000;
 const ENTITY = /&(?:#x([0-9a-fA-F]+)|#(\d+)|(amp|lt|gt|quot|apos|nbsp));/g;
-const HTML_TAG = /<[^>]*>/g;
+// `[^<>]` keeps a run of '<' with no '>' linear to scan.
+const HTML_TAG = /<[^<>]*>/g;
 
 const NAMED_ENTITIES: Readonly<Record<string, string>> = {
   amp: '&',
@@ -25,7 +24,7 @@ const NAMED_ENTITIES: Readonly<Record<string, string>> = {
   nbsp: ' ',
 };
 
-const decodeEntities = (text: string): string =>
+const decodeHtmlEntities = (text: string): string =>
   text.replace(
     ENTITY,
     (match, hex: string | undefined, dec: string | undefined, name) => {
@@ -64,47 +63,77 @@ const inflateRawWithin = (input: Uint8Array, budget: InflateBudget): Buffer => {
 };
 
 // Same decoding as validateCompressedData in packages/remark-drawio/src/utils/embed.ts.
-const toGraphModelXml = (content: string, budget: InflateBudget): string => {
-  const xml = MXGRAPH_MODEL.test(content)
-    ? content
-    : decodeURIComponent(
-        inflateRawWithin(
-          Buffer.from(content.trim(), 'base64'),
-          budget,
-        ).toString('utf8'),
-      );
-  if (!MXGRAPH_MODEL.test(xml)) {
-    throw new Error('not a draw.io graph model');
-  }
-  return xml;
-};
-
-// A multi-page <mxfile> holds one <diagram> per page, each either compressed
-// or plain XML (see packages/remark-drawio/src/utils/mxfile.ts).
-const toGraphModelXmls = (code: string, budget: InflateBudget): string[] => {
-  const trimmed = code.trim();
-  if (!MXFILE.test(trimmed)) {
-    return [toGraphModelXml(trimmed, budget)];
-  }
-  return [...trimmed.matchAll(DIAGRAM_ELEMENT)].map((match) =>
-    toGraphModelXml(match[1], budget),
+const inflateDiagram = (base64: string, budget: InflateBudget): string =>
+  decodeURIComponent(
+    inflateRawWithin(Buffer.from(base64, 'base64'), budget).toString('utf8'),
   );
-};
 
-// A cell value is HTML escaped into an XML attribute: unescape the XML, drop
-// the tags, then unescape the HTML.
+// The parser has already unescaped the XML; what is left is HTML.
 const toPlainLabel = (attributeValue: string): string =>
-  decodeEntities(decodeEntities(attributeValue).replace(HTML_TAG, ' '))
+  decodeHtmlEntities(attributeValue.replace(HTML_TAG, ' '))
     .replace(/\s+/g, ' ')
     .trim();
 
-const collectCellLabels = (xml: string): string[] =>
-  [...xml.matchAll(LABELLED_TAG)]
-    .map(([, tagName, attributes]) =>
-      LABEL_ATTRIBUTE[tagName].exec(` ${attributes}`),
-    )
-    .map((value) => (value == null ? '' : toPlainLabel(value[1] ?? value[2])))
-    .filter((label) => label !== '');
+const labelOf = (tag: SaxesTagPlain): string => {
+  const attribute = LABEL_ATTRIBUTE.get(tag.name);
+  const value = attribute == null ? undefined : tag.attributes[attribute];
+  return value == null ? '' : toPlainLabel(value);
+};
+
+/**
+ * Labels of one draw.io XML document, read in a single pass. A multi-page
+ * <mxfile> holds one <diagram> per page, either as child elements or as
+ * compressed text (see packages/remark-drawio/src/utils/mxfile.ts); compressed
+ * pages are inflated and read in turn, one level deep.
+ * Throws when the XML is not well-formed or holds no graph model.
+ */
+const collectLabels = (
+  xml: string,
+  budget: InflateBudget,
+  readsPages: boolean,
+): string[] => {
+  const labels: string[] = [];
+  let hasGraphModel = false;
+  let pageText: string[] | null = null;
+
+  const parser = new SaxesParser();
+  parser.on('opentag', (tag) => {
+    if (tag.name === 'mxGraphModel') {
+      hasGraphModel = true;
+    } else if (readsPages && tag.name === 'diagram') {
+      pageText = [];
+    }
+    const label = labelOf(tag);
+    if (label !== '') labels.push(label);
+  });
+  parser.on('text', (text) => {
+    pageText?.push(text);
+  });
+  parser.on('closetag', (tag) => {
+    if (pageText == null || tag.name !== 'diagram') return;
+    const compressed = pageText.join('').trim();
+    pageText = null;
+    if (compressed === '') return;
+    labels.push(
+      ...collectLabels(inflateDiagram(compressed, budget), budget, false),
+    );
+    hasGraphModel = true;
+  });
+  parser.write(xml).close();
+
+  if (!hasGraphModel) {
+    throw new Error('not a draw.io graph model');
+  }
+  return labels;
+};
+
+const toStandIn = (labels: readonly string[]): string => {
+  const text = [...new Set(labels)].join(' / ');
+  if (text === '') return '[draw.io diagram]';
+  return text.length > MAX_TEXT_LENGTH
+    ? `[draw.io diagram: ${cutText(text, MAX_TEXT_LENGTH)}…]`
+    : `[draw.io diagram: ${text}]`;
+};
 
 type DrawioDiagramSummary = {
   readonly text: string;
@@ -123,16 +152,16 @@ export const summarizeDrawioDiagram = (
   const budget: InflateBudget = { remaining: maxInflatedBytes };
   const inflatedBytes = (): number =>
     Math.min(maxInflatedBytes, maxInflatedBytes - budget.remaining);
+  const trimmed = code.trim();
   let labels: string[];
   try {
-    labels = toGraphModelXmls(code, budget).flatMap(collectCellLabels);
+    // Base64 never starts with '<', so anything else is compressed.
+    const xml = trimmed.startsWith('<')
+      ? trimmed
+      : inflateDiagram(trimmed, budget);
+    labels = collectLabels(xml, budget, true);
   } catch {
     return { text: '[draw.io diagram]', inflatedBytes: inflatedBytes() };
   }
-  const uniqueLabels = [...new Set(labels)];
-  const text =
-    uniqueLabels.length > 0
-      ? `[draw.io diagram: ${uniqueLabels.join(' / ')}]`
-      : '[draw.io diagram]';
-  return { text, inflatedBytes: inflatedBytes() };
+  return { text: toStandIn(labels), inflatedBytes: inflatedBytes() };
 };

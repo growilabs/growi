@@ -58,6 +58,51 @@ describe('preparePageBody', () => {
       expect(body).toBe('get [the file]([embedded data]) here');
     });
 
+    it('replaces a non-image data URI inside HTML', () => {
+      const { body } = preparePageBody(
+        '<a href="data:application/pdf;base64,JVBERi0xLjQ=">the file</a>',
+      );
+
+      expect(body).toBe('<a href="[embedded data]">the file</a>');
+    });
+
+    it('keeps the closing parenthesis of a CSS url() around a data URI', () => {
+      const { body } = preparePageBody(
+        '<div style="background:url(data:image/png;base64,AAAA)">hi</div>',
+      );
+
+      expect(body).toBe(
+        '<div style="background:url([embedded image])">hi</div>',
+      );
+    });
+
+    it('leaves a word that only ends in "data:" inside HTML alone', () => {
+      const source = '<p>metadata:value</p>';
+
+      expect(preparePageBody(source).body).toBe(source);
+    });
+
+    it.each([
+      [
+        'a Markdown image',
+        '![chart](DATA:IMAGE/PNG;base64,AAAA)',
+        '[embedded image]',
+      ],
+      [
+        'an HTML <img>',
+        '<img src="Data:image/png;base64,AAAA">',
+        '<img src="[embedded image]">',
+      ],
+    ])('replaces an upper-case data URI in %s', (_label, source, expected) => {
+      expect(preparePageBody(source).body).toBe(expected);
+    });
+
+    it('replaces an upper-case data URI of a link', () => {
+      const { body } = preparePageBody('[file](DATA:text/plain,hi)');
+
+      expect(body).toBe('[file]([embedded data])');
+    });
+
     it.each([
       ['a backtick fence', `\`\`\`drawio\n${DIAGRAM}\n\`\`\``],
       ['a tilde fence', `~~~drawio\n${DIAGRAM}\n~~~`],

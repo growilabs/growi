@@ -1,3 +1,4 @@
+import { cutText } from '../../tools/page-content';
 import type { PageReadBudget } from './request-context';
 
 type PageSlice = {
@@ -37,15 +38,6 @@ const fitOutline = <T extends PageSlice>(
       };
 };
 
-const isHighSurrogate = (code: number): boolean =>
-  code >= 0xd800 && code <= 0xdbff;
-
-// Never splits a surrogate pair: a lone surrogate is not valid Unicode.
-const cutContent = (content: string, room: number): string =>
-  room > 0 && isHighSurrogate(content.charCodeAt(room - 1))
-    ? content.slice(0, room - 1)
-    : content.slice(0, room);
-
 /**
  * Charges one tool result against the remaining budget, in characters: the
  * outline as the LLM receives it (serialised), then the body. Whatever does
@@ -64,7 +56,7 @@ export const fitPageToBudget = <T extends PageSlice>(
   if (page.content.length <= contentRoom) {
     return { page, consumed: outlineChars + page.content.length };
   }
-  const content = cutContent(page.content, contentRoom);
+  const content = cutText(page.content, contentRoom);
   return {
     page: { ...page, content, hasMore: true },
     consumed: outlineChars + content.length,

@@ -6,7 +6,10 @@ import { summarizeDrawioDiagram } from './drawio-diagram';
 
 const EMBEDDED_IMAGE = '[embedded image]';
 const EMBEDDED_DATA = '[embedded data]';
-const HTML_DATA_IMAGE_URI = /data:image\/[^\s"'<>]+/gi;
+// URL schemes are case-insensitive, so `DATA:` is a data URI too. ')' ends
+// the URI so a CSS `url(...)` keeps its closing parenthesis.
+const HTML_DATA_URI = /\bdata:[^\s"'<>)]+/gi;
+const DATA_URI = /^data:/i;
 const DATA_IMAGE_URI = /^data:image\//i;
 // Shared by every draw.io diagram on the page (see ai-summarize research.md 7.11).
 const MAX_DRAWIO_INFLATED_BYTES = 10 * 1024 * 1024;
@@ -16,6 +19,9 @@ type Replacement = {
   readonly end: number;
   readonly text: string;
 };
+
+const standInFor = (url: string): string =>
+  DATA_IMAGE_URI.test(url) ? EMBEDDED_IMAGE : EMBEDDED_DATA;
 
 const offsetsOf = (node: Node): [number, number] | null => {
   const start = node.position?.start.offset;
@@ -29,10 +35,10 @@ const replacementsInHtml = (
   body: string,
   [start, end]: [number, number],
 ): Replacement[] =>
-  [...body.slice(start, end).matchAll(HTML_DATA_IMAGE_URI)].map((match) => ({
+  [...body.slice(start, end).matchAll(HTML_DATA_URI)].map((match) => ({
     start: start + match.index,
     end: start + match.index + match[0].length,
-    text: EMBEDDED_IMAGE,
+    text: standInFor(match[0]),
   }));
 
 // Only the URL is replaced, so a link's text and a definition's label stay.
@@ -50,7 +56,7 @@ const replacementOfUrl = (
         {
           start: index,
           end: index + url.length,
-          text: DATA_IMAGE_URI.test(url) ? EMBEDDED_IMAGE : EMBEDDED_DATA,
+          text: standInFor(url),
         },
       ];
 };
@@ -69,14 +75,14 @@ const collectReplacements = (body: string, tree: Root): Replacement[] => {
       );
       drawioRoom -= inflatedBytes;
       replacements.push({ start, end, text });
-    } else if (node.type === 'image' && node.url.startsWith('data:')) {
+    } else if (node.type === 'image' && DATA_URI.test(node.url)) {
       replacements.push({ start, end, text: EMBEDDED_IMAGE });
     } else if (
       (node.type === 'link' || node.type === 'definition') &&
-      node.url.startsWith('data:')
+      DATA_URI.test(node.url)
     ) {
       replacements.push(...replacementOfUrl(body, offsets, node.url));
-    } else if (node.type === 'html' && node.value.includes('data:')) {
+    } else if (node.type === 'html') {
       replacements.push(...replacementsInHtml(body, offsets));
     }
   });

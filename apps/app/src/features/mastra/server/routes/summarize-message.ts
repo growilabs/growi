@@ -11,6 +11,11 @@ import {
 import type { Request, RequestHandler } from 'express';
 import mongoose, { type HydratedDocument } from 'mongoose';
 
+import {
+  createUsageMeter,
+  type UsageMeter,
+  type UsageMeterOutcome,
+} from '~/features/ai-usage/server';
 import { incrementAiSummarizeGeneratedCount } from '~/features/opentelemetry/server/custom-metrics/ai-summarize-metrics';
 import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
@@ -105,15 +110,37 @@ const recordUnsettledAttempt = (activityId: string | undefined): void => {
   }
 };
 
-const startSummarizeStream = (
+// Stops the LLM run when the client disconnects mid-stream.
+const abortOnDisconnect = (res: ApiV3Response): AbortSignal => {
+  const abortController = new AbortController();
+  res.on('close', () => {
+    if (!res.writableFinished) {
+      abortController.abort();
+    }
+  });
+  return abortController.signal;
+};
+
+type StartedSummary = {
+  readonly stream: SummarizeStream;
+  // Closed by whoever ends the run: pipeSummaryRun, or the throw below.
+  readonly usageMeter: UsageMeter;
+};
+
+const startSummarizeStream = async (
   req: Req,
   res: ApiV3Response,
   crowi: Crowi,
   page: SummaryPage,
-): Promise<SummarizeStream> => {
+): Promise<StartedSummary> => {
   const summarizeAgent = mastra.getAgent('summarizeAgent');
   // Throws when no model is available; the caller answers 500.
   const effectiveModelKey = resolveEffectiveModelKey(req.body.modelKey);
+  const usageMeter = createUsageMeter({
+    userId: req.user._id.toString(),
+    feature: 'summarize',
+    modelKey: effectiveModelKey,
+  });
 
   // Built per request so concurrent summaries never share a budget. The same
   // object is read by the tool and by the per-step tool gate.
@@ -122,25 +149,27 @@ const startSummarizeStream = (
   requestContext.set('user', req.user);
   requestContext.set('searchService', crowi.searchService);
   requestContext.set('modelKey', effectiveModelKey);
+  requestContext.set('usageMeter', usageMeter);
   requestContext.set('pageReadBudget', pageReadBudget);
   requestContext.set('targetPageId', page._id.toString());
 
-  // Stops the LLM run when the client disconnects mid-stream.
-  const abortController = new AbortController();
-  res.on('close', () => {
-    if (!res.writableFinished) {
-      abortController.abort();
-    }
-  });
-
-  return summarizeAgent.stream(buildSummarizeRequest(page, req.user.lang), {
-    requestContext,
-    maxSteps: MAX_STEPS,
-    prepareStep: ({ stepNumber }) =>
-      resolveStepToolChoice(pageReadBudget, stepNumber, MAX_STEPS),
-    providerOptions: getProviderOptionsForModel(effectiveModelKey),
-    abortSignal: abortController.signal,
-  });
+  try {
+    const stream = await summarizeAgent.stream(
+      buildSummarizeRequest(page, req.user.lang),
+      {
+        requestContext,
+        maxSteps: MAX_STEPS,
+        prepareStep: ({ stepNumber }) =>
+          resolveStepToolChoice(pageReadBudget, stepNumber, MAX_STEPS),
+        providerOptions: getProviderOptionsForModel(effectiveModelKey),
+        abortSignal: abortOnDisconnect(res),
+      },
+    );
+    return { stream, usageMeter };
+  } catch (error) {
+    usageMeter.close({ outcome: 'failed' });
+    throw error;
+  }
 };
 
 // Same sanitize points as post-message.ts: the toAISdkStream hook covers
@@ -177,6 +206,7 @@ type SummaryRun = {
   readonly crowi: Crowi;
   readonly page: SummaryPage;
   readonly stream: SummarizeStream;
+  readonly usageMeter: UsageMeter;
   readonly startMetadata: CustomUIMessageMetadata;
   // Undefined when addActivity failed to begin tracking.
   readonly activityId: string | undefined;
@@ -205,15 +235,15 @@ const settleSummaryRun = async (
   run: SummaryRun,
   writer: UIMessageStreamWriter,
   state: SummaryRelayState,
-): Promise<void> => {
+): Promise<UsageMeterOutcome> => {
   const { res, stream, activityId } = run;
   // The fail-safe finalizer has recorded that attempt.
-  if (res.destroyed) return;
+  if (res.destroyed) return 'failed';
   // The client already got the error chunk; awaiting the stream's promises
   // here could reject and send it a second one.
   if (state.hasErrorChunk) {
     recordUnsettledAttempt(activityId);
-    return;
+    return 'failed';
   }
 
   const [usage, finishReason, steps] = await Promise.all([
@@ -222,7 +252,7 @@ const settleSummaryRun = async (
     stream.steps,
   ]);
   // The client may have left while the promises above settled.
-  if (res.destroyed) return;
+  if (res.destroyed) return 'failed';
 
   const messageMetadata: CustomUIMessageMetadata = { finishReason };
   writer.write({ type: 'message-metadata', messageMetadata });
@@ -239,9 +269,10 @@ const settleSummaryRun = async (
 
   if (isCompleteSummary(finishReason, state)) {
     recordCompletedSummary(run);
-  } else {
-    recordUnsettledAttempt(activityId);
+    return 'completed';
   }
+  recordUnsettledAttempt(activityId);
+  return 'failed';
 };
 
 const pipeSummaryRun = (run: SummaryRun): void => {
@@ -251,12 +282,17 @@ const pipeSummaryRun = (run: SummaryRun): void => {
       return onChatError(error);
     },
     execute: async ({ writer }) => {
-      writer.write({
-        type: 'message-metadata',
-        messageMetadata: run.startMetadata,
-      });
-      const state = await relaySummaryChunks(run.stream, writer);
-      await settleSummaryRun(run, writer, state);
+      let outcome: UsageMeterOutcome = 'failed';
+      try {
+        writer.write({
+          type: 'message-metadata',
+          messageMetadata: run.startMetadata,
+        });
+        const state = await relaySummaryChunks(run.stream, writer);
+        outcome = await settleSummaryRun(run, writer, state);
+      } finally {
+        run.usageMeter.close({ outcome });
+      }
     },
   });
 
@@ -309,13 +345,19 @@ export const summarizeMessageHandlersFactory: SummarizeMessageHandlersFactory =
             sourceRevisionId: getIdStringForRef(page.revision),
             capturedAt: new Date().toISOString(),
           };
-          const stream = await startSummarizeStream(req, res, crowi, page);
+          const { stream, usageMeter } = await startSummarizeStream(
+            req,
+            res,
+            crowi,
+            page,
+          );
           pipeSummaryRun({
             req,
             res,
             crowi,
             page,
             stream,
+            usageMeter,
             startMetadata,
             activityId: res.locals.activity?._id,
           });

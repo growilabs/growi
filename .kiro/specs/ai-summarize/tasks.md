@@ -14,7 +14,7 @@
 - [x] 1.2 要約instructionsができる
   - **段階的な全文読み取り手順**を、`getPageContentTool` の実際の入出力契約に沿った具体手順として明文化する:
     - 初回呼び出しは `offset` を省略する。この呼び出しではアウトライン（見出し構成）と `totalLines` が返る
-    - ページが1回分（`limit`、既定200行・最大500行）に収まる場合は、初回呼び出しで `content` と `hasMore`（`false`）も同時に返るため1回で読み終わる
+    - ページが1回分（`limitedGetPageContentTool` が固定する500行）に収まる場合は、初回呼び出しで `content` と `hasMore`（`false`）も同時に返るため1回で読み終わる
     - ページが `limit` を超える場合、初回呼び出しは**アウトラインのみ**を返し `content` と `hasMore` はいずれも `undefined` になる。この `hasMore === undefined` を「偽だから読み終わった」と解釈してはならない（＝**まだ本文を1行も読んでいない**状態）。`totalLines` は見積り参考値として使うが、**打ち切り判定には使わない**
     - 2回目以降は `offset`（1始まりの行番号）を明示して先頭から順に読み進める。各呼び出しの結果の `hasMore` と、読み込んだ行数の累計を参考に次の `offset` を決める。**`content` が `undefined` 以外のときだけ行数を累積カウンタに加算する**
     - 打ち切り条件は3つのみ: `hasMore === false`（全文読了）／`limit_exceeded`（ハード上限到達）／`not_found_or_forbidden` 等の失敗。アウトラインだけを見て「構成が分かったので本文は読まない」と判断してはならない。`totalLines` の値で打ち切ってもいけない
@@ -35,7 +35,7 @@
   - _Depends: 1.1, 1.2_
 
 - [x] 1.4 GetPageContentTool: 埋め込み画像と draw.io の図が短い文字に置き換えられ、置き換えた本文が1回のリクエストの中で使い回される
-  - 共通の `getPageContentTool` の中で、`data:` の画像（Markdown・HTML）を `[embedded image]` に、`drawio` のコードブロックを図に書かれた文字だけの1行（`[draw.io diagram: ...]`）に置き換える。mermaid は置き換えない（詳細は design.md「GetPageContentTool」）
+  - 共通の `getPageContentTool` の中で、`data:` の画像を `[embedded image]` に、それ以外の `data:` の URL を `[embedded data]` に、`drawio` のコードブロックを図に書かれた文字だけの1行（`[draw.io diagram: ...]`）に置き換える。mermaid は置き換えない（詳細は design.md「GetPageContentTool」）
   - 置き換える場所は `fromMarkdown` の構文解析で探し、元の本文の文字列の上で置き換える。見出しの一覧と行の切り出しは置き換えた後の本文から作る
   - 置き換えた本文と見出しの一覧は、ページごとに最初の1回だけ作って `RequestContext` の `preparedPageBodies` に入れる。閲覧権限の確認は呼び出しのたびに行う
   - 置き換えの各ケース（画像・draw.io の圧縮した形と圧縮していない形・`<mxfile>`・`~~~`・箇条書きと引用の中・別のコードブロックの中の説明文・mermaid）と、本文を1回のリクエストで1回だけ読むことをユニットテストで、画像と draw.io（両方の形）を含むページを `get-page-content-tool.integ.ts` で確認できる

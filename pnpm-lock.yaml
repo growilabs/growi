@@ -875,6 +875,9 @@ importers:
       sanitize-filename:
         specifier: ^1.6.3
         version: 1.6.3
+      saxes:
+        specifier: ^6.0.0
+        version: 6.0.0
       simplebar-react:
         specifier: ^2.3.6
         version: 2.4.3(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
@@ -11255,6 +11258,7 @@ packages:
     resolution: {integrity: sha512-Quz3MvAwHxVYNXsOByL7xI5EB2WYOeFswqaHIA3qOK3isRWTxiplBEocmmru6XmxDB2L7jDNYtYA4FyimoAFEw==}
     engines: {node: '>=8.17.0'}
     hasBin: true
+    bundledDependencies: []
 
   jsonfile@3.0.1:
     resolution: {integrity: sha512-oBko6ZHlubVB5mRFkur5vgYR1UyqX+S6Y/oCfLhqNdcc2fYFlDpIoNc7AfKS1KOGcnNAkvsr0grLck9ANM815w==}

@@ -74,6 +74,18 @@ vi.mock('~/server/service/activity/record-failsafe-attempt', () => ({
   recordFailsafeAttempt: mocks.recordFailsafeAttempt,
 }));
 
+// The real usage meter, writing through a mocked recorder. The barrel also
+// loads the public route and Prisma models.
+vi.mock('~/features/ai-usage/server', async () => {
+  const { createUsageMeter } = await import(
+    '~/features/ai-usage/server/services/usage-meter'
+  );
+  return { createUsageMeter };
+});
+vi.mock('~/features/ai-usage/server/services/record-ai-usage', () => ({
+  recordAiUsage: mocks.recordAiUsage,
+}));
+
 vi.mock('~/features/mastra/server/services/mastra-modules', () => ({
   mastra: { getAgent: mocks.getAgent },
 }));
@@ -222,6 +234,15 @@ export const activityContext = {
   userId: viewer._id.toString(),
   username: viewer.username,
   createdAt: new Date(),
+};
+
+// What the fake agent reports for its one model call.
+export const MODEL_CALL_USAGE = {
+  inputTokens: 120,
+  outputTokens: 30,
+  reasoningTokens: null,
+  cacheReadTokens: null,
+  cacheWriteTokens: null,
 };
 
 export const FINAL_TEXT =
@@ -397,6 +418,7 @@ export const useSummarizeRoute = (): SummarizeRouteHarness => {
   beforeEach(async () => {
     vi.clearAllMocks();
     mocks.takeActivityContext.mockReturnValue(activityContext);
+    mocks.recordAiUsage.mockResolvedValue(undefined);
     mocks.resolveEffectiveModelKey.mockReturnValue('openai/test-model');
     mocks.pageLookup.mockResolvedValue(undefined);
     mocks.currentUser = viewer;
@@ -411,6 +433,8 @@ export const useSummarizeRoute = (): SummarizeRouteHarness => {
           extractPageId(prompt),
           options.requestContext,
         );
+        // Stands in for the metered model the real agent resolves.
+        options.requestContext.get('usageMeter')?.add(MODEL_CALL_USAGE);
         streamCalls = [
           ...streamCalls,
           { prompt, options, budgetAtStart, toolOutputs },

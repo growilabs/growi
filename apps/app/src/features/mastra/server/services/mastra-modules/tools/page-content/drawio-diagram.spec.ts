@@ -91,4 +91,90 @@ describe('summarizeDrawioDiagram', () => {
   it('falls back to a bare placeholder for data that does not decode', () => {
     expect(labelsOf('not-a-diagram')).toBe('[draw.io diagram]');
   });
+
+  it('falls back to a bare placeholder for XML that is not well-formed', () => {
+    expect(labelsOf('<mxGraphModel><mxCell value="DB"></mxGraphModel>')).toBe(
+      '[draw.io diagram]',
+    );
+  });
+
+  it('caps the length of the text it keeps', () => {
+    const label = 'x'.repeat(10_000);
+    const { text } = summarizeDrawioDiagram(
+      `<mxGraphModel><root><mxCell value="${label}" /></root></mxGraphModel>`,
+      Number.MAX_SAFE_INTEGER,
+    );
+
+    expect(text.length).toBeLessThan(label.length);
+    expect(text.startsWith('[draw.io diagram: xxx')).toBe(true);
+    expect(text.endsWith('…]')).toBe(true);
+  });
+
+  it('does not split a surrogate pair when capping the text', () => {
+    const { text } = summarizeDrawioDiagram(
+      `<mxGraphModel><root><mxCell value="${'😀'.repeat(5_000)}" /></root></mxGraphModel>`,
+      Number.MAX_SAFE_INTEGER,
+    );
+
+    expect(text.isWellFormed()).toBe(true);
+  });
+
+  describe('input built to make parsing slow', () => {
+    const MiB = 1024 * 1024;
+    // A parser that backtracks takes several seconds on each of these.
+    const FAST_ENOUGH_MS = 1000;
+
+    const timedSummary = (code: string) => {
+      const startedAt = performance.now();
+      const { text } = summarizeDrawioDiagram(code, 10 * MiB);
+      return { text, elapsedMs: performance.now() - startedAt };
+    };
+
+    it.each([
+      [
+        'attribute quotes that never close',
+        `<mxGraphModel>${'<mxCell value="'.repeat(24_000)}`,
+      ],
+      [
+        'diagram elements that never close',
+        `<mxfile>${'<diagram>'.repeat(40_000)}`,
+      ],
+      [
+        'a label made of "<" with no ">"',
+        `<mxGraphModel><root><mxCell value="${'&lt;'.repeat(90_000)}" /></root></mxGraphModel>`,
+      ],
+    ])('returns quickly for %s', (_, code) => {
+      const { elapsedMs } = timedSummary(code);
+
+      expect(elapsedMs).toBeLessThan(FAST_ENOUGH_MS);
+    });
+
+    it('returns quickly for a compressed diagram that inflates to the limit', () => {
+      // About 10 MiB once inflated, from a few KB of base64.
+      const code = compress(
+        `<mxGraphModel>${'<mxCell value="'.repeat(450_000)}`,
+      );
+
+      const { text, elapsedMs } = timedSummary(code);
+
+      expect(code.length).toBeLessThan(100_000);
+      expect(text).toBe('[draw.io diagram]');
+      expect(elapsedMs).toBeLessThan(FAST_ENOUGH_MS);
+    });
+
+    it('reads a well-formed compressed diagram that inflates to nearly the limit quickly', () => {
+      const cells = Array.from(
+        { length: 170_000 },
+        (_, i) => `<mxCell id="${i}" value="L${i % 3}" />`,
+      ).join('');
+      const code = compress(
+        `<mxGraphModel><root>${cells}</root></mxGraphModel>`,
+      );
+
+      const { text, elapsedMs } = timedSummary(code);
+
+      expect(text).toBe('[draw.io diagram: L0 / L1 / L2]');
+      expect(elapsedMs).toBeLessThan(FAST_ENOUGH_MS);
+    });
+  });
 });

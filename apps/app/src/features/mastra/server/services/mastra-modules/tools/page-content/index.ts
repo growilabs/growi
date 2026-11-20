@@ -1,3 +1,4 @@
+export { cutText } from './cut-text';
 export type { OutlineEntry, PreparedPageBody } from './prepared-page-body';
 export {
   countLines,

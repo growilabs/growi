@@ -8,6 +8,7 @@ export const mocks = {
   emitActivity: vi.fn(),
   takeActivityContext: vi.fn(),
   recordFailsafeAttempt: vi.fn(),
+  recordAiUsage: vi.fn(),
   responseClosed: vi.fn(),
   // Awaited by the fake Page finders, so a test can hold the lookup open.
   pageLookup: vi.fn(),

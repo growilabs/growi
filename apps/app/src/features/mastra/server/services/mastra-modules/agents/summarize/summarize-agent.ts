@@ -2,6 +2,7 @@ import { Agent } from '@mastra/core/agent';
 import type { RequestContext } from '@mastra/core/request-context';
 
 import { resolveMastraModel } from '../../../ai-sdk-modules/resolve-mastra-model';
+import { meterModelForRequest } from '../../../usage-metering';
 import { SUMMARIZE_INSTRUCTIONS } from './instructions';
 import { limitedGetPageContentTool } from './limited-get-page-content-tool';
 import type { SummarizeRequestContextShape } from './request-context';
@@ -24,11 +25,17 @@ export const summarizeAgent = new Agent({
   // the effective default. Constructing the agent never throws even when the
   // provider/API key are unconfigured — resolveMastraModel() only throws at
   // request time, surfaced by the route's existing error handling.
-  model: ({
+  // Per-request metering wrap: see ai-usage-metering design.md, agent integration note.
+  model: async ({
     requestContext,
   }: {
     requestContext: RequestContext<SummarizeRequestContextShape>;
-  }) => resolveMastraModel(requestContext.get('modelKey')),
+  }) =>
+    meterModelForRequest(
+      requestContext,
+      'summarize',
+      await resolveMastraModel(requestContext.get('modelKey')),
+    ),
   tools: {
     // Same key as growiAgent's page-content tool, so the client's
     // `tool-getPageContentTool` part types cover the summary stream too.

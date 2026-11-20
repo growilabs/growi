@@ -392,7 +392,7 @@ sequenceDiagram
 - instructionsは、以下の4点を規定する。
   - **(a) 段階的な全文読み取り手順**（`getPageContentTool` の既存契約に沿った具体手順として明文化する）:
     1. **初回呼び出しは `offset` を省略**する。`getPageContentTool` は `offset` 省略時にアウトライン（見出し構成）と `totalLines` を返す（`includeOutline = (offset == null)`）。
-       - ページが1回分（`limit`、既定200行・最大500行）に収まる場合は、この初回呼び出しで `content` と `hasMore`（この場合 `false`）も同時に返るため、**1回で読み終わる**。
+       - ページが1回分（`limitedGetPageContentTool` が固定する500行）に収まる場合は、この初回呼び出しで `content` と `hasMore`（この場合 `false`）も同時に返るため、**1回で読み終わる**。
        - ページが `limit` を超える長さの場合、初回呼び出しは**アウトラインのみ**を返し、**`content` と `hasMore` はいずれも `undefined`** になる（`includeContent = (offset != null) || totalLines <= limit`）。この `hasMore === undefined` を「偽だから読み終わった」と解釈してはならない。`content` が返らなかった＝**まだ本文を1行も読んでいない**と扱う。`totalLines` はカバレッジの見積り情報として使うが、打ち切り判定には**使わない**。
     2. **2回目以降は `offset` を明示して**（1始まりの行番号）、ページ先頭から順に本文を段階的に読み込む。各呼び出しの結果の `hasMore` と、読み込んだ行数の累計を参考に、次の `offset` を決めて読み進める。`content` が `undefined` でない限り、その行数を累積カウンタに加算する。
     3. **打ち切り条件は次の3つのみ**: (i) `hasMore === false` が返った（＝全文を読み終えた）、(ii) `limit_exceeded` が返った（＝読み取り量のハード上限に到達した）、(iii) `not_found_or_forbidden` 等の失敗が返った（＝これ以上読めない）。それ以外の理由で読み取りを途中でやめてはならない。特に、アウトラインだけを見て「構成が分かったので本文は読まなくてよい」と判断してはならない（要件2.1の全文カバレッジに反する）。
@@ -403,6 +403,7 @@ sequenceDiagram
 - `growi-agent.ts` のinstructionsとは完全に独立したファイルとし、共有しない。
 - `suggestPathAgent` と同様、`resolveMastraModel` によるモデル解決を用いる。`modelKey` はリクエストから渡された場合のみ考慮し（`post-message.ts` と同じ `resolveEffectiveModelKey` による丸め込みを再利用）、省略時はデフォルトモデルを使う。
 - `suggestPathAgent` と同じく `memory` を接続しない。要約は1回で終わる実行であり、スレッドを保存しない。
+- `suggestPathAgent` と同じく、解決したモデルを `meterModelForRequest(requestContext, 'summarize', model)` で包み、LLMの利用量（トークン数と推定費用）を `ai-usage-metering` の仕組みで記録する（記録の種類は `summarize`）。
 
 **Dependencies**
 - Outbound: `limitedGetPageContentTool`（新規）— ページ本文取得・権限チェック・読み取り量バジェットの適用（P0）
@@ -470,9 +471,10 @@ export const limitedGetPageContentTool: Tool; // used only by summarizeAgent
 
 **Responsibilities & Constraints**（理由は research.md 7.11）
 - 置き換え（要約・検索Q&A・パス提案のすべてに効く）:
-  - URL が `data:` で始まる Markdown の画像、HTML の部品の中の `data:image/...` → `[embedded image]`
-  - URL が `data:` で始まるリンクと参照定義（`[ref]: data:...`）→ URL の部分だけを `[embedded image]`（`data:image/` のとき）または `[embedded data]` にする。リンクの文字と参照のラベルは残す
-  - `drawio` のコードブロック → `[draw.io diagram: <図に書かれた文字> / ...]`。文字は `mxCell` の `value` と、`UserObject` / `object` の `label`。圧縮された形は `embed.ts` と同じ手順で XML に戻し、`<mxfile>` は各 `<diagram>` を読む。戻せない図・文字のない図は `[draw.io diagram]`。圧縮された図を展開してよい量は1ページの全図の合計で 10MiB とし、超えた図も `[draw.io diagram]` にする
+  - URL が `data:` で始まる Markdown の画像 → `[embedded image]`
+  - URL が `data:` で始まるリンクと参照定義（`[ref]: data:...`）、HTML の部品の中の `data:` の URL → URL の部分だけを `[embedded image]`（`data:image/` のとき）または `[embedded data]` にする。リンクの文字と参照のラベルは残す
+  - `data:` は大文字小文字を区別しない（URL のスキームは大文字小文字を区別しないため）
+  - `drawio` のコードブロック → `[draw.io diagram: <図に書かれた文字> / ...]`。文字は `mxCell` の `value` と、`UserObject` / `object` の `label`。圧縮された形は `embed.ts` と同じ手順で XML に戻し、`<mxfile>` は各 `<diagram>` を読む。XML は `saxes` で先頭から1回だけ読む。戻せない図・整形式でない図・文字のない図は `[draw.io diagram]`。図の文字は2,000文字までとし、超えた分は `…` で省く。圧縮された図を展開してよい量は1ページの全図の合計で 10MiB とし、超えた図も `[draw.io diagram]` にする
   - mermaid は置き換えない
 - 置き換える場所は `fromMarkdown` の構文解析で探し、各部品の `position` の範囲を元の本文の文字列の上で置き換える。
 - 見出しの一覧と行の切り出しは、置き換えた後の本文から作る。
@@ -515,6 +517,7 @@ export const limitedGetPageContentTool: Tool; // used only by summarizeAgent
 - `capturedAt` を、`sourceRevisionId` を取得するのと**同じ時点（生成開始時点、`findByIdAndViewer` 直後）**に `new Date()` でサーバ側に生成し、`sourceRevisionId` と併せてストリーム応答に含める。クライアントから受け取った日時は使わない（7.2）。両者が同一の瞬間を指すことで、鮮度表示と生成時刻表示の基準時刻が一致する。
 - ストリーミング応答の構築（`createUIMessageStream` / `toAISdkStream` / `pipeUIMessageStreamToResponse`）は `post-message.ts` と同型のパターンを踏襲し、`CustomUIMessage`（既存の型）と互換のストリームを返す。将来のトリガーUIが、既存のチャット表示コンポーネント（`ChatSidebar` のメッセージレンダリング）をそのまま再利用できるようにするため。
 - 「正常終了」は、error チャンクがなく、`finishReason === 'stop'` で、最後のステップに空白でない本文テキストが1つ以上届いた場合に限る。判定はストリームのチャンクを順に読む純粋関数（`summarize-stream-outcome.ts` の `trackSummaryChunk` / `isCompleteSummary`）に置き、ハンドラはそれを呼ぶだけにする。`'tool-calls'`（`maxSteps` を使い切った）や `'length'`（出力の打ち切り）は要約が完成していないため正常終了に含めない。
+- リクエストごとに `createUsageMeter({ userId, feature: 'summarize', modelKey })` で利用量の集計器を作り、`RequestContext` の `usageMeter` に入れる。1回の要約のすべてのステップの呼び出しを、1件の記録にまとめる。集計器は、ストリームの終わり（正常終了・失敗・切断のいずれでも）か、ストリームの開始に失敗したときに1回だけ閉じる。
 - ストリームが正常終了した時点で `AiSummarizeMetrics` のCounterをインクリメントする（6.1）。正常終了以外ではインクリメントしない。
 - 同じくストリームが正常終了した時点（レスポンス送信前）で、`crowi.events.activity.emit('update', res.locals.activity._id, { action: SupportedAction.ACTION_PAGE_AI_SUMMARIZE, targetModel: SupportedTargetModel.MODEL_PAGE, target: page, contributor: req.user })` を呼び、Audit Logに記録する（18.1）。既存の `create-page.ts` と同じ呼び出し形。`emit` はレスポンス送信より前に完了させる必要がある（既存規約: 送信後に呼ぶと記録の `user` が欠落する）。永続化ルート（`AiSummaryPersistenceRoute`）にはこの `emit` を追加しない（18.3）。
 - 正常終了以外で終わった場合は `PAGE_AI_SUMMARIZE` を記録せず、代わりに `ACTION_UNSETTLED` の試行記録を1件残す（`pendingActivityContext.take()` → `recordFailsafeAttempt()`、レスポンス送信前）。ストリーム内の失敗は 200 応答の中で届き、`add-activity` の fail-safe finalizer（`statusCode >= 400` またはクライアント切断のみを失敗とみなす）では記録されないため。
@@ -525,6 +528,7 @@ export const limitedGetPageContentTool: Tool; // used only by summarizeAgent
 - Outbound: `summarizeAgent`（P0）
 - Outbound: `Page.findByIdAndViewer`（既存、無変更）— `sourceRevisionId` 取得のための1回限りのメタデータ参照（P0）
 - Outbound: `AiSummarizeMetrics`（P1）
+- Outbound: `createUsageMeter`（`features/ai-usage`、既存）— LLM利用量の記録（P1）
 - Inbound: `aiReadyGuard`（P0、`routes/index.ts` で既に全 `mastra` ルートにミドルウェアとして適用済み）
 
 **Contracts**: Service [ ] / API [x] / Event [ ] / Batch [ ] / State [ ]
