@@ -21,6 +21,8 @@
  * Error responses (fixed messages, the input is never echoed):
  *   400  — invalid_query / invalid_page_ids
  *   403  — not logged in and guests may not read
+ *   500  — the permission check or the attachment search failed, or took longer
+ *          than the secondary time limit (no empty result is returned instead)
  *   503  — feature_disabled
  */
 

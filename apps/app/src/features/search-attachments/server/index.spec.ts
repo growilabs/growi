@@ -206,7 +206,7 @@ describe('initAttachmentFullTextSearch', () => {
           resolvedFilterData: { groupIds: [], notGroupIds: [] },
           viewer: { user: null, userGroups: null },
         },
-        { facet: 'attachments', from: 0, size: 20 },
+        { from: 0, size: 20 },
       );
 
       expect(esClient.search).toHaveBeenCalledWith(
