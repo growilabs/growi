@@ -37,7 +37,7 @@
 - **検索時の権限判定 (Option D)**: 添付 ES 文書に権限情報を持たせない。検索時に、親ページを page_index (viewer filter と検索演算子) と MongoDB で確かめ、ページ検索が本文の抜粋を見せるページの添付ヒットだけを返す。権限変更のたびに添付の文書を書き換える必要が無い
 - **Client package**: `packages/attachment-text-extractor-client/` を新規追加。orval が `apps/attachment-text-extractor` の OpenAPI spec (commit 済みの `openapi.json`) を入力に TS クライアントを自動生成 (pdf-converter-client と同パターン)
 - **Config keys**: `app:attachmentFullTextSearch:extractorUri` / `extractorToken` / `timeoutMs` / `maxFileSizeBytes` の 4 つを [config-definition.ts](apps/app/src/server/service/config-manager/config-definition.ts) に追加。有効・無効は「検索サービスが設定済み AND URI とトークンが設定済み」の算出値で、`enabled` のキーは無い
-- **検索クエリ**: `facet=all` の 1 ページ目は、ページ検索の後に、本文の抜粋を見せるページの添付だけを検索する (pageId ごとに上位 5 件)。`facet=attachments` は添付 index を検索してから親ページを判定する。2 ページ目以降の添付ヒットは別の API (secondary) で足す
+- **検索クエリ**: ページ検索 (`GET /_api/search`) は機能導入前のまま動く。その結果のページの添付ヒットは、別の API (`GET /_api/v3/search/attachments`) が、ページを判定してから、そのページの添付だけを検索して返す (pageId ごとに上位 5 件)。`facet=attachments` は添付 index を検索してから親ページを判定する。ページと添付の点数を混ぜた順位は作らない
 - **性能 fallback**: 添付の検索が閾値 (800ms) を超えたら添付ヒットを除外し Page 結果のみ返す safety net
 - **rebuildIndex 互換**: チェックボックス追加のみで既存挙動を保つ (OFF 時は Page/Comment のみ処理)
 
@@ -68,7 +68,7 @@
 #### 既存ファイル修正
 - [apps/app/src/server/crowi/index.ts](apps/app/src/server/crowi/index.ts): `initAttachmentFullTextSearch(this)` を searchService/attachmentService 初期化後に追加
 - [apps/app/src/server/service/search.ts](apps/app/src/server/service/search.ts): facet 付きの検索の入口と集約ロジック。本文の抜粋の表示規則を `search/can-show-snippet.ts` に切り出し、添付検索と共有 (権限変更リスナは足さない)
-- [apps/app/src/server/routes/search.ts](apps/app/src/server/routes/search.ts): `GET /_api/search` に optional な `facet` / `resolve` を追加
+- [apps/app/src/server/routes/search.ts](apps/app/src/server/routes/search.ts): `GET /_api/search` に optional な `facet` (`attachments`) を追加
 - [apps/app/src/server/service/config-manager/config-definition.ts](apps/app/src/server/service/config-manager/config-definition.ts): 新規 Config キー 4 件
 - [apps/app/src/interfaces/search.ts](apps/app/src/interfaces/search.ts): `IPageSearchMeta.attachmentHits[]` optional 追加 (検索結果の各項目では `meta.attachmentHits`)
 - [apps/app/src/interfaces/activity.ts](apps/app/src/interfaces/activity.ts): 監査ログの action 2 つ (設定の更新、個別再抽出)

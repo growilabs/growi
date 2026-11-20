@@ -182,6 +182,8 @@
 
 ## 7. Core: 検索結果 Aggregator
 
+> 7.1 の facet=`all`、7.2 の「失敗したら空を返す」と facet 引数、9.2 の `resolve` は、12 でやめる (research.md 12)。
+
 - [x] 7.1 `AttachmentSearchResultAggregator.searchPrimary` を実装する
   - facet=`pages` は既存 Page 検索経路のみを呼び attachments_index を一切叩かない (完全互換)
   - facet=`all` かつ `from==0` では、先にページ検索を行い、その結果のうちページ検索が本文の抜粋を見せるページ (`snippetVisiblePageIds`: 結果の各項目が持つ MongoDB のページ文書に `canShowSnippetOfPage` を当てる) を選び、そのページの添付だけを検索して `meta.attachmentHits` に付ける。添付 index 全体は検索しない。添付の検索は pageId 20 件ごとに分け、1 ページあたり上位 5 件を返す
@@ -350,13 +352,14 @@
   - _Requirements: 9.2_
   - _Boundary: integration_
 
-- [ ] 10.8 primary / secondary 検索性能とスナップ safety net を perf test で確認する (`attachment-search-performance.integ.ts`: 手で走らせる測定。`ATTACHMENT_SEARCH_PERF=1` のときだけ動き、CI では飛ばす。測定値は research.md 8.7)
-  - primary p95 が機能有効時に既存 Page 検索比 +30% 以内 — **未達**。facet=`all` の 2 ページ目以降はページ検索と同等だが、1 ページ目は直近の手元の測定でページ検索の約 2.36 倍 (p95 がページ検索 17.9ms に対して 42.2ms)。1 ページ目はページ検索の後に、見えるページの添付だけを検索するので、2 つの検索の時間が足される (research.md 8.7 / 10.1)。目標を見直すか速くするかは umbrella の roadmap.md 3-(d) / (e) で決める
-  - secondary p95 が 500ms 以内 (非同期なので初期描画に影響しない) — 2026-11-16 の手元の測定で 32〜71ms
-  - primary 閾値超過時 facet=`all` が facet=`pages` 相当に degrade、facet=`attachments` が `primaryResultIncomplete: true` を返す safety net (`attachment-search-result-aggregator.spec.ts` で固定済み)
-  - secondary 閾値超過時 enrichment skip で primary のみ返ること (`attachment-search-result-aggregator.spec.ts` で固定済み)
-  - _Requirements: 9.1, 9.2_
+- [ ] 10.8 検索の速さを perf test で確認する (`attachment-search-performance.integ.ts`: 手で走らせる測定。`ATTACHMENT_SEARCH_PERF=1` のときだけ動き、CI では飛ばす。測定値は research.md 8.7 / 12)
+  - 測る経路を、機能有効時の `facet` なしの `GET /_api/search`、`GET /_api/v3/search/attachments` (20 ページ分)、`facet=attachments` の 3 つにする。facet=`all` の経路は外す
+  - 機能有効時の `facet` なしの `GET /_api/search` の p95 が、機能無効時のページ検索と同等であること (添付 index を使わないので同じ処理になる)
+  - `GET /_api/v3/search/attachments` の p95 が 500ms 以内であること (ページ検索の結果の表示を待たせない) — 2026-11-20 の手元の測定で 38.4ms
+  - 時間の上限を超えたとき、`facet=attachments` が `primaryResultIncomplete: true` を返し、`GET /_api/v3/search/attachments` がエラーを返すこと (`attachment-search-result-aggregator.spec.ts` で固定する)
+  - _Requirements: 9.1, 9.2, 9.5_
   - _Boundary: performance_
+  - _Depends: 12.1, 12.2_
 
 ## 11. 抽出サービスへの送信の修正
 
@@ -370,3 +373,20 @@
   - ファイルを読む前に、保存してある大きさと設定を比べる。超えたら、読まず、送らない。上限ちょうどは送る
   - 抽出サービスが 413 `file_too_large` を返したとき、本物の生成クライアントを通して `tooLarge` になることをテストで固定する
   - _Requirements: 8.3_
+
+## 12. ページと添付をまとめた検索 (`facet=all`) と `resolve` をやめる
+
+- [ ] 12.1 `GET /_api/search` から `facet=all` と `resolve` を取り除く
+  - 機能が有効なとき、`facet` は `pages` と `attachments` だけを受け付け、それ以外 (`all` を含む) は `{ ok: false, code: 400 }` にする。`resolve` は読まない。機能が無効のときは、これまでどおり `facet` を読まない
+  - `AttachmentSearchResultAggregator.searchPrimary` を `facet=attachments` の検索だけにする。facet=`all` の処理 (`searchPrimaryAll`、`snippetVisiblePageIds`、2 ページ目以降の分岐) と、`SearchService.searchByFacet` の `resolve` / `attachSecondaryHits` を消す
+  - `SearchFacet` / `IFacetedSearchResultMeta` / `IPrimarySearchResult` を design.md の形にする。`GET /_api/search` の OpenAPI の説明から `all` と `resolve` を消す
+  - 消した処理のテストを消し、機能が有効でも `facet` なし・`facet=pages` の `GET /_api/search` が添付 index に触れず、機能が無効のときと同じ応答を返すことを結合テストで固定する。権限の比較の結合テスト (`attachment-search-permission.integ.ts`) は、検索結果のページへの添付ヒットと `facet=attachments` の 2 経路にする
+  - _Requirements: 9.1, 9.3, 9.5_
+  - _Boundary: apps/app/src/server/routes/search.ts, SearchService, AttachmentSearchResultAggregator, interfaces/search.ts_
+
+- [ ] 12.2 `GET /_api/v3/search/attachments` の失敗を、空の結果で隠さずエラーで返す
+  - `resolveSecondary` は、権限確認か添付の検索が失敗するか 500ms を超えたら例外を投げる。ルートは 500 を返す
+  - `resolveSecondary` の `facet` 引数と、応答の `facet` を消す (応答は `{ enrichments }`)
+  - _Requirements: 4.1, 9.5_
+  - _Boundary: AttachmentSearchResultAggregator, features/search-attachments/server/routes/apiv3_
+  - _Depends: 12.1_
