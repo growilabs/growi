@@ -66,6 +66,16 @@
 - **Findings**: Mongoose は `dbStatementSerializer` を設定したときだけ `db.statement` を記録する。GROWI は設定していない。MongoDB は `enhancedDatabaseReporting` が既定で無効で、クエリの値を記録しない。
 - **Implications**: 現在の設定では DB の span からページパスなどは漏れない。これらの設定を変える場合は再確認が必要（Revalidation Triggers に記載）。
 
+### Next.js のサーバー側の span
+
+- **Sources Consulted**: `next` 16.4.1 `dist/server/base-server.js`（`handleRequest`）、`dist/server/lib/trace/tracer.js`、`@opentelemetry/sdk-trace-base` 2.7.1 `build/src/Span.js`、`@opentelemetry/sdk-node` 0.217.0 `build/src/sdk.js`、ローカルの OTel Collector（debug exporter）で受け取ったトレース。
+- **Findings**:
+  - Next.js は登録済みの tracer provider があると、リクエストごとに scope `next.js`・種類 `SERVER` の span（`GET /[[...path]]`、`next.span_type` は `BaseServer.handleRequest`）を作り、作成時の属性に `'http.target': req.url` を渡す。`startIncomingSpanHook` は HTTP の計測部品の span にしか効かないため、匿名化を有効にしてもページ表示のたびにページパスが平文で記録されていた。
+  - 同じリクエストの Next.js のほかの span（`getServerSideProps` など）と、終了時に足される属性（`http.route`、`next.route`）はルートの型（`/[[...path]]`）だけで、利用者データを含まない。
+  - SDK の Span は作成時の属性を設定してから span processor の `onStart` を呼ぶ。`onStart` の時点では span はまだ書き換えられる。
+  - NodeSDK は `spanProcessors` を渡すと `traceExporter` を使わない（`spanProcessors ?? [new BatchSpanProcessor(traceExporter)]`）。
+- **Implications**: span processor の `onStart` で `http.target` を書き換えれば、Next.js の span も HTTP の計測部品の span と同じ値にできる。Next.js の更新で属性の付け方が変わると効かなくなる（design.md の Revalidation Triggers）。
+
 ## Architecture Pattern Evaluation
 
 | Option | Description | Strengths | Risks / Limitations | Notes |
@@ -113,6 +123,18 @@
 
 - **Selected Approach**: 共有リンク ID・トークンは `[ANONYMIZED]` に置き換える。
 - **Rationale**: ObjectId は推測可能で、ハッシュからでも総当たりで割り出せる（要件 7.3）。
+
+### Decision: Next.js の span は span processor の onStart で匿名化する
+
+- **Context**: Next.js のサーバー側の span の `http.target` に生の URL が残る（Research Log「Next.js のサーバー側の span」）。
+- **Alternatives Considered**:
+  1. exporter を包んで、送る直前に属性を書き換える — 終了済みの span（`ReadableSpan`）の属性は読み取り専用の型で、書き換えるには型を崩す必要がある。
+  2. Next.js の span を送らない — span の木から中間の span が抜け、子の span（DB など）の親が欠ける。Next.js のルートの型（`http.route`）という有用な情報も失う。
+  3. Next.js のトレースを止める — Next.js に止める設定がない。
+  4. span processor の `onStart` で書き換える — 公開の API（`span.setAttribute`）だけで済み、span の木も保つ。
+- **Selected Approach**: 4。種類が `SERVER` で、scope が HTTP の計測部品でない span の `http.target` を、hook と同じ規則・同じ実行関数に通す。
+- **Rationale**: 同じリクエストの 2 つの span が同じハッシュ値になり、受信側で突き合わせられる。scope を `next.js` に限らず「HTTP の計測部品以外のサーバー側の span」とした（除外するものを並べる形）のは、同じように生の URL を記録する tracer が加わっても対象に入るようにするため。対象を `next.js` に限る形では、Next.js が tracer 名を変えたときや新しい tracer が加わったときに平文で漏れる。除外する形で外れた場合に起きるのは二重のハッシュ化で、平文は漏れないため、こちらを選んだ。HTTP の計測部品の span を除くのは、開始時点で hook が匿名化した値（`/[HASHED:...]`）を持っており、もう一度通すとページパスとしてハッシュ化し直してしまうため（要件 9）。
+- **Trade-offs**: 扱うのは `onStart` の時点で入っている `http.target` だけ。Next.js が開始後に URL 属性を設定するようになると効かない。単体テストでは Next.js の実際の span を作れないため、Next.js の更新時はローカルの Collector で確かめる。
 
 ### Decision: 匿名化の処理が失敗したら、URL を残さない
 
