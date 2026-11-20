@@ -593,7 +593,7 @@ export type AncestorUpdate =
 
 export interface SubOperationInput {
   readonly toPath: string;
-  /** normalizeParentRecursively in duplicate mode applies no grant filter, so the id suffices. */
+  /** normalizeParentRecursively in duplicate mode skips only the grant filter; it still reads user._id, so the caller passes { _id: ObjectId(userId) }, not the bare string. */
   readonly userId: string;
   readonly shouldNormalizeParent: boolean;
   readonly ancestorUpdate: AncestorUpdate;

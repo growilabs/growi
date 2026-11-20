@@ -132,10 +132,26 @@ export interface IPageService {
     pageId: string,
     revisionBody?: string,
   ): Promise<CurrentPageYjsData>;
-  updateDescendantCountOfPagesWithPaths(paths: string[]): Promise<void>;
+  // onBatchStart: called before each batch; throwing aborts the run with that error
+  normalizeParentRecursively(
+    paths: string[],
+    user,
+    isDuplicateOperation?: boolean,
+    shouldEmitProgress?: boolean,
+    onBatchStart?: () => Promise<void>,
+  ): Promise<number>;
+  updateDescendantCountOfSelfAndDescendants(
+    path: string,
+    onBatchStart?: () => Promise<void>,
+  ): Promise<void>;
+  updateDescendantCountOfPagesWithPaths(
+    paths: string[],
+    onBatchStart?: () => Promise<void>,
+  ): Promise<void>;
   recountAndUpdateDescendantCountOfPages(
     pageCursor: Cursor<unknown>,
     batchSize: number,
+    onBatchStart?: () => Promise<void>,
   ): Promise<void>;
   revertRecursivelyMainOperation(
     page,

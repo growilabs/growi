@@ -4154,6 +4154,7 @@ class PageService implements IPageService {
    * Normalize parent attribute by passing paths and user.
    * @param paths Pages under this paths value will be updated.
    * @param user To be used to filter pages to update. If null, only public pages will be updated.
+   * @param onBatchStart Called before each batch; throwing aborts the whole run with that error.
    * @returns Promise<void>
    */
   async normalizeParentRecursively(
@@ -4161,6 +4162,7 @@ class PageService implements IPageService {
     user: any | null,
     isDuplicateOperation = false,
     shouldEmitProgress = false,
+    onBatchStart?: () => Promise<void>,
   ): Promise<number> {
     const Page = mongoose.model<IPage, PageModel>('Page');
 
@@ -4194,6 +4196,10 @@ class PageService implements IPageService {
       user,
       grantFiltersByUser,
       shouldEmitProgress,
+      0,
+      0,
+      true,
+      onBatchStart,
     );
   }
 
@@ -4253,6 +4259,7 @@ class PageService implements IPageService {
     count = 0,
     skiped = 0,
     isFirst = true,
+    onBatchStart?: () => Promise<void>,
   ): Promise<number> {
     const BATCH_SIZE = 100;
     const PAGES_LIMIT = 1000;
@@ -4303,148 +4310,160 @@ class PageService implements IPageService {
 
     const migratePagesStream = new Writable({
       objectMode: true,
-      async write(pages, encoding, callback) {
-        const parentPaths = Array.from(
-          new Set<string>(pages.map((p) => pathlib.dirname(p.path))),
-        );
-
-        // 1. Remove unnecessary empty pages & reset parent for pages which had had those empty pages
-        const pageIdsToNotDelete = pages.map((p) => p._id);
-        const emptyPagePathsToDelete = pages.map((p) => p.path);
-
-        const builder1 = new PageQueryBuilder(
-          Page.find({ isEmpty: true }, { _id: 1 }),
-          true,
-        );
-        builder1.addConditionToListByPathsArray(emptyPagePathsToDelete);
-        builder1.addConditionToExcludeByPageIdsArray(pageIdsToNotDelete);
-
-        const emptyPagesToDelete = await builder1.query.lean().exec();
-        const resetParentOperations = emptyPagesToDelete.map((p) => {
-          return {
-            updateOne: {
-              filter: {
-                parent: p._id,
-              },
-              update: {
-                parent: null,
-              },
-            },
-          };
-        });
-
-        await Page.bulkWrite(resetParentOperations);
-        await Page.removeEmptyPages(pageIdsToNotDelete, emptyPagePathsToDelete);
-
-        // 2. Create lacking parents as empty pages
-        const orFilters = [
-          { path: '/' },
-          {
-            path: { $in: publicPathsToNormalize },
-            grant: Page.GRANT_PUBLIC,
-            status: Page.STATUS_PUBLISHED,
-          },
-          {
-            path: { $in: publicPathsToNormalize },
-            parent: { $ne: null },
-            status: Page.STATUS_PUBLISHED,
-          },
-          {
-            path: { $nin: publicPathsToNormalize },
-            status: Page.STATUS_PUBLISHED,
-          },
-        ];
-        const filterForApplicableAncestors = { $or: orFilters };
-        const aggregationPipeline = await buildPipelineToCreateEmptyPagesByUser(
-          user,
-          parentPaths,
-          false,
-          filterForApplicableAncestors,
-        );
-        await Page.createEmptyPagesByPaths(parentPaths, aggregationPipeline);
-
-        // 3. Find parents
-        const builder2 = new PageQueryBuilder(Page.find(), true);
-        if (grantFiltersByUser != null) {
-          builder2.query = builder2.query.and(grantFiltersByUser);
-        }
-        const parents = await builder2
-          .addConditionToListByPathsArray(parentPaths)
-          .addConditionToFilterByApplicableAncestors(publicPathsToNormalize)
-          .query.lean()
-          .exec();
-
-        // Normalize all siblings for each page
-        const updateManyOperations = parents.map((parent) => {
-          const parentId = parent._id;
-
-          // Build filter
-          const parentPathEscaped = escapeStringForMongoRegex(
-            parent.path === '/' ? '' : parent.path,
-          ); // adjust the path for RegExp
-          const filter: any = {
-            $and: [
-              {
-                path: {
-                  $regex: new RegExp(
-                    `^${parentPathEscaped}(\\/[^/]+)\\/?$`,
-                    'i',
-                  ),
-                }, // see: regexr.com/6889f (e.g. /parent/any_child or /any_level1)
-              },
-              {
-                path: { $in: pathOrRegExps.concat(publicPathsToNormalize) },
-              },
-              filterForApplicableAncestors,
-            ],
-          };
-          if (grantFiltersByUser != null) {
-            filter.$and.push(grantFiltersByUser);
-          }
-
-          return {
-            updateMany: {
-              filter,
-              update: {
-                parent: parentId,
-              },
-            },
-          };
-        });
+      // Every failure must reach callback(err) (see page-duplicate research.md)
+      async write(pages, _encoding, callback) {
         try {
-          const res = await Page.bulkWrite(updateManyOperations);
+          await onBatchStart?.();
 
-          nextCount += res.result.nModified;
-          nextSkiped += res.result.writeErrors.length;
-          logger.info(
-            `Page migration processing: (migratedPages=${res.result.nModified})`,
+          const parentPaths = Array.from(
+            new Set<string>(pages.map((p) => pathlib.dirname(p.path))),
           );
 
-          socket?.emit(SocketEventName.PMMigrating, { count: nextCount });
-          socket?.emit(SocketEventName.PMErrorCount, { skip: nextSkiped });
+          // 1. Remove unnecessary empty pages & reset parent for pages which had had those empty pages
+          const pageIdsToNotDelete = pages.map((p) => p._id);
+          const emptyPagePathsToDelete = pages.map((p) => p.path);
 
-          // Throw if any error is found
-          if (res.result.writeErrors.length > 0) {
-            logger.error(
-              { writeErrors: res.result.writeErrors },
-              'Failed to migrate some pages',
+          const builder1 = new PageQueryBuilder(
+            Page.find({ isEmpty: true }, { _id: 1 }),
+            true,
+          );
+          builder1.addConditionToListByPathsArray(emptyPagePathsToDelete);
+          builder1.addConditionToExcludeByPageIdsArray(pageIdsToNotDelete);
+
+          const emptyPagesToDelete = await builder1.query.lean().exec();
+          const resetParentOperations = emptyPagesToDelete.map((p) => {
+            return {
+              updateOne: {
+                filter: {
+                  parent: p._id,
+                },
+                update: {
+                  parent: null,
+                },
+              },
+            };
+          });
+
+          await Page.bulkWrite(resetParentOperations);
+          await Page.removeEmptyPages(
+            pageIdsToNotDelete,
+            emptyPagePathsToDelete,
+          );
+
+          // 2. Create lacking parents as empty pages
+          const orFilters = [
+            { path: '/' },
+            {
+              path: { $in: publicPathsToNormalize },
+              grant: Page.GRANT_PUBLIC,
+              status: Page.STATUS_PUBLISHED,
+            },
+            {
+              path: { $in: publicPathsToNormalize },
+              parent: { $ne: null },
+              status: Page.STATUS_PUBLISHED,
+            },
+            {
+              path: { $nin: publicPathsToNormalize },
+              status: Page.STATUS_PUBLISHED,
+            },
+          ];
+          const filterForApplicableAncestors = { $or: orFilters };
+          const aggregationPipeline =
+            await buildPipelineToCreateEmptyPagesByUser(
+              user,
+              parentPaths,
+              false,
+              filterForApplicableAncestors,
             );
-            socket?.emit(SocketEventName.PMEnded, { isSucceeded: false });
-            throw Error('Failed to migrate some pages');
+          await Page.createEmptyPagesByPaths(parentPaths, aggregationPipeline);
+
+          // 3. Find parents
+          const builder2 = new PageQueryBuilder(Page.find(), true);
+          if (grantFiltersByUser != null) {
+            builder2.query = builder2.query.and(grantFiltersByUser);
           }
+          const parents = await builder2
+            .addConditionToListByPathsArray(parentPaths)
+            .addConditionToFilterByApplicableAncestors(publicPathsToNormalize)
+            .query.lean()
+            .exec();
 
-          // Finish migration if no modification occurred
-          if (res.result.nModified === 0 && res.result.nMatched === 0) {
-            shouldContinue = false;
-            logger.error(
-              { parentPaths, bulkWriteResult: res },
-              'Migration is unable to continue',
+          // Normalize all siblings for each page
+          const updateManyOperations = parents.map((parent) => {
+            const parentId = parent._id;
+
+            // Build filter
+            const parentPathEscaped = escapeStringForMongoRegex(
+              parent.path === '/' ? '' : parent.path,
+            ); // adjust the path for RegExp
+            const filter: any = {
+              $and: [
+                {
+                  path: {
+                    $regex: new RegExp(
+                      `^${parentPathEscaped}(\\/[^/]+)\\/?$`,
+                      'i',
+                    ),
+                  }, // see: regexr.com/6889f (e.g. /parent/any_child or /any_level1)
+                },
+                {
+                  path: { $in: pathOrRegExps.concat(publicPathsToNormalize) },
+                },
+                filterForApplicableAncestors,
+              ],
+            };
+            if (grantFiltersByUser != null) {
+              filter.$and.push(grantFiltersByUser);
+            }
+
+            return {
+              updateMany: {
+                filter,
+                update: {
+                  parent: parentId,
+                },
+              },
+            };
+          });
+          try {
+            const res = await Page.bulkWrite(updateManyOperations);
+
+            nextCount += res.result.nModified;
+            nextSkiped += res.result.writeErrors.length;
+            logger.info(
+              `Page migration processing: (migratedPages=${res.result.nModified})`,
             );
-            socket?.emit(SocketEventName.PMEnded, { isSucceeded: false });
+
+            socket?.emit(SocketEventName.PMMigrating, { count: nextCount });
+            socket?.emit(SocketEventName.PMErrorCount, { skip: nextSkiped });
+
+            // Throw if any error is found
+            if (res.result.writeErrors.length > 0) {
+              logger.error(
+                { writeErrors: res.result.writeErrors },
+                'Failed to migrate some pages',
+              );
+              socket?.emit(SocketEventName.PMEnded, { isSucceeded: false });
+              throw Error('Failed to migrate some pages');
+            }
+
+            // Finish migration if no modification occurred
+            if (res.result.nModified === 0 && res.result.nMatched === 0) {
+              shouldContinue = false;
+              logger.error(
+                { parentPaths, bulkWriteResult: res },
+                'Migration is unable to continue',
+              );
+              socket?.emit(SocketEventName.PMEnded, { isSucceeded: false });
+            }
+          } catch (err) {
+            logger.error('Failed to update page.parent.', err);
+            throw err;
           }
         } catch (err) {
-          logger.error('Failed to update page.parent.', err);
-          throw err;
+          callback(err);
+          return;
         }
 
         callback();
@@ -4466,6 +4485,7 @@ class PageService implements IPageService {
         nextCount,
         nextSkiped,
         false,
+        onBatchStart,
       );
     }
 
@@ -4518,7 +4538,10 @@ class PageService implements IPageService {
    * - page that has the same path as the provided path
    * - pages that are descendants of the above page
    */
-  async updateDescendantCountOfSelfAndDescendants(path: string): Promise<void> {
+  async updateDescendantCountOfSelfAndDescendants(
+    path: string,
+    onBatchStart?: () => Promise<void>,
+  ): Promise<void> {
     const BATCH_SIZE = 200;
     const Page = mongoose.model<IPage, PageModel>('Page');
     const { PageQueryBuilder } = Page;
@@ -4534,13 +4557,17 @@ class PageService implements IPageService {
     await this.recountAndUpdateDescendantCountOfPages(
       aggregatedPages,
       BATCH_SIZE,
+      onBatchStart,
     );
   }
 
   /**
    * update descendantCount of the pages sequentially from longer path to shorter path
    */
-  async updateDescendantCountOfPagesWithPaths(paths: string[]): Promise<void> {
+  async updateDescendantCountOfPagesWithPaths(
+    paths: string[],
+    onBatchStart?: () => Promise<void>,
+  ): Promise<void> {
     const BATCH_SIZE = 200;
     const Page = mongoose.model<IPage, PageModel>('Page');
     const { PageQueryBuilder } = Page;
@@ -4555,31 +4582,41 @@ class PageService implements IPageService {
     await this.recountAndUpdateDescendantCountOfPages(
       aggregatedPages,
       BATCH_SIZE,
+      onBatchStart,
     );
   }
 
   /**
    * Recount descendantCount of pages one by one
+   * @param onBatchStart Called before each batch; throwing aborts the whole run with that error.
    */
   async recountAndUpdateDescendantCountOfPages(
     pageCursor: Cursor<any>,
     batchSize: number,
+    onBatchStart?: () => Promise<void>,
   ): Promise<void> {
     const Page = mongoose.model<IPage, PageModel>('Page');
     const batchStream = createBatchStream(batchSize);
     const recountWriteStream = new Writable({
       objectMode: true,
-      async write(pageDocuments, encoding, callback) {
-        for await (const document of pageDocuments) {
-          const descendantCount = await Page.recountDescendantCount(
-            document._id,
-          );
-          // Skip no-op writes: on a healthy tree almost every page is already
-          // correct, so this avoids rewriting the whole collection and shrinks the
-          // window in which a concurrent live edit could be clobbered.
-          if (descendantCount !== document.descendantCount) {
-            await Page.findByIdAndUpdate(document._id, { descendantCount });
+      // Every failure must reach callback(err) (see page-duplicate research.md)
+      async write(pageDocuments, _encoding, callback) {
+        try {
+          await onBatchStart?.();
+          for await (const document of pageDocuments) {
+            const descendantCount = await Page.recountDescendantCount(
+              document._id,
+            );
+            // Skip no-op writes: on a healthy tree almost every page is already
+            // correct, so this avoids rewriting the whole collection and shrinks the
+            // window in which a concurrent live edit could be clobbered.
+            if (descendantCount !== document.descendantCount) {
+              await Page.findByIdAndUpdate(document._id, { descendantCount });
+            }
           }
+        } catch (err) {
+          callback(err);
+          return;
         }
         callback();
       },
