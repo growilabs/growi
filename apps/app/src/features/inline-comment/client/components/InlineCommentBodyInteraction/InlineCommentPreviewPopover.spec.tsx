@@ -44,32 +44,41 @@ const mockCreatePopper = vi.fn(
   }),
 );
 
-vi.mock('~/features/comment-reaction/client', () => ({
-  CommentReactionBar: (props: {
-    pageId: string;
-    commentId: string;
-    isReadOnly: boolean;
-  }) => (
-    <div
-      data-testid="comment-reaction-bar"
-      data-page-id={props.pageId}
-      data-comment-id={props.commentId}
-      data-read-only={String(props.isReadOnly)}
-    />
-  ),
-  CommentReactionHeaderButton: (props: {
-    pageId: string;
-    commentId: string;
-    isReadOnly: boolean;
-  }) => (
-    <span
-      data-testid="comment-reaction-header-button"
-      data-page-id={props.pageId}
-      data-comment-id={props.commentId}
-      data-read-only={String(props.isReadOnly)}
-    />
-  ),
-}));
+vi.mock('~/features/comment-reaction/client', async () => {
+  const { createPortal } = await import('react-dom');
+  return {
+    CommentReactionBar: (props: {
+      pageId: string;
+      commentId: string;
+      isReadOnly: boolean;
+    }) => (
+      <div
+        data-testid="comment-reaction-bar"
+        data-page-id={props.pageId}
+        data-comment-id={props.commentId}
+        data-read-only={String(props.isReadOnly)}
+      />
+    ),
+    // Like the real add button's emoji picker, the stand-in is portaled to document.body.
+    CommentReactionHeaderButton: (props: {
+      pageId: string;
+      commentId: string;
+      isReadOnly: boolean;
+    }) => (
+      <span
+        data-testid="comment-reaction-header-button"
+        data-page-id={props.pageId}
+        data-comment-id={props.commentId}
+        data-read-only={String(props.isReadOnly)}
+      >
+        {createPortal(
+          <div data-testid={`portaled-emoji-picker-${props.commentId}`} />,
+          document.body,
+        )}
+      </span>
+    ),
+  };
+});
 
 vi.mock('@popperjs/core', () => ({
   createPopper: (reference: unknown, popper: unknown, options: unknown) =>
@@ -1147,6 +1156,34 @@ describe('InlineCommentPreviewPopover', () => {
     await userEvent.click(composer);
 
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('does not close when pressing UI it opened through a portal, such as the emoji picker', () => {
+    const onClose = vi.fn();
+    renderPopover({ id: 'comment1' }, { onClose });
+
+    const picker = screen.getByTestId('portaled-emoji-picker-comment1');
+    expect(
+      screen.getByTestId('inline-comment-preview-popover'),
+    ).not.toContainElement(picker);
+
+    fireEvent.mouseDown(picker);
+
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('still closes on a press outside after one inside its portaled UI', () => {
+    const onClose = vi.fn();
+    renderPopover({ id: 'comment1' }, { onClose });
+    const outsideNode = document.createElement('div');
+    document.body.appendChild(outsideNode);
+
+    fireEvent.mouseDown(screen.getByTestId('portaled-emoji-picker-comment1'));
+    fireEvent.mouseDown(outsideNode);
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    document.body.removeChild(outsideNode);
   });
 
   it('renders a Resolve control for an unresolved comment, and toggles to resolved on click (Req 4.6)', async () => {

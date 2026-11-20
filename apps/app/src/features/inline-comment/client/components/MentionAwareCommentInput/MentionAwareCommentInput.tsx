@@ -33,6 +33,7 @@ import { useCodeMirrorEditorIsolated } from '@growi/editor/dist/client/stores/co
 
 import { useNextThemes } from '~/stores-universal/use-next-themes';
 
+import { MENTION_COMPLETION_Z_INDEX } from '../../constants/z-index';
 import { fetchMentionUsers } from '../../services/fetch-mention-users';
 import type { MentionAwareCommentInputControls } from './use-comment-input-controls';
 
@@ -107,12 +108,12 @@ export const MentionAwareCommentInput = (
     );
   }, [codeMirrorEditor]);
 
-  // 1080 is one step above Bootstrap's $zindex-popover (1070), so this popup
-  // paints above SelectionPopover's portal instead of behind it.
   const tooltipZIndexTheme = useMemo(
     () =>
       EditorView.theme({
-        '.cm-tooltip.cm-tooltip-autocomplete': { zIndex: '1080' },
+        '.cm-tooltip.cm-tooltip-autocomplete': {
+          zIndex: String(MENTION_COMPLETION_Z_INDEX),
+        },
       }),
     [],
   );

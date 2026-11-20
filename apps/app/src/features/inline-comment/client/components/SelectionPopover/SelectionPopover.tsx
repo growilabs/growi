@@ -12,6 +12,7 @@ import { useMemo, useRef, useState } from 'react';
 import type { VirtualElement } from '@popperjs/core';
 import { createPortal } from 'react-dom';
 
+import { INLINE_COMMENT_POPOVER_Z_INDEX } from '../../constants/z-index';
 import type { SelectionEdge } from './selection-virtual-element';
 import {
   rangeToEdgeVirtualElement,
@@ -88,8 +89,11 @@ export const SelectionPopover = (
     // zIndex is the one style this element owns (Popper writes position/transform
     // itself). Some page-layout ancestors set an explicit z-index with no
     // stacking context to contain it, so without this the portal would paint
-    // behind them. 1070 mirrors Bootstrap's $zindex-popover.
-    <div ref={setPopperElement} style={{ zIndex: 1070 }}>
+    // behind them.
+    <div
+      ref={setPopperElement}
+      style={{ zIndex: INLINE_COMMENT_POPOVER_Z_INDEX }}
+    >
       {children}
     </div>,
     document.body,
