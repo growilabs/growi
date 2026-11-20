@@ -17,7 +17,7 @@
 
 本 spec は GROWI の添付ファイル全文検索機能のクライアント側 UI 層を担う。上流 `attachment-search-indexing` spec が提供する検索 API (ページ検索の結果のページに添付ヒットを返す `GET /_api/v3/search/attachments` と、添付だけを対象にした検索 `GET /_api/search?facet=attachments`。添付ヒットの形は `IPageWithSearchMeta.meta.attachmentHits[]`) と admin 系 apiv3 エンドポイントを消費し、エンドユーザ検索体験と管理者運用体験を完結させる。
 
-UI 拡張は 3 領域に分かれる。第 1 に検索結果画面で、左ペイン Page カード内の「添付サブエントリ」と右ペインプレビューでの添付ヒットの表示、および検索の対象を「ページ」と「添付ファイル」で切り替える選択肢を提供する。既定はページ検索で、ページの一覧を先に表示し、表示中のページの添付ヒットを後から取得して付け足す。ページと添付の点数を混ぜた順位は扱わない。第 2 に添付ファイル一覧モーダルで、各添付行に「再抽出」ボタンを追加し、成功/失敗を toast でフィードバックする。第 3 に管理画面 (`ElasticsearchManagement`) で、抽出サービスの接続先 URI と limits を編集するフォーム、rebuildIndex の「添付も対象にする」チェックボックス、抽出失敗可視化パネルを追加する。なお、機能の有効/無効を表す独立したトグルは**提供しない**。機能の有効化判定は上流 spec で「ES 有効 AND `extractorUri` 設定済み」の算出値として導出され、UI には SSR prop (`searchConfig.isAttachmentFullTextSearchEnabled: boolean`) として供給される。soft-disable (緊急停止) は管理者が URI を空文字にクリアして保存することで実現する。
+UI 拡張は 3 領域に分かれる。第 1 に検索結果画面で、左ペイン Page カード内の「添付サブエントリ」と右ペインプレビューでの添付ヒットの表示、および検索の対象を「ページ」と「添付ファイル」で切り替える選択肢を提供する。既定はページ検索で、ページの一覧を先に表示し、表示中のページの添付ヒットを後から取得して付け足す。ページと添付の点数を混ぜた順位は扱わない。第 2 に添付ファイル一覧モーダルで、各添付行に「再抽出」ボタンを追加し、成功/失敗を toast でフィードバックする。第 3 に管理画面 (`ElasticsearchManagement`) で、抽出サービスの接続先 URI と limits を編集するフォーム、rebuildIndex の「添付も対象にする」チェックボックス、抽出失敗可視化パネルを追加する。なお、機能の有効/無効を表す独立したトグルは**提供しない**。機能の有効化判定は上流 spec で「ES 有効 AND `extractorUri` 設定済み AND `extractorToken` 設定済み」の算出値として導出され、UI には SSR prop (`searchConfig.isAttachmentFullTextSearchEnabled: boolean`) として供給される。soft-disable (緊急停止) は管理者が URI を空文字にクリアして保存するか、トークンを削除することで実現する。
 
 本 spec は上流 (`attachment-search-indexing`) が定めた型と API 契約に UI を**追従させる**責務に限定する。したがって上流の API 応答形状・Config キー名・進捗通知イベント名の変更は本 spec の Revalidation Trigger となる。
 
@@ -113,14 +113,16 @@ UI 拡張は 3 領域に分かれる。第 1 に検索結果画面で、左ペ�
 ### Requirement 5: 管理画面の設定 UI と URI 設定時ガイダンス
 <!-- derived from umbrella R9.3 + 設定 UI 表示部分 -->
 
-**Objective:** As a GROWI 管理者, I want 添付ファイル全文検索機能の接続先 URI と limits を 1 つの画面で操作でき、新たに URI を設定した際に必要な後続操作が分かる形で提示されること, so that 設定ミスや運用ミスを防げる
+**Objective:** As a GROWI 管理者, I want 添付ファイル全文検索機能の接続先 URI・トークンと limits を 1 つの画面で操作でき、新たに URI を設定した際に必要な後続操作が分かる形で提示されること, so that 設定ミスや運用ミスを防げる
 
 #### Acceptance Criteria
 
-1. The 管理画面 shall `ElasticsearchManagement` 画面内に「添付ファイル全文検索」セクションを表示し、抽出サービス URI (`extractorUri`)、抽出タイムアウト (`timeoutMs`)、最大ファイルサイズ (`maxFileSizeBytes`) の 3 つの設定項目を管理者が閲覧・編集・保存できる入力フォームとして提供する。独立した有効/無効トグルは**提供しない** (機能の有効化は URI が非空で保存されていることで成立し、soft-disable は URI を空文字にクリアすることで実現する)
+1. The 管理画面 shall `ElasticsearchManagement` 画面内に「添付ファイル全文検索」セクションを表示し、抽出サービス URI (`extractorUri`)、抽出サービスのトークン (`extractorToken`)、抽出タイムアウト (`timeoutMs`)、最大ファイルサイズ (`maxFileSizeBytes`) の 4 つの設定項目を管理者が閲覧・編集・保存できる入力フォームとして提供する。独立した有効/無効トグルは**提供しない** (機能の有効化は URI とトークンの両方が保存されていることで成立し、soft-disable は URI を空文字にクリアするか、トークンを削除することで実現する)
 2. When 管理者が `extractorUri` を未設定 (空文字) から設定済み (非空) に変更して保存する, the 管理画面 shall 既存添付を検索対象に取り込むには別途一括再インデックスを実行する必要がある旨を明示するガイダンスを保存成功後に表示する <!-- derived from umbrella R9.3 -->
 3. If 設定値 (`extractorUri` の URI 形式、または数値項目) が形式要件を満たさない, the 管理画面 shall 該当フィールドにバリデーションエラーを表示し、保存操作を抑止する
 4. Where 管理者でないユーザが当該画面にアクセスしようとした場合, the 管理画面 shall 既存 admin 画面と同じ権限制御に従いアクセスを遮断する
+5. The 管理画面 shall トークンの値を表示せず、設定済みかどうかだけを示す。トークンの入力欄を空のまま保存したときは保存済みのトークンを変えず、トークンを削除する操作を入力欄とは別に提供する
+6. Where 4 つの設定項目が環境変数で固定されている (上流 spec の `env:useOnlyEnvVars:app:attachmentFullTextSearch` が有効な状態), the 管理画面 shall 設定項目を読み取り専用で表示し、環境変数で管理されていることを示して、保存の操作を提供しない
 
 ### Requirement 6: 管理画面の一括再インデックス UI
 <!-- derived from umbrella R10.1, R10.3, R10.5 -->
