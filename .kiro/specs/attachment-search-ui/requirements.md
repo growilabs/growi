@@ -4,11 +4,11 @@
 
 ### 背景と問題
 
-上流 spec `attachment-search-indexing` によって、添付ファイルのテキストが Elasticsearch にインデックスされ、ページ検索の結果のページについて添付ヒットを返す API (`GET /_api/v3/search/attachments`) と、添付だけを対象にした検索 (`GET /_api/search?facet=attachments`) が提供される。添付ヒットの形は `IPageWithSearchMeta.meta.attachmentHits[]` (optional) である。しかしサーバ側の API だけでは、エンドユーザと管理者に添付ヒットの存在が可視化されず、機能としては未完結である。本 spec は apps/app クライアント側の UI 統合を担い、(1) 検索結果画面 (左ペイン集約 / 右ペイン添付ヒットカード / 検索対象の切り替え)、(2) 添付ファイル一覧モーダルの個別再抽出ボタン、(3) 管理画面 (設定 / 一括再インデックスチェックボックス / 抽出失敗可視化) の 3 領域を新規コンポーネントと既存コンポーネントの最小差分拡張で提供する。
+上流 spec `attachment-search-indexing` によって、添付ファイルのテキストが Elasticsearch にインデックスされ、ページ検索の結果のページについて添付ヒットを返す API (`GET /_api/v3/search/attachments`) と、添付だけを対象にした検索 (`GET /_api/search?facet=attachments`) が提供される。添付ヒットの形は `IPageWithSearchMeta.meta.attachmentHits[]` (optional) である。しかしサーバ側の API だけでは、エンドユーザと管理者に添付ヒットの存在が可視化されず、機能としては未完結である。本 spec は apps/app クライアント側の UI 統合を担い、(1) 検索結果画面 (左ペイン集約 / 右ペインプレビューでの添付ヒット表示 / 検索対象の切り替え)、(2) 添付ファイル一覧モーダルの個別再抽出ボタン、(3) 管理画面 (設定 / 一括再インデックスチェックボックス / 抽出失敗可視化) の 3 領域を新規コンポーネントと既存コンポーネントの最小差分拡張で提供する。
 
 ### スコープ
 
-- **In**: 既存 SearchPage / PageAttachmentList / ElasticsearchManagement への拡張。新規コンポーネント群 (`AttachmentHitCard` / `AttachmentSubEntry` / 検索対象の切り替え / `ReextractButton` / `AttachmentSearchSettings` / `AttachmentExtractionFailures` / `RebuildWithAttachmentsCheckbox`) と SWR hooks を feature module 配下に集約。機能無効時の UI 完全隠蔽。
+- **In**: 既存 SearchPage / PageAttachmentList / ElasticsearchManagement への拡張。新規コンポーネント群 (右ペインの添付ヒット表示 / `AttachmentSubEntry` / 検索対象の切り替え / `ReextractButton` / `AttachmentSearchSettings` / `AttachmentExtractionFailures` / `RebuildWithAttachmentsCheckbox`) と SWR hooks を feature module 配下に集約。機能無効時の UI 完全隠蔽。
 - **Out**: apiv3 エンドポイント実装、ES 連携、Config 永続化 (上流 `attachment-search-indexing` 責務)。抽出サービス本体 (`attachment-search-text-extractor` 責務)。添付ビューア本体の変更、PDF インラインプレビュー、形式別詳細ファセット、抽出テキストの全文プレビュー表示、選択的再インデックス UI。
 
 詳細は [brief.md](./brief.md) を参照。
@@ -17,7 +17,7 @@
 
 本 spec は GROWI の添付ファイル全文検索機能のクライアント側 UI 層を担う。上流 `attachment-search-indexing` spec が提供する検索 API (ページ検索の結果のページに添付ヒットを返す `GET /_api/v3/search/attachments` と、添付だけを対象にした検索 `GET /_api/search?facet=attachments`。添付ヒットの形は `IPageWithSearchMeta.meta.attachmentHits[]`) と admin 系 apiv3 エンドポイントを消費し、エンドユーザ検索体験と管理者運用体験を完結させる。
 
-UI 拡張は 3 領域に分かれる。第 1 に検索結果画面で、左ペイン Page カード内の「添付サブエントリ」と右ペインプレビュー最上部の「添付ヒットカード」、および検索の対象を「ページ」と「添付ファイル」で切り替える選択肢を提供する。既定はページ検索で、ページの一覧を先に表示し、表示中のページの添付ヒットを後から取得して付け足す。ページと添付の点数を混ぜた順位は扱わない。第 2 に添付ファイル一覧モーダルで、各添付行に「再抽出」ボタンを追加し、成功/失敗を toast でフィードバックする。第 3 に管理画面 (`ElasticsearchManagement`) で、抽出サービスの接続先 URI と limits を編集するフォーム、rebuildIndex の「添付も対象にする」チェックボックス、抽出失敗可視化パネルを追加する。なお、機能の有効/無効を表す独立したトグルは**提供しない**。機能の有効化判定は上流 spec で「ES 有効 AND `extractorUri` 設定済み」の算出値として導出され、UI には SSR prop (`searchConfig.isAttachmentFullTextSearchEnabled: boolean`) として供給される。soft-disable (緊急停止) は管理者が URI を空文字にクリアして保存することで実現する。
+UI 拡張は 3 領域に分かれる。第 1 に検索結果画面で、左ペイン Page カード内の「添付サブエントリ」と右ペインプレビューでの添付ヒットの表示、および検索の対象を「ページ」と「添付ファイル」で切り替える選択肢を提供する。既定はページ検索で、ページの一覧を先に表示し、表示中のページの添付ヒットを後から取得して付け足す。ページと添付の点数を混ぜた順位は扱わない。第 2 に添付ファイル一覧モーダルで、各添付行に「再抽出」ボタンを追加し、成功/失敗を toast でフィードバックする。第 3 に管理画面 (`ElasticsearchManagement`) で、抽出サービスの接続先 URI と limits を編集するフォーム、rebuildIndex の「添付も対象にする」チェックボックス、抽出失敗可視化パネルを追加する。なお、機能の有効/無効を表す独立したトグルは**提供しない**。機能の有効化判定は上流 spec で「ES 有効 AND `extractorUri` 設定済み」の算出値として導出され、UI には SSR prop (`searchConfig.isAttachmentFullTextSearchEnabled: boolean`) として供給される。soft-disable (緊急停止) は管理者が URI を空文字にクリアして保存することで実現する。
 
 本 spec は上流 (`attachment-search-indexing`) が定めた型と API 契約に UI を**追従させる**責務に限定する。したがって上流の API 応答形状・Config キー名・進捗通知イベント名の変更は本 spec の Revalidation Trigger となる。
 
@@ -72,18 +72,18 @@ UI 拡張は 3 領域に分かれる。第 1 に検索結果画面で、左ペ�
 7. When 検索結果の続き (2 ページ目以降) を読み込む, the 検索結果リスト shall 新しく表示したページについても、1 ページ目と同じ方法で添付ヒットを取得して付け足す
 8. If 添付ヒットの取得に失敗する, the 検索結果リスト shall ページの一覧を表示したまま、添付ヒットを取得できなかったことを、添付ヒットが無い場合と区別できる形で示す
 
-### Requirement 2: 検索結果プレビュー (右ペイン) の添付ヒットカード
+### Requirement 2: 検索結果プレビュー (右ペイン) の添付ヒット表示
 <!-- derived from umbrella R6.1〜R6.5 -->
 
-**Objective:** As a GROWI 利用者, I want ページ選択時にどの添付でマッチしたかをプレビュー最上部で即座に確認したい, so that マッチ箇所に素早く到達できる
+**Objective:** As a GROWI 利用者, I want ページ選択時にどの添付でマッチしたかをプレビューで確認したい, so that マッチ箇所に素早く到達できる
 
 #### Acceptance Criteria
 
-1. When 左ペインで添付ヒットを持つページが選択される, the 検索結果プレビュー shall 右ペインプレビュー最上部に「添付ヒットカード」を表示する <!-- derived from umbrella R6.1 -->
-2. The 添付ヒットカード shall 添付ファイル名、ファイル形式アイコン、ファイルサイズ、`label`、マッチスニペット、および添付本体を開くためのリンクまたはボタンを含む <!-- derived from umbrella R6.2 -->
-3. When 添付ヒットカードの添付本体リンクがクリックされる, the 検索結果プレビュー shall 既存の添付ビューアで当該添付本体を開く <!-- derived from umbrella R6.3 -->
-4. Where 選択ページに添付ヒットが 2 件以上存在する, the 検索結果プレビュー shall 関連度最上位 1 件をカードとして展開表示し、残りを折りたたみで切替可能にする <!-- derived from umbrella R6.4 -->
-5. Where 選択ページに添付ヒットが存在しない, the 検索結果プレビュー shall 添付ヒットカードを表示しない <!-- derived from umbrella R6.5 -->
+1. When 左ペインで添付ヒットを持つページが選択される, the 検索結果プレビュー shall 右ペインプレビューに当該ページの添付ヒットを表示する <!-- derived from umbrella R6.1 -->
+2. The 検索結果プレビュー shall 各添付ヒットについて、添付ファイル名、ファイル形式、ファイルサイズ、`label`、マッチスニペット、および添付本体を開く手段を示す <!-- derived from umbrella R6.2 -->
+3. When 添付本体を開く操作が行われる, the 検索結果プレビュー shall 既存の添付ビューアで当該添付本体を開く <!-- derived from umbrella R6.3 -->
+4. Where 選択ページに添付ヒットが 2 件以上存在する, the 検索結果プレビュー shall 関連度最上位の添付ヒットを最初に示し、残りの添付ヒットにも到達できるようにする <!-- derived from umbrella R6.4 -->
+5. Where 選択ページに添付ヒットが存在しない, the 検索結果プレビュー shall 添付ヒットの表示を出さない <!-- derived from umbrella R6.5 -->
 
 ### Requirement 3: 検索対象の切り替え
 <!-- derived from umbrella R7.1〜R7.5 -->
