@@ -4,6 +4,16 @@ import { mock } from 'vitest-mock-extended';
 
 const consumePoints = vi.hoisted(() => vi.fn());
 
+// Read once when ./factory is imported, so it must be set before that import.
+const MIXED_CASE_REGEXP_MAX_REQUESTS = vi.hoisted(() => {
+  vi.stubEnv(
+    'API_RATE_LIMIT_999_MIXED_CASE_ENDPOINT_WITH_REGEXP',
+    '/_api/Mixed-Case/.*',
+  );
+  vi.stubEnv('API_RATE_LIMIT_999_MIXED_CASE_MAX_REQUESTS', '3');
+  return 3;
+});
+
 vi.mock('./consume-points', () => ({ consumePoints }));
 vi.mock('~/utils/logger', () => ({ default: () => ({ error: vi.fn() }) }));
 
@@ -64,6 +74,10 @@ const configsUsedFor = async (
   (await consumeCallsFor(path, method)).map(({ config }) => config);
 
 describe('middlewareFactory', () => {
+  afterAll(() => {
+    vi.unstubAllEnvs();
+  });
+
   it('limits the username-suggestion endpoint more tightly than the global default', async () => {
     const configs = await configsUsedFor('/_api/v3/users/usernames');
 
@@ -84,6 +98,56 @@ describe('middlewareFactory', () => {
 
     for (const { ipMultiplier } of calls) {
       expect(ipMultiplier).toBeGreaterThan(DEFAULT_USERS_PER_IP_PROSPECTION);
+    }
+  });
+
+  // Tightest tier: see ai-summarize research.md 7.10.
+  it('limits AI summary generation to 5 POSTs per window', async () => {
+    const configs = await configsUsedFor('/_api/v3/mastra/summary', 'POST');
+
+    for (const config of configs) {
+      expect(config).toMatchObject({ method: 'POST', maxRequests: 5 });
+    }
+  });
+
+  it('assumes more users per IP than the default for AI summary generation', async () => {
+    const calls = await consumeCallsFor('/_api/v3/mastra/summary', 'POST');
+
+    for (const { ipMultiplier } of calls) {
+      expect(ipMultiplier).toBeGreaterThan(DEFAULT_USERS_PER_IP_PROSPECTION);
+    }
+  });
+
+  // Express routes these to the same handler, so they must share the entry and
+  // the counter, or each spelling would get its own fresh allowance.
+  it.each([
+    '/_api/v3/mastra/summary/',
+    '/_api/v3/mastra/Summary',
+    '/_API/V3/MASTRA/SUMMARY/',
+  ])('treats %s as the same endpoint as /_api/v3/mastra/summary', async (variant) => {
+    const canonical = await consumeCallsFor('/_api/v3/mastra/summary', 'POST');
+    const canonicalKeys = consumePoints.mock.calls.map(([, key]) => key);
+
+    const variantCalls = await consumeCallsFor(variant, 'POST');
+    const variantKeys = consumePoints.mock.calls.map(([, key]) => key);
+
+    expect(variantCalls).toEqual(canonical);
+    expect(variantKeys).toEqual(canonicalKeys);
+  });
+
+  it('matches a mixed-case config key regardless of the request casing', async () => {
+    const configs = await configsUsedFor('/_api/login/testldap', 'POST');
+
+    for (const config of configs) {
+      expect(config?.maxRequests).toBeLessThan(DEFAULT_MAX_REQUESTS);
+    }
+  });
+
+  it('matches a mixed-case RegExp config key case-insensitively', async () => {
+    const configs = await configsUsedFor('/_api/Mixed-Case/foo');
+
+    for (const config of configs) {
+      expect(config?.maxRequests).toBe(MIXED_CASE_REGEXP_MAX_REQUESTS);
     }
   });
 

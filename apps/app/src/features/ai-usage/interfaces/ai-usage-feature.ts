@@ -1,1 +1,5 @@
-export type AiUsageFeature = 'chat' | 'suggest-path' | 'thread-title';
+export type AiUsageFeature =
+  | 'chat'
+  | 'suggest-path'
+  | 'thread-title'
+  | 'summarize';

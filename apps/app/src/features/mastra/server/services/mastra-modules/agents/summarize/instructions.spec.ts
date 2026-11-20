@@ -57,14 +57,26 @@ describe('SUMMARIZE_INSTRUCTIONS', () => {
     );
   });
 
+  it('instructs to state that the summary is partial whenever reading ended before hasMore false, not only on limit_exceeded', () => {
+    expect(SUMMARIZE_INSTRUCTIONS).toMatch(
+      /without having received `?hasMore: false`?[\s\S]{0,250}PARTIAL/,
+    );
+  });
+
   it('instructs the output format: one lead sentence plus 3-5 bullet points', () => {
     expect(SUMMARIZE_INSTRUCTIONS).toMatch(/lead sentence|one[- ]sentence/i);
     expect(SUMMARIZE_INSTRUCTIONS).toMatch(/3[-–]5|three to five/i);
     expect(SUMMARIZE_INSTRUCTIONS).toMatch(/bullet/i);
   });
 
-  it('instructs to respond in the user’s input language', () => {
-    expect(SUMMARIZE_INSTRUCTIONS).toMatch(/same language/i);
+  it('instructs to respond in the requested locale’s language, falling back to the page’s language', () => {
+    expect(SUMMARIZE_INSTRUCTIONS).toMatch(
+      /language of the locale specified in the request/i,
+    );
+    expect(SUMMARIZE_INSTRUCTIONS).toMatch(
+      /no locale is specified[\s\S]{0,60}same language as the page content/i,
+    );
+    expect(SUMMARIZE_INSTRUCTIONS).not.toMatch(/same language as the user/i);
   });
 
   it('instructs that totalLines is never a stop condition by itself (not merely mentioning the word)', () => {

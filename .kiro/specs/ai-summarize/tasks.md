@@ -3,38 +3,43 @@
 > **LLMテストダブルの共通方針**: 本specの全テストは実LLMを呼ばない。Agentをモック化し、tool-call / tool-result を偽の `data` で埋める方式を採る（design.md「Testing Strategy → LLM Test Double Strategy」を参照）。前例は `apps/app/src/features/ai-tools/suggest-path/server/integration-tests/suggest-path-agentic-integration.spec.ts`。各タスクの記述では、この方針に従うことを前提に固有の注意点のみを記す。
 
 - [x] 1. SummarizeAgent: 全文カバレッジ方針で単一ページを要約するAgentができる
-- [x] 1.1 LimitedGetPageContentTool: 読み取り行数バジェットが強制される
+- [x] 1.1 LimitedGetPageContentTool: 読み取り文字数バジェットが強制される
   - `RequestContext` の `pageReadBudget: { used: number; limit: number }` を読み、未設定時は `getPageContentTool` に委譲せず `context_error` を返す
   - `used >= limit` の場合は委譲せず `limit_exceeded` を返す（このとき `used`/`limit` は変更しない）
-  - それ以外は既存の `getPageContentTool`（無変更）に委譲し、返された `content` の行数分だけ `used` を加算する
-  - **`content` が `undefined` の場合は `used` に加算しない**（加算量0）。`content` が返らないのは (i) `offset` 省略かつ `totalLines > limit` のアウトラインのみ取得、(ii) `not_found_or_forbidden` 等の失敗応答 — いずれも本文行を消費していないため。`undefined` を空文字として扱う実装（実行時エラーや意図しない加算の原因）を避ける
-  - 委譲結果の `hasMore` / `totalLines` は加工せずそのまま通す（Agentが段階的読み取りの判断に使う）
-  - `getPageContentTool` 自体を一切変更しないことをdiffレビュー観点として明記する
-  - 上記4パターン（未設定／上限到達／通常委譲＋加算／`content` undefined で非加算）をユニットテストで確認できる
+  - それ以外は `getPageContentTool` に委譲し、LLMに渡す文字数を `used` に加算する。見出しの一覧（`outline`）はJSONにした文字数で数える。残りの文字数に収まらない見出しは末尾から落とす。本文（`content`）は、見出しの一覧を数えた後の残りの文字数で切り（サロゲートペアの途中では切らない）、切った場合は `hasMore: true` にする。失敗応答は数えない
+  - 切らなかった場合、委譲結果の `hasMore` / `totalLines` は加工せずそのまま通す（Agentが段階的読み取りの判断に使う）
+  - 未設定／上限到達／通常委譲＋文字数の加算（1行がとても長い場合を含む）／見出しの一覧の加算／最後の1回で残りの分だけを返す／収まらない見出しを落とす／サロゲートペアで切らない／失敗応答で非加算、をユニットテストで確認できる
   - _Requirements: 2.2, 2.3_
 
 - [x] 1.2 要約instructionsができる
   - **段階的な全文読み取り手順**を、`getPageContentTool` の実際の入出力契約に沿った具体手順として明文化する:
     - 初回呼び出しは `offset` を省略する。この呼び出しではアウトライン（見出し構成）と `totalLines` が返る
-    - ページが1回分（`limit`、既定200行・最大500行）に収まる場合は、初回呼び出しで `content` と `hasMore`（`false`）も同時に返るため1回で読み終わる
+    - ページが1回分（`limitedGetPageContentTool` が固定する500行）に収まる場合は、初回呼び出しで `content` と `hasMore`（`false`）も同時に返るため1回で読み終わる
     - ページが `limit` を超える場合、初回呼び出しは**アウトラインのみ**を返し `content` と `hasMore` はいずれも `undefined` になる。この `hasMore === undefined` を「偽だから読み終わった」と解釈してはならない（＝**まだ本文を1行も読んでいない**状態）。`totalLines` は見積り参考値として使うが、**打ち切り判定には使わない**
     - 2回目以降は `offset`（1始まりの行番号）を明示して先頭から順に読み進める。各呼び出しの結果の `hasMore` と、読み込んだ行数の累計を参考に次の `offset` を決める。**`content` が `undefined` 以外のときだけ行数を累積カウンタに加算する**
     - 打ち切り条件は3つのみ: `hasMore === false`（全文読了）／`limit_exceeded`（ハード上限到達）／`not_found_or_forbidden` 等の失敗。アウトラインだけを見て「構成が分かったので本文は読まない」と判断してはならない。`totalLines` の値で打ち切ってもいけない
     - `totalLines` はカバレッジ判定の**参考値**（残り行数の見積り・全文/部分の自己判断の材料）として使い、打ち切り条件の代替にはしない
-  - 「`limitedGetPageContentTool` から `limit_exceeded` を受け取ったら打ち切り、部分的な内容に基づく旨を明示する」ことを明文化する
+  - 「`limitedGetPageContentTool` から `limit_exceeded` を受け取ったら打ち切り、部分的な内容に基づく旨を明示する」こと、および `hasMore === false` を受け取らずに要約を書く場合も同様に明示することを明文化する
   - 「リード文1文＋主要ポイント3〜5個の箇条書き」という出力形式を明文化する
-  - ユーザーの入力言語で応答する指示を含める
+  - リクエストで指定されたロケールの言語（指定がなければページ本文の言語）で応答する指示を含める
   - instructions文字列に上記4方針（段階的読み取り手順・打ち切り時の明示・出力形式・応答言語）の指示が含まれることをユニットテストで確認できる
   - _Requirements: 2.1, 3.1_
 
 - [x] 1.3 SummarizeAgentがMastraから取得できる
-  - `limitedGetPageContentTool`（タスク1.1）のみをツールとして持ち、`memory`（既存のMongoDBStore、growiAgentと共有）に接続したAgent定義を作成する
-  - ツールの登録**キー**を `getPageContentTool` にする（`tools: { getPageContentTool: limitedGetPageContentTool }`）。LLMに送られるツール名は `tools` レコードのキーであり、クロスAgentスレッド再生時に `growiAgent` の登録名と一致させるために必須
+  - `limitedGetPageContentTool`（タスク1.1）のみをツールとして持ち、`memory` を接続しない（`suggestPathAgent` と同じくステートレスな）Agent定義を作成する
+  - ツールの登録**キー**を `getPageContentTool` にする（`tools: { getPageContentTool: limitedGetPageContentTool }`）。クライアントの `tool-getPageContentTool` パートの型を要約ストリームにもそのまま使うため
   - モデル解決は `post-message.ts` と同じ `resolveEffectiveModelKey` の丸め込みを経由し、リクエストの `modelKey` 省略時はデフォルトモデルへフォールバックする
   - Mastraインスタンスに `summarizeAgent` として登録し、`mastra.getAgent('summarizeAgent')` で取得できる
   - `growi-agent.ts` は一切変更しないことをユニットテスト（またはdiffレビュー観点の明記）で確認できる
   - _Requirements: 1.1, 2.3_
   - _Depends: 1.1, 1.2_
+
+- [x] 1.4 GetPageContentTool: 埋め込み画像と draw.io の図が短い文字に置き換えられ、置き換えた本文が1回のリクエストの中で使い回される
+  - 共通の `getPageContentTool` の中で、`data:` の画像を `[embedded image]` に、それ以外の `data:` の URL を `[embedded data]` に、`drawio` のコードブロックを図に書かれた文字だけの1行（`[draw.io diagram: ...]`）に置き換える。mermaid は置き換えない（詳細は design.md「GetPageContentTool」）
+  - 置き換える場所は `fromMarkdown` の構文解析で探し、元の本文の文字列の上で置き換える。見出しの一覧と行の切り出しは置き換えた後の本文から作る
+  - 置き換えた本文と見出しの一覧は、ページごとに最初の1回だけ作って `RequestContext` の `preparedPageBodies` に入れる。閲覧権限の確認は呼び出しのたびに行う
+  - 置き換えの各ケース（画像・draw.io の圧縮した形と圧縮していない形・`<mxfile>`・`~~~`・箇条書きと引用の中・別のコードブロックの中の説明文・mermaid）と、本文を1回のリクエストで1回だけ読むことをユニットテストで、画像と draw.io（両方の形）を含むページを `get-page-content-tool.integ.ts` で確認できる
+  - _Requirements: 2.2, 4.1_
 
 - [x] 2. (P) AiSummarizeMetrics: 要約生成のたびにCounterがインクリメントされる
   - 既存の `custom-metrics/` ディレクトリのパターンに沿って、要約生成専用のCounterメトリクスを新規ファイルに実装する
@@ -47,39 +52,42 @@
   - _Requirements: 6.1, 6.2_
   - _Boundary: AiSummarizeMetrics_
 
-- [ ] 3. SummarizeMessageRoute: 要約を1回起動し既存の対話に合流できる
-- [ ] 3.1 要約リクエストの妥当性が検証される
+- [x] 3. SummarizeMessageRoute: 要約を1回実行できる
+- [x] 3.1 要約リクエストの妥当性が検証される
   - `pageId` と `pagePath` のいずれか一方が必須であることを検証するバリデータを実装する
   - `modelKey` に `post-message-validator.ts` と同じ型・長さ制約を課す
   - 両方欠落時にリクエストが400相当で拒否され、片方のみ指定時は通過することをユニットテストで確認できる
   - _Requirements: 1.3_
 
-- [ ] 3.2 要約リクエストが新規スレッドでSummarizeAgentのストリーム応答を返せる
+- [x] 3.2 要約リクエストがSummarizeAgentのストリーム応答を返せる
   - `summarizeAgent.stream()` を呼ぶ前に `Page.findByIdAndViewer`（既存、無変更）を1回呼び出す。これが**権限なし時の唯一の応答経路**であり、結果が `null` の場合は**ストリームを開始せず**、不存在と権限なしを区別しない単一の応答（403/404 のいずれか一方に統一）でその場で短絡する（検証はタスク4.1）
   - 結果が得られた場合は、その時点の `page.revision`（populate されていないため ObjectId そのもの。populate 済みの場合は `revision._id`）を `sourceRevisionId` として保持する
   - **`capturedAt` を、`sourceRevisionId` を取得するのと同じ時点（生成開始時点）に `new Date()` でサーバ側に生成する**（クライアントから受け取った日時は使わない）。ストリーム応答に含める
-  - リクエストごとに新しい `threadId` を採番し、`getOrCreateThread`（既存関数、無変更）で新規スレッドを作成する（既存スレッドへの追記は行わない）
+  - スレッドを作らず、`summarizeAgent.stream()` に `memory` を渡さない
   - クライアントの自由入力を受け取らず、`pageId`/`pagePath` からサーバ側で固定形式の初期リクエストを組み立てて `summarizeAgent.stream()` に渡す
-  - ストリーム応答に `threadId`・`sourceRevisionId`・**`capturedAt`** を含める
-  - **`summarizeAgent.stream()` に渡す `RequestContext` をリクエスト毎に新規生成し**、その中の `pageReadBudget` も毎回 `{ used: 0, limit: 1500 }` の新規オブジェクトとする。モジュールスコープ・Agentインスタンス・シングルトンに保持したコンテキストやバジェットを再利用しない
-  - `post-message.ts` の `maxSteps: 10` とは独立した `maxSteps: 15` を設定する（`pageReadBudget` 1500行 ÷ 1回最大500行 = 最小3ステップに対する安全弁）
+  - ストリーム応答に `sourceRevisionId`・**`capturedAt`** を含める
+  - **`summarizeAgent.stream()` に渡す `RequestContext` をリクエスト毎に新規生成し**、その中の `pageReadBudget` も毎回 `{ used: 0, limit: 60000 }` の新規オブジェクトとする。モジュールスコープ・Agentインスタンス・シングルトンに保持したコンテキストやバジェットを再利用しない
+  - `post-message.ts` の `maxSteps: 10` とは独立した `maxSteps: 6` を設定する（見出しの一覧1回＋本文の読み込み最大4回＋要約を書く1回）
+  - `summarizeAgent.stream()` に `prepareStep` を渡し、上限に達した後と最後のステップでは `{ toolChoice: 'none' }` を返してツールを使えなくする。判定は純粋関数に置き、ツールと同じ `pageReadBudget` を見る
+  - 正常終了の判定（`finishReason` と最後のステップの本文の有無）は純粋関数に置き、ハンドラはそれを呼ぶだけにする
   - `post-message.ts` と同型のUIメッセージストリーム（`createUIMessageStream`/`toAISdkStream`/`pipeUIMessageStreamToResponse`）で応答を返し、ストリームが正常終了した時点でのみタスク2のCounterをインクリメントする
   - モデル呼び出し失敗・ストリーム構築失敗時は、プロバイダ由来の一行メッセージのみを含む500を返し、スタックトレースやレスポンス本体を転送しないこと、かつこの失敗パスではタスク2のCounterをインクリメントしないことを統合テストで確認できる
   - ページ本文の取得が `limitedGetPageContentTool` 経由のツール呼び出しループのみで行われ、ルート層に本文の事前取得・直接DB参照が存在しないことをコードレビュー観点として明記する（`findByIdAndViewer` はメタデータと権限ゲートのみで、本文は読まない）
   - **統合テストのLLMモック**: `~/features/mastra/server/services/mastra-modules` を `vi.mock` し `{ mastra: { getAgent } }` を返す。偽Agentの `stream()` が `options.requestContext` を捕捉した上で**実物の `limitedGetPageContentTool.execute()` を実際に呼び**、`limit_exceeded` でループを抜ける。実物のツールは**バレル経由ではなく直接ファイルから**インポートする（バレル経由では `@mastra/core/agent` が引き込まれvitest下でロードできない）。認証ミドルウェアはデフォルトエクスポートを含めてモックし `req.user` を注入する。`Crowi` は `mock<Crowi>()` を使い型アサーションを避ける
-  - 権限のあるページに対するリクエストが新規スレッドを作成しストリーム応答を返すことを統合テストで確認できる
+  - 権限のあるページに対するリクエストが、スレッドを作らずにストリーム応答を返すことを統合テストで確認できる
+  - 上限を超えるページを読んだ後、ルートが渡した `prepareStep` が以後のステップでツールを使えなくすることを統合テストで確認できる
   - **連続する2リクエストで捕捉した `requestContext` が別インスタンスであり、2回目の `pageReadBudget.used` が0から始まること（バジェット独立性）**を統合テストで確認できる
   - **応答に含まれる `capturedAt` が有効なISO Date Stringであり、リクエスト時刻の近傍であること**を統合テストで確認できる
   - _Requirements: 1.1, 1.2, 2.2, 4.1, 4.2, 7.2_
-  - _Depends: 1.3, 2_
+  - _Depends: 1.3, 1.4, 2_
 
-- [ ] 3.3 要約ルートがExpressに登録され、AI未設定時は既存ガードで利用不可になる
+- [x] 3.3 要約ルートがExpressに登録され、AI未設定時は既存ガードで利用不可になる
   - `routes/index.ts` の遅延ロードパターンに沿って `POST /_api/v3/mastra/summary` を追加登録する（既存の `router.use(aiReadyGuard)` の適用範囲内）
   - `generateAddActivityMiddleware()`（既存、`apps/app/src/server/middlewares/add-activity.ts`）を、認可ミドルウェアの後・バリデータの前に挟む
   - AI未設定・無効時に本ルートが501を返すことを統合テストで確認できる（既存の `aiReadyGuard` の回帰確認）
   - _Requirements: 5.1_
 
-- [ ] 3.4 要約の生成イベントがAudit Logに記録される
+- [x] 3.4 要約の生成イベントがAudit Logに記録される
   - `apps/app/src/interfaces/activity.ts` に `ACTION_PAGE_AI_SUMMARIZE = 'PAGE_AI_SUMMARIZE'` を追加し、`SupportedAction` と `LargeActionGroup` に登録する（既存の `ACTION_ADMIN_AI_SETTING_UPDATE` 追加時と同じ形。カテゴリ分類は `PAGE_` プレフィックスにより既存の正規表現判定で自動的に `PageActions` に含まれるため、新規カテゴリの追加は不要）
   - 要約ハンドラ（タスク3.2）で、ストリームが正常終了した時点（レスポンス送信前）に `crowi.events.activity.emit('update', res.locals.activity._id, { action: SupportedAction.ACTION_PAGE_AI_SUMMARIZE, targetModel: SupportedTargetModel.MODEL_PAGE, target: page, contributor: req.user })` を呼ぶ（既存の `create-page.ts` と同じ呼び出し形）。エラー終了時は呼ばない
   - `apps/app/public/static/locales/{en_US,fr_FR,ja_JP,ko_KR,zh_CN}/admin.json` に `audit_log_action.PAGE_AI_SUMMARIZE` の表示ラベルを5ロケール分追加する（`/admin/audit-log` での表示用）
@@ -98,22 +106,14 @@
   - _Requirements: 4.1, 4.2_
   - _Depends: 3.3_
 
-- [ ] 4.2 要約完了後、同じスレッドで既存の対話に追質問を続けられる
-  - 要約完了後に取得した `threadId` を使って既存の `POST /message` に追質問を送り、`growiAgent` がスレッド履歴（要約メッセージ）を認識して応答することを統合テストで確認できる
-  - **クロスAgentスレッド再生の実証**（本リポジトリに前例がないため必須）: `summarizeAgent` のツール登録キーが `getPageContentTool` であること、および `growiAgent` が引き継いだスレッド履歴に含まれる tool-call のツール名が `growiAgent` の登録ツールセットに実在することを、偽の tool-call / tool-result `data` を使って確認できる
-  - この経路で `growi-agent.ts` と `post-message.ts` の既存の挙動（`maxSteps: 10` を含む）が変化しないことを確認できる
-  - _Requirements: 1.4, 2.3_
-  - _Depends: 3.3_
-
 - [ ] 4.3 長いページで読み取り量の上限に到達すると、打ち切りと部分要約である旨が明示される
-  - 1500行を超える長いページのフィクスチャで、`limitedGetPageContentTool` が `pageReadBudget` の上限到達により `limit_exceeded` を返し、`maxSteps: 15` に達する前に打ち切りが発生することを確認できる
-  - 実効の読み取り量が `limit` + 500 = 2000行を超えないことを確認できる（バジェット判定は呼び出し前のため、`limit` 未満の状態から1回分＝最大500行が通り得る許容幅）
+  - 60,000文字を超える長いページのフィクスチャで、`pageReadBudget.used` がちょうど上限で止まり、その後の呼び出しで `limitedGetPageContentTool` が `limit_exceeded` を返すことを確認できる
   - 偽Agentが返す最終テキストに、部分的な内容に基づく旨の明示が含まれること、およびリード文1文＋主要ポイント3〜5個の箇条書き形式であることを確認できる（LLMの指示追従性そのものは検証対象とせず、ルート層・ツール層・ストリーム構築の挙動を検証する）
   - _Requirements: 2.1, 2.2, 3.1_
   - _Depends: 3.3_
 
 - [ ] 4.4 同一ページへの同時要約リクエストが互いを破壊せず安全に処理される
-  - 同一ページに対して短時間に2件の要約リクエストを送り、それぞれ独立したスレッドとして正常に処理され、状態の破壊や競合エラーが起きないことを統合テストで確認できる
+  - 同一ページに対して短時間に2件の要約リクエストを送り、それぞれ独立して正常に処理され、状態の破壊や競合エラーが起きないことを統合テストで確認できる
   - **2件のリクエストで捕捉した `RequestContext` および `pageReadBudget` がそれぞれ新規インスタンスであり、一方の読み取りが他方の `used` を消費していないことを確認できる**（バジェット独立性。バジェットがリクエスト間で漏れない）
   - 偽Agentの `stream()` が2件の呼び出しでそれぞれ別の `requestContext` を受け取ることを、モックで捕捉した値の同一性比較で確認できる
   - 要約は状態を書き換えないため、サーバ側の新規ロック機構は追加しない設計であることを踏まえたテストとする
@@ -149,7 +149,7 @@
   - `loginRequiredStrictly` は export された名前ではなく、`import loginRequiredFactory from '~/server/middlewares/login-required';` のデフォルトエクスポートから `loginRequiredFactory(crowi)` でハンドラファクトリ内にローカル生成する（第2引数 `isGuestAllowed` の既定値 `false` が「strictly」の意味）
   - `excludeReadOnlyUser` は `~/server/middlewares/exclude-read-only-user` の named export をそのまま使う
   - `findByIdAndViewer` は**閲覧**権限しか判定しないため、これらのミドルウェアの代替にはならないことをコードレビュー観点として明記する
-  - **レート制限を `apps/app/src/features/rate-limiter/config/index.ts` の `defaultConfigWithRegExp` にエントリ追加で実装する**（`pageId` を含む動的パスのため完全一致マップ `defaultConfig` ではなく正規表現マップを使う。`/_api/v3/page/[^/]+/ai-summary`、`POST`、`MAX_REQUESTS_TIER_1`）。GROWIのレート制限は `app.use(rateLimiterFactory())` として全体に1回適用される方式であり、ルートにミドルウェアを差し込む実装にはしない。独自の数値をハードコードせず既存のティア定数を使う
+  - **レート制限を `apps/app/src/features/rate-limiter/config/index.ts` の `defaultConfigWithRegExp` にエントリ追加で実装する**（`pageId` を含む動的パスのため完全一致マップ `defaultConfig` ではなく正規表現マップを使う。`/_api/v3/page/[^/]+/ai-summary`、`POST`、`MAX_REQUESTS_TIER_1`、`usersPerIpProspection: 20`。倍率の根拠は research.md 7.10）。GROWIのレート制限は `app.use(rateLimiterFactory())` として全体に1回適用される方式であり、ルートにミドルウェアを差し込む実装にはしない。独自の数値をハードコードせず既存のティア定数を使う
   - **統合テスト**: 未ログイン（ゲスト）からの保存が拒否されること、読み取り専用ユーザーからの保存が403で拒否されること、いずれの場合も `Page.summary` が書き込まれていないことを確認できる
   - **統合テスト（レート制限）**: 設定した上限を超える回数の保存リクエストを短時間に送ると、上限超過分が **429** を返し、上限内のリクエストは正常に処理されることを確認できる
   - _Requirements: 7.1_
@@ -205,13 +205,13 @@
 - [ ] 8.2 ボタンクリックで要約生成を開始し、中途で二重送信を防ぐ
   - クリック直後にボタンを無効化し、ローディング状態に切り替える（`isGenerating` フラグ）
   - `POST /_api/v3/mastra/summary` をcurrentPageIdを指定して呼び出す
-  - ストリーム応答から `threadId`, `sourceRevisionId`, `capturedAt` を解析する
-  - 新規チャットスレッドをChatSidebarで開く
+  - ストリーム応答から `sourceRevisionId`, `capturedAt` を解析する
+  - 新規チャット画面をChatSidebarで開き、要約のストリームを表示する。要約の画面ではメッセージの入力欄を出さない
   - 生成完了時：ローディング表示を終了し、ボタンを再度有効化する。結果の要約メッセージは既存のチャット描画に任せる
   - 生成がエラーで終了時：エラー通知を表示し、ボタンを再度有効化する
   - クリック直後から生成完了まで、再クリックは受け付けない（`isGenerating` フラグで防止）
-  - ボタンの無効化・有効化状態をコンポーネントテストで確認できる
-  - _Requirements: 11.1, 11.2, 11.3, 11.4, 11.5_
+  - ボタンの無効化・有効化状態と、要約の画面に入力欄が出ないことをコンポーネントテストで確認できる
+  - _Requirements: 11.1, 11.2, 11.3, 11.4, 11.5, 11.6_
 
 - [ ] 8.3 トークン消費が明示される
   - ボタンテキスト・ツールチップ・説明文で「AIトークンを消費します」旨を明示する
@@ -286,7 +286,7 @@
 
 - [ ] 13. E2E Integration Test: ページ表示 → 要約生成 → 保存の完全フロー
 - [ ] 13.1 ページ表示から保存完了まで、全UIコンポーネントが協調して動作する
-  - ページ表示 → ボタンクリック → ストリーム応答 → 新規スレッド作成 → メッセージ表示 → 「残す」クリック → 永続化 → ページ再読み込み → 永続化要約表示、の全フロー
+  - ページ表示 → ボタンクリック → ストリーム応答 → メッセージ表示 → 「残す」クリック → 永続化 → ページ再読み込み → 永続化要約表示、の全フロー
   - マルチユーザーシナリオ：一方のユーザーが要約を非表示に → 別ユーザーは表示されたまま
   - 既存要約がある場合の置き換え確認ダイアログ動作
   - 多言語表示確認（複数ロケール選択時の正しい表示）
@@ -308,3 +308,5 @@
 
 - ~~タスク1.2完了時点で、instructions.ts の「アウトラインだけで打ち切らず先頭から順に読み進める」（design.md a-2/a-3、`read forward from the start of the page` 文言・2箇所のアンチショートカット文）はユニットテストで文言拘束されていない（残存指摘、非ブロッキング）。~~ **解消済み**: `instructions.spec.ts` に2文それぞれを対象とする `toMatch` アサーションを追加し、mutation-check（各文を個別に削除してREDになることを確認→revert）で検証済み。
 - タスク2で判明した落とし穴: 「モジュールをimportするだけではトップレベルの副作用（`getMeter()`呼び出し等）が起きないこと」を検証するテストは、対象モジュールをspecファイル先頭で静的importしていると`beforeEach`の`vi.clearAllMocks()`より前にその副作用が発生し、モック呼び出し履歴が消えて常にパスしてしまう（リグレッションを検知できない）。`vi.resetModules()` + モックの`mockClear()` + `await import(...)`によるテスト内での動的再importで検証する必要がある。以降のタスクで同種の「トップレベルで生成しない」不変条件をテストする際はこのパターンを使う。
+- タスク3.1で判明した落とし穴: express-validator v6 の `.optional()` はチェーン内の位置に関係なくそのチェーン全体をスキップする。「いずれか一方が必須」のような横断チェックは `.optional()` を持たない別チェーンに置く必要がある。また標準バリデータは配列を要素ごとに検証するため、`isMongoId()` 等の前に `isString()` を置かないと配列入力がすり抜ける。
+- タスク3.2への引き継ぎ: バリデータは `{ pageId: 有効値, pagePath: '' }` を通過させる。ハンドラ側で `pageId`/`pagePath` 両方存在時の優先順位を決め、空の `pagePath` を参照先として使わないこと。

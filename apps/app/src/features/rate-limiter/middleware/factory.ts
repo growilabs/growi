@@ -55,7 +55,7 @@ const valuesWithRegExp = Object.values(configWithRegExp);
  * @param customizedConfig
  * @returns
  */
-const consumePointsByUser = async (
+const consumePointsByUser = (
   method: string,
   key: string | null,
   customizedConfig?: IApiRateLimitConfig,
@@ -70,7 +70,7 @@ const consumePointsByUser = async (
  * @param customizedConfig
  * @returns
  */
-const consumePointsByIp = async (
+const consumePointsByIp = (
   method: string,
   key: string | null,
   customizedConfig?: IApiRateLimitConfig,

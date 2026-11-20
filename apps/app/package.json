@@ -324,6 +324,7 @@
     "remark-stringify": "^11.0.0",
     "reveal.js": "^4.4.8",
     "sanitize-filename": "^1.6.3",
+    "saxes": "^6.0.0",
     "simplebar-react": "^2.3.6",
     "socket.io": "^4.7.5",
     "streamdown": "^1.4.0",

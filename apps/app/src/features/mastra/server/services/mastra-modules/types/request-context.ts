@@ -3,6 +3,8 @@ import type { IUserHasId } from '@growi/core';
 import type { UsageMeter } from '~/features/ai-usage/server';
 import type SearchService from '~/server/service/search';
 
+import type { PreparedPageBody } from '../tools/page-content';
+
 /**
  * Shape of RequestContext keys shared between the code that starts an agent
  * run (writer: the chat post-message handler, the suggest-path agentic engine)
@@ -35,10 +37,16 @@ import type SearchService from '~/server/service/search';
  *   around one response (one chat response, one suggest-path proposal). When
  *   it is absent, `meterModelForRequest` records each model call on its own
  *   instead.
+ *
+ * Notes on `preparedPageBodies`:
+ * - Keyed by page id. getPageContentTool fills it on the first read of each
+ *   page, so later reads within the same request reuse the prepared body. No
+ *   route sets it; the tool creates it on first use.
  */
 export type MastraRequestContextShape = {
   user: IUserHasId;
   searchService: SearchService;
   modelKey?: string;
   usageMeter?: UsageMeter;
+  preparedPageBodies?: Map<string, PreparedPageBody>;
 };

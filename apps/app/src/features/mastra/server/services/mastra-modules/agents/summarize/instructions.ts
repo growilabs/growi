@@ -6,7 +6,7 @@
  * (a) stepped full-coverage reading procedure via limitedGetPageContentTool
  * (b) explicit "partial content" disclosure when limit_exceeded is received
  * (c) output format: one lead sentence + 3-5 bullet points
- * (d) respond in the user's input language
+ * (d) respond in the requested locale's language, else the page's language
  *
  * This file is intentionally independent from growi-agent.ts's instructions
  * and shares nothing with it.
@@ -29,9 +29,11 @@ The tool you call is named "getPageContentTool" (a budget-limited wrapper — ca
    Do not stop early just because the outline told you the page's structure — read the actual body content.
 5. \`totalLines\` is a REFERENCE-ONLY estimate for judging how much of the page remains and whether your summary will be based on the full page or only part of it. Never use \`totalLines\` itself as a stop condition — only the three conditions in point 4 above decide when to stop reading.
 
-## Step 2 — When the read budget is exhausted
+## Step 2 — When you could not read to the end
 
 If \`getPageContentTool\` returns \`limit_exceeded\`, stop calling it immediately and produce a summary from the content you have already read. Explicitly state in your answer that the summary is based on a PARTIAL reading of the page (you did not reach the end).
+
+The same applies whenever you write the summary without having received \`hasMore: false\` — for example, when the last \`content\` you received was cut short with \`hasMore: true\` and the tool can no longer be called. State that the summary is PARTIAL in that case too.
 
 ## Step 3 — Output format
 
@@ -41,4 +43,4 @@ Write the summary as exactly:
 
 ## Step 4 — Response language
 
-Always respond in the SAME LANGUAGE as the user's input.`;
+Write the summary in the language of the locale specified in the request. If no locale is specified, write it in the same language as the page content.`;

@@ -5,6 +5,7 @@ import { z } from 'zod';
 import loggerFactory from '~/utils/logger';
 
 import { getPageContentTool } from '../../tools/get-page-content-tool';
+import { fitPageToBudget, isPageReadBudgetExhausted } from './page-read-budget';
 import type { SummarizeRequestContextShape } from './request-context';
 
 const logger = loggerFactory(
@@ -14,6 +15,9 @@ const logger = loggerFactory(
 // Typed view of RequestContext bound to the summarize shape so that
 // ctx.get('pageReadBudget') is statically inferred.
 type TypedRequestContext = RequestContext<SummarizeRequestContextShape>;
+
+// MAX_STEPS is sized for reads of this many lines (design.md SummarizeAgent).
+const READ_LIMIT_LINES = 500;
 
 // The wrapped tool's discriminated union, restated here because the
 // original tool keeps its schema module-private, extended with
@@ -58,23 +62,16 @@ const outputSchema = z.discriminatedUnion('result', [
 
 type LimitedGetPageContentToolOutput = z.infer<typeof outputSchema>;
 
-// Counts the number of lines in a returned content slice. `content` never
-// carries a trailing newline (see get-page-content-tool's scanBody CRLF
-// contract), so splitting on '\n' yields exactly the line count.
-const countLines = (content: string): number => content.split('\n').length;
-
 /**
  * Budget-enforcing wrapper around {@link getPageContentTool}, used only by
- * the summarizeAgent. Execution rules (design.md LimitedGetPageContentTool):
+ * the summarizeAgent. The budget counts characters sent to the LLM
+ * (design.md LimitedGetPageContentTool):
  *
- * 1. `pageReadBudget` missing from requestContext -> `context_error` (no throw)
- * 2. `used >= limit` -> `limit_exceeded` WITHOUT delegating (used/limit unchanged)
- * 3. otherwise delegate verbatim, then increment `used` by the number of
- *    lines actually returned in `content`
- * 4. `content` is `undefined` (outline-only call, or a failure response) ->
- *    do NOT increment `used` (no body lines were consumed)
- *
- * The shared getPageContentTool is NOT modified.
+ * 1. `pageReadBudget` or `targetPageId` missing from requestContext ->
+ *    `context_error` (no throw)
+ * 2. budget exhausted -> `limit_exceeded` WITHOUT delegating
+ * 3. otherwise delegate, then charge the outline and body actually returned,
+ *    cutting the body at the remaining room
  */
 export const limitedGetPageContentTool = createTool({
   id: 'limited-get-page-content-tool',
@@ -92,34 +89,42 @@ export const limitedGetPageContentTool = createTool({
   ): Promise<LimitedGetPageContentToolOutput> => {
     const ctx = context.requestContext as TypedRequestContext;
     const pageReadBudget = ctx.get('pageReadBudget');
+    const targetPageId = ctx.get('targetPageId');
 
-    if (pageReadBudget == null) {
+    if (pageReadBudget == null || targetPageId == null) {
       logger.warn(
-        'limited-get-page-content-tool: pageReadBudget missing in requestContext',
+        'limited-get-page-content-tool: pageReadBudget or targetPageId missing in requestContext',
       );
       return {
         result: 'context_error' as const,
-        reason: 'pageReadBudget missing in requestContext',
+        reason: 'pageReadBudget or targetPageId missing in requestContext',
       };
     }
 
-    if (pageReadBudget.used >= pageReadBudget.limit) {
+    if (isPageReadBudgetExhausted(pageReadBudget)) {
       return {
         result: 'limit_exceeded' as const,
-        reason: `page read budget exhausted (${pageReadBudget.used}/${pageReadBudget.limit} lines used); finalize the summary from the content already read`,
+        reason: `page read budget exhausted (${pageReadBudget.used}/${pageReadBudget.limit} characters used); finalize the summary from the content already read`,
       };
     }
 
     // biome-ignore lint/style/noNonNullAssertion: createTool always wires execute
-    const result = await getPageContentTool.execute!(inputData, context);
+    const result = await getPageContentTool.execute!(
+      // pageId wins over pagePath in the delegate, so this pins the read.
+      { ...inputData, pageId: targetPageId, limit: READ_LIMIT_LINES },
+      context,
+    );
     const typedResult = result as LimitedGetPageContentToolOutput;
 
-    // Only a successful response with `content` actually consumed body
-    // lines (outline-only responses and failure responses did not).
-    if (typedResult.result === 'ok' && typedResult.page.content != null) {
-      pageReadBudget.used += countLines(typedResult.page.content);
+    if (typedResult.result !== 'ok') {
+      return typedResult;
     }
 
-    return typedResult;
+    const { page, consumed } = fitPageToBudget(
+      typedResult.page,
+      pageReadBudget.limit - pageReadBudget.used,
+    );
+    pageReadBudget.used += consumed;
+    return { ...typedResult, page };
   },
 });

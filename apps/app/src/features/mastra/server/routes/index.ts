@@ -14,16 +14,19 @@ const loadHandlersRouter = async (crowi: Crowi): Promise<express.Router> => {
     { deleteThreadHandlersFactory },
     { getMessagesHandlersFactory },
     { getModelsFactory },
+    { summarizeMessageHandlersFactory },
   ] = await Promise.all([
     import('./post-message'),
     import('./get-threads'),
     import('./delete-thread'),
     import('./get-messages'),
     import('./get-models'),
+    import('./summarize-message'),
   ]);
 
   const router = express.Router();
   router.post('/message', postMessageHandlersFactory(crowi));
+  router.post('/summary', summarizeMessageHandlersFactory(crowi));
   router.get('/threads', getThreadsFactory(crowi));
   router.delete('/thread/:threadId', deleteThreadHandlersFactory(crowi));
   router.get('/messages/:threadId', getMessagesHandlersFactory(crowi));

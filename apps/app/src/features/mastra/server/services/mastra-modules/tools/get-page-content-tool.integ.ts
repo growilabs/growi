@@ -1,6 +1,7 @@
 import type { IUserHasId } from '@growi/core';
 import { RequestContext } from '@mastra/core/request-context';
 import mongoose, { type Model } from 'mongoose';
+import pako from 'pako';
 
 import { getInstance } from '^/test/setup/crowi';
 
@@ -696,6 +697,81 @@ describe('getPageContentTool (integration)', () => {
         { line: longPageHeadingLines[0], level: 1, heading: 'Section A' },
         { line: longPageHeadingLines[1], level: 2, heading: 'Section B' },
         { line: longPageHeadingLines[2], level: 3, heading: 'Section C' },
+      ]);
+    });
+  });
+
+  describe('embedded images and draw.io diagrams', () => {
+    const pagePathEmbedded = `/get-page-content-integ/${WORKER_ID}/embedded`;
+    const graphModel = (label: string): string =>
+      `<mxGraphModel><root><mxCell id="0" /><mxCell id="2" value="${label}" vertex="1" parent="0"><mxGeometry x="10" y="20" width="120" height="60" as="geometry" /></mxCell></root></mxGraphModel>`;
+    const compressed = Buffer.from(
+      pako.deflateRaw(encodeURIComponent(graphModel('Load balancer'))),
+    ).toString('base64');
+    const dataUri = `data:image/png;base64,${'A'.repeat(20_000)}`;
+    const bodyEmbedded = [
+      '# Embedded',
+      `![inline](${dataUri})`,
+      `<img src="${dataUri}" alt="html">`,
+      '```drawio',
+      graphModel('Web server'),
+      '```',
+      '## Compressed',
+      '```drawio',
+      compressed,
+      '```',
+      'tail',
+    ].join('\n');
+
+    let embeddedPageId: string;
+
+    beforeAll(async () => {
+      await Page.deleteMany({ path: pagePathEmbedded });
+      const page = await Page.create({
+        path: pagePathEmbedded,
+        grant: Page.GRANT_PUBLIC,
+        creator: userA._id,
+        lastUpdateUser: userA._id,
+      });
+      const revision = await prisma.revisions.create({
+        data: {
+          pageId: page._id.toString(),
+          body: bodyEmbedded,
+          format: 'markdown',
+          authorId: userA._id,
+        },
+      });
+      page.revision = revision._id;
+      await page.save();
+      embeddedPageId = String(page._id);
+    });
+
+    afterAll(async () => {
+      await prisma.revisions.deleteMany({ where: { pageId: embeddedPageId } });
+      await Page.deleteMany({ path: pagePathEmbedded });
+    });
+
+    it('returns images and both draw.io forms as short stand-ins, with the outline matching the returned lines', async () => {
+      const result = await invokeExecute(
+        { pageId: embeddedPageId },
+        buildRequestContext(userA),
+      );
+
+      assertOk(result);
+      expect(result.page.content).toBe(
+        [
+          '# Embedded',
+          '[embedded image]',
+          '<img src="[embedded image]" alt="html">',
+          '[draw.io diagram: Web server]',
+          '## Compressed',
+          '[draw.io diagram: Load balancer]',
+          'tail',
+        ].join('\n'),
+      );
+      expect(result.page.outline).toEqual([
+        { line: 1, level: 1, heading: 'Embedded' },
+        { line: 5, level: 2, heading: 'Compressed' },
       ]);
     });
   });

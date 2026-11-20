@@ -731,4 +731,95 @@ describe('getPageContentTool', () => {
       expect(result.page.hasMore).toBe(true);
     });
   });
+
+  describe('embedded content', () => {
+    it('returns embedded image data as a short stand-in', async () => {
+      const requestContext = buildRequestContext();
+      requestContext.set('user', buildMockUser());
+      setupPageWithBody(
+        `# Chart\n![chart](data:image/png;base64,${'A'.repeat(5000)})`,
+      );
+
+      const result = await invokeExecute({ pageId: 'abc' }, requestContext);
+
+      if (isValidationFailure(result) || result.result !== 'ok') {
+        throw new Error('expected ok');
+      }
+      expect(result.page.content).toBe('# Chart\n[embedded image]');
+    });
+  });
+
+  describe('per-request reuse of the prepared body', () => {
+    // Each call returns a fresh unpopulated page, as a real query does.
+    const servePages = (bodiesById: Record<string, string>): void => {
+      mocks.findByIdAndViewer.mockImplementation(async (id: string) =>
+        buildMockPage({ _id: id }),
+      );
+      mocks.populateDataToShowRevision.mockImplementation((page: MockPage) => {
+        page.revision = { body: bodiesById[page._id] };
+        return Promise.resolve(page);
+      });
+    };
+
+    it('reads the revision body once per page within one request, but checks the viewer on every call', async () => {
+      const requestContext = buildRequestContext();
+      requestContext.set('user', buildMockUser());
+      servePages({ p1: 'L1\nL2\nL3' });
+
+      await invokeExecute({ pageId: 'p1' }, requestContext);
+      const second = await invokeExecute(
+        { pageId: 'p1', offset: 2, limit: 1 },
+        requestContext,
+      );
+
+      expect(mocks.populateDataToShowRevision).toHaveBeenCalledTimes(1);
+      expect(mocks.findByIdAndViewer).toHaveBeenCalledTimes(2);
+      if (isValidationFailure(second) || second.result !== 'ok') {
+        throw new Error('expected ok');
+      }
+      expect(second.page.content).toBe('L2');
+    });
+
+    it('stops serving the reused body once the viewer can no longer see the page', async () => {
+      const requestContext = buildRequestContext();
+      requestContext.set('user', buildMockUser());
+      servePages({ p1: 'L1\nL2' });
+      await invokeExecute({ pageId: 'p1' }, requestContext);
+
+      mocks.findByIdAndViewer.mockResolvedValueOnce(null);
+      const result = await invokeExecute(
+        { pageId: 'p1', offset: 1 },
+        requestContext,
+      );
+
+      expect(result).toMatchObject({ result: 'not_found_or_forbidden' });
+    });
+
+    it('keeps each page separate within one request', async () => {
+      const requestContext = buildRequestContext();
+      requestContext.set('user', buildMockUser());
+      servePages({ p1: 'first page', p2: 'second page' });
+
+      const first = await invokeExecute({ pageId: 'p1' }, requestContext);
+      const second = await invokeExecute({ pageId: 'p2' }, requestContext);
+
+      expect(first).toMatchObject({ page: { content: 'first page' } });
+      expect(second).toMatchObject({ page: { content: 'second page' } });
+    });
+
+    it('reads the body again for a new request', async () => {
+      servePages({ p1: 'body' });
+
+      for (const requestContext of [
+        buildRequestContext(),
+        buildRequestContext(),
+      ]) {
+        requestContext.set('user', buildMockUser());
+        // biome-ignore lint/performance/noAwaitInLoops: requests run one after another
+        await invokeExecute({ pageId: 'p1' }, requestContext);
+      }
+
+      expect(mocks.populateDataToShowRevision).toHaveBeenCalledTimes(2);
+    });
+  });
 });

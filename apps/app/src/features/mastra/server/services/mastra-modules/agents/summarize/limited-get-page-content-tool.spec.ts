@@ -35,8 +35,12 @@ vi.mock('~/server/models/obsolete-page', () => ({
   populateDataToShowRevision: vi.fn(),
 }));
 
-const buildRequestContext = (): RequestContext<SummarizeRequestContextShape> =>
-  new RequestContext<SummarizeRequestContextShape>();
+const buildRequestContext =
+  (): RequestContext<SummarizeRequestContextShape> => {
+    const requestContext = new RequestContext<SummarizeRequestContextShape>();
+    requestContext.set('targetPageId', 'p1');
+    return requestContext;
+  };
 
 const buildBudget = (limit: number, used = 0): PageReadBudget => ({
   limit,
@@ -67,7 +71,12 @@ type GetPageContentToolResult =
     };
 
 const invokeExecute = async (
-  inputData: { pageId?: string; pagePath?: string; offset?: number },
+  inputData: {
+    pageId?: string;
+    pagePath?: string;
+    offset?: number;
+    limit?: number;
+  },
   requestContext: RequestContext<SummarizeRequestContextShape>,
 ): Promise<GetPageContentToolResult> => {
   // biome-ignore lint/style/noNonNullAssertion: createTool always wires execute
@@ -125,28 +134,51 @@ describe('limitedGetPageContentTool', () => {
       expect(result.result).toBe('context_error');
       expect(delegateSpy).not.toHaveBeenCalled();
     });
+
+    it('returns context_error without delegating when targetPageId is missing', async () => {
+      const requestContext = new RequestContext<SummarizeRequestContextShape>();
+      requestContext.set('pageReadBudget', buildBudget(60_000));
+
+      const result = await invokeExecute({ pageId: 'p1' }, requestContext);
+
+      expect(result.result).toBe('context_error');
+      expect(delegateSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('reads only the target page', () => {
+    it.each([
+      { pageId: 'other-page' },
+      { pagePath: '/other-page' },
+      { pageId: 'other-page', pagePath: '/other-page' },
+    ])('reads the target page when the model asks for %o', async (input) => {
+      const requestContext = buildRequestContext();
+      requestContext.set('pageReadBudget', buildBudget(60_000));
+
+      await invokeExecute(input, requestContext);
+
+      expect(delegateSpy.mock.calls[0][0]).toMatchObject({ pageId: 'p1' });
+    });
   });
 
   describe('budget boundary', () => {
     it('returns limit_exceeded without delegating when used already equals limit', async () => {
       const requestContext = buildRequestContext();
-      const budget = buildBudget(1500, 1500);
+      const budget = buildBudget(60_000, 60_000);
       requestContext.set('pageReadBudget', budget);
 
       const result = await invokeExecute({ pageId: 'p1' }, requestContext);
 
       expect(result.result).toBe('limit_exceeded');
       expect(delegateSpy).not.toHaveBeenCalled();
-      // used/limit must not change when rejecting without delegating.
-      expect(budget.used).toBe(1500);
-      expect(budget.limit).toBe(1500);
+      expect(budget.used).toBe(60_000);
     });
   });
 
-  describe('normal delegation', () => {
-    it('delegates to getPageContentTool and increments used by the returned content line count', async () => {
+  describe('charging the budget in characters', () => {
+    it('charges the characters of the returned content', async () => {
       const requestContext = buildRequestContext();
-      const budget = buildBudget(1500, 0);
+      const budget = buildBudget(60_000);
       requestContext.set('pageReadBudget', budget);
       delegateSpy.mockResolvedValue(okWithContent('line1\nline2\nline3', true));
 
@@ -156,55 +188,64 @@ describe('limitedGetPageContentTool', () => {
       );
 
       expect(result).toEqual(okWithContent('line1\nline2\nline3', true));
-      expect(delegateSpy).toHaveBeenCalledTimes(1);
-      // 3 lines returned -> used increments by 3.
-      expect(budget.used).toBe(3);
+      expect(budget.used).toBe('line1\nline2\nline3'.length);
     });
 
-    it('passes hasMore and totalLines through unmodified', async () => {
+    it('charges a single very long line by its length, not as one line', async () => {
       const requestContext = buildRequestContext();
-      requestContext.set('pageReadBudget', buildBudget(1500));
-      const delegateValue = okWithContent('a\nb', true);
-      delegateSpy.mockResolvedValue(delegateValue);
+      const budget = buildBudget(60_000);
+      requestContext.set('pageReadBudget', budget);
+      delegateSpy.mockResolvedValue(okWithContent('x'.repeat(10_000)));
 
-      const result = await invokeExecute(
-        { pageId: 'p1', offset: 1 },
-        requestContext,
-      );
+      await invokeExecute({ pageId: 'p1', offset: 1 }, requestContext);
 
-      expect(result).toEqual(delegateValue);
+      expect(budget.used).toBe(10_000);
     });
 
     it('accumulates used across multiple calls', async () => {
       const requestContext = buildRequestContext();
-      const budget = buildBudget(1500);
+      const budget = buildBudget(60_000);
       requestContext.set('pageReadBudget', budget);
-      delegateSpy.mockResolvedValueOnce(okWithContent('a\nb\nc', true));
-      delegateSpy.mockResolvedValueOnce(okWithContent('d\ne', false));
+      delegateSpy.mockResolvedValueOnce(okWithContent('abc', true));
+      delegateSpy.mockResolvedValueOnce(okWithContent('de', false));
 
       await invokeExecute({ pageId: 'p1', offset: 1 }, requestContext);
       await invokeExecute({ pageId: 'p1', offset: 4 }, requestContext);
 
       expect(budget.used).toBe(5);
     });
-  });
 
-  describe('content undefined does not consume budget', () => {
-    it('does not increment used when the delegate returns outline-only (no content)', async () => {
+    it('charges an outline-only response by the outline as sent to the LLM', async () => {
       const requestContext = buildRequestContext();
-      const budget = buildBudget(1500);
+      const budget = buildBudget(60_000);
       requestContext.set('pageReadBudget', budget);
       delegateSpy.mockResolvedValue(okOutlineOnly());
 
       const result = await invokeExecute({ pageId: 'p1' }, requestContext);
 
       expect(result).toEqual(okOutlineOnly());
-      expect(budget.used).toBe(0);
+      expect(budget.used).toBe(
+        JSON.stringify(okOutlineOnly().page.outline).length,
+      );
     });
 
-    it('does not increment used when the delegate returns a failure response', async () => {
+    it('stops repeated outline-only calls once the outline has used up the budget', async () => {
       const requestContext = buildRequestContext();
-      const budget = buildBudget(1500);
+      const outlineChars = JSON.stringify(okOutlineOnly().page.outline).length;
+      requestContext.set('pageReadBudget', buildBudget(outlineChars * 2));
+      delegateSpy.mockResolvedValue(okOutlineOnly());
+
+      await invokeExecute({ pageId: 'p1' }, requestContext);
+      await invokeExecute({ pageId: 'p1' }, requestContext);
+      const third = await invokeExecute({ pageId: 'p1' }, requestContext);
+
+      expect(third.result).toBe('limit_exceeded');
+      expect(delegateSpy).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not charge a failure response', async () => {
+      const requestContext = buildRequestContext();
+      const budget = buildBudget(60_000);
       requestContext.set('pageReadBudget', budget);
       delegateSpy.mockResolvedValue({
         result: 'not_found_or_forbidden' as const,
@@ -218,21 +259,130 @@ describe('limitedGetPageContentTool', () => {
     });
   });
 
+  describe('the last read before the limit', () => {
+    it('returns only the remaining room, marks more content, and fills the budget exactly', async () => {
+      const requestContext = buildRequestContext();
+      const budget = buildBudget(100, 90);
+      requestContext.set('pageReadBudget', budget);
+      delegateSpy.mockResolvedValue(okWithContent('y'.repeat(500), false));
+
+      const result = await invokeExecute(
+        { pageId: 'p1', offset: 1 },
+        requestContext,
+      );
+
+      expect(result).toMatchObject({
+        result: 'ok',
+        page: { content: 'y'.repeat(10), hasMore: true },
+      });
+      expect(budget.used).toBe(100);
+      const next = await invokeExecute(
+        { pageId: 'p1', offset: 2 },
+        requestContext,
+      );
+      expect(next.result).toBe('limit_exceeded');
+    });
+
+    it('charges the outline first and cuts the body to what is left after it', async () => {
+      const requestContext = buildRequestContext();
+      const outline = [{ line: 1, level: 1, heading: 'Intro' }];
+      const outlineChars = JSON.stringify(outline).length;
+      const budget = buildBudget(outlineChars + 4);
+      requestContext.set('pageReadBudget', budget);
+      delegateSpy.mockResolvedValue({
+        result: 'ok' as const,
+        page: { ...okWithContent('abcdefgh').page, outline },
+      });
+
+      const result = await invokeExecute({ pageId: 'p1' }, requestContext);
+
+      expect(result).toMatchObject({
+        page: { content: 'abcd', hasMore: true, outline },
+      });
+      expect(budget.used).toBe(outlineChars + 4);
+    });
+
+    it('drops trailing outline entries that do not fit, never exceeding the limit', async () => {
+      const requestContext = buildRequestContext();
+      const outline = [1, 2, 3].map((line) => ({
+        line,
+        level: 2,
+        heading: `Section ${line}`,
+      }));
+      const twoEntriesChars = JSON.stringify(outline.slice(0, 2)).length;
+      const budget = buildBudget(twoEntriesChars + 5);
+      requestContext.set('pageReadBudget', budget);
+      delegateSpy.mockResolvedValue({
+        result: 'ok' as const,
+        page: { ...okOutlineOnly().page, outline },
+      });
+
+      const result = await invokeExecute({ pageId: 'p1' }, requestContext);
+
+      expect(result).toMatchObject({
+        page: { outline: outline.slice(0, 2) },
+      });
+      expect(budget.used).toBe(twoEntriesChars);
+    });
+
+    it('omits the outline when not even an empty one fits', async () => {
+      const requestContext = buildRequestContext();
+      const budget = buildBudget(100, 99);
+      requestContext.set('pageReadBudget', budget);
+      delegateSpy.mockResolvedValue(okOutlineOnly());
+
+      const result = await invokeExecute({ pageId: 'p1' }, requestContext);
+
+      expect(result).toMatchObject({
+        result: 'ok',
+        page: { outline: undefined },
+      });
+      expect(budget.used).toBe(99);
+    });
+
+    it('does not split a surrogate pair when cutting the body', async () => {
+      const requestContext = buildRequestContext();
+      const budget = buildBudget(3);
+      requestContext.set('pageReadBudget', budget);
+      delegateSpy.mockResolvedValue(okWithContent('ab😀cd'));
+
+      const result = await invokeExecute(
+        { pageId: 'p1', offset: 1 },
+        requestContext,
+      );
+
+      expect(result).toMatchObject({
+        page: { content: 'ab', hasMore: true },
+      });
+      expect(budget.used).toBe(2);
+    });
+  });
+
   describe('never modifies getPageContentTool', () => {
-    it('forwards the validated input (zod defaults applied) and the same requestContext to the delegate', async () => {
+    it('forwards the input with a 500-line limit and the same requestContext to the delegate', async () => {
       const requestContext = buildRequestContext();
       requestContext.set('pageReadBudget', buildBudget(1500));
 
       await invokeExecute({ pageId: 'p1', offset: 5 }, requestContext);
 
-      // The wrapper's input schema is the SAME instance as the original
-      // tool's (limit defaults to 200), so the validated payload carries it.
       expect(delegateSpy.mock.calls[0][0]).toEqual({
         pageId: 'p1',
         offset: 5,
-        limit: 200,
+        limit: 500,
       });
       expect(delegateSpy.mock.calls[0][1].requestContext).toBe(requestContext);
+    });
+
+    it('reads 500 lines even when the model asks for fewer', async () => {
+      const requestContext = buildRequestContext();
+      requestContext.set('pageReadBudget', buildBudget(1500));
+
+      await invokeExecute(
+        { pageId: 'p1', offset: 5, limit: 100 },
+        requestContext,
+      );
+
+      expect(delegateSpy.mock.calls[0][0]).toMatchObject({ limit: 500 });
     });
 
     it('shares the exact same input schema instance as the wrapped tool', () => {

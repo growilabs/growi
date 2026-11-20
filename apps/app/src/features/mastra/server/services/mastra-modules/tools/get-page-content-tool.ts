@@ -1,10 +1,7 @@
 import type { RequestContext } from '@mastra/core/request-context';
 import { createTool } from '@mastra/core/tools';
-import type { Heading } from 'mdast';
-import { fromMarkdown } from 'mdast-util-from-markdown';
-import { toString as mdastToString } from 'mdast-util-to-string';
+import type { HydratedDocument } from 'mongoose';
 import mongoose from 'mongoose';
-import { visit } from 'unist-util-visit';
 import { z } from 'zod';
 
 import { populateDataToShowRevision } from '~/server/models/obsolete-page';
@@ -12,6 +9,12 @@ import type { PageDocument, PageModel } from '~/server/models/page';
 import loggerFactory from '~/utils/logger';
 
 import type { MastraRequestContextShape } from '../types/request-context';
+import {
+  countLines,
+  type PreparedPageBody,
+  preparePageBody,
+  sliceLines,
+} from './page-content';
 
 const logger = loggerFactory('growi:tools:get-page-content-tool');
 
@@ -19,79 +22,38 @@ const logger = loggerFactory('growi:tools:get-page-content-tool');
 // ctx.get('user') is statically inferred.
 type TypedRequestContext = RequestContext<MastraRequestContextShape>;
 
-type OutlineEntry = {
-  line: number;
-  level: 1 | 2 | 3 | 4 | 5 | 6;
-  heading: string;
+const readRevisionBody = async (
+  page: HydratedDocument<PageDocument>,
+): Promise<string> => {
+  // Empty userPublicFields is fine — only the revision body is needed.
+  await populateDataToShowRevision(page, '');
+  return String(
+    page.revision != null &&
+      typeof page.revision === 'object' &&
+      'body' in page.revision
+      ? ((page.revision as { body?: unknown }).body ?? '')
+      : '',
+  );
 };
 
-// Build an outline from the page body by parsing it into a MDAST tree and
-// visiting heading nodes. Handles ATX (`# h`) and Setext (`h\n===` / `h\n---`)
-// headings; code blocks / HTML blocks are correctly excluded by the parser.
-const extractOutline = (body: string): OutlineEntry[] => {
-  const tree = fromMarkdown(body);
-  const entries: OutlineEntry[] = [];
-  visit(tree, 'heading', (node: Heading) => {
-    // node.position is normally present for parsed input; guard defensively.
-    if (node.position == null) return;
-    entries.push({
-      line: node.position.start.line,
-      level: node.depth,
-      heading: mdastToString(node),
-    });
-  });
-  return entries;
-};
-
-// Single-pass scanner: counts total lines and extracts a 1-indexed line range
-// without allocating one substring per line. Replaces an earlier
-// `body.split(/\r?\n/)` that materialised O(totalLines) line objects + array
-// even when the agent only needed `safeLimit` lines — wasteful for long pages
-// under the outline → drill-down access pattern (PR #11204 review FB).
-//
-// CRLF semantics match the previous `split(/\r?\n/).join('\n')` contract:
-//  - The \r preceding the closing \n of the last returned line is stripped
-//    (so the slice ends at the line content, not at the CR).
-//  - Internal \r\n sequences within the slice are normalised to \n.
-//  - A bare \r at end-of-body (no trailing \n) is preserved verbatim.
-const scanBody = (
-  text: string,
-  sliceFrom: number, // 1-indexed inclusive start of the slice
-  sliceCount: number, // number of lines to take
-): { totalLines: number; slice: string; hasMore: boolean } => {
-  const sliceTo = sliceFrom + sliceCount - 1; // 1-indexed inclusive end
-
-  let totalLines = 1;
-  let sliceStartPos: number | undefined = sliceFrom === 1 ? 0 : undefined;
-  let sliceEndPos: number | undefined;
-
-  let pos = 0;
-  while (true) {
-    const nl = text.indexOf('\n', pos);
-    if (nl === -1) break;
-    totalLines += 1;
-    // After this newline, line `totalLines` begins at nl + 1.
-    if (totalLines === sliceFrom) sliceStartPos = nl + 1;
-    if (totalLines === sliceTo + 1) {
-      // End of the requested range. Strip a preceding \r so the slice ends
-      // on the line's last visible char (CRLF normalisation parity).
-      sliceEndPos =
-        nl > 0 && text.charCodeAt(nl - 1) === 13 /* \r */ ? nl - 1 : nl;
-    }
-    pos = nl + 1;
+// Prepared once per page per request: later calls skip the revision read and
+// the Markdown parse. The viewer check still runs on every call.
+const getPreparedPageBody = async (
+  ctx: TypedRequestContext,
+  page: HydratedDocument<PageDocument>,
+): Promise<PreparedPageBody> => {
+  let cache = ctx.get('preparedPageBodies');
+  if (cache == null) {
+    cache = new Map<string, PreparedPageBody>();
+    ctx.set('preparedPageBodies', cache);
   }
+  const pageId = String(page._id);
+  const cached = cache.get(pageId);
+  if (cached != null) return cached;
 
-  // sliceFrom past EOF → empty slice, definitively no more pages.
-  if (sliceStartPos == null) {
-    return { totalLines, slice: '', hasMore: false };
-  }
-  if (sliceEndPos == null) sliceEndPos = text.length;
-
-  let slice = text.substring(sliceStartPos, sliceEndPos);
-  if (slice.indexOf('\r') !== -1) slice = slice.replace(/\r\n/g, '\n');
-
-  // hasMore iff a line numbered (sliceTo + 1) exists in the body.
-  return { totalLines, slice, hasMore: sliceTo < totalLines };
+  const prepared = preparePageBody(await readRevisionBody(page));
+  cache.set(pageId, prepared);
+  return prepared;
 };
 
 const inputSchema = z
@@ -229,17 +191,7 @@ export const getPageContentTool = createTool({
         };
       }
 
-      // Populate revision so page.revision.body (Markdown) is available.
-      // Empty userPublicFields is fine — we only need the revision body here.
-      await populateDataToShowRevision(page, '');
-
-      const body = String(
-        page.revision != null &&
-          typeof page.revision === 'object' &&
-          'body' in page.revision
-          ? ((page.revision as { body?: unknown }).body ?? '')
-          : '',
-      );
+      const prepared = await getPreparedPageBody(ctx, page);
       const path = page.path;
       // Legacy pages predating the timestamps schema can have `updatedAt`
       // missing; omit the field from the response in that case rather than
@@ -257,17 +209,8 @@ export const getPageContentTool = createTool({
       // defensive guard for clarity when offset is omitted (first call).
       const safeOffset = Math.max(1, offset ?? 1);
 
-      // Line-based pagination via a single-pass scan: counts totalLines AND
-      // extracts the requested slice without materialising every line as a
-      // separate string. PR #11204 review FB: avoid allocating an
-      // O(totalLines) string array for long pages when only `safeLimit` lines
-      // are actually returned. Slicing stays in memory; no extra DB queries
-      // (the Page.findByIdAndViewer path is unchanged).
-      const { totalLines, slice, hasMore } = scanBody(
-        body,
-        safeOffset,
-        safeLimit,
-      );
+      const totalLines = countLines(prepared);
+      const { slice, hasMore } = sliceLines(prepared, safeOffset, safeLimit);
 
       // === Mode selection (outline vs content) ===
       // `offset` omitted  → outline mode  (return the heading list; the agent
@@ -282,7 +225,7 @@ export const getPageContentTool = createTool({
       const includeOutline = isFirstCall;
       const includeContent = !isFirstCall || fitsInOnePage;
 
-      const outline = includeOutline ? extractOutline(body) : undefined;
+      const outline = includeOutline ? [...prepared.outline] : undefined;
 
       const contentFields = includeContent
         ? {

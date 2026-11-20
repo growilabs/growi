@@ -1,6 +1,12 @@
 import type { MastraModelConfig } from '@mastra/core/llm';
-import type { RequestContext } from '@mastra/core/request-context';
+import { RequestContext } from '@mastra/core/request-context';
+import { MockLanguageModelV3 } from 'ai/test';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { mock } from 'vitest-mock-extended';
+
+import type { UsageMeter } from '~/features/ai-usage/server';
+
+import type { LanguageModelV3 } from '../../../usage-metering/from-language-model-usage';
 
 // ---------------------------------------------------------------------------
 // Module mocks
@@ -60,6 +66,9 @@ vi.mock('@mastra/core/mastra', () => {
   return { Mastra: StubMastra };
 });
 
+// The real barrel also loads the public route and Prisma models.
+vi.mock('~/features/ai-usage/server', () => ({ recordAiUsage: vi.fn() }));
+
 // Suppress logger noise from transitively-imported modules.
 vi.mock('~/utils/logger', () => ({
   default: () => ({
@@ -84,8 +93,8 @@ vi.mock('../../../ai-sdk-modules/resolve-mastra-model', () => ({
 }));
 
 // Replace memory with an inert stub: mastra-modules/index.ts (loaded by the
-// registration tests) also pulls in growi-agent.ts -> ../memory, which would
-// spin up MongoDBStore at module load. Both resolve to the same module.
+// registration tests) pulls in growi-agent.ts -> ../memory, which would
+// spin up MongoDBStore at module load.
 vi.mock('../../memory', () => ({
   memory: { id: 'stub-memory' },
 }));
@@ -100,7 +109,6 @@ resolverMock.fn.mockImplementation(() => {
   throw new Error('Mastra LLM provider is not configured (set AI_PROVIDER)');
 });
 
-import { memory as mockedMemory } from '../../memory';
 import { SUMMARIZE_INSTRUCTIONS } from './instructions';
 import { limitedGetPageContentTool } from './limited-get-page-content-tool';
 import type { SummarizeRequestContextShape } from './request-context';
@@ -159,7 +167,7 @@ describe('summarizeAgent', () => {
     });
   });
 
-  describe('tools composition (Requirement 1.4 — cross-agent thread replay)', () => {
+  describe('tools composition', () => {
     it('registers limitedGetPageContentTool under the key "getPageContentTool" (same key growiAgent uses)', () => {
       const config = getCapturedConfig();
 
@@ -182,11 +190,11 @@ describe('summarizeAgent', () => {
     });
   });
 
-  describe('memory (Requirement 1.4 — follow-up questions need thread history)', () => {
-    it('connects the shared memory instance', () => {
+  describe('memory', () => {
+    it('is stateless: no memory is connected, so a summary persists no thread', () => {
       const config = getCapturedConfig();
 
-      expect(config.memory).toBe(mockedMemory);
+      expect(config.memory).toBeUndefined();
     });
   });
 
@@ -240,6 +248,72 @@ describe('summarizeAgent', () => {
       const thrown = await modelFn(makeModelFnArg()).catch((e: unknown) => e);
 
       expect(thrown).toBe(resolverError);
+    });
+  });
+
+  describe('usage metering', () => {
+    const isV3Model = (model: unknown): model is LanguageModelV3 =>
+      typeof model === 'object' &&
+      model != null &&
+      'specificationVersion' in model &&
+      model.specificationVersion === 'v3';
+
+    const createProviderModel = () =>
+      new MockLanguageModelV3({
+        doGenerate: {
+          content: [{ type: 'text', text: 'ok' }],
+          finishReason: { unified: 'stop', raw: 'stop' },
+          usage: {
+            inputTokens: {
+              total: 30,
+              noCache: 30,
+              cacheRead: undefined,
+              cacheWrite: undefined,
+            },
+            outputTokens: { total: 7, text: 7, reasoning: undefined },
+          },
+          warnings: [],
+        },
+      });
+
+    const callModel = (model: LanguageModelV3) =>
+      model.doGenerate({
+        prompt: [{ role: 'user', content: [{ type: 'text', text: 'hi' }] }],
+      });
+
+    it('reports each call of the resolved model to the usage meter of the request', async () => {
+      resolverMock.fn.mockReturnValue(createProviderModel());
+      const usageMeter = mock<UsageMeter>();
+      const requestContext = new RequestContext<SummarizeRequestContextShape>();
+      requestContext.set('usageMeter', usageMeter);
+
+      const model = await getModelFn()({ requestContext });
+      if (!isV3Model(model)) {
+        throw new Error('Expected a v3 language model');
+      }
+      await callModel(model);
+
+      expect(usageMeter.add).toHaveBeenCalledTimes(1);
+      expect(usageMeter.add).toHaveBeenCalledWith({
+        inputTokens: 30,
+        outputTokens: 7,
+        reasoningTokens: null,
+        cacheReadTokens: null,
+        cacheWriteTokens: null,
+      });
+    });
+
+    it('leaves the resolved (cached) model unwrapped, so other requests are not reported to this meter', async () => {
+      const providerModel = createProviderModel();
+      resolverMock.fn.mockReturnValue(providerModel);
+      const usageMeter = mock<UsageMeter>();
+      const requestContext = new RequestContext<SummarizeRequestContextShape>();
+      requestContext.set('usageMeter', usageMeter);
+
+      await getModelFn()({ requestContext });
+      await callModel(providerModel);
+
+      expect(usageMeter.add).not.toHaveBeenCalled();
     });
   });
 

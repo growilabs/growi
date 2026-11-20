@@ -2,7 +2,7 @@ import { Agent } from '@mastra/core/agent';
 import type { RequestContext } from '@mastra/core/request-context';
 
 import { resolveMastraModel } from '../../../ai-sdk-modules/resolve-mastra-model';
-import { memory } from '../../memory';
+import { meterModelForRequest } from '../../../usage-metering';
 import { SUMMARIZE_INSTRUCTIONS } from './instructions';
 import { limitedGetPageContentTool } from './limited-get-page-content-tool';
 import type { SummarizeRequestContextShape } from './request-context';
@@ -25,23 +25,22 @@ export const summarizeAgent = new Agent({
   // the effective default. Constructing the agent never throws even when the
   // provider/API key are unconfigured — resolveMastraModel() only throws at
   // request time, surfaced by the route's existing error handling.
-  model: ({
+  // Per-request metering wrap: see ai-usage-metering design.md, agent integration note.
+  model: async ({
     requestContext,
   }: {
     requestContext: RequestContext<SummarizeRequestContextShape>;
-  }) => resolveMastraModel(requestContext.get('modelKey')),
+  }) =>
+    meterModelForRequest(
+      requestContext,
+      'summarize',
+      await resolveMastraModel(requestContext.get('modelKey')),
+    ),
   tools: {
-    // Registered under the SAME key growiAgent uses for its page-content
-    // tool ('getPageContentTool'), NOT a summarize-specific key. The
-    // LLM-provider tool name is this `tools` record's key, not the tool's
-    // own `id` — so after the summary completes and growiAgent takes over
-    // the thread for follow-up questions, the past tool-call it replays
-    // from history still names a tool that exists in growiAgent's own
-    // tool set (Requirement 1.4).
+    // Same key as growiAgent's page-content tool, so the client's
+    // `tool-getPageContentTool` part types cover the summary stream too.
     getPageContentTool: limitedGetPageContentTool,
   },
-  // memory IS connected (unlike suggestPathAgent, which is stateless): the
-  // post-summary follow-up conversation needs this thread's history
-  // (Requirement 1.4).
-  memory,
+  // memory is intentionally NOT connected: like suggestPathAgent, a summary
+  // is a one-shot run that needs no thread persistence.
 });

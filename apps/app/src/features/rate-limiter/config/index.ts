@@ -77,6 +77,13 @@ export const defaultConfig: IApiRateLimitEndpointMap = {
     maxRequests: MAX_REQUESTS_TIER_4,
     usersPerIpProspection: 20,
   },
+  // One summary run (up to 6 LLM steps) per request; per-IP prospection
+  // raised for shared egress IPs (see ai-summarize research.md 7.10).
+  '/_api/v3/mastra/summary': {
+    method: 'POST',
+    maxRequests: MAX_REQUESTS_TIER_1,
+    usersPerIpProspection: 20,
+  },
 };
 
 const isDev = process.env.NODE_ENV === 'development';
