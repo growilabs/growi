@@ -10,7 +10,7 @@
   - 単体テストで、照合が revision の ID で行われ、ページ ID では行われないこと、出力が7項目に固定されていることを確かめる
   - _Requirements: 1.1, 1.2, 2.1, 2.2_
 
-- [ ] 1.2 複製の PageOperation の担当と進捗を管理する処理を実装する
+- [x] 1.2 複製の PageOperation の担当と進捗を管理する処理を実装する
   - PageOperation に任意項目 `lastProgressAt` と `ownerToken` を追加する。`unprocessableExpiryDate` は変えない
   - 複製の PageOperation の作成（新しい `ownerToken` と今の時刻を書く）、`ownerToken` を条件にした `lastProgressAt` の更新、`lastProgressAt` により期限切れと判定された PageOperation の回復の引き受け（条件付きの書き換えで1件ずつ）、`ownerToken` を条件にした削除を実装する。担当を外れたときは、すべて同じ例外で知らせる
   - `ownerToken` を持たない複製の PageOperation は、作成から15分たったものだけを回復の対象にする
