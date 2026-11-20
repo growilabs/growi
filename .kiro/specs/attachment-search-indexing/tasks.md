@@ -352,10 +352,11 @@
   - _Requirements: 9.2_
   - _Boundary: integration_
 
-- [ ] 10.8 検索の速さを perf test で確認する (`attachment-search-performance.integ.ts`: 手で走らせる測定。`ATTACHMENT_SEARCH_PERF=1` のときだけ動き、CI では飛ばす。測定値は research.md 8.7 / 12)
+- [x] 10.8 検索の速さを perf test で確認する (`attachment-search-performance.integ.ts`: 手で走らせる測定。`ATTACHMENT_SEARCH_PERF=1` のときだけ動き、CI では飛ばす。測定値は research.md 8.7 / 12)
+  - 測定はアプリを起動して HTTP で送る。経路の順番は 1 回ごとに入れ替える (research.md 8.7 の最後の測定)
   - 測る経路を、機能有効時の `facet` なしの `GET /_api/search`、`GET /_api/v3/search/attachments` (20 ページ分)、`facet=attachments` の 3 つにする。facet=`all` の経路は外す
-  - 機能有効時の `facet` なしの `GET /_api/search` の p95 が、機能無効時のページ検索と同等であること (添付 index を使わないので同じ処理になる)
-  - `GET /_api/v3/search/attachments` の p95 が 500ms 以内であること (ページ検索の結果の表示を待たせない) — 2026-11-20 の手元の測定で 38.4ms
+  - 機能有効時の `facet` なしの `GET /_api/search` の p95 が、機能無効時のページ検索と同等であること (添付 index を使わないので同じ処理になる) — 2026-11-20 のアプリ経由の測定で、比は p95 で 0.96〜1.08 倍
+  - `GET /_api/v3/search/attachments` の p95 が 500ms 以内であること (ページ検索の結果の表示を待たせない) — 2026-11-20 のアプリ経由の測定で 36.5〜42.3ms
   - 時間の上限を超えたとき、`facet=attachments` が `primaryResultIncomplete: true` を返し、`GET /_api/v3/search/attachments` がエラーを返すこと (`attachment-search-result-aggregator.spec.ts` で固定する)
   - _Requirements: 9.1, 9.2, 9.5_
   - _Boundary: performance_
