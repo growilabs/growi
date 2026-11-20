@@ -86,7 +86,13 @@
     "notifications": "Notifications",
     "filter_all": "Tout",
     "no_news": "Aucune actualité disponible",
-    "view_detail": "Voir les détails"
+    "view_detail": "Voir les détails",
+    "change_proposal": {
+      "applied": "a appliqué un Change Proposal",
+      "reverted": "a annulé un Change Proposal",
+      "revert_requested": "vous a demandé d'annuler un Change Proposal",
+      "other_pages": "et d'autres pages"
+    }
   },
   "personal_dropdown": {
     "home": "Accueil",

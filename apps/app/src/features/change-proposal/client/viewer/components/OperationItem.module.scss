@@ -1,0 +1,109 @@
+.operation {
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem 1.25rem;
+  background-color: var(--bs-body-bg);
+  border: 1px solid var(--bs-border-color);
+  border-radius: var(--bs-border-radius-lg);
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.type {
+  display: inline-flex;
+  gap: 0.375rem;
+  align-items: center;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--bs-secondary-color);
+}
+
+.type-icon {
+  font-size: 1.15rem;
+}
+
+.title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+// A page path, not code: keep the monospace face but the body color.
+// Nested to outrank the app-wide inline-code frame (code:not([class^='language-'])).
+.operation .path {
+  padding: 0;
+  font-size: 0.9375rem;
+  color: var(--bs-emphasis-color);
+  overflow-wrap: anywhere;
+  background: none;
+  border: 0;
+}
+
+.move {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.5rem;
+  align-items: center;
+}
+
+// Generated content keeps the arrow out of a copied "from → to" selection.
+.move-arrow::before {
+  display: inline-block;
+  font-family: var(--grw-font-family-material-symbols-outlined);
+  font-size: 1.1rem;
+  font-weight: normal;
+  line-height: 1;
+  color: var(--bs-secondary-color);
+  content: 'arrow_forward';
+  content: 'arrow_forward' / '';
+}
+
+.page-gone {
+  font-style: italic;
+  font-weight: 400;
+  color: var(--bs-secondary-color);
+}
+
+.notes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  align-items: center;
+  font-size: 0.875rem;
+  color: var(--bs-secondary-color);
+
+  &:empty {
+    display: none;
+  }
+}
+
+.note {
+  display: inline-flex;
+  gap: 0.25rem;
+  align-items: center;
+}
+
+.note-icon {
+  font-size: 1.05rem;
+}
+
+// In a narrow card the move turns into a top-to-bottom "from / to" stack.
+@container (max-width: 32rem) {
+  .move {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .move-arrow::before {
+    rotate: 90deg;
+  }
+}

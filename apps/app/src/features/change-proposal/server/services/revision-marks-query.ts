@@ -7,6 +7,7 @@ import type { ProposalMark, RevisionMarkView } from '../../interfaces';
 import { selectVisibleOperations } from '../domain';
 import { loadViewablePages } from './current-page-facts';
 import { contextFor, pageIdsOf } from './proposal-view-parts';
+import { NO_REVERT_COUNTERPART } from './revert-counterparts';
 
 const MAX_REVISION_IDS = 100;
 
@@ -72,10 +73,16 @@ export const createRevisionMarksQuery = (): RevisionMarksQuery => ({
 
     const viewerId = viewer._id.toString();
     const isRevertOf = new Map<string, boolean>();
+    // Empty counterpart values: see core design.md (selectVisibleOperations / contextFor).
     for (const proposal of proposals) {
       const visible = selectVisibleOperations(
         proposal.operations,
-        contextFor(proposal.requester, viewerId, viewable),
+        contextFor(
+          proposal.requester,
+          viewerId,
+          viewable,
+          NO_REVERT_COUNTERPART,
+        ),
       );
       for (const op of visible) {
         isRevertOf.set(

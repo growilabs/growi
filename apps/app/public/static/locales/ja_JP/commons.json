@@ -86,7 +86,13 @@
     "notifications": "通知",
     "filter_all": "すべて",
     "no_news": "ニュースはありません",
-    "view_detail": "詳細を見る"
+    "view_detail": "詳細を見る",
+    "change_proposal": {
+      "applied": "が Change Proposal を反映しました",
+      "reverted": "が Change Proposal を取り消しました",
+      "revert_requested": "が Change Proposal を戻すよう依頼しました",
+      "other_pages": "ほかのページもあります"
+    }
   },
   "personal_dropdown": {
     "home": "ホーム",

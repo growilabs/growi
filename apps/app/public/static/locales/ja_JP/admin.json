@@ -1181,6 +1181,7 @@
     "CHANGE_PROPOSAL_CREATE": "Change Proposal の作成",
     "CHANGE_PROPOSAL_APPLY": "Change Proposal の反映",
     "CHANGE_PROPOSAL_REVERT": "Change Proposal の取り消し",
+    "CHANGE_PROPOSAL_REVERT_REQUEST": "Change Proposal の取り消し依頼",
     "CHANGE_PROPOSAL_APPROVE": "Change Proposal の承認",
     "CHANGE_PROPOSAL_REJECT": "Change Proposal の却下",
     "CHANGE_PROPOSAL_ABSTAIN": "Change Proposal の判断の放棄",

@@ -6,6 +6,9 @@ import { UserPicture } from '@growi/ui/dist/components';
 import { useTranslation } from 'next-i18next';
 import urljoin from 'url-join';
 
+import { ProposalMarkBadge } from '~/features/change-proposal/client/viewer/marks';
+import type { RevisionMarkView } from '~/features/change-proposal/interfaces';
+
 import UserDate from '../../../components/User/UserDate';
 import { Username } from '../../../components/User/Username';
 
@@ -15,6 +18,7 @@ type RevisionProps = {
   revision: IRevisionHasId;
   isLatestRevision: boolean;
   hasDiff: boolean;
+  proposalMark?: RevisionMarkView;
   currentPageId: string;
   currentPagePath: string;
   onClose: () => void;
@@ -27,6 +31,7 @@ export const Revision = (props: RevisionProps): JSX.Element => {
     revision,
     isLatestRevision,
     hasDiff,
+    proposalMark,
     onClose,
     currentPageId,
     currentPagePath,
@@ -58,6 +63,11 @@ export const Revision = (props: RevisionProps): JSX.Element => {
         <div className="flex-grow-1 text-center">
           <span className="text-muted small">{t('No diff')}</span>
         </div>
+        {proposalMark != null && (
+          <div className="d-flex align-items-center ms-2">
+            <ProposalMarkBadge mark={proposalMark} size="sm" />
+          </div>
+        )}
       </div>
     );
   };
@@ -84,6 +94,11 @@ export const Revision = (props: RevisionProps): JSX.Element => {
             </strong>
             {isLatestRevision && (
               <span className="badge bg-info ms-2">{t('Latest')}</span>
+            )}
+            {proposalMark != null && (
+              <span className="ms-2">
+                <ProposalMarkBadge mark={proposalMark} />
+              </span>
             )}
           </div>
           <div className="mb-1">

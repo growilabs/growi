@@ -73,3 +73,31 @@ describe('getServerSideCommonInitialProps - aiEnabled supply', () => {
     expect(await getAiEnabledProp(false, true)).toBe(false);
   });
 });
+
+const getChangeProposalEnabledProp = async (
+  configValue: boolean,
+): Promise<boolean> => {
+  const req = mockDeep<CrowiRequest>();
+  req.crowi.configManager.getConfig.mockImplementation((key) =>
+    key === 'app:changeProposalEnabled' ? configValue : undefined,
+  );
+  const context = mock<GetServerSidePropsContext>({
+    req: req as unknown as GetServerSidePropsContext['req'],
+  });
+  const result = await getServerSideCommonInitialProps(context);
+  if (!('props' in result)) {
+    throw new Error('expected a props result');
+  }
+  const props = await result.props;
+  return props.changeProposalEnabled;
+};
+
+describe('getServerSideCommonInitialProps - changeProposalEnabled supply', () => {
+  it('supplies changeProposalEnabled=true when app:changeProposalEnabled is true', async () => {
+    expect(await getChangeProposalEnabledProp(true)).toBe(true);
+  });
+
+  it('supplies changeProposalEnabled=false when app:changeProposalEnabled is false', async () => {
+    expect(await getChangeProposalEnabledProp(false)).toBe(false);
+  });
+});

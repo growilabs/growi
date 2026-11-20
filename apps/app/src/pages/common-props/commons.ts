@@ -26,6 +26,7 @@ export type CommonInitialProps = {
   growiAppIdForGrowiCloud: number | undefined;
   forcedColorScheme?: ColorScheme;
   aiEnabled: boolean;
+  changeProposalEnabled: boolean;
 };
 
 export const getServerSideCommonInitialProps: GetServerSideProps<
@@ -69,6 +70,9 @@ export const getServerSideCommonInitialProps: GetServerSideProps<
       // client bundle. The verdict (= enabled && configured) mirrors the mastra
       // route guard, keeping UI and API aligned.
       aiEnabled: crowi.isAiReady(),
+      changeProposalEnabled: configManager.getConfig(
+        'app:changeProposalEnabled',
+      ),
     } satisfies CommonInitialProps,
   };
 };

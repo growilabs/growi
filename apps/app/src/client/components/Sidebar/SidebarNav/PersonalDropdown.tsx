@@ -13,8 +13,12 @@ import {
 
 import { apiv3Post } from '~/client/util/apiv3-client';
 import { toastError } from '~/client/util/toastr';
+import { CHANGE_PROPOSAL_LIST_HREF } from '~/features/change-proposal/client/viewer/consts';
 import { useCurrentUser } from '~/states/global';
-import { disableUserPagesAtom } from '~/states/server-configurations';
+import {
+  disableUserPagesAtom,
+  useChangeProposalEnabled,
+} from '~/states/server-configurations';
 
 import { SkeletonItem } from './SkeletonItem';
 
@@ -25,6 +29,7 @@ export const PersonalDropdown = (): JSX.Element => {
   const currentUser = useCurrentUser();
 
   const disableUserPages = useAtomValue(disableUserPagesAtom);
+  const changeProposalEnabled = useChangeProposalEnabled();
 
   if (currentUser == null) {
     return <SkeletonItem />;
@@ -87,6 +92,28 @@ export const PersonalDropdown = (): JSX.Element => {
                   home
                 </span>
                 <span className="item-text">{t('personal_dropdown.home')}</span>
+              </span>
+            </DropdownItem>
+          </Link>
+        )}
+
+        {changeProposalEnabled && (
+          <Link
+            href={CHANGE_PROPOSAL_LIST_HREF}
+            data-testid="grw-personal-dropdown-menu-change-proposals"
+          >
+            <DropdownItem
+              className={`my-1 ${styles['personal-dropdown-item']}`}
+            >
+              <span className="d-flex align-items-center">
+                <span className="item-icon material-symbols-outlined me-2 pb-0 fs-6">
+                  difference
+                </span>
+                <span className="item-text">
+                  {t('change_proposal_viewer.list.title', {
+                    ns: 'translation',
+                  })}
+                </span>
               </span>
             </DropdownItem>
           </Link>

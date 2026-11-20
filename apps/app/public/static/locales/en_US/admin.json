@@ -1192,6 +1192,7 @@
     "CHANGE_PROPOSAL_CREATE": "Create Change Proposal",
     "CHANGE_PROPOSAL_APPLY": "Apply Change Proposal",
     "CHANGE_PROPOSAL_REVERT": "Revert Change Proposal",
+    "CHANGE_PROPOSAL_REVERT_REQUEST": "Request Change Proposal revert",
     "CHANGE_PROPOSAL_APPROVE": "Approve Change Proposal",
     "CHANGE_PROPOSAL_REJECT": "Reject Change Proposal",
     "CHANGE_PROPOSAL_ABSTAIN": "Abstain from reviewing Change Proposal",

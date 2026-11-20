@@ -36,10 +36,13 @@ type EditOperation = OperationRecordOf<'edit'>;
 // whose cleanup fails, or a run stopped in between, leaves it behind. It counts
 // as applied only when the page points to it now, or when the revision just
 // before it is the base (the page moved from base to it, then was edited on).
-const findAdoptedMarkedRevisionId = async (
+const findAdoptedMarkedRevision = async (
   op: EditOperation,
   ctx: ExistingResultContext,
-): Promise<string | null> => {
+): Promise<{
+  readonly revisionId: string;
+  readonly pagePath?: string;
+} | null> => {
   const marked = await prisma.revisions.findMany({
     where: {
       proposalId: ctx.proposalId,
@@ -53,15 +56,19 @@ const findAdoptedMarkedRevisionId = async (
     return null;
   }
 
-  const page = await pageModel().findById(op.pageId, { revision: 1 });
+  const page = await pageModel().findById(op.pageId, { revision: 1, path: 1 });
   const currentRevisionId =
     page?.revision == null ? null : getIdStringForRef(page.revision);
   if (currentRevisionId === op.baseRevisionId) {
     return null;
   }
+  const adopted = (revisionId: string) => ({
+    revisionId,
+    ...(page?.path == null ? {} : { pagePath: page.path }),
+  });
   const current = marked.find((revision) => revision.id === currentRevisionId);
   if (current != null) {
-    return current.id;
+    return adopted(current.id);
   }
   if (page == null) {
     return null;
@@ -75,7 +82,7 @@ const findAdoptedMarkedRevisionId = async (
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     });
     if (predecessor?.id === op.baseRevisionId) {
-      return revision.id;
+      return adopted(revision.id);
     }
   }
   return null;
@@ -85,14 +92,17 @@ export const createEditHandler = (
   crowi: Crowi,
 ): OperationHandler<EditOperation> => ({
   async findExistingResult(op, ctx) {
-    const revisionId = await findAdoptedMarkedRevisionId(op, ctx);
-    if (revisionId == null) {
+    const adopted = await findAdoptedMarkedRevision(op, ctx);
+    if (adopted == null) {
       return null;
     }
     return {
       status: 'applied',
       resultPageId: op.pageId,
-      resultRevisionId: revisionId,
+      resultRevisionId: adopted.revisionId,
+      ...(adopted.pagePath == null
+        ? {}
+        : { appliedPagePath: adopted.pagePath }),
     };
   },
 
@@ -131,6 +141,7 @@ export const createEditHandler = (
         result.page.revision == null
           ? null
           : getIdStringForRef(result.page.revision),
+      appliedPagePath: page.path,
     };
   },
 
