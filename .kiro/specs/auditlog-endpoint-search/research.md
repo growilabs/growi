@@ -37,7 +37,7 @@
 ### 制約
 
 - **共有コンポーネント**: `UsernameTypeahead` は全文検索ページ（`SearchUsernameTypeahead`）も使う。監査ログ用に作り直す変更が、全文検索ページの動きを変えてはいけない。
-- **エクスポートのモーダル**: `AuditLogUsernameTypeahead` を使い続ける（範囲外）。監査ログ画面から `AuditLogUsernameTypeahead` を外しても、モーダル側では残す。
+- **エクスポートのモーダル**: ユーザー名の欄は `AuditLogUsernameTypeahead` を使い続ける（範囲外）。監査ログ画面から `AuditLogUsernameTypeahead` を外しても、モーダル側では残す。URL は一覧から引き継いだ値の表示と解除だけを足す。
 - **一覧の API の 2 経路**: `GET /activity` と `POST /activity/list` の両方で、endpoint 条件が文字列の配列であることを検証する必要がある（NoSQL injection の対策）。検証の置き場所は設計で決める。
 - **失敗の扱い**: 候補 API は複数 field を 1 回で受け付け、1 つでも例外になれば 500 を返す。ただし field ごとの検索は、全文検索サーバーとデータベースのどちらでも失敗したときに空の候補を返すので、例外になるのはデータベース自体が止まっている場合などに限られる。失敗をどの単位で表示するかは設計で決める。
 
@@ -131,7 +131,7 @@
   1. field ごとに `useSWRxAuditlogSuggestions` を呼び、失敗を種類ごとに表示する — 片方の種類だけが失敗する場面のための仕組みになる。
   2. 対象の field をまとめて 1 回のリクエストで取得し、失敗は 1 つの表示にする。
 - **Selected Approach**: 2。`useSWRxAuditlogSuggestions` に field の配列を受け取る形を足す。
-- **Rationale**: 候補 API の field ごとの検索は、全文検索サーバーとデータベースのどちらでも失敗したときに空の候補を返す（`search-auditlog-suggestions.ts`）。リクエストが失敗するのは、通信の失敗・ログイン切れ・`q` の上限超え（400）・データベース自体の停止など、どの種類にも同じように起きる場合に限られる。種類ごとに失敗を見分けても、表示が変わる場面がほぼない。
+- **Rationale**: 候補 API の field ごとの検索は、全文検索サーバーとデータベースのどちらでも失敗したときに空の候補を返す（`search-auditlog-suggestions.ts`）。リクエストが失敗するのは、通信の失敗・ログイン切れ・データベース自体の停止など、どの種類にも同じように起きる場合に限られる（`q` は送る前に上限の長さに切るので、上限超えの 400 は起きない）。種類ごとに失敗を見分けても、表示が変わる場面がほぼない。
 - **Trade-offs**: field ごとの検索が将来、失敗時に例外を投げるようになると、「すべて」では片方の失敗で両方の候補が出なくなる（design.md の Revalidation Triggers に記載）。
 
 ### Decision: 「取得できなかった」の表示は、候補のリクエスト自体の失敗に限る
@@ -173,15 +173,40 @@
 - **Selected Approach**: 2。既存の `UsernameTypeahead`（`filterBy` で `shouldShowUsernameSuggestion` を使う）と同じ形。
 - **Rationale**: 失敗は候補ではないので `filterBy` を通らず、`renderMenu` で出し分けるしかない。判定を 1 つの純粋関数にまとめれば、2 か所で判定がずれない。
 
-### Decision: 前後の空白を除いて 100 文字を超える入力では候補を取得しない
-- **Context**: 要件 1.7 と 4。候補 API の validator は `q` を `isLength({ max: 100 })` で検証し、超えると 400 を返す。SWR の `error` をそのまま失敗の表示にすると、入力が長いだけで「取得できませんでした」が出る。
+### Decision: 送る q は、検索文字列（`?` 以降と前後の空白を除いた入力）の先頭 100 文字 1 つにする
+- **Context**: 要件 1.6、1.7。候補 API の validator は `q` を `isLength({ max: 100 })` で検証し、超えると 400 を返す。一覧の URL 列からコピーした値はクエリ文字列を含み、100 文字を超えることがある。
+- **Selected Approach**: `toSuggestionQuery` が、入力の最初の `?` 以降を除き、前後の空白を除いて検索文字列を作る。2 文字未満なら空にし、それ以外は先頭 `AUDITLOG_SUGGESTION_QUERY_MAX_LENGTH` 文字に切る。q は 1 つで、ユーザーと URL のどちらの候補の検索にも使う。上限は `interfaces/activity.ts` の定数として持ち、候補 API の validator と画面の両方が使う。
+- **Rationale**:
+  - 検索文字列全体に前方一致する endpoint は、その先頭 100 文字にも前方一致するので、先頭 100 文字で検索しても目的の endpoint は検索結果から漏れない。
+  - `?` 以降を画面で除くので、クエリ文字列が長くてもパス部分全体で検索できる。候補 API が q の `?` 以降をどう扱うかに依存しない。
+  - ユーザーと URL で同じ q を使うので、1 回のリクエストにまとめる Decision（q は 1 つ）と両立する。
+  - 2 文字未満の判定も `?` を除いた後の長さで行うので、判定の対象と送る q が一致する。
+- **Trade-offs**: 古さの判定も `toSuggestionQuery` で正規化した値どうしで比べる必要がある。生の入力で比べると、101 文字以上の入力やクエリ文字列を含む入力では取得に使った q と一致せず、候補が常に古いと判定される。ユーザー名を検索するときも `?` 以降は使われない。
+
+### Decision: 2 文字未満の入力は、検索対象にかかわらず画面で止める
+- **Context**: 要件 1.6。候補 API のデータベースでの検索は、field ごとに最小文字数（`AUDITLOG_SUGGESTION_FIELD_SPECS` の `fallbackMinQueryLength`。username は 2、endpoint は 1）を持ち、全文検索サーバーには最小文字数がない。そのため 1 文字の入力では、全文検索サーバーの稼働状況と種類によって候補が出たり出なかったりする。
+- **Selected Approach**: 画面の `AUDITLOG_SEARCH_MIN_QUERY_LENGTH = 2` で、検索文字列が 2 文字未満ならリクエストしない（`toSuggestionQuery` が空を返す）。
+- **Rationale**: サーバーの `fallbackMinQueryLength` は field ごとに値が違う、サーバー内のデータベースでの検索だけの設定で、画面からは参照しない。要件は種類にかかわらず同じ長さで止めることを求めるので、画面に 1 つの定数として持つ。値は username の最小文字数と同じにし、全文検索サーバーが止まっていても 2 文字以上ならどちらの種類も検索される。
+
+### Decision: 一致なしの表示は、候補 API が返した件数で決める
+- **Context**: 要件 4.3。`renderMenu` が受け取る結果は `filterBy` を通した後で、古い候補と選択済みの値が除かれている。
 - **Alternatives Considered**:
-  1. 101 文字以上ではリクエストせず、候補なしとして扱う（上限 100 を、validator と画面で同じ定数として持つ）
-  2. 400 を失敗として扱わず、候補なしとして扱う
-  3. 長い入力でも失敗の表示を出す
-- **Selected Approach**: 1。上限を `interfaces/activity.ts` の `AUDITLOG_SUGGESTION_QUERY_MAX_LENGTH` として持ち、候補 API の validator と `useAuditLogSearchSuggestions` の両方が使う。画面は前後の空白を除いた長さで比べる（`useSWRxAuditlogSuggestions` が trim した q を送るため）。
-- **Rationale**: 2 は 400 の理由を画面側で推し量ることになり、別の理由の 400 まで候補なしに見えてしまう。1 は送る前に判定するので、サーバーの応答の解釈に依存しない。
-- **Trade-offs**: クエリ文字列を含めて 100 文字を超える値は、パス部分が短くても候補が出ない（要件の Boundary Context に記載）。
+  1. `filterBy` を通した後の件数が 0 なら一致なしを出す
+  2. 候補 API が返した件数（`SearchSuggestionsResult.options.length`）が 0 で、結果が新しく、取得待ちでも失敗でもなく、送る q が空でないときだけ一致なしを出す
+- **Selected Approach**: 2。`buildSuggestionGroups` が `state: 'empty'` のグループを返し、`renderMenu` が失敗の表示と同じく選べない `Menu` の子として本機能の文言で描く。
+- **Rationale**: 1 では、返った候補がすべて選択済みのときや、取得待ちで古い候補が除かれたときにも一致なしが出る。要件 4.3 は、候補 API が 0 件を返した場合に限る。空の `Menu` に頼るとライブラリの既定の英語の文言（"No matches found."）が出るので、自前のグループとして描く。
+
+### Decision: エクスポートの endpoint の条件は、一覧と同じ関数で組み立てる
+- **Context**: 要件 7.3、7.4。エクスポートのジョブは `features/audit-log-bulk-export` にあり、一覧の `where` の組み立ては `server/routes/apiv3` にある。
+- **Selected Approach**:
+  - パス部分の完全一致の条件を `buildEndpointWhere` として `server/service/activity` に置き、一覧の `buildActivityListWhere` とジョブの `exportAuditLogsToFsAsync` の両方が使う。
+  - ジョブの `filters` のスキーマに `endpoints: [String]` を足す。
+  - 重複判定の `canonicalizeFilters` には、`endpoints` が空でないときだけ並べ替えた配列を足す。
+- **Rationale**:
+  - 一致の仕方とエスケープを 1 か所に置けば、一覧とエクスポートで出る記録がずれない。
+  - `features/` から `server/routes/apiv3/` のロジックを読み込むとルートの層に依存するので、どちらにも属さない activity のサービスに置く。
+  - ジョブの `filters` は型付きのサブドキュメントで、スキーマにない項目は保存時に黙って捨てられるため、スキーマへの追加が必須。
+  - endpoint が空のときに項目を足さなければ、URL を含まないエクスポートのハッシュは今と同じになり、進行中のジョブとの重複判定も変わらない。
 
 ### Decision: デコード済みの形の入力は変換しない
 - **Context**: 記録された endpoint は `req.originalUrl` で、パーセントエンコードされた形。デコード済みの形（`/日本語ページ` など）で入力すると前方一致しない。
@@ -190,7 +215,7 @@
   2. 送る前に ASCII 以外の文字だけをパーセントエンコードする
 - **Selected Approach**: 1。
 - **Rationale**: ページの URL を endpoint として記録するのは、ページの表示の記録（`pages/utils/activity.ts`。アクションは `PAGE_VIEW` / `PAGE_USER_HOME_VIEW` / `PAGE_NOT_FOUND` / `PAGE_FORBIDDEN` / `PAGE_NOT_CREATABLE`）で、これらは Small / Medium / Large のどの記録グループにも入っておらず、`AUDIT_LOG_ADDITIONAL_ACTIONS` で足したときだけ記録される。既定で記録される API のパスで日本語が入るのは主にクエリ文字列で、候補はクエリ文字列を除いて検索する。一覧の URL 列のコピーボタンは記録された形をそのままコピーする。
-- **Follow-up**: ページの表示を記録する運用での要望が出たら、2 を要件として足す。2 では 100 文字の上限をエンコードした後の長さで数える（日本語 1 文字が 9 文字になる）。
+- **Follow-up**: ページの表示を記録する運用での要望が出たら、2 を要件として足す。2 では先頭 100 文字の切り出しをエンコードした後の長さで行う（日本語 1 文字が 9 文字になる）。
 
 ### Decision: `activity-log-snapshot` の design.md は本 spec で直し、amend spec にしない
 - **Context**: `activity-log-snapshot/design.md` の Allowed Dependencies にある `findSnapshotUsernamesByUsernameRegex` の説明が、候補の検索の変更（呼び出し元と最小文字数の判定の位置）に追随していない。
@@ -200,9 +225,9 @@
 ### Synthesis
 - **Generalization**: 「検索対象の種類」をデータ（`AUDITLOG_SEARCH_SCOPES` の表）で持ち、種類ごとの取得・見出し・トークンの表示をその表から引く。IP を後で足すときは、表に 1 行足して候補の取得を足すだけで済む。ただし、実装するのは今回の要件のユーザーと URL だけにする。
 - **Build vs. Adopt**: 入力欄は既存の `react-bootstrap-typeahead` を使う。新しい依存はない。
-- **Simplification**: 候補 API とサーバー側の候補の検索は変えない。エクスポートのモーダルは既存の `AuditLogUsernameTypeahead` のまま残す。
+- **Simplification**: 候補 API とサーバー側の候補の検索は変えない。エクスポートのモーダルのユーザー名の欄は既存の `AuditLogUsernameTypeahead` のまま残し、URL は一覧から引き継いだ値の表示と解除だけにする。
 
 ## Risks & Mitigations
 - Prisma のバージョンアップで `startsWith` がエスケープするようになり、二重エスケープで一致しなくなる — 正規表現の記号を含むパスと `/_api/v3/pages` の除外を確かめる integ テストで検知する。
 - 一覧のクエリが全件走査のまま — 今の username・action の絞り込みと同じ水準。activities は既定で 30 日で消える。改善は本 spec の範囲外。
-- `react-bootstrap-typeahead` 6.3.2 は、候補一覧を開くかを `isShown`（`open` / `minLength` / `showMenu` / `text`）だけで決め、結果の件数は見ない。フィルタ後の結果が 0 件でも `renderMenu` は呼ばれる — `renderMenu` が結果が空のときに早期 return すると、失敗表示（要件 4.1）が消える。一方で、空の `Menu` を描くと、`Menu` が `emptyLabel` を描き（`es/components/Menu/Menu.js`）、`AsyncTypeahead` がそれを状況に応じて "Type to search..." / "Searching..." / "No matches found." に差し替える（`es/behaviors/async.js` の `getEmptyLabel`）。そのため、空を返すかどうかは `buildSuggestionGroups` の戻り値で決める（失敗のグループがあれば描き、何もなければ空のフラグメントを返す）。`emptyLabel` などに空文字を渡すと中身のない無効な項目が残るので使わない。コンポーネントテストで固定する。
+- `react-bootstrap-typeahead` 6.3.2 は、候補一覧を開くかを `isShown`（`open` / `minLength` / `showMenu` / `text`）だけで決め、結果の件数は見ない。フィルタ後の結果が 0 件でも `renderMenu` は呼ばれる — `renderMenu` が結果が空のときに早期 return すると、失敗表示（要件 4.1）が消える。一方で、空の `Menu` を描くと、`Menu` が `emptyLabel` を描き（`es/components/Menu/Menu.js`）、`AsyncTypeahead` がそれを状況に応じて "Type to search..." / "Searching..." / "No matches found." に差し替える（`es/behaviors/async.js` の `getEmptyLabel`）。そのため、空を返すかどうかは `buildSuggestionGroups` の戻り値で決める（失敗のグループか一致なしのグループがあれば描き、何もなければ空のフラグメントを返す）。`emptyLabel` などに空文字を渡すと中身のない無効な項目が残るので使わない。コンポーネントテストで固定する。
