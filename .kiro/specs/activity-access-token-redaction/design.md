@@ -27,14 +27,19 @@
 | activity-log のファイル | 節 | 変わる内容 |
 |---|---|---|
 | requirements.md | Requirements | Requirement 5〜9 を末尾に追加する（既存の 1〜4 は番号を変えない） |
-| requirements.md | Boundary Context | In scope に伏せ字を追加する。Out of scope の「既に DB に溜まっている未確定／対象外の残骸行の遡及的な掃除・移行」は残骸の掃除のことで、伏せ字の migration とは別だと分かる書き方にする |
+| requirements.md | Boundary Context | In scope に伏せ字を追加する。本 spec の Out of scope（TTL で消えた行、作成済みのエクスポートファイル、ローリングアップデート中・ロールバック中に古いバージョンが書いた行、access_token 以外のパラメータ、endpoint 以外の項目）を追加する。既存の Out of scope の「既に DB に溜まっている未確定／対象外の残骸行の遡及的な掃除・移行」は残骸の掃除のことで、伏せ字の migration とは別だと分かる書き方にする |
+| design.md | Non-Goals | 「既存残骸の掃除・移行」が伏せ字の migration を含まないことを明記する |
 | design.md | This Spec Owns | 「保存する endpoint の伏せ字」を追加する |
 | design.md | Out of Boundary | 「既存残骸の掃除・移行」が伏せ字の migration を含まないことを明記する |
 | design.md | Allowed Dependencies | `server/util/redact-access-token-from-endpoint.ts` を追加する |
 | design.md | Revalidation Triggers | 本 spec の Revalidation Triggers を追加する（下記。**activity-log の Revalidation Triggers に触れる変更**） |
 | design.md | File Structure Plan | 伏せ字の関数の場所と、migration・インポートの変更を追加する |
+| design.md | Requirements Traceability | 5.1〜9.3 の行を追加する |
+| design.md | Components and Interfaces | 表に redactAccessTokenFromEndpoint・ImportEndpointConverter・RedactionMigration の行を追加し、ActivityExtension.createByParameters の Req Coverage に 5.1, 5.2 を足す |
 | design.md | add-activity middleware（変更） | 文脈の `endpoint` は `req.originalUrl` をそのまま持つ（伏せ字は保存口で行う） |
-| design.md | Data / 保存口 `createByParameters` | 保存前に endpoint を伏せ字にすることを追加する。`updateByParameters` の型から endpoint を外すことも書く |
+| design.md | Data / 保存口 `createByParameters` | 保存前に endpoint を伏せ字にすることを追加する。`updateByParameters` が endpoint を型でも実行時でも受け付けないことも書く |
+| design.md | Data Models | 「スキーマ変更なし」の説明に endpoint の値の約束を加え、本 spec の Invariant を追加する |
+| design.md | Error Handling | 伏せ字の関数が例外を投げないこと、migration の失敗時の扱い、インポートの変換の扱いを追加する |
 | design.md | Migration Strategy | 「データ移行なし」を、伏せ字の migration の説明に書き換える |
 | design.md | Testing Strategy | 本 spec のテスト項目を追加する |
 | research.md | Design Decisions | 本 spec の research.md の Decision をすべて移す |
@@ -44,7 +49,7 @@
 
 ### This Spec Owns
 - **endpoint の伏せ字の規則**: どのクエリパラメータを、どの値に置き換えるか。純粋関数 `redactAccessTokenFromEndpoint` が唯一の定義。
-- **保存口での伏せ字の適用**: `createByParameters` に渡された endpoint を、保存前に必ず伏せ字にすること。`updateByParameters` で endpoint を書けないようにすること。
+- **保存口での伏せ字の適用**: `createByParameters` に渡された endpoint を、保存前に必ず伏せ字にすること。`updateByParameters` で endpoint を書けないようにすること（型と実行時の両方）。
 - **インポートでの伏せ字の適用**: `activities.endpoint` の変換関数。
 - **既存の activity の伏せ字**: 伏せ字の migration と、その冪等性・再実行性。
 
@@ -122,7 +127,8 @@ graph TB
 - `apps/app/src/server/middlewares/redact-access-token-from-endpoint.spec.ts` → `apps/app/src/server/util/redact-access-token-from-endpoint.spec.ts` — 冪等性のケースを足す。
 
 ### Modified Files
-- `apps/app/src/server/models/activity.ts` — `createByParameters` で、`create` に渡す前に `endpoint` を伏せ字にする。`IActivityUpdateParameters` から `endpoint` を外す。
+- `apps/app/src/server/models/activity.ts` — `createByParameters` で、`create` に渡す前に `endpoint` を伏せ字にする。`IActivityUpdateParameters` から `endpoint` を外し、`updateByParameters` は実行時にも `endpoint` を取り除いてから `update` に渡す。
+- `apps/app/src/server/models/activity-update-by-parameters.integ.ts` — `endpoint` を含む変数を渡しても、保存済みの endpoint が変わらないことのテストを足す。
 - `apps/app/src/server/middlewares/add-activity.ts` — 伏せ字の呼び出しを外し、文脈の `endpoint` に `req.originalUrl` をそのまま入れる。
 - `apps/app/src/server/service/import/construct-convert-map.ts` — `SPECIAL_CONVERT_FUNCTIONS.activities` に `endpoint` の変換関数を足す。
 - `apps/app/src/server/models/activity-create-by-parameters.integ.ts` — 保存口での伏せ字のテストを足す。
@@ -220,7 +226,9 @@ export const redactAccessTokenFromEndpoint: (originalUrl: string) => string;
 
 **Responsibilities & Constraints**
 - `createByParameters`: `endpoint` が渡されたら、Prisma の `create` に渡す前に `redactAccessTokenFromEndpoint` を通す。渡されなければ、今までどおり `''` を保存する。
-- `updateByParameters`: `IActivityUpdateParameters` から `endpoint` を外す。更新で endpoint を書く手段をなくし、伏せ字を通らない書き込みをコンパイラで塞ぐ（本番コードの呼び出し元はなく、`emit('update')` の payload にも endpoint はない）。
+- `updateByParameters`: 更新で endpoint を書く手段をなくす（本番コードの呼び出し元はなく、`emit('update')` の payload にも endpoint はない）。
+  - 型: `IActivityUpdateParameters` から `endpoint` を外す。
+  - 実行時: `parameters` から `endpoint` を取り除いてから `update` に渡す。型の除外はオブジェクトリテラルで渡したときしか効かず、`endpoint` を持つ変数はそのまま代入できてしまうため。
 - 伏せ字は `create` の前に行うので、Prisma の validation error のメッセージ（引数を含む）にも平文は出ない。
 
 **Dependencies**
@@ -240,7 +248,7 @@ export type IActivityUpdateParameters = Omit<
   'snapshot' | 'endpoint'
 > & { snapshot?: ISnapshot };
 ```
-- Postconditions: 保存された行の `endpoint` は `redactAccessTokenFromEndpoint(parameters.endpoint ?? '')` と等しい。
+- Postconditions: 保存された行の `endpoint` は `redactAccessTokenFromEndpoint(parameters.endpoint ?? '')` と等しい。`updateByParameters` は、渡された値に `endpoint` があっても保存済みの endpoint を変えない。
 
 ### Middleware
 
@@ -300,7 +308,9 @@ const SPECIAL_CONVERT_FUNCTIONS: Record<string, Record<string, OverwriteFunction
 
 スキーマの変更はない。`activities.endpoint` の値の約束だけが変わる。
 
-- **Invariant（本 spec の後）**: `activities.endpoint` に入る値は、`redactAccessTokenFromEndpoint` を通したもの。例外は、ローリングアップデート中に古いバージョンのインスタンスが migration のあとに書いた行だけで、これは TTL で消えるまで残る（要件の範囲外）。
+- **Invariant（本 spec の後）**: `activities.endpoint` に入る値は、`redactAccessTokenFromEndpoint` を通したもの。例外は、migration のあとに古いバージョンのコードが書いた行で、TTL で消えるまで残る（要件の範囲外）。該当するのは次の 2 つ。
+  - ローリングアップデート中に、古いバージョンのインスタンスが書いた行
+  - 古いバージョンにロールバックしている間に書かれた行（migration は適用済みとして記録されているので、再びアップグレードしても流れない）
 
 ## Error Handling
 
@@ -326,8 +336,10 @@ const SPECIAL_CONVERT_FUNCTIONS: Record<string, Record<string, OverwriteFunction
 - `construct-convert-map.integ.ts`: `activities.endpoint` の変換関数が表にあり、トークンを含む値を伏せ字にし、文字列でない値は変えない（7.1, 7.2）。Mongoose の `Activity` モデルが外れたときに落ちるドリフト検知を兼ねる。
 - 同じ endpoint の文字列を、保存口・migration・インポートの変換に通した結果が一致する（8.1）。上の各テストの期待値を `redactAccessTokenFromEndpoint` の戻り値で書けば足りる。
 
+- `activity-update-by-parameters.integ.ts`: `endpoint` を含む変数（オブジェクトリテラルでない値）を `updateByParameters` に渡しても、保存済みの endpoint が変わらない（5.2）。
+
 ### 型のテスト
-- `activity-extension.spec.ts`: `updateByParameters` に `endpoint` を渡すとコンパイルエラーになる（`@ts-expect-error` で固定する）（5.2）。
+- `activity-extension.spec.ts`: `updateByParameters` にオブジェクトリテラルで `endpoint` を渡すとコンパイルエラーになる（`@ts-expect-error` で固定する）（5.2）。
 
 ## Security Considerations
 - 伏せ字は保存口で行うので、Prisma のエラーログにも平文は出ない。
@@ -337,6 +349,6 @@ const SPECIAL_CONVERT_FUNCTIONS: Record<string, Record<string, OverwriteFunction
 ## Migration Strategy
 
 - **Phase 1（デプロイ）**: 新しいコードは保存口で伏せ字にする。サーバ起動前の migrate で、伏せ字の migration が流れる。
-- **Phase 2（ローリングアップデート中）**: 古いバージョンのインスタンスが、`createActivity` の直接呼び出しの経路で平文の行を書くことがある。migrate-mongo は適用済みの migration を `migrations` コレクションに記録し、以後の `up` では流さないので、これらの行を migration で直す手段はなく、TTL で消えるまで残る（要件の範囲外）。
-- **ロールバック**: コードを戻しても、伏せ字にした値は戻らない。戻したコードでも middleware の経路は伏せ字にするので、新しい平文は `createActivity` の直接呼び出しの経路からしか入らない。
+- **Phase 2（ローリングアップデート中）**: 古いバージョンのインスタンスが平文の行を書くことがある。古いバージョンが伏せ字の処理を持たなければすべての経路で、middleware の伏せ字だけを持つなら `createActivity` の直接呼び出しの経路で書く。migrate-mongo は適用済みの migration を `migrations` コレクションに記録し、以後の `up` では流さないので、これらの行を migration で直す手段はなく、TTL で消えるまで残る（要件の範囲外）。
+- **ロールバック**: コードを戻しても、伏せ字にした値は戻らない。戻している間は、Phase 2 と同じ条件で古いコードが平文の行を書く。再びアップグレードしても migration は流れないので、これらの行も TTL で消えるまで残る（要件の範囲外）。
 - **索引への同期への影響**: change stream は update イベントを読み飛ばし、ES には書かない。負荷は、書き換えた件数ぶんのイベントを読むことと、100 件ごとの resume token の書き込みだけ。

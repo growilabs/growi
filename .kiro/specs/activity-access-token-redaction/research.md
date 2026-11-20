@@ -18,7 +18,7 @@
   - `updateByParameters` は extension 内の定義だけで、本番コードからの呼び出しはない。
   - `collection('activities')` を触るのは `service/activity.ts` の TTL インデックス作成だけで、行は書かない。
   - モデルを通らずに行を書くのは、管理画面のデータのインポート（`import.ts` の `initializeUnorderedBulkOp`）だけ。G2G は `activities` を `NON_TRANSFERABLE_COLLECTIONS` に入れているので転送しない。
-- **Implications**: 記録時の伏せ字は `createByParameters` の 1 か所で全経路を押さえられる。`updateByParameters` は型から endpoint を外して、コンパイラで塞ぐ。インポートは別の口として扱う。
+- **Implications**: 記録時の伏せ字は `createByParameters` の 1 か所で全経路を押さえられる。`updateByParameters` は型から endpoint を外し、実行時にも取り除く（型の除外はオブジェクトリテラルにしか効かないため）。インポートは別の口として扱う。
 
 ### インポートでの変換の仕組み
 - **Sources Consulted**: `service/import/construct-convert-map.ts`、`service/import/import.ts`（`convertDocuments`）、`service/import/overwrite-function.ts`
@@ -69,7 +69,7 @@
 - **Alternatives Considered**:
   1. 呼び出し元ごとに伏せ字を入れる
   2. 保存口で伏せ字にする
-- **Selected Approach**: `createByParameters` が `endpoint` を受け取ったら、Prisma の `create` に渡す前に伏せ字にする。`updateByParameters` は型（`IActivityUpdateParameters`）から `endpoint` を外し、更新で endpoint を書けないようにする。
+- **Selected Approach**: `createByParameters` が `endpoint` を受け取ったら、Prisma の `create` に渡す前に伏せ字にする。`updateByParameters` は型（`IActivityUpdateParameters`）から `endpoint` を外し、実行時にも `endpoint` を取り除いてから `update` に渡す。更新で endpoint を書く手段をなくす。
 - **Rationale**: 記録の 3 経路はすべて `createByParameters` を通るので、1 か所で全経路を押さえられる。Prisma の validation error はメッセージに引数を含むが、伏せ字は `create` の前に行うので、エラーログにも平文は出ない。
 - **Trade-offs**: 保存口が「中身を書き換える」責務を持つ。ただし対象は endpoint の 1 項目に限られ、関数も純粋なので、保存口の見通しは悪くならない。
 
@@ -99,7 +99,7 @@
   - `_id` の範囲で区切るので、長時間開きっぱなしのカーソルを持たない。
 - **Trade-offs**: `?` を含む文書はすべて一度アプリ側に読む。activity は既定で 30 日で消え、読むのは `endpoint` の 1 項目だけなので、許容できる。
 - **Follow-up**: `endpoint_1` が選ばれると、`_id` の範囲で区切っていてもバッチのたびに endpoint のインデックスを全走査し、`_id` 順の並べ替えも挟まる（バッチ数×全件の負荷になる）。そのため `hint({ _id: 1 })` で `_id` インデックスに固定する。実装時に explain で、`_id_` の IXSCAN で SORT ステージがないことを確かめる。
-- **Note**: migrate-mongo は適用済みの migration を `migrations` コレクションに記録し、以後は流さない。ローリングアップデート中に古いインスタンスが migration のあとに書いた平文の行は、この migration では直せず、TTL で消えるまで残る（要件の範囲外）。
+- **Note**: migrate-mongo は適用済みの migration を `migrations` コレクションに記録し、以後は流さない。ローリングアップデート中やロールバック中に、古いバージョンのコードが migration のあとに書いた平文の行は、この migration では直せず、TTL で消えるまで残る（要件の範囲外）。
 
 ### Decision: migration の `down` は何もしない
 - **Context**: 伏せ字にした値から元のトークンは戻せない。
