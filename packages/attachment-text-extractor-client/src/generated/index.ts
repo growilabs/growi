@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Attachment Text Extractor
  * Attachment text extraction microservice for GROWI.
- * OpenAPI spec version: 1.0.0
+ * OpenAPI spec version: 1.1.0
  */
 
 import type { AxiosRequestConfig, AxiosResponse } from 'axios';

@@ -11,7 +11,7 @@ import {
 import { killStrayChildren } from '../../src/runner/spec-support';
 import { SAMPLES } from './samples';
 
-// Req 8.2, 9.1, 9.5: the checks the image job runs inside the container
+// The checks the image job runs inside the container
 // (no network, so they cannot run from outside it). The client is started
 // here the way the job starts it in the container: its source handed to
 // `node -e`, the token in the environment, the file on stdin. The service

@@ -113,6 +113,10 @@ GROWI の Elasticsearch 連携では Page の `path` / `body` / `comments` の�
 2. The apps/app shall 抽出成功・失敗・スキップ・再試行の各イベントを構造化ログに記録する <!-- derived from umbrella R2.5 -->
 3. Where 抽出サービスが到達不可能または `extractorUri` が未設定 / 空である (算出値 `isAttachmentFullTextSearchEnabled` が false), the apps/app shall 添付アップロードと既存検索を従来どおり動作させる <!-- derived from umbrella R13.4 -->
 4. If 抽出サービス到達不可の結果が返る, the apps/app shall ExtractionOutcome を `serviceUnreachable` に正規化し例外を throw しない
+5. When apps/app が `POST /extract` を送り、設定 `app:growiAppIdForCloud` に値がある, the apps/app shall その値を文字列にして (前後の空白を取り除かずに) `X-Growi-App-Id` ヘッダーに入れて送る。ただし 1.6 と 1.7 に当たるときは送らない
+6. Where 設定 `app:growiAppIdForCloud` に値が無いか空の文字列である, the apps/app shall `X-Growi-App-Id` ヘッダーを付けずに送る
+7. If 設定の値を文字列にしたものが、表示できる ASCII 文字 (0x21〜0x7E) だけでできていない (空白、改行、非 ASCII の文字を含む), the apps/app shall ヘッダーを付けずに抽出を続け、抽出の要求そのものを失敗させない
+8. The apps/app shall 設定の値を、送るたびに読み直す (抽出サービスの URI とトークンと同じ読み方)
 
 ### Requirement 2: 添付アップロード時の自動インデックス化 <!-- derived from umbrella R3.1〜R3.5 -->
 

@@ -3,7 +3,7 @@
   "info": {
     "title": "Attachment Text Extractor",
     "description": "Attachment text extraction microservice for GROWI.",
-    "version": "1.0.0"
+    "version": "1.1.0"
   },
   "components": {
     "schemas": {
@@ -163,6 +163,17 @@
     "/extract": {
       "post": {
         "operationId": "postExtract",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Growi-App-Id",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {

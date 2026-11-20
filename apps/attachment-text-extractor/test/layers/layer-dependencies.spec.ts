@@ -149,6 +149,22 @@ describe('layer dependency direction', () => {
       expect(check([{ path: 'src/main.ts', source: sources }])).toHaveLength(2);
     });
 
+    it('allows @prometheus-io/client only in the http layer', () => {
+      const sources =
+        "import { Registry } from '@prometheus-io/client';\nconst m = await import('@prometheus-io/client');";
+
+      expect(check([{ path: 'src/http/a.ts', source: sources }])).toEqual([]);
+      for (const path of [
+        'src/conversion/a.ts',
+        'src/runner/a.ts',
+        'src/child/a.ts',
+      ]) {
+        expect(
+          check([{ path, source: sources }]).map((v) => v.specifier),
+        ).toEqual(['@prometheus-io/client', '@prometheus-io/client']);
+      }
+    });
+
     it('skips test files and test-support code', () => {
       const source = "import { x } from '../runner/conversion-runner';";
       const files: SourceFile[] = [

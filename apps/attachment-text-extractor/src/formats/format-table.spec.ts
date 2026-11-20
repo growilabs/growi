@@ -185,7 +185,7 @@ describe('resolveFormat', () => {
     expect(resolved('v1.2.final.pdf', null).route).toBe('pdf');
   });
 
-  // Outlook MSG is deliberately absent from the table (target spec Req 1.6).
+  // Outlook MSG is deliberately absent from the table.
   it.each([
     ['mail.msg', 'application/vnd.ms-outlook'],
     ['mail.msg', null],

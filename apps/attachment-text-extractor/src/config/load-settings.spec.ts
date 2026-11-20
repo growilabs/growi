@@ -26,7 +26,7 @@ const INT_SETTINGS: readonly (readonly [string, keyof Settings])[] = [
   ['MAX_HTML_BYTES', 'maxHtmlBytes'],
 ];
 
-describe('loadSettings: the service token is required (Req 1.5)', () => {
+describe('loadSettings: the service token is required', () => {
   it('fails when the token is not set', () => {
     expect(() => loadSettings({})).toThrow(TOKEN);
   });
@@ -44,7 +44,7 @@ describe('loadSettings: the service token is required (Req 1.5)', () => {
   });
 });
 
-describe('loadSettings: defaults (Req 1.4)', () => {
+describe('loadSettings: defaults', () => {
   const settings = (): Settings =>
     loadSettings({ [TOKEN]: 'test-secret-token' });
 

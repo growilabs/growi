@@ -4,7 +4,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { type ChildEntry, createConversionRunner } from './conversion-runner';
 import { killStrayChildren, runnerOptions, within } from './spec-support';
 
-// Req 8.8 and research.md 20.12 / 27.6: the readiness probe must load every
+// research.md 20.12 / 27.6: the readiness probe must load every
 // external conversion package, whatever a single conversion would load (a PDF
 // child loads PDFium only, an HTML child neither anydoc nor PDFium). Python test_main.py
 // test_missing_dependency_boots_not_ready_and_readyz_gives_503: a child that

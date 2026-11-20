@@ -56,7 +56,7 @@ describe.skipIf(process.platform !== 'linux')(
       expect(oomScoreAdj(child.pid)).toBe('1000');
     });
 
-    // Req 3.11. The input pipe stays open and empty, so the child is waiting for
+    // The input pipe stays open and empty, so the child is waiting for
     // its input; only the parent watch can end it.
     it('ends within 1 s once the parent drops the liveness pipe', async () => {
       child = spawnDirect(CHILD_ENTRY);

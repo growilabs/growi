@@ -125,7 +125,7 @@ describe.skipIf(process.platform !== 'linux')(
   () => {
     afterEach(killStrayChildren);
 
-    describe('the deadline (Req 3.4)', () => {
+    describe('the deadline', () => {
       it('stops a conversion at the deadline, reaps its child, and the next run succeeds', async () => {
         const short = runnerWith({ ...LONG_PAGE_ROOM, timeoutS: 0.4 });
         const normal = runnerWith();
@@ -184,7 +184,7 @@ describe.skipIf(process.platform !== 'linux')(
       });
     });
 
-    describe('memory and CPU limits (Req 3.4)', () => {
+    describe('memory and CPU limits', () => {
       it('stops a real XLSX over a small RSS limit as memory_exceeded', async () => {
         // 128 MB sits between an idle child (about 65 MB) and this workbook's
         // peak (about 290 MB, research.md 20).
@@ -215,7 +215,7 @@ describe.skipIf(process.platform !== 'linux')(
       });
     });
 
-    describe('a crash stays inside its child (Req 3.10)', () => {
+    describe('a crash stays inside its child', () => {
       it.each([
         'abort',
         'segfault',
@@ -245,9 +245,9 @@ describe.skipIf(process.platform !== 'linux')(
       });
     });
 
-    // Req 3.11 through the whole stack: a separate parent process runs the real
+    // Through the whole stack: a separate parent process runs the real
     // runner, whose child imports the real parent watch and then spins forever.
-    describe('the parent goes away (Req 3.11)', () => {
+    describe('the parent goes away', () => {
       let markerDir: string | undefined;
 
       afterEach(async () => {
@@ -298,7 +298,7 @@ describe.skipIf(process.platform !== 'linux')(
       });
     });
 
-    describe('the default limits let large legitimate files through (Req 11.2)', () => {
+    describe('the default limits let large legitimate files through', () => {
       // research.md 20.12: child_peak_rss_mb < 0.95 x MAX_CHILD_RSS_MB carries
       // over; Python's VmPeak < 0.8 x RLIMIT_AS does not (V8 sizes its
       // reservations to the limit). The peak is sampled, so it can only read low.
@@ -469,7 +469,7 @@ describe.skipIf(process.platform !== 'linux')(
     // MAX_ARCHIVE_UNCOMPRESSED_MB must be refused without being inflated into
     // memory. A converter that inflated it first would hit the RSS limit and
     // answer memory_exceeded instead.
-    describe('ZIP bombs (Req 3.7)', () => {
+    describe('ZIP bombs', () => {
       const bombs: [string, (declared: DeclaredSize) => Buffer, string][] = [
         ['PPTX', buildPptxBomb, 'bomb.pptx'],
         ['XLSX', buildXlsxBomb, 'bomb.xlsx'],

@@ -15,8 +15,8 @@ import {
 } from './spec-support';
 
 // What a child actually runs under, read by the child itself from /proc/self
-// ('report-self' stand-in): the prlimit limits (Req 3.12, research.md 15.11 /
-// 19.1), its environment (Req 3.8, 19.1) and its node flags (20.12). Python
+// ('report-self' stand-in): the prlimit limits (research.md 15.11 /
+// 19.1), its environment and its node flags (20.12). Python
 // test_platform_guards.py test_guards_are_visible_in_proc_inside_a_child_process,
 // test_child_entry.py test_guards_are_set_in_the_running_child_before_it_reads_the_file
 // (the limits half) and test_extract_with_real_runner.py's token case.
@@ -120,7 +120,7 @@ describe.skipIf(process.platform !== 'linux')(
     });
 
     // The token is in the parent's environment, as in the container; the child
-    // must get the explicit environment only (Req 3.8).
+    // must get the explicit environment only.
     it('gives the child neither the service token nor anything else from the parent environment', async () => {
       const token = 'secret-token-7f3a9c';
       const { report } = startHost(

@@ -255,7 +255,7 @@ describe('result JSON', () => {
   });
 });
 
-// Req 3.9: what a hijacked child sends is parsed as data and never evaluated or merged into objects.
+// What a hijacked child sends is parsed as data and never evaluated or merged into objects.
 describe('child-sent data is never treated as code', () => {
   it.each([
     [
@@ -293,7 +293,7 @@ describe('child-sent data is never treated as code', () => {
   });
 });
 
-// Req 3.9 / 3.14: a result that fits in the frame must not cost the parent unbounded memory or time.
+// A result that fits in the frame must not cost the parent unbounded memory or time.
 // A sync loop or an out-of-memory crash cannot be caught inside the test process, so each case runs
 // in its own process with a hard time limit and a small heap.
 describe('hostile result bodies in an isolated process', () => {

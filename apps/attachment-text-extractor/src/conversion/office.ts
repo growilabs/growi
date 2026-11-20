@@ -74,7 +74,7 @@ export const convertOffice = async (
   }
   try {
     // No options argument: any `ocr` other than the default can send the
-    // document to a hosted service (Req 4.5).
+    // document to a hosted service.
     return await toMarkdownBytes(bytes, anydocFormat);
   } catch (thrown) {
     throw classify(thrown);

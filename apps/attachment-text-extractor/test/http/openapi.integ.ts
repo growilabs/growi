@@ -8,7 +8,7 @@ import {
 import { responseChecker } from '../openapi/openapi-support';
 import { useBlackboxService } from './blackbox-service';
 
-// Black box (research.md 22.7 `openapi`): Req 7.1 from outside. The service
+// Black box (research.md 22.7 `openapi`): from outside. The service
 // serves its document without a token, and real answers fit the schemas the
 // served document gives (17.7 2 (iv)). Both hold for the Python service with
 // its own document, so nothing here is Node only; what only the Node

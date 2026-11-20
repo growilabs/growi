@@ -46,7 +46,6 @@ describe('answers.json', () => {
     expect(committed).toEqual(declaredAnswers());
   });
 
-  // Req 2.7: each listed format has a Japanese document.
   it.each([
     'pdf',
     'docx',
@@ -66,7 +65,6 @@ describe('answers.json', () => {
     expect(japanese.length).toBeGreaterThan(0);
   });
 
-  // Req 2.4: the corpus carries these encodings and layouts.
   it.each([
     'shift_jis',
     'euc-jp',

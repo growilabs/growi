@@ -395,6 +395,23 @@ umbrella gap analysis 時点では「親ページ権限変更のイベントフ�
 - 判断 1 (大きさ): 応答は 64MiB まで受け取る。抽出サービスの既定 (`MAX_RESULT_BYTES` = 16MiB) では、応答は最大でも約 33MiB なので、正常な応答は通る。設定項目にはしない。超えたら `resourceLimit` (そのファイルの結果が、GROWI が受け取れる大きさを超えた) にする。`serviceUnreachable` にしない理由: 運用者が抽出サービスの `MAX_RESULT_BYTES` を上げた環境で、大きな結果のファイルが続くたびに障害として数えられ、作り直しが止まるのを避けるため
 - 判断 2 (時間): 1 回の呼び出し (再試行は別の 1 回) を、要求を送り始めてから応答を受け取り終えるまで `timeoutMs` で打ち切る。結果は `serviceUnreachable` にする。抽出サービスは最悪でも約 74 秒で応答を返し終える設計なので (`timeoutMs` の既定は 90 秒)、それを超えるのはファイルの問題ではなく、抽出サービスか経路の異常である。axios の `timeout` を超えた場合と同じ結果でもある
 
+## 11. 抽出サービスへ app の ID を送る (2026-11-19)
+
+抽出サービス 1.1.0 は、ログの行に呼び出し元の app を出すために、任意のヘッダー `X-Growi-App-Id` を受け付ける。apps/app は、設定 `app:growiAppIdForCloud` の値をこのヘッダーで送る (Req 1 の AC 1.5〜1.8)。ヘッダーの名前と形、抽出サービスの側の扱い (形に合わない値は `(invalid)` とだけ書く、メトリクスのラベルに使わない) の理由は、`attachment-search-text-extractor` の research.md §9.2 にある。ここには apps/app の側の理由を残す。
+
+### 11.1 設定の値は、実際には文字列で入る
+
+- `config-definition.ts` は `'app:growiAppIdForCloud': defineConfig<number | undefined>({ envVarName: 'GROWI_APP_ID_FOR_GROWI_CLOUD', defaultValue: undefined })` と宣言している。
+- `config-loader.ts` の `parseEnvValue(value, typeof metadata.defaultValue)` は、既定値の型で読み方を選ぶ。既定値が `undefined` なので型は `'undefined'` になり、`default` の分岐で文字列をそのまま返す。つまり値は数ではなく、環境変数の文字列そのものである (`parseInt` は通らないので `NaN` にもならない)。
+- そのため送る側は `String(value)` で扱い、数であることを前提にしない。値の形の検査は抽出サービスが行う。
+
+### 11.2 ヘッダーに入れる前に確かめること
+
+- Node は、ヘッダーの値に使えない文字があると、要求を作る時点で例外を投げる。手元で `http.request(url, { headers: { 'X-Growi-App-Id': 'a\nb' } })` は `ERR_INVALID_CHAR` を投げ、`'日本'` も同じだった。このまま渡すと、ラベルのための値のせいで抽出そのものが失敗する (AC 1.7 に反する)。
+- **判断**: apps/app は、文字列が空でなく、表示できる ASCII 文字 (0x21〜0x7E) だけでできているときだけ付ける。形 (`^[A-Za-z0-9]…`) の検査は抽出サービスだけで行う。
+- **理由**: apps/app の検査は「自分の要求を壊さない」ためで、抽出サービスの検査は「ログの行を壊させない」ためである。目的が違う。形の決まりを 2 か所に書くと、片方だけ変わったときに食い違う。形に合わない値は抽出サービスのログで `(invalid)` と分かるので、運用者は設定の誤りに気づける。
+- **採らなかった案**: apps/app でも同じ形で検査して、合わなければ付けない。抽出サービスのログには `-` と出て、ヘッダーが無い app と区別できなくなる。
+
 ## 参照
 
 
