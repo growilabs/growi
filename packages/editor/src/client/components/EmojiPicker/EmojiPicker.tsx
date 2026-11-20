@@ -17,6 +17,10 @@ type PickerProps = {
   skinTonePosition: 'preview' | 'search' | 'none';
 };
 
+// Above Bootstrap's popover layer ($zindex-popover: 1070), which the picker can be opened
+// from, and below its tooltip layer ($zindex-tooltip: 1080).
+const PICKER_Z_INDEX = 1075;
+
 /** Discriminated by `kind` so that other emoji sources can be added as further members. */
 export type EmojiPickerSelection = {
   kind: 'native';
@@ -80,6 +84,7 @@ export const EmojiPicker = (props: EmojiPickerProps): JSX.Element | null => {
       toggle={onClose}
       centered
       fade={false}
+      zIndex={PICKER_Z_INDEX}
       backdropClassName="emoji-picker-modal"
       contentClassName="border-0 bg-transparent shadow-none align-items-center"
     >
