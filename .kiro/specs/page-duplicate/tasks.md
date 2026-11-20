@@ -102,7 +102,7 @@
 
 - [ ] 3. 統合: 要求時の処理の切り出しと起動時の配線
 
-- [ ] 3.1 複製の要求時の処理を切り出し、ページサービスからの委譲に切り替える
+- [x] 3.1 複製の要求時の処理を切り出し、ページサービスからの委譲に切り替える
   - 今の要求時の処理（検証、先頭ページの作成、タグの複製）を、順序と例外の種類を変えずに複製の部品へ移す
   - v5 で配下を含む場合は PageOperation を作って 2.6 の処理を、v4 の場合は 2.7 の処理を、待たずに始める
   - ページサービスの複製を委譲だけにし、本体から古い複製の処理を削除する。公開窓口から呼び出し元のない複製の処理を外す
@@ -145,3 +145,4 @@
 - 2.5: `recoverInterruptedDuplicate` は `OwnershipLostError` 以外の例外（PageOperation の削除後に起きた通知の失敗を含む）を呼び出し元へ返す。2.6（run）と 2.8（cron）は、それを受け止めてログに出し、握りつぶさず・待たない Promise に再送出もしない。「本人がいない」は User のドキュメントがない、または `STATUS_DELETED`（GROWI の削除はドキュメントを残して status を書き換える）。User モデルの参照は design.md の Allowed Dependencies に未記載で、spec-cleanup のときに1行足す。
 - 2.7: v4 の複製も全文検索への通知（`syncDescendantsUpdate`、`{ path: newPagePath }`）を最後に1回出す。設計書の「PageOperation・サブオペレーションは持たない」は通知を除く意味（設計書を訂正済み）。3.1 は (1) `newPagePath` に XSS 無害化（`generalXssFilter.process`）後の値を渡す、(2) v4 の入力は `{ sourcePath: page.path, newPagePath, user }`、deps は `pageGrantService` と `pageEvent`、(3) 今の v4 は1回分の例外後も次の回へ進むが新しい処理はそこで止まる（設計どおり）。
 - 2.8: 起動関数 `startInterruptedDuplicateRecoveryCronIfEnabled` は `crowi` ではなく `{ duplicateDeps, appService, waitBeforeRun? }` を受け取る。3.2 は、3.1 で作る `duplicateDeps()`（`activityService` が null のときの確認入り）で `DuplicateDeps` を組み立てて渡す。壊れた PageOperation（保存値の欠落）は `CorruptDuplicatePageOperationError` で見分け、2〜3分ごとに引き受け直されてエラーログが出続ける（PageOperation は残り重なる操作を拒否し続ける）。spec-cleanup で design.md の duplicatePageOperation と Error Handling にこの扱いを足す。引き受けのたびに `new Date()` を読む（実行開始時刻の使い回しは不可）。
+- 3.1: `PageService.duplicateDeps()`（`IPageService` にも追加）が `DuplicateDeps` を組み立てる。`activityService` は呼ぶたびに読み、null なら明示的に例外。3.2 は `crowi.pageService.duplicateDeps()` を起動関数に渡す。`duplicate/index.ts`（barrel）は `startInterruptedDuplicateRecoveryCronIfEnabled` も出すので、crowi/index.ts は barrel からの動的 import で呼ぶ（読み込み時期は PageService の静的 import により実質早まる）。v5 の `toPath` と配下の `newPagePath` は XSS 無害化後の値に統一（経路の検証を通ったパスは変わらない）。PageOperation には populated な page と `{ _id }` の user を保存する。`v5.public-page.integ.ts` と `v5.non-public-page.integ.ts` に `duplicateRecursivelyMainOperation` を指す古いコメントが残る（4.1 か spec-cleanup で直す）。
