@@ -1,9 +1,6 @@
 import { sharedThenKept } from './readiness';
 import { manualClock } from './spec-support';
 
-// A check's result, ready or not, and a check that threw, are kept for a
-// while after the check settles; callers during a check share it.
-
 const KEEP_MS = 10_000;
 
 interface Check {

@@ -7,8 +7,6 @@ import type { AppEnv } from './app-env';
 import { countResponses } from './metrics-route';
 import type { ServiceMetrics } from './service-metrics';
 
-// The 500 Hono itself builds for a route that threw is an answer too: the
-// counter must see it, not only the answers a route returned.
 describe('countResponses', () => {
   it('counts the 500 Hono returns for a route that threw', async () => {
     // Hono's default error handler logs the thrown error to the console.

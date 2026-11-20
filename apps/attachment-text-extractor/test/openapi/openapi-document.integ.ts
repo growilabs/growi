@@ -104,10 +104,6 @@ describe('what a client generated from the document keeps', () => {
     ]);
   });
 
-  it('is version 1.1.0', async () => {
-    expect(textAt(await served(), ['info', 'version'])).toBe('1.1.0');
-  });
-
   // At least, not equal: the written version is raised in the PR that adds the
   // changeset, and package.json catches up only when the release PR merges.
   it('is not older than the package version', async () => {

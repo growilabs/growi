@@ -158,7 +158,8 @@ const isCleanForYauzl = (data: Buffer, at: number, entries: number): boolean =>
 
 /**
  * The bytes for yauzl to read, or null when they hold no end-of-central-
- * directory record. Usually the input itself; a slice when the archive sits among
+ * directory record that passes endRecordAt's checks (a lone signature before
+ * the last 64 KiB does not). Usually the input itself; a slice when the archive sits among
  * stray bytes; a repaired copy when the end record's counts, disk number or
  * comment length are off, or when an entry is flagged strong encryption.
  */
