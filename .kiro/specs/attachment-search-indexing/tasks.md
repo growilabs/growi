@@ -110,7 +110,7 @@
 
 - [x] 4.3 (P) 検索クエリ builder 群を pure function として追加する
   - `queries/build-attachment-search-query.ts` (`buildAttachmentSearchQuery`): 添付 index 全体を本文語で検索する body (権限フィルタを一切含めない) を組み立てる。facet=`attachments` が使う
-  - `queries/build-attachments-by-page-ids-query.ts` (`buildAttachmentsByPageIdsQuery`): `terms: { pageId }` + 本文語の body を組み立てる。`collapse` で pageId ごとにまとめ、`inner_hits` で 1 ページあたり上位 5 件を返す。`pageIds.length > 20` で throw する。facet=`all` の 1 ページ目と secondary が使う
+  - `queries/build-attachments-by-page-ids-query.ts` (`buildAttachmentsByPageIdsQuery`): `terms: { pageId }` + 本文語の body を組み立てる。`collapse` で pageId ごとにまとめ、`inner_hits` で 1 ページあたり上位 5 件を返す。`pageIds.length > 20` で throw する。`GET /_api/v3/search/attachments` (検索結果のページへの添付ヒット) が使う
   - どちらも `_source` から `content` を除き、件数を数えない (`track_total_hits: false`)。本文語の句と強調表示の指定は `queries/attachment-keyword-query.ts` に共通化する
   - 2 つの builder それぞれの snapshot / unit test が通る
   - _Requirements: 4.1, 4.3, 4.4_
@@ -308,7 +308,7 @@
   - _Requirements: 2.1, 2.2, 2.5, 3.1, 9.1_
   - _Boundary: integration_
 
-- [x] 10.2 query-time permission lookup (facet=all secondary / facet=attachments primary) を integ test で固定する (`attachment-search-permission.integ.ts`: 本物の ES と MongoDB で、7 種類の閲覧者 × 公開範囲 × 一覧ポリシー 4 通り × 3 経路を、ページ検索そのものを正解として比較)
+- [x] 10.2 query-time permission lookup (検索結果のページへの添付ヒット / facet=attachments) を integ test で固定する (`attachment-search-permission.integ.ts`: 本物の ES と MongoDB で、7 種類の閲覧者 × 公開範囲 × 一覧ポリシー 4 通り × 2 経路を、ページ検索そのものを正解として比較)
   - 親ページ権限変更直後に ES を触らずに次回検索で添付ヒット可視性が更新されること (MongoDB の権限確認で、page_index の同期が遅れていても即座に反映される)
   - 親ページ削除後 rebuildIndex 前でも添付ヒットが primary の権限判定により除外されること
   - `AttachmentOrphanSweeper` が親 Page 不在の doc を削除することは、ES を mock した単体テスト (`attachment-orphan-sweeper.spec.ts`) で確かめている。本物の ES を使うテストは無い

@@ -258,7 +258,7 @@ export class AttachmentSearchResultAggregator {
     pageIds: readonly string[],
   ): Promise<Map<string, IAttachmentHit[]>> {
     const hitsByPageId = new Map<string, IAttachmentHit[]>();
-    if (!hasPositiveKeyword(keywords) || pageIds.length === 0) {
+    if (pageIds.length === 0) {
       return hitsByPageId;
     }
 
