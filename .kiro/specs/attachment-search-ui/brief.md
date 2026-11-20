@@ -16,9 +16,9 @@
 
 ## Desired Outcome
 
-- **検索結果リスト (左ペイン)**: 各 Page カード内に「この添付にもマッチ」サブエントリが折りたたみ表示され、添付名 / ファイル形式アイコン / `label` (p.N や Slide N) / マッチスニペットを含む。本文ヒットなし + 添付のみヒットのページも Page カードとして表示される
+- **検索結果リスト (左ペイン)**: 各 Page カード内に「この添付にもマッチ」サブエントリが折りたたみ表示され、添付名 / ファイル形式アイコン / `label` (p.N や Slide N) / マッチスニペットを含む。「添付ファイル」を対象にした検索では、本文ヒットなし + 添付のみヒットのページも Page カードとして表示される。既定のページ検索では、ページの一覧を先に表示し、添付ヒットは後から付け足す
 - **検索結果プレビュー (右ペイン)**: 添付ヒット持ちページ選択時にプレビュー最上部に「添付ヒットカード」が表示され、添付本体リンクで既存添付ビューアへ遷移できる
-- **ファセットタブ**: 「全体 / ページ / 添付ファイル」の 3 つが切り替え可能。デフォルト「全体」。機能無効時はタブ自体が非表示
+- **検索対象の切り替え**: 既定はページ検索で、表示中のページの添付ヒットを後から取って付け足す。検索の選択肢で「添付ファイルを対象に検索」に切り替えられる。機能無効時は切り替え自体が非表示
 - **添付ファイル一覧モーダル**: 各添付行に「再抽出」ボタンが表示 (機能有効時のみ)、クリックで apiv3 呼び出し → 結果 toast
 - **Admin (設定セクション)**: 有効化トグル、抽出サービス URL、最大サイズ、タイムアウト、同時実行上限を設定可能。初回有効化時の一括再インデックスガイダンス
 - **Admin (rebuildIndex)**: 既存 rebuild ボタンに「添付も対象にする」チェックボックス (デフォルト ON)、Socket.io の `AddAttachmentProgress` で進捗表示
@@ -44,7 +44,7 @@
 - `apps/app/src/features/search-attachments/client/components/`:
   - `SearchPage/AttachmentHitCard.tsx` (右ペイン最上部カード)
   - `SearchPage/AttachmentSubEntry.tsx` (左ペイン Page カード内サブエントリ、複数時は折りたたみ)
-  - `SearchPage/SearchResultFacetTabs.tsx` (全体/ページ/添付 のタブ、Jotai atom で共有)
+  - 検索対象 (ページ / 添付ファイル) の切り替え (Jotai atom で共有)
   - `PageAttachment/ReextractButton.tsx` (個別再抽出ボタン、feature-gated)
   - `Admin/AttachmentSearchSettings.tsx` (設定フォーム、有効化 + URL/上限/タイムアウト/同時実行、ガイダンス)
   - `Admin/AttachmentExtractionFailures.tsx` (失敗ログテーブル)
@@ -58,7 +58,7 @@
 #### 既存ファイル修正 (最小差分)
 - [SearchResultList.tsx](apps/app/src/features/search/client/components/SearchPage/SearchResultList.tsx): Page カード内に `AttachmentSubEntry` をレンダリング
 - [SearchResultContent.tsx](apps/app/src/features/search/client/components/SearchPage/SearchResultContent.tsx): 添付ヒット持ちページ時に `AttachmentHitCard` をプレビュー最上部にレンダリング
-- [SearchPage.tsx](apps/app/src/features/search/client/components/SearchPage/SearchPage.tsx): `SearchResultFacetTabs` 設置、facet 状態を検索 API クエリパラメータに反映
+- [SearchPage.tsx](apps/app/src/features/search/client/components/SearchPage/SearchPage.tsx): 検索対象の切り替えを設置し、「添付ファイル」のときは検索 API に `facet=attachments` を付ける。「ページ」のときは従来の要求のまま、結果のページの添付ヒットを `GET /_api/v3/search/attachments` で後から取る
 - [PageAttachmentList.tsx](apps/app/src/client/components/PageAttachment/PageAttachmentList.tsx): `Attachment` コンポーネントに `ReextractButton` を追加 (既存 `onAttachmentDeleteClicked` と同パターン)
 - [ElasticsearchManagement.tsx](apps/app/src/client/components/Admin/ElasticsearchManagement/ElasticsearchManagement.tsx): `RebuildWithAttachmentsCheckbox` 配置、PUT payload に `includeAttachments` フラグ注入、`AttachmentSearchSettings` / `AttachmentExtractionFailures` セクションへのリンクまたは同居表示、`AddAttachmentProgress` Socket.io listener 追加
 
@@ -76,7 +76,7 @@
 
 ## Boundary Candidates
 
-1. **検索結果 UI コンポーネント群** (`SearchPage/AttachmentHitCard.tsx` + `AttachmentSubEntry.tsx` + `SearchResultFacetTabs.tsx`) — ヒット表示とファセット
+1. **検索結果 UI コンポーネント群** (`SearchPage/AttachmentHitCard.tsx` + `AttachmentSubEntry.tsx` + 検索対象の切り替え) — ヒット表示と検索対象の切り替え
 2. **添付モーダル拡張** (`PageAttachment/ReextractButton.tsx` + `use-attachment-reextract`) — 個別再抽出アクション
 3. **Admin 設定 UI** (`Admin/AttachmentSearchSettings.tsx` + `use-attachment-search-config`) — 機能設定
 4. **Admin 失敗可視化 UI** (`Admin/AttachmentExtractionFailures.tsx` + `use-attachment-extraction-failures`) — 失敗ログ表示

@@ -56,7 +56,6 @@ describe('GET /_api/v3/search/attachments', () => {
     currentUser = undefined;
     searchService = mock<SearchService>({ isConfigured: true });
     searchService.resolveAttachmentSecondary.mockResolvedValue({
-      facet: 'all',
       enrichments: {},
     });
     aclService = mock<AclService>();
@@ -141,14 +140,13 @@ describe('GET /_api/v3/search/attachments', () => {
     it('returns the enrichments', async () => {
       const enrichments = { [oid(1)]: { attachmentHits: [] } };
       searchService.resolveAttachmentSecondary.mockResolvedValue({
-        facet: 'all',
         enrichments,
       });
 
       const res = await get({ q: 'kw', pageIds: `${oid(1)},${oid(2)}` });
 
       expect(res.status).toBe(200);
-      expect(res.body).toEqual({ facet: 'all', enrichments });
+      expect(res.body).toEqual({ enrichments });
     });
 
     it('accepts repeated pageIds params and counts duplicates once', async () => {

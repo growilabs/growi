@@ -41,22 +41,22 @@ export type IFormattedSearchResult = IDataWithRequiredMeta<
   ISearchResultMeta
 >;
 
-export type SearchFacet = 'all' | 'pages' | 'attachments';
+export type SearchFacet = 'pages' | 'attachments';
 
 export type IFacetedSearchResultMeta = {
-  facet: SearchFacet;
-  /** null for facet=attachments: a count would include hits the viewer cannot see */
-  total: number | null;
+  facet: 'attachments';
+  /** Always null: a count would include hits the viewer cannot see */
+  total: null;
   hitsCount: number;
   /** true only when the attachment search or its permission lookup failed */
-  primaryResultIncomplete?: boolean;
+  primaryResultIncomplete: boolean;
 };
 
 /**
- * `GET /_api/search` body for `facet=all|attachments` while attachment search
- * is enabled. Every other request (no `facet`, `facet=pages`, feature
- * disabled, `nq`) keeps answering IFormattedSearchResult, so existing clients
- * never see a null total.
+ * `GET /_api/search` body for `facet=attachments` while attachment search is
+ * enabled. Every other request (no `facet`, `facet=pages`, feature disabled,
+ * `nq`) keeps answering IFormattedSearchResult, so existing clients never see
+ * a null total.
  */
 export type IFacetedSearchResult = IDataWithRequiredMeta<
   IPageWithSearchMeta[],

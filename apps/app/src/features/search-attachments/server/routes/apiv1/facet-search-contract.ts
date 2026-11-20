@@ -1,8 +1,4 @@
-import type {
-  IFacetedSearchResult,
-  IPageWithSearchMeta,
-  SearchFacet,
-} from '~/interfaces/search';
+import type { IFacetedSearchResult, SearchFacet } from '~/interfaces/search';
 
 import type { IPrimarySearchResult } from '../../services/attachment-search-result-aggregator';
 
@@ -11,52 +7,31 @@ export const FACET_SEARCH_MAX_LIMIT = 200;
 /** The default page size of /_api/search (ApiPaginate), kept for facet searches. */
 const FACET_SEARCH_DEFAULT_LIMIT = 50;
 
-const FACETS: readonly SearchFacet[] = ['all', 'pages', 'attachments'];
-const RESOLVE_MODES = ['primary', 'full'] as const;
-export type ResolveMode = (typeof RESOLVE_MODES)[number];
+const FACETS: readonly SearchFacet[] = ['pages', 'attachments'];
 
 export type FacetSearchParams =
-  | { ok: true; facet: SearchFacet | null; resolve: ResolveMode }
+  | { ok: true; facet: SearchFacet | null }
   | { ok: false; message: string };
 
-const pickOne = <T extends string>(
-  raw: unknown,
-  allowed: readonly T[],
-): T | undefined =>
-  typeof raw === 'string' && (allowed as readonly string[]).includes(raw)
-    ? (raw as T)
-    : undefined;
-
 /**
- * Reads the optional `facet` / `resolve` query parameters of `/_api/search`.
- * Without `facet` the request is a plain page search and `resolve` is
- * ignored, so existing callers keep their behaviour. Error messages are fixed
- * strings and never echo the input.
+ * Reads the optional `facet` query parameter of `/_api/search`. Without
+ * `facet` the request is a plain page search, so existing callers keep their
+ * behaviour. The error message is a fixed string and never echoes the input.
  */
 export const parseFacetSearchParams = (
   query: Record<string, unknown>,
 ): FacetSearchParams => {
   if (query.facet === undefined) {
-    return { ok: true, facet: null, resolve: 'primary' };
+    return { ok: true, facet: null };
   }
-  const facet = pickOne(query.facet, FACETS);
+  const facet = FACETS.find((allowed) => allowed === query.facet);
   if (facet == null) {
     return {
       ok: false,
-      message: 'The param "facet" must be one of all, pages, attachments.',
+      message: 'The param "facet" must be one of pages, attachments.',
     };
   }
-  if (query.resolve === undefined) {
-    return { ok: true, facet, resolve: 'primary' };
-  }
-  const resolve = pickOne(query.resolve, RESOLVE_MODES);
-  if (resolve == null) {
-    return {
-      ok: false,
-      message: 'The param "resolve" must be one of primary, full.',
-    };
-  }
-  return { ok: true, facet, resolve };
+  return { ok: true, facet };
 };
 
 export type FacetPagination =
@@ -90,7 +65,7 @@ export const parseFacetPagination = (
   ) {
     return {
       ok: false,
-      message: `The param "limit" must be an integer between 1 and ${FACET_SEARCH_MAX_LIMIT} when "facet" is all or attachments.`,
+      message: `The param "limit" must be an integer between 1 and ${FACET_SEARCH_MAX_LIMIT} when "facet" is attachments.`,
     };
   }
   const from = readNonNegativeInteger(query.offset);
@@ -98,7 +73,7 @@ export const parseFacetPagination = (
     return {
       ok: false,
       message:
-        'The param "offset" must be a non-negative integer when "facet" is all or attachments.',
+        'The param "offset" must be a non-negative integer when "facet" is attachments.',
     };
   }
   return {
@@ -108,19 +83,15 @@ export const parseFacetPagination = (
   };
 };
 
-export const toFacetedSearchResult = (
-  facet: SearchFacet,
-  result: IPrimarySearchResult,
-): IFacetedSearchResult => {
-  const data: IPageWithSearchMeta[] = result.items;
-  const { total, primaryResultIncomplete } = result.meta;
-  return {
-    data,
-    meta: {
-      facet,
-      total,
-      hitsCount: data.length,
-      ...(primaryResultIncomplete != null ? { primaryResultIncomplete } : {}),
-    },
-  };
-};
+export const toFacetedSearchResult = ({
+  items,
+  meta,
+}: IPrimarySearchResult): IFacetedSearchResult => ({
+  data: items,
+  meta: {
+    facet: 'attachments',
+    total: null,
+    hitsCount: items.length,
+    primaryResultIncomplete: meta.primaryResultIncomplete,
+  },
+});

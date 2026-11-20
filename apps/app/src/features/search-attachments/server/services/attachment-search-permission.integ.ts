@@ -5,10 +5,7 @@ import { getInstance } from '^/test/setup/crowi';
 
 import ExternalUserGroup from '~/features/external-user-group/server/models/external-user-group';
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
-import type {
-  IFormattedSearchResult,
-  IPageWithSearchMeta,
-} from '~/interfaces/search';
+import type { IFormattedSearchResult } from '~/interfaces/search';
 import type Crowi from '~/server/crowi';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import UserGroup from '~/server/models/user-group';
@@ -50,13 +47,11 @@ const RUN = digitsToAlpha(
 );
 // Every scenario has its own token so that its fixtures never show up in another one.
 const TOKEN = `zzattperm${RUN}`;
-const XSS_TOKEN = `zzxss${RUN}`;
 const PROBE_TOKEN = `zzprobe${RUN}`;
 const MISSING_TOKEN = `zzmissing${RUN}`;
 const PAGING_TOKEN = `zzpaging${RUN}`;
 const OP_TOKEN = `zzoperator${RUN}`;
 const DRIFT_TOKEN = `zzdrift${RUN}`;
-const RANK_TOKEN = `zzrank${RUN}`;
 const CROWD_TOKEN = `zzcrowd${RUN}`;
 const TAG_A = `attperm-tag-${RUN}`;
 const PAGE_INDEX = `fix_attperm_pages_${RUN}`;
@@ -115,21 +110,6 @@ class SearchServiceForTest extends SearchService {
 }
 
 const sorted = (ids: Iterable<string>): string[] => [...ids].sort();
-
-// Page items compared as the JSON the API would send, without the attachment part.
-const asPageJson = (items: IPageWithSearchMeta[]): unknown =>
-  JSON.parse(
-    JSON.stringify(
-      items.map((item) => ({
-        data: item.data,
-        meta: Object.fromEntries(
-          Object.entries(item.meta ?? {}).filter(
-            ([key]) => key !== 'attachmentHits',
-          ),
-        ),
-      })),
-    ),
-  );
 
 describe.skipIf(esUri == null)(
   'attachment search permission (real Elasticsearch + MongoDB)',
@@ -197,13 +177,6 @@ describe.skipIf(esUri == null)(
           .map((item) => item.data._id),
       );
     };
-
-    const attachmentHitKinds = (items: IPageWithSearchMeta[]): string[] =>
-      kindsOf(
-        items
-          .filter((i) => (i.meta?.attachmentHits?.length ?? 0) > 0)
-          .map((i) => i.data._id),
-      );
 
     const refresh = async (index: string): Promise<void> => {
       const res = await fetch(`${esHost}/${index}/_refresh`, {
@@ -403,15 +376,6 @@ describe.skipIf(esUri == null)(
         ],
       });
 
-      // --- stored XSS in a page body --------------------------------------
-      // Two pages so that from=1 still returns one of them.
-      for (const kind of ['xss1', 'xss2']) {
-        // biome-ignore lint/performance/noAwaitInLoops: two fixture pages
-        await seedPage(kind, {
-          body: `${XSS_TOKEN} <img src=x onerror=alert(1)> ${XSS_TOKEN}`,
-        });
-      }
-
       // --- paging over the gated stream -----------------------------------
       for (const kind of PAGING_KINDS) {
         // biome-ignore lint/performance/noAwaitInLoops: a handful of fixture pages
@@ -445,18 +409,6 @@ describe.skipIf(esUri == null)(
         // biome-ignore lint/performance/noAwaitInLoops: a handful of fixture pages
         await seedPage(kind, { body: `${kind} page ${DRIFT_TOKEN}` });
       }
-
-      // --- hidden hits outranking a visible one ----------------------------
-      await seedPage('rankVisible', {
-        path: `/attperm/${RUN}/rank/visible`,
-        body: `visible ${RANK_TOKEN}`,
-      });
-      await seedPage('rankHidden', {
-        path: `/attperm/${RUN}/rank/hidden`,
-        body: `hidden ${RANK_TOKEN}`,
-        grant: PageGrant.GRANT_OWNER,
-        grantedUsers: [users.creator],
-      });
 
       // --- one page with many matching attachments beside another ---------
       await seedPage('crowded', { body: `crowded ${CROWD_TOKEN}` });
@@ -526,13 +478,6 @@ describe.skipIf(esUri == null)(
         // biome-ignore lint/performance/noAwaitInLoops: a handful of fixture docs
         await indexAttachment(kind, `att-${kind}`, `attached ${DRIFT_TOKEN}`);
       }
-
-      await indexAttachment('rankVisible', 'att-rankVisible', RANK_TOKEN);
-      await indexAttachment(
-        'rankHidden',
-        'att-rankHidden',
-        Array(12).fill(RANK_TOKEN).join(' '),
-      );
 
       for (let i = 0; i < 25; i++) {
         // biome-ignore lint/performance/noAwaitInLoops: fixture docs
@@ -614,13 +559,8 @@ describe.skipIf(esUri == null)(
           const onlyAttachments = await searchService.searchByFacet(
             query,
             viewer,
-            { facet: 'attachments', from: 0, size: 20 },
+            { from: 0, size: 20 },
           );
-          const combined = await searchService.searchByFacet(query, viewer, {
-            facet: 'all',
-            from: 0,
-            size: 20,
-          });
           const secondary = await searchService.resolveAttachmentSecondary(
             query,
             viewer,
@@ -631,13 +571,16 @@ describe.skipIf(esUri == null)(
           expect(kindsOf(onlyAttachments.items.map((i) => i.data._id))).toEqual(
             expected,
           );
-          expect(attachmentHitKinds(combined.items)).toEqual(expected);
           expect(kindsOf(Object.keys(secondary.enrichments))).toEqual(expected);
 
           const returnedAttachmentIds = [
-            ...onlyAttachments.items,
-            ...combined.items,
-          ].flatMap((i) => i.meta?.attachmentHits ?? []);
+            ...onlyAttachments.items.flatMap(
+              (i) => i.meta?.attachmentHits ?? [],
+            ),
+            ...Object.values(secondary.enrichments).flatMap(
+              (e) => e.attachmentHits ?? [],
+            ),
+          ];
           expect(
             returnedAttachmentIds.map((h) => h.attachmentId),
           ).not.toContain('att-unrelated');
@@ -649,39 +592,6 @@ describe.skipIf(esUri == null)(
             expect(hit.snippets.map((s) => s.text).join('')).not.toContain(
               '<em',
             );
-          }
-        }, 30_000);
-
-        it.each(
-          VIEWER_NAMES,
-        )('viewer %s gets page items identical to the page search response', async (name) => {
-          const viewer = await viewerOf(name);
-
-          const firstPage = await searchService.searchByFacet(query, viewer, {
-            facet: 'all',
-            from: 0,
-            size: 20,
-          });
-          const secondPage = await searchService.searchByFacet(query, viewer, {
-            facet: 'all',
-            from: 1,
-            size: 20,
-          });
-
-          const expectedFirst = await pageSearch(query, name);
-          const expectedSecond = await pageSearch(query, name, { offset: 1 });
-          expect(firstPage.items.length).toBeGreaterThan(0);
-          expect(asPageJson(firstPage.items)).toEqual(
-            asPageJson(expectedFirst.data),
-          );
-          expect(asPageJson(secondPage.items)).toEqual(
-            asPageJson(expectedSecond.data),
-          );
-          for (const item of [...firstPage.items, ...secondPage.items]) {
-            const keys = Object.keys(JSON.parse(JSON.stringify(item.data)));
-            expect(keys).not.toContain('comments');
-            expect(keys).not.toContain('tag_names');
-            expect(keys).not.toContain('body');
           }
         }, 30_000);
       });
@@ -729,32 +639,6 @@ describe.skipIf(esUri == null)(
       }, 30_000);
     });
 
-    describe('stored XSS in a page body', () => {
-      it.each([
-        { facet: 'all' as const, from: 0 },
-        { facet: 'all' as const, from: 1 },
-      ])('escapes the snippet exactly as page search does (facet=$facet from=$from)', async ({
-        facet,
-        from,
-      }) => {
-        const query = `"${XSS_TOKEN}"`;
-        const viewer = await viewerOf('other');
-        const expected = await pageSearch(query, 'other', { offset: from });
-        expect(expected.data.length).toBeGreaterThan(0);
-        for (const item of expected.data) {
-          expect(item.meta?.elasticSearchResult?.snippet).toContain('&lt;img');
-        }
-
-        const result = await searchService.searchByFacet(query, viewer, {
-          facet,
-          from,
-          size: 20,
-        });
-        expect(asPageJson(result.items)).toEqual(asPageJson(expected.data));
-        expect(JSON.stringify(result.items)).not.toContain('<img');
-      }, 30_000);
-    });
-
     describe('facet=attachments never reveals hidden hits', () => {
       const responseFor = async (
         query: string,
@@ -763,11 +647,7 @@ describe.skipIf(esUri == null)(
         size: number,
       ) => {
         const viewer = await viewerOf(name);
-        return searchService.searchByFacet(query, viewer, {
-          facet: 'attachments',
-          from,
-          size,
-        });
+        return searchService.searchByFacet(query, viewer, { from, size });
       };
 
       describe.each([
@@ -794,7 +674,7 @@ describe.skipIf(esUri == null)(
           const missing = await responseFor(MISSING_TOKEN, name, from, size);
 
           expect(probe).toEqual(missing);
-          expect(probe.meta.total).toBeNull();
+          expect(probe.meta).toEqual({ primaryResultIncomplete: false });
         }, 30_000);
       });
 
@@ -804,7 +684,7 @@ describe.skipIf(esUri == null)(
           'owner',
           'specified',
         ]);
-        expect(creator.meta.total).toBeNull();
+        expect(creator.meta).toEqual({ primaryResultIncomplete: false });
       }, 30_000);
 
       it('pages through the visible hits in order, disjointly, even when hidden hits score higher', async () => {
@@ -825,25 +705,6 @@ describe.skipIf(esUri == null)(
       }, 30_000);
     });
 
-    describe('facet=all never lets hidden hits change the visible result', () => {
-      it('gives a visible page its attachment hits even when a hidden attachment scores higher (limit=1)', async () => {
-        const viewer = await viewerOf('other');
-
-        const result = await searchService.searchByFacet(
-          `${RANK_TOKEN} prefix:/attperm/${RUN}/rank/visible`,
-          viewer,
-          { facet: 'all', from: 0, size: 1 },
-        );
-
-        expect(kindsOf(result.items.map((i) => i.data._id))).toEqual([
-          'rankVisible',
-        ]);
-        expect(
-          result.items[0].meta?.attachmentHits?.map((h) => h.attachmentId),
-        ).toEqual(['att-rankVisible']);
-      }, 30_000);
-    });
-
     describe('a page with many matching attachments', () => {
       const hitCounts = (
         entries: [string, { attachmentHits?: unknown[] } | undefined][],
@@ -854,31 +715,19 @@ describe.skipIf(esUri == null)(
             .map(([id, v]) => [idToKind.get(id), v?.attachmentHits?.length]),
         );
 
-      it('does not crowd out the hits of the other pages, on the first page and in the secondary search', async () => {
+      it('does not crowd out the hits of the other pages in the secondary search', async () => {
         const viewer = await viewerOf('other');
 
-        const first = await searchService.searchByFacet(CROWD_TOKEN, viewer, {
-          facet: 'all',
-          from: 0,
-          size: 20,
-        });
         const secondary = await searchService.resolveAttachmentSecondary(
           CROWD_TOKEN,
           viewer,
           { primaryIds: [pageIds.crowded, pageIds.crowdedOut] },
         );
 
-        const firstCounts = hitCounts(
-          first.items.map((i) => [String(i.data._id), i.meta]),
-        );
-        const secondaryCounts = hitCounts(
-          Object.entries(secondary.enrichments),
-        );
-        for (const counts of [firstCounts, secondaryCounts]) {
-          expect(Object.keys(counts).sort()).toEqual(['crowded', 'crowdedOut']);
-          expect(counts.crowdedOut).toBe(1);
-          expect(counts.crowded).toBe(ATTACHMENT_HITS_PER_PAGE);
-        }
+        const counts = hitCounts(Object.entries(secondary.enrichments));
+        expect(Object.keys(counts).sort()).toEqual(['crowded', 'crowdedOut']);
+        expect(counts.crowdedOut).toBe(1);
+        expect(counts.crowded).toBe(ATTACHMENT_HITS_PER_PAGE);
       }, 30_000);
     });
 
@@ -920,13 +769,8 @@ describe.skipIf(esUri == null)(
             const onlyAttachments = await searchService.searchByFacet(
               query,
               viewer,
-              { facet: 'attachments', from: 0, size: 20 },
+              { from: 0, size: 20 },
             );
-            const combined = await searchService.searchByFacet(query, viewer, {
-              facet: 'all',
-              from: 0,
-              size: 20,
-            });
             const secondary = await searchService.resolveAttachmentSecondary(
               query,
               viewer,
@@ -936,10 +780,6 @@ describe.skipIf(esUri == null)(
             expect({
               query,
               kinds: kindsOf(onlyAttachments.items.map((i) => i.data._id)),
-            }).toEqual({ query, kinds: expected });
-            expect({
-              query,
-              kinds: attachmentHitKinds(combined.items),
             }).toEqual({ query, kinds: expected });
             expect({
               query,
@@ -997,12 +837,7 @@ describe.skipIf(esUri == null)(
         const onlyAttachments = await searchService.searchByFacet(
           DRIFT_TOKEN,
           viewer,
-          { facet: 'attachments', from: 0, size: 20 },
-        );
-        const combined = await searchService.searchByFacet(
-          DRIFT_TOKEN,
-          viewer,
-          { facet: 'all', from: 0, size: 20 },
+          { from: 0, size: 20 },
         );
         const secondary = await searchService.resolveAttachmentSecondary(
           DRIFT_TOKEN,
@@ -1014,7 +849,6 @@ describe.skipIf(esUri == null)(
         expect(kindsOf(onlyAttachments.items.map((i) => i.data._id))).toEqual(
           expected,
         );
-        expect(attachmentHitKinds(combined.items)).toEqual(expected);
         expect(kindsOf(Object.keys(secondary.enrichments))).toEqual(expected);
       }, 30_000);
     });

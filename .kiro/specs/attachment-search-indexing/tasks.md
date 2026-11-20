@@ -110,7 +110,7 @@
 
 - [x] 4.3 (P) 検索クエリ builder 群を pure function として追加する
   - `queries/build-attachment-search-query.ts` (`buildAttachmentSearchQuery`): 添付 index 全体を本文語で検索する body (権限フィルタを一切含めない) を組み立てる。facet=`attachments` が使う
-  - `queries/build-attachments-by-page-ids-query.ts` (`buildAttachmentsByPageIdsQuery`): `terms: { pageId }` + 本文語の body を組み立てる。`collapse` で pageId ごとにまとめ、`inner_hits` で 1 ページあたり上位 5 件を返す。`pageIds.length > 20` で throw する。facet=`all` の 1 ページ目と secondary が使う
+  - `queries/build-attachments-by-page-ids-query.ts` (`buildAttachmentsByPageIdsQuery`): `terms: { pageId }` + 本文語の body を組み立てる。`collapse` で pageId ごとにまとめ、`inner_hits` で 1 ページあたり上位 5 件を返す。`pageIds.length > 20` で throw する。`GET /_api/v3/search/attachments` (検索結果のページへの添付ヒット) が使う
   - どちらも `_source` から `content` を除き、件数を数えない (`track_total_hits: false`)。本文語の句と強調表示の指定は `queries/attachment-keyword-query.ts` に共通化する
   - 2 つの builder それぞれの snapshot / unit test が通る
   - _Requirements: 4.1, 4.3, 4.4_
@@ -181,6 +181,8 @@
   - _Boundary: features/search-attachments/server/services_
 
 ## 7. Core: 検索結果 Aggregator
+
+> 7.1 の facet=`all`、7.2 の「失敗したら空を返す」と facet 引数、9.2 の `resolve` は、12 でやめる (research.md 12)。
 
 - [x] 7.1 `AttachmentSearchResultAggregator.searchPrimary` を実装する
   - facet=`pages` は既存 Page 検索経路のみを呼び attachments_index を一切叩かない (完全互換)
@@ -306,7 +308,7 @@
   - _Requirements: 2.1, 2.2, 2.5, 3.1, 9.1_
   - _Boundary: integration_
 
-- [x] 10.2 query-time permission lookup (facet=all secondary / facet=attachments primary) を integ test で固定する (`attachment-search-permission.integ.ts`: 本物の ES と MongoDB で、7 種類の閲覧者 × 公開範囲 × 一覧ポリシー 4 通り × 3 経路を、ページ検索そのものを正解として比較)
+- [x] 10.2 query-time permission lookup (検索結果のページへの添付ヒット / facet=attachments) を integ test で固定する (`attachment-search-permission.integ.ts`: 本物の ES と MongoDB で、7 種類の閲覧者 × 公開範囲 × 一覧ポリシー 4 通り × 2 経路を、ページ検索そのものを正解として比較)
   - 親ページ権限変更直後に ES を触らずに次回検索で添付ヒット可視性が更新されること (MongoDB の権限確認で、page_index の同期が遅れていても即座に反映される)
   - 親ページ削除後 rebuildIndex 前でも添付ヒットが primary の権限判定により除外されること
   - `AttachmentOrphanSweeper` が親 Page 不在の doc を削除することは、ES を mock した単体テスト (`attachment-orphan-sweeper.spec.ts`) で確かめている。本物の ES を使うテストは無い
@@ -350,13 +352,15 @@
   - _Requirements: 9.2_
   - _Boundary: integration_
 
-- [ ] 10.8 primary / secondary 検索性能とスナップ safety net を perf test で確認する (`attachment-search-performance.integ.ts`: 手で走らせる測定。`ATTACHMENT_SEARCH_PERF=1` のときだけ動き、CI では飛ばす。測定値は research.md 8.7)
-  - primary p95 が機能有効時に既存 Page 検索比 +30% 以内 — **未達**。facet=`all` の 2 ページ目以降はページ検索と同等だが、1 ページ目は直近の手元の測定でページ検索の約 2.36 倍 (p95 がページ検索 17.9ms に対して 42.2ms)。1 ページ目はページ検索の後に、見えるページの添付だけを検索するので、2 つの検索の時間が足される (research.md 8.7 / 10.1)。目標を見直すか速くするかは umbrella の roadmap.md 3-(d) / (e) で決める
-  - secondary p95 が 500ms 以内 (非同期なので初期描画に影響しない) — 2026-11-16 の手元の測定で 32〜71ms
-  - primary 閾値超過時 facet=`all` が facet=`pages` 相当に degrade、facet=`attachments` が `primaryResultIncomplete: true` を返す safety net (`attachment-search-result-aggregator.spec.ts` で固定済み)
-  - secondary 閾値超過時 enrichment skip で primary のみ返ること (`attachment-search-result-aggregator.spec.ts` で固定済み)
-  - _Requirements: 9.1, 9.2_
+- [x] 10.8 検索の速さを perf test で確認する (`attachment-search-performance.integ.ts`: 手で走らせる測定。`ATTACHMENT_SEARCH_PERF=1` のときだけ動き、CI では飛ばす。測定値は research.md 8.7 / 12)
+  - 測定はアプリを起動して HTTP で送る。経路の順番は 1 回ごとに入れ替える (research.md 8.7 の最後の測定)
+  - 測る経路を、機能有効時の `facet` なしの `GET /_api/search`、`GET /_api/v3/search/attachments` (20 ページ分)、`facet=attachments` の 3 つにする。facet=`all` の経路は外す
+  - 機能有効時の `facet` なしの `GET /_api/search` の p95 が、機能無効時のページ検索と同等であること (添付 index を使わないので同じ処理になる) — 2026-11-20 のアプリ経由の測定で、比は p95 で 0.96〜1.08 倍
+  - `GET /_api/v3/search/attachments` の p95 が 500ms 以内であること (ページ検索の結果の表示を待たせない) — 2026-11-20 のアプリ経由の測定で 36.5〜42.3ms
+  - 時間の上限を超えたとき、`facet=attachments` が `primaryResultIncomplete: true` を返し、`GET /_api/v3/search/attachments` がエラーを返すこと (`attachment-search-result-aggregator.spec.ts` で固定する)
+  - _Requirements: 9.1, 9.2, 9.5_
   - _Boundary: performance_
+  - _Depends: 12.1, 12.2_
 
 ## 11. 抽出サービスへの送信の修正
 
@@ -370,3 +374,22 @@
   - ファイルを読む前に、保存してある大きさと設定を比べる。超えたら、読まず、送らない。上限ちょうどは送る
   - 抽出サービスが 413 `file_too_large` を返したとき、本物の生成クライアントを通して `tooLarge` になることをテストで固定する
   - _Requirements: 8.3_
+
+## 12. ページと添付をまとめた検索 (`facet=all`) と `resolve` をやめる
+
+- [x] 12.1 `GET /_api/search` から `facet=all` と `resolve` を取り除く
+  - 機能が有効なとき、`facet` は `pages` と `attachments` だけを受け付け、それ以外 (`all` を含む) は `{ ok: false, code: 400 }` にする。`resolve` は読まない。機能が無効のときは、これまでどおり `facet` を読まない
+  - `AttachmentSearchResultAggregator.searchPrimary` を `facet=attachments` の検索だけにする。facet=`all` の処理 (`searchPrimaryAll`、`snippetVisiblePageIds`、2 ページ目以降の分岐) と、`SearchService.searchByFacet` の `resolve` / `attachSecondaryHits` を消す
+  - `SearchFacet` / `IFacetedSearchResultMeta` / `IPrimarySearchResult` を design.md の形にする。`GET /_api/search` の OpenAPI の説明から `all` と `resolve` を消す
+  - 消した処理のテストを消し、機能が有効でも `facet` なし・`facet=pages` の `GET /_api/search` が添付 index に触れず、機能が無効のときと同じ応答を返すことを結合テストで固定する。権限の比較の結合テスト (`attachment-search-permission.integ.ts`) は、検索結果のページへの添付ヒットと `facet=attachments` の 2 経路にする
+  - `attachment-search-routes.integ.ts` は、ゲスト・アクセストークン・トークンの範囲・機能が無効のときの確認を facet=`all` で行っている。これらは消さずに `facet=attachments` に移す
+  - _Requirements: 9.1, 9.3, 9.5_
+  - _Boundary: apps/app/src/server/routes/search.ts (と `search.spec.ts`), SearchService (と `search.spec.ts`), AttachmentSearchResultAggregator, `features/search-attachments/server/routes/apiv1/facet-search-contract.ts` (と `.spec.ts`), interfaces/search.ts, `attachment-search-routes.integ.ts`, `attachment-search-permission.integ.ts`_
+
+- [x] 12.2 `GET /_api/v3/search/attachments` の失敗を、空の結果で隠さずエラーで返す
+  - `resolveSecondary` は、権限確認か添付の検索が失敗するか 500ms を超えたら例外を投げる。ルートは 500 を返す
+  - `resolveSecondary` の `facet` 引数と、応答の `facet` を消す (応答は `{ enrichments }`)
+  - 機能が無効のときなど aggregator が無いとき、`SearchService.resolveAttachmentSecondary` が空の結果を返す分岐も、例外にする。`routes/apiv3/search-attachments.ts` の先頭の説明に 500 を足す
+  - _Requirements: 4.1, 9.5, 9.6_
+  - _Boundary: AttachmentSearchResultAggregator, SearchService, features/search-attachments/server/routes/apiv3 (`search-attachments.ts` と `.spec.ts`)_
+  - _Depends: 12.1_
