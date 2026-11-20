@@ -19,6 +19,7 @@
 - 作成済みの監査ログのエクスポートファイルと、TTL で消えた行の修正。
 - endpoint による監査ログの検索・候補表示の仕様の変更。
 - 記録ゲート（どの action を記録するか）と fail-safe の挙動の変更。
+- HTTP アクセスログ（`@growi/logger` の pino-http）に出るリクエスト URL の伏せ字。
 
 ## Amend target
 
@@ -27,21 +28,28 @@
 | activity-log のファイル | 節 | 変わる内容 |
 |---|---|---|
 | requirements.md | Requirements | Requirement 5〜9 を末尾に追加する（既存の 1〜4 は番号を変えない） |
-| requirements.md | Boundary Context | In scope に伏せ字を追加する。本 spec の Out of scope（TTL で消えた行、作成済みのエクスポートファイル、ローリングアップデート中・ロールバック中に古いバージョンが書いた行、access_token 以外のパラメータ、endpoint 以外の項目）を追加する。既存の Out of scope の「既に DB に溜まっている未確定／対象外の残骸行の遡及的な掃除・移行」は残骸の掃除のことで、伏せ字の migration とは別だと分かる書き方にする |
+| requirements.md | Boundary Context | In scope に伏せ字を追加する。本 spec の Out of scope（TTL で消えた行、作成済みのエクスポートファイル、ローリングアップデート中・ロールバック中に古いバージョンが書いた行、access_token 以外のパラメータ、パラメータを将来追加したときの保存済みの行、endpoint 以外の項目、HTTP アクセスログ）を追加する。既存の Out of scope の「既に DB に溜まっている未確定／対象外の残骸行の遡及的な掃除・移行」は残骸の掃除のことで、伏せ字の migration とは別だと分かる書き方にする |
+| requirements.md | Boundary Context > Adjacent expectations | 本 spec の Adjacent expectations（全文検索の索引にはクエリ文字列が入らないこと、G2G では activity を転送しないこと）を追加する。記録ゲートと fail-safe を変えないことは既存の項目でカバーされているので足さない |
 | design.md | Non-Goals | 「既存残骸の掃除・移行」が伏せ字の migration を含まないことを明記する |
 | design.md | This Spec Owns | 「保存する endpoint の伏せ字」を追加する |
 | design.md | Out of Boundary | 「既存残骸の掃除・移行」が伏せ字の migration を含まないことを明記する |
 | design.md | Allowed Dependencies | `server/util/redact-access-token-from-endpoint.ts` を追加する |
 | design.md | Revalidation Triggers | 本 spec の Revalidation Triggers を追加する（下記。**activity-log の Revalidation Triggers に触れる変更**） |
+| design.md | Existing Architecture Analysis | endpoint が DB に入る口（`createByParameters` を呼ぶすべての箇所、`updateByParameters`、インポートの bulk 書き込み）と、migrate-mongo が `preserver` で流れることを追加する |
+| design.md | Architecture Pattern & Boundary Map | 図に保存口・インポート・migration から伏せ字の関数への矢印を追加し、「保存口で伏せ字にする」パターンの説明を追加する |
+| design.md | Technology Stack | MongoDB driver（migrate-mongo の `db`）と migrate-mongo の行を追加する |
 | design.md | File Structure Plan | 伏せ字の関数の場所と、migration・インポートの変更を追加する |
+| design.md | System Flows | 「migration の処理」のフロー図と説明（条件付き `updateOne` で、読んでから書くまでに変わった文書を上書きしないこと）を追加する |
 | design.md | Requirements Traceability | 5.1〜9.3 の行を追加する |
 | design.md | Components and Interfaces | 表に redactAccessTokenFromEndpoint・ImportEndpointConverter・RedactionMigration の行を追加し、ActivityExtension.createByParameters の Req Coverage に 5.1, 5.2 を足す |
 | design.md | add-activity middleware（変更） | 文脈の `endpoint` は `req.originalUrl` をそのまま持つ（伏せ字は保存口で行う） |
 | design.md | Data / 保存口 `createByParameters` | 保存前に endpoint を伏せ字にすることを追加する。`updateByParameters` が endpoint を型でも実行時でも受け付けないことも書く |
 | design.md | Data Models | 「スキーマ変更なし」の説明に endpoint の値の約束を加え、本 spec の Invariant を追加する |
 | design.md | Error Handling | 伏せ字の関数が例外を投げないこと、migration の失敗時の扱い、インポートの変換の扱いを追加する |
+| design.md | Performance & Scalability | 伏せ字の migration の負荷（平文トークンを含む行が多いと起動が延びること、書き換えた件数ぶんの更新イベントを索引への同期処理が読むこと）を追加する |
 | design.md | Migration Strategy | 「データ移行なし」を、伏せ字の migration の説明に書き換える |
 | design.md | Testing Strategy | 本 spec のテスト項目を追加する |
+| design.md | Security Considerations | 節を新設し、本 spec の Security Considerations を移す |
 | research.md | Design Decisions | 本 spec の research.md の Decision をすべて移す |
 | spec.json | `updated_at` | 更新する（`phase` / `approvals` は変えない） |
 
@@ -75,7 +83,7 @@
 ## Architecture
 
 ### Existing Architecture Analysis
-- 記録の 3 経路（settle、fail-safe、`ActivityService.createActivity`）は、すべて `prisma.activities.createByParameters` で行を作る。
+- activity の行はすべて `prisma.activities.createByParameters` で作られる。呼ぶのは記録の 3 経路（settle、fail-safe、`ActivityService.createActivity`）と、それ以外に直接呼ぶ箇所（inline-comment のサービスなど。リクエストの文脈がないので endpoint は渡さない）。
 - `updateByParameters` は本番コードから呼ばれていないが、型は endpoint を受け付ける。
 - データのインポートは `import.ts` で変換表を通したあと、モデルを通らずに bulk 書き込みする。
 - migration は migrate-mongo で、`server` スクリプトの前（`preserver`）に流れる。
@@ -133,6 +141,7 @@ graph TB
 - `apps/app/src/server/service/import/construct-convert-map.ts` — `SPECIAL_CONVERT_FUNCTIONS.activities` に `endpoint` の変換関数を足す。
 - `apps/app/src/server/models/activity-create-by-parameters.integ.ts` — 保存口での伏せ字のテストを足す。
 - `apps/app/src/server/service/import/construct-convert-map.integ.ts` — `activities.endpoint` の変換関数が表にあり、伏せ字にすることのテストを足す。
+- `apps/app/src/server/service/activity/record-gate.integ.ts` — 生の URL を持つ文脈から settle した行が伏せ字で保存されることのテストを足す。
 - `apps/app/src/server/service/activity/record-failsafe-attempt.integ.ts` — 生の URL を持つ文脈から作った試行記録が伏せ字で保存されることのテストを足す。
 - `apps/app/src/server/service/activity.integ.ts` — `createActivity` の直接呼び出しで伏せ字になることのテストを足す。
 - `apps/app/src/server/models/activity-extension.spec.ts` — `updateByParameters` が `endpoint` を受け付けないことの型のテストを足す。
@@ -175,7 +184,7 @@ flowchart TB
 | 7.1 | インポートで伏せ字 | ImportEndpointConverter | `SPECIAL_CONVERT_FUNCTIONS.activities.endpoint` | — |
 | 7.2 | 他の項目は変えない | ImportEndpointConverter | `SPECIAL_CONVERT_FUNCTIONS.activities` | — |
 | 8.1 | 3 経路で同じ結果 | redactAccessTokenFromEndpoint（3 か所から呼ぶ） | `redactAccessTokenFromEndpoint` | — |
-| 8.2 | 対象追加が全経路に効く | redactAccessTokenFromEndpoint | `SENSITIVE_QUERY_PARAMS` | — |
+| 8.2 | 対象追加が以後の記録・インポートに効く | redactAccessTokenFromEndpoint | `SENSITIVE_QUERY_PARAMS` | — |
 | 9.1 | 一覧・エクスポートは保存値のまま | （変更なし） | — | — |
 | 9.2 | 検索・候補表示の結果を変えない | （変更なし。候補表示はパス部分でまとめ、ES はクエリ文字列を持たない） | — | — |
 | 9.3 | 記録ゲートと fail-safe を変えない | add-activity middleware（文脈の endpoint 以外は変えない） | — | — |
@@ -232,7 +241,7 @@ export const redactAccessTokenFromEndpoint: (originalUrl: string) => string;
 - 伏せ字は `create` の前に行うので、Prisma の validation error のメッセージ（引数を含む）にも平文は出ない。
 
 **Dependencies**
-- Inbound: settleActivityRecord、recordFailsafeAttempt、ActivityService.createActivity — 行の作成（P0）
+- Inbound: settleActivityRecord、recordFailsafeAttempt、ActivityService.createActivity、その他の直接の呼び出し元（inline-comment のサービスなど） — 行の作成（P0）
 - Outbound: redactAccessTokenFromEndpoint — 伏せ字（P0）
 
 **Contracts**: Service [x]
@@ -255,7 +264,7 @@ export type IActivityUpdateParameters = Omit<
 #### add-activity middleware（変更）
 
 - 文脈の `endpoint` に `req.originalUrl` をそのまま入れる。伏せ字は保存口に任せる。
-- 文脈は、リクエストの間だけプロセス内の Map に置かれる。同じ期間、`req.originalUrl` も生の URL を持つ。文脈をログに出す箇所は今はない（Revalidation Triggers 参照）。
+- 文脈は、リクエストの間だけプロセス内の Map に置かれる。同じ期間、`req.originalUrl` も生の URL を持つ。文脈をログに出す箇所は今はない（Revalidation Triggers 参照）。HTTP アクセスログ（pino-http）は文脈とは別に、リクエスト URL を伏せ字にせずに出す（本 spec の範囲外）。
 - 文脈の他の項目、id の採番、finalizer の登録は変えない（9.3）。
 
 ### Service / import
@@ -325,16 +334,17 @@ const SPECIAL_CONVERT_FUNCTIONS: Record<string, Record<string, OverwriteFunction
 
 ### Integration Tests
 - `activity-create-by-parameters.integ.ts`: `createByParameters` に `access_token` を含む endpoint を渡すと、保存された行は伏せ字になっている。endpoint を渡さないと `''` のまま（5.1）。
+- `record-gate.integ.ts`: 生の URL を持つ文脈から settle した行が伏せ字で保存される。成功した記録の大半が通る経路での確認（5.2）。
 - `record-failsafe-attempt.integ.ts`: 生の URL を持つ文脈から試行記録を作ると、保存された行は伏せ字になっている。middleware を通る経路でも保存口で伏せ字になることの確認（5.2）。
 - `activity.integ.ts`（`service/`）: `ActivityService.createActivity` を直接呼んだ行が伏せ字で保存される（5.2）。
 - migration（`20261120120000-…integ.ts`）: トークンあり・エンコードされたキー・クエリなし・トークンなしのクエリ・伏せ字済みの行を seed して `up` を流し、次を確かめる（6.1–6.5）。
   - トークンを含む行だけが伏せ字になる
   - 他の行は値も `__v` も変わらない
   - endpoint 以外の項目が変わらない
-  - 2 回目の `up` で書き換え件数が 0
+  - 2 回目の `up` のあとも、全行の endpoint・`__v`・他の項目が 1 回目のあとと同じ
   - 1,000 件を超える行（バッチの境目）でも全件直る
 - `construct-convert-map.integ.ts`: `activities.endpoint` の変換関数が表にあり、トークンを含む値を伏せ字にし、文字列でない値は変えない（7.1, 7.2）。Mongoose の `Activity` モデルが外れたときに落ちるドリフト検知を兼ねる。
-- 同じ endpoint の文字列を、保存口・migration・インポートの変換に通した結果が一致する（8.1）。上の各テストの期待値を `redactAccessTokenFromEndpoint` の戻り値で書けば足りる。
+- 同じ endpoint の文字列を、保存口・migration・インポートの変換に通した結果が一致する（8.1）。上の各テストの期待値を `redactAccessTokenFromEndpoint` の戻り値で書く。あわせて各テストで、保存・変換された値にトークンの文字列そのものが残らず、`[REDACTED]` が入っていることも直接確かめる（伏せ字の関数が壊れたときに、期待値も一緒に変わって見逃さないため）。
 
 - `activity-update-by-parameters.integ.ts`: `endpoint` を含む変数（オブジェクトリテラルでない値）を `updateByParameters` に渡しても、保存済みの endpoint が変わらない（5.2）。
 
@@ -344,6 +354,7 @@ const SPECIAL_CONVERT_FUNCTIONS: Record<string, Record<string, OverwriteFunction
 ## Security Considerations
 - 伏せ字は保存口で行うので、Prisma のエラーログにも平文は出ない。
 - 文脈（`PendingActivityContext`）は生の URL をリクエストの間だけ持つ。ログに出す変更は Revalidation Trigger とする。
+- HTTP アクセスログ（pino-http）は、リクエスト URL を access_token ごとそのまま出す。本 spec は activity の endpoint だけを扱い、アクセスログは範囲外。
 - migration の `down` は平文を戻さない（戻せない）。
 
 ## Migration Strategy

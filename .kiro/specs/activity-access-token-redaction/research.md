@@ -14,7 +14,7 @@
 - **Context**: どの経路で記録しても伏せ字にするには、endpoint が DB に入る口をすべて押さえる必要がある。
 - **Sources Consulted**: `apps/app/src/server/models/activity.ts`、`service/activity.ts`、`service/activity/settle-activity-record.ts`、`service/activity/record-failsafe-attempt.ts`、`service/import/import.ts`、`grep` による `activities.create|update|upsert` / `Activity.create|insertMany|updateOne|bulkWrite` / `collection('activities')` の全件検索
 - **Findings**:
-  - 記録の 3 経路（settle、fail-safe、`ActivityService.createActivity` を直接呼ぶ約 20 か所）は、すべて `prisma.activities.createByParameters` を通る。
+  - 記録の 3 経路（settle、fail-safe、`ActivityService.createActivity` を直接呼ぶ約 20 か所）は、すべて `prisma.activities.createByParameters` を通る。それ以外に `createByParameters` を直接呼ぶ箇所もある（inline-comment のサービスの 7 か所。リクエストの文脈がないので endpoint は渡さない）。
   - `updateByParameters` は extension 内の定義だけで、本番コードからの呼び出しはない。
   - `collection('activities')` を触るのは `service/activity.ts` の TTL インデックス作成だけで、行は書かない。
   - モデルを通らずに行を書くのは、管理画面のデータのインポート（`import.ts` の `initializeUnorderedBulkOp`）だけ。G2G は `activities` を `NON_TRANSFERABLE_COLLECTIONS` に入れているので転送しない。
@@ -37,7 +37,7 @@
   - `activities` には `endpoint_1` インデックスがある（`20261111120000-…`）。
 - **Implications**:
   - migration は Prisma ではなく素の `db` で書く。Prisma を使うと `__v` が変わり、要件 6.3 に反する。
-  - 194481.md にあった「Prisma が条件をどんな問い合わせに変換するか」は、素の driver を使うので問わなくてよくなった。代わりに、driver の問い合わせ `{ _id: { $gt }, endpoint: { $regex: '\\?' } }`（`_id` で並べ替え）の実行計画を explain で確かめる。
+  - 素の driver の問い合わせ `{ _id: { $gt }, endpoint: { $regex: '\\?' } }`（`_id` で並べ替え）の実行計画を explain で確かめる。
   - サーバ起動前に流れるので、運用者から見える影響は「記録が止まる」ことではなく「起動が延びる」ことになる。
 
 ### 監査ログの索引への同期（auditlog-es-sync）への影響
@@ -70,11 +70,11 @@
   1. 呼び出し元ごとに伏せ字を入れる
   2. 保存口で伏せ字にする
 - **Selected Approach**: `createByParameters` が `endpoint` を受け取ったら、Prisma の `create` に渡す前に伏せ字にする。`updateByParameters` は型（`IActivityUpdateParameters`）から `endpoint` を外し、実行時にも `endpoint` を取り除いてから `update` に渡す。更新で endpoint を書く手段をなくす。
-- **Rationale**: 記録の 3 経路はすべて `createByParameters` を通るので、1 か所で全経路を押さえられる。Prisma の validation error はメッセージに引数を含むが、伏せ字は `create` の前に行うので、エラーログにも平文は出ない。
+- **Rationale**: activity の行を作る箇所はすべて `createByParameters` を通るので、1 か所で全経路を押さえられる。Prisma の validation error はメッセージに引数を含むが、伏せ字は `create` の前に行うので、エラーログにも平文は出ない。
 - **Trade-offs**: 保存口が「中身を書き換える」責務を持つ。ただし対象は endpoint の 1 項目に限られ、関数も純粋なので、保存口の見通しは悪くならない。
 
 ### Decision: middleware では伏せ字にしない（`PendingActivityContext` は生の URL を持つ）
-- **Context**: 伏せ字を保存口に移すと、middleware が組み立てる文脈（`PendingActivityContext`）の `endpoint` には生の URL が入る。194481.md で、将来この文脈をログに出すと漏れることが懸念として挙がっていた。
+- **Context**: 伏せ字を保存口に移すと、middleware が組み立てる文脈（`PendingActivityContext`）の `endpoint` には生の URL が入る。将来この文脈をログに出すと、平文のトークンがログに漏れる。
 - **Alternatives Considered**:
   1. middleware でも伏せ字にする（2 か所で呼ぶ。関数は冪等なので結果は同じ）
   2. 保存口だけで伏せ字にする
@@ -82,6 +82,7 @@
 - **Rationale**:
   - 文脈が生きているのはリクエストの間だけ。同じ期間、`req.originalUrl` は生の URL を持ったまま `req` にある。文脈を伏せ字にしても、プロセスのメモリから生の値が消えるわけではない。
   - 今は文脈をログに出す箇所がない（`service/activity/` と `models/activity.ts` のログ呼び出しを全件確認した）。
+  - HTTP アクセスログ（`crowi/index.ts` で登録する `@growi/logger` の pino-http）は、リクエスト URL を伏せ字にせずに出す。生の URL はアクセスログにも残るので、文脈だけを伏せ字にしてもログからトークンは消えない（アクセスログの伏せ字は本 spec の範囲外）。
   - 伏せ字を呼ぶ箇所を 2 つにすると、片方が冗長に見えて消され、保存口側が消される事故がありうる。保存口だけに置けば、「DB に入る値は必ず伏せ字」という約束の担い手が 1 つに定まる。
 - **Trade-offs**: 文脈をログに出すコードを将来足すと、平文が漏れる。そのため、これを activity-log の Revalidation Trigger に加える。
 
@@ -113,7 +114,7 @@
 
 ## Synthesis
 
-- **Generalization**: 記録・migration・インポートの 3 つの要件は、どれも「endpoint を DB に入れる前に同じ規則で伏せ字にする」という 1 つの規則の適用先違い。規則は純粋関数 1 つにまとめ、3 か所はそれを呼ぶだけにする（要件 8）。伏せ字にするパラメータは関数内の定数 `SENSITIVE_QUERY_PARAMS` で決まるので、追加すれば 3 か所すべてに効く（要件 8.2）。
+- **Generalization**: 記録・migration・インポートの 3 つの要件は、どれも「endpoint を DB に入れる前に同じ規則で伏せ字にする」という 1 つの規則の適用先違い。規則は純粋関数 1 つにまとめ、3 か所はそれを呼ぶだけにする（要件 8）。伏せ字にするパラメータは関数内の定数 `SENSITIVE_QUERY_PARAMS` で決まるので、追加すれば以後の記録とインポートに効く（要件 8.2）。migration は一度しか流れないので、追加前に保存済みの行を直すには新しい migration を足す。
 - **Build vs. Adopt**: URL のパースに `URL` / `URLSearchParams` を使うと、他のパラメータのエンコードや順序が正規化されて変わってしまい、要件 5.5 に反する。そのため、既存の自前の文字列処理を使い続ける。
 - **Simplification**: 伏せ字のための新しいモデル層の仕組み（Prisma の query 拡張など）は作らない。migration のための汎用バッチ基盤も作らない。
 
