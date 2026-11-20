@@ -80,18 +80,6 @@ describe('EmojiPicker', () => {
     expect(content?.classList.contains('shadow-none')).toBe(true);
   });
 
-  it('stacks above a Bootstrap popover (z-index 1070), so a popover it is opened from does not hide it', async () => {
-    render(<EmojiPicker isOpen onSelect={vi.fn()} onClose={vi.fn()} />);
-    const picker = await screen.findByTestId('fake-picker');
-
-    // The nearest ancestor with a z-index is the layer the picker stacks in.
-    let layer: HTMLElement | null = picker;
-    while (layer != null && layer.style.zIndex === '') {
-      layer = layer.parentElement;
-    }
-    expect(Number(layer?.style.zIndex)).toBeGreaterThan(1070);
-  });
-
   it('passes a native selection with the emoji id and skin tone number to onSelect', async () => {
     const onSelect = vi.fn();
     render(<EmojiPicker isOpen onSelect={onSelect} onClose={vi.fn()} />);

@@ -37,6 +37,7 @@ import type { RendererOptions } from '~/interfaces/renderer-options';
 import { useCurrentUser } from '~/states/global';
 
 import type { InlineCommentWithReplies } from '../../../interfaces';
+import { INLINE_COMMENT_POPOVER_Z_INDEX } from '../../constants/z-index';
 import { MentionPickerButton } from '../InlineCommentForm/MentionPickerButton';
 import { MentionAwareCommentInput } from '../MentionAwareCommentInput/MentionAwareCommentInput';
 import { useCommentInputControls } from '../MentionAwareCommentInput/use-comment-input-controls';
@@ -183,12 +184,11 @@ export const InlineCommentPreviewPopover: FC<
   const replyEditorKey = `inline_comment_preview_popover_new_reply_${comment.id}`;
 
   return createPortal(
-    // zIndex 1070 mirrors SelectionPopover's own portal (Bootstrap's $zindex-popover).
     // biome-ignore lint/a11y/noStaticElementInteractions: not an interactive element -- onMouseEnter only reports "pointer arrived" so the caller can lock the popover open
     <div
       ref={setPopperElement}
       data-testid="inline-comment-preview-popover"
-      style={{ zIndex: 1070 }}
+      style={{ zIndex: INLINE_COMMENT_POPOVER_Z_INDEX }}
       // `card` gives the mockup's own surface color and 1px border; the
       // corner radius and the diffuse drop shadow are its `--radius-lg`
       // (14px -> Bootstrap's 1rem `rounded-4`, the nearest step) and
