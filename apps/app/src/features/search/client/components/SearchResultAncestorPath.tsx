@@ -5,6 +5,7 @@ import { pagePathUtils } from '@growi/core/dist/utils';
 
 import type { AncestorPathNode } from '~/client/util/build-ancestor-path-nodes';
 import { buildAncestorPathNodes } from '~/client/util/build-ancestor-path-nodes';
+import { parsePagePath } from '~/client/util/format-truncated-page-path';
 import { PagePathHierarchicalLink } from '~/components/Common/PagePathHierarchicalLink';
 import { LinkedPagePath } from '~/models/linked-page-path';
 
@@ -79,13 +80,14 @@ const nodeKey = (node: AncestorPathNode): string =>
  */
 export const SearchResultAncestorPath = memo(
   ({ path, highlightedPath }: SearchResultAncestorPathProps): JSX.Element => {
+    const parsed = useMemo(() => parsePagePath(path), [path]);
     const { containerRef, collapseLevel } = usePathCollapseLevel(
-      path,
+      parsed,
       highlightedPath,
     );
     const { nodes, fullPath } = useMemo(
-      () => buildAncestorPathNodes(path, highlightedPath, collapseLevel),
-      [path, highlightedPath, collapseLevel],
+      () => buildAncestorPathNodes(parsed, highlightedPath, collapseLevel),
+      [parsed, highlightedPath, collapseLevel],
     );
     // Like PageListItemL's legacy row, the trash icon marks pages *inside*
     // /trash; the /trash page itself sits directly under the top page.

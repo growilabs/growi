@@ -4,7 +4,10 @@ import { LinkedPagePath } from '~/models/linked-page-path';
 import { buildLinkedPagePathHref } from '~/utils/build-linked-page-path-href';
 
 import { alignHighlightedPathSegments } from './align-highlighted-path-segments';
-import { formatTruncatedPagePath } from './format-truncated-page-path';
+import {
+  formatTruncatedPagePath,
+  type ParsedPagePath,
+} from './format-truncated-page-path';
 
 /**
  * A single rendered unit of the ancestor-path breadcrumb.
@@ -70,6 +73,9 @@ const toLinkNode = (
 });
 
 /**
+ * Takes the path already split by `parsePagePath`, so the caller that also
+ * needs its maximum collapse level parses it only once.
+ *
  * Bridge `formatTruncatedPagePath`'s truncation decision with the plain
  * ancestor segments (links) and the per-segment highlight markup, returning a
  * React-agnostic display plan for the ancestor-only portion of a page path
@@ -88,11 +94,12 @@ const toLinkNode = (
  * Pure function: no React, no DOM, no network. Never throws on a valid string input.
  */
 export const buildAncestorPathNodes = (
-  path: string,
+  parsed: ParsedPagePath,
   highlightedPath?: string | null,
   collapseLevel = 0,
 ): AncestorPathPlan => {
-  const truncated = formatTruncatedPagePath(path, collapseLevel);
+  const { path } = parsed;
+  const truncated = formatTruncatedPagePath(parsed, collapseLevel);
   const { fullPath } = truncated;
   // Drop the trailing page-name part (always exactly one, always last).
   const ancestorParts = truncated.parts.slice(0, -1);

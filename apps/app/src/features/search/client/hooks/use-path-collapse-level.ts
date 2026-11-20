@@ -1,6 +1,4 @@
-import { useMemo } from 'react';
-
-import { formatTruncatedPagePath } from '~/client/util/format-truncated-page-path';
+import type { ParsedPagePath } from '~/client/util/format-truncated-page-path';
 
 import {
   type FittingCollapseLevel,
@@ -14,15 +12,14 @@ import {
  * The highlight markup is part of the reset key because highlighted text is
  * rendered bold (wider): the same page re-rendered for a new keyword must be
  * fitted again from the base form.
+ *
+ * Takes the path already split by `parsePagePath`, which the caller reuses to
+ * build the parts for the chosen level.
  */
 export const usePathCollapseLevel = (
-  path: string,
+  { path, maxCollapseLevel }: ParsedPagePath,
   highlightedPath?: string | null,
 ): FittingCollapseLevel => {
-  const maxCollapseLevel = useMemo(
-    () => formatTruncatedPagePath(path).maxCollapseLevel,
-    [path],
-  );
   // NUL never appears in a page path, so the joined key is unambiguous
   return useFittingCollapseLevel(
     maxCollapseLevel,

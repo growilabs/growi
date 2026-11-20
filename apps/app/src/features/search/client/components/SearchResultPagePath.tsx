@@ -2,7 +2,10 @@ import type { JSX, RefObject } from 'react';
 import { Fragment, memo, useMemo } from 'react';
 
 import type { PagePathPart } from '~/client/util/format-truncated-page-path';
-import { formatTruncatedPagePath } from '~/client/util/format-truncated-page-path';
+import {
+  formatTruncatedPagePath,
+  parsePagePath,
+} from '~/client/util/format-truncated-page-path';
 
 import { usePathCollapseLevel } from '../hooks/use-path-collapse-level';
 import { PathSeparator } from './PathSeparator';
@@ -81,11 +84,12 @@ const PathPartView = ({
 // arrow-key navigation, and each render re-parses the path and re-measures it.
 export const SearchResultPagePath = memo(
   ({ path, className }: SearchResultPagePathProps): JSX.Element => {
+    const parsed = useMemo(() => parsePagePath(path), [path]);
     const { containerRef, shrinkableRef, collapseLevel } =
-      usePathCollapseLevel(path);
+      usePathCollapseLevel(parsed);
     const { isRoot, parts, fullPath } = useMemo(
-      () => formatTruncatedPagePath(path, collapseLevel),
-      [path, collapseLevel],
+      () => formatTruncatedPagePath(parsed, collapseLevel),
+      [parsed, collapseLevel],
     );
 
     return (
