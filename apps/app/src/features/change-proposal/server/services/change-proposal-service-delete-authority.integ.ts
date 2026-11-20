@@ -292,7 +292,7 @@ describe("ChangeProposalService.revert and the admin's page deletion authority",
           await kit.aggregatedNotifications(revertProposalId);
         expect(
           notifications.map((n) => ({
-            user: String(n.user),
+            user: n.userId,
             pages: (
               JSON.parse(n.snapshot) as ChangeProposalNotificationSnapshot
             ).pages,
@@ -312,7 +312,7 @@ describe("ChangeProposalService.revert and the admin's page deletion authority",
     const notifiedProposals = async (revertProposalId: string) => {
       const notifications = await kit.aggregatedNotifications(revertProposalId);
       return notifications.map((n) => ({
-        user: String(n.user),
+        user: n.userId,
         proposalId: (
           JSON.parse(n.snapshot) as ChangeProposalNotificationSnapshot
         ).proposalId,

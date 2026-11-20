@@ -9,7 +9,6 @@ import { getInstance } from '^/test/setup/crowi';
 import { SupportedAction } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
 import { RevisionConflictError } from '~/server/models/errors';
-import { InAppNotification } from '~/server/models/in-app-notification';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import type {
   IPageOperation,
@@ -74,11 +73,9 @@ describe('PageService options used by change proposals', () => {
     pageId: mongoose.Types.ObjectId,
     action: string,
   ): Promise<number> =>
-    InAppNotification.countDocuments({
-      user: subscriber._id,
-      target: pageId,
-      action,
-    }).exec();
+    prisma.inappnotifications.count({
+      where: { userId: String(subscriber._id), target: String(pageId), action },
+    });
 
   const countActivities = (pageId: mongoose.Types.ObjectId, action: string) =>
     prisma.activities.count({
@@ -148,7 +145,9 @@ describe('PageService options used by change proposals', () => {
     await prisma.revisions.deleteMany({
       where: { pageId: { in: pageIds.map((id) => id.toString()) } },
     });
-    await InAppNotification.deleteMany({ target: { $in: pageIds } });
+    await prisma.inappnotifications.deleteMany({
+      where: { target: { in: pageIds.map(String) } },
+    });
     await Subscription.deleteMany({ target: { $in: pageIds } });
     await prisma.activities.deleteMany({ where: { ip: TEST_IP } });
     await Page.deleteMany({ _id: { $in: pageIds } });

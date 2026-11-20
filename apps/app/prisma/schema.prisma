@@ -436,19 +436,32 @@ model growiplugins {
 
 model inappnotifications {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  v           Int      @default(0) @map("__v")
   action      String
-  activities  String[]
+  // A scalar list, not a relation: a Prisma many-to-many on MongoDB needs a
+  // matching id list on `activities` too, which no writer would maintain.
+  // Activities are also removed by a TTL index outside Prisma,
+  // so ids that point at deleted activities are expected.
+  activities  String[] @db.ObjectId
   createdAt   DateTime @default(now())
-  snapshot    String
-  status      String
-  target      String   @db.ObjectId
+  // optional: targets without a snapshot (User, AuditLogBulkExportJob) have null
+  // or no field (legacy documents)
+  snapshot    String?
+  status      String   @default("UNOPENED")
+  // polymorphic: the collection `target` points at is selected by `targetModel`.
+  // optional: notifications of activities without a single target (e.g. empty
+  // trash) are stored with a null target.
+  target      String?  @db.ObjectId
   targetModel String
-  user        String   @db.ObjectId
+  userId      String   @map("user") @db.ObjectId
 
-  @@index([user], map: "user_1")
+  // optional: the list route already tolerates a since-removed user
+  user users? @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([userId], map: "user_1")
   @@index([status], map: "status_1")
   @@index([createdAt], map: "createdAt_1")
-  @@index([user, target, action, createdAt], map: "user_1_target_1_action_1_createdAt_1")
+  @@index([userId, target, action, createdAt], map: "user_1_target_1_action_1_createdAt_1")
 }
 
 model inappnotificationsettings {
@@ -851,6 +864,7 @@ model users {
   bookmarkfolders        bookmarkfolders[]
   pagebulkexportjobs     pagebulkexportjobs[]
   auditlogbulkexportjobs auditlogbulkexportjobs[]
+  inappnotifications     inappnotifications[]
 
   @@index([name], map: "name_1")
   @@index([status], map: "status_1")

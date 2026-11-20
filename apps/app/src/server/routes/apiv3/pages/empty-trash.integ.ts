@@ -23,7 +23,6 @@ import { getInstance } from '^/test/setup/crowi';
 import { SupportedAction } from '~/interfaces/activity';
 import { PageDeleteConfigValue } from '~/interfaces/page-delete-config';
 import type Crowi from '~/server/crowi';
-import { InAppNotification } from '~/server/models/in-app-notification';
 import Subscription from '~/server/models/subscription';
 import { UserStatus } from '~/server/models/user/conts';
 import addCustomFunctionToResponse from '~/server/routes/apiv3/response';
@@ -319,9 +318,12 @@ describe('DELETE /empty-trash', () => {
         // The notification is written after the response, so wait for it.
         await vi.waitFor(
           async () => {
-            const notification = await InAppNotification.findOne({
-              user: subscriber._id,
-              action: SupportedAction.ACTION_PAGE_RECURSIVELY_DELETE_COMPLETELY,
+            const notification = await prisma.inappnotifications.findFirst({
+              where: {
+                userId: subscriber._id.toString(),
+                action:
+                  SupportedAction.ACTION_PAGE_RECURSIVELY_DELETE_COMPLETELY,
+              },
             });
             expect(notification).not.toBeNull();
           },
@@ -329,7 +331,9 @@ describe('DELETE /empty-trash', () => {
         );
       } finally {
         await Subscription.deleteMany({ user: subscriber._id });
-        await InAppNotification.deleteMany({ user: subscriber._id });
+        await prisma.inappnotifications.deleteMany({
+          where: { userId: subscriber._id.toString() },
+        });
       }
     });
   });

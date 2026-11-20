@@ -13,7 +13,6 @@ import { getInstance } from '^/test/setup/crowi';
 
 import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
-import { InAppNotification } from '~/server/models/in-app-notification';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import Subscription from '~/server/models/subscription';
 import { UserStatus } from '~/server/models/user/conts';
@@ -161,15 +160,20 @@ describe('ProposalNotifier.notifyApplied', () => {
   };
 
   const notificationsFor = (proposalId: string) =>
-    InAppNotification.find({ target: proposalId }).lean().exec();
+    prisma.inappnotifications
+      .findMany({ where: { target: proposalId } })
+      .then((rows) =>
+        rows.map(({ snapshot, ...row }) => ({
+          ...row,
+          snapshot: snapshot ?? '',
+        })),
+      );
 
   const snapshotOf = (
     notifications: Awaited<ReturnType<typeof notificationsFor>>,
     user: HydratedDocument<IUserHasId>,
   ): Snapshot | undefined => {
-    const found = notifications.find(
-      (n) => n.user.toString() === user._id.toString(),
-    );
+    const found = notifications.find((n) => n.userId === user._id.toString());
     return found == null ? undefined : JSON.parse(found.snapshot);
   };
 
@@ -223,7 +227,9 @@ describe('ProposalNotifier.notifyApplied', () => {
     });
     const pageIds = pages.map((p) => p._id);
     const userIds = Object.values(users).map((u) => u._id);
-    await InAppNotification.deleteMany({ user: { $in: userIds } });
+    await prisma.inappnotifications.deleteMany({
+      where: { userId: { in: userIds.map(String) } },
+    });
     await Subscription.deleteMany({ target: { $in: pageIds } });
     await prisma.changeproposals.deleteMany({
       where: { requester: { in: userIds.map((id) => id.toString()) } },
@@ -299,7 +305,7 @@ describe('ProposalNotifier.notifyApplied', () => {
     it('creates one notification for a subscriber, built only from applied edits and moves the subscriber can view', async () => {
       const notifications = await notificationsFor(proposal._id);
       const forSubscriber = notifications.filter(
-        (n) => n.user.toString() === users.subscriber._id.toString(),
+        (n) => n.userId === users.subscriber._id.toString(),
       );
 
       expect(forSubscriber).toHaveLength(1);
@@ -308,7 +314,7 @@ describe('ProposalNotifier.notifyApplied', () => {
         action: SupportedAction.ACTION_CHANGE_PROPOSAL_APPLY,
         status: 'UNOPENED',
       });
-      expect(forSubscriber[0].target.toString()).toBe(proposal._id);
+      expect(forSubscriber[0].target).toBe(proposal._id);
       expect(forSubscriber[0].activities.map(String)).toEqual([activityId]);
 
       const snapshot = snapshotOf(notifications, users.subscriber);
@@ -332,7 +338,7 @@ describe('ProposalNotifier.notifyApplied', () => {
 
       const nameOf = (id: string) =>
         Object.entries(users).find(([, u]) => u._id.toString() === id)?.[0];
-      expect(notifications.map((n) => nameOf(n.user.toString()))).toEqual([
+      expect(notifications.map((n) => nameOf(n.userId))).toEqual([
         'subscriber',
       ]);
     });
@@ -360,22 +366,26 @@ describe('ProposalNotifier.notifyApplied', () => {
 
     it('never lets the notification list API load the proposal behind a ChangeProposal notification', async () => {
       // Inserted directly so the list behavior is checked apart from the notifier.
-      await InAppNotification.create({
-        user: users.outsider._id,
-        targetModel: SupportedTargetModel.MODEL_CHANGE_PROPOSAL,
-        target: proposal._id,
-        action: SupportedAction.ACTION_CHANGE_PROPOSAL_APPLY,
-        activities: [],
-        snapshot: '{}',
+      await prisma.inappnotifications.create({
+        data: {
+          userId: users.outsider._id.toString(),
+          targetModel: SupportedTargetModel.MODEL_CHANGE_PROPOSAL,
+          target: proposal._id,
+          action: SupportedAction.ACTION_CHANGE_PROPOSAL_APPLY,
+          activities: [],
+          snapshot: '{}',
+        },
       });
       // A page notification in the same list must still carry its loaded page.
-      await InAppNotification.create({
-        user: users.outsider._id,
-        targetModel: SupportedTargetModel.MODEL_PAGE,
-        target: pages.stale._id,
-        action: SupportedAction.ACTION_PAGE_UPDATE,
-        activities: [],
-        snapshot: '{}',
+      await prisma.inappnotifications.create({
+        data: {
+          userId: users.outsider._id.toString(),
+          targetModel: SupportedTargetModel.MODEL_PAGE,
+          target: pages.stale._id.toString(),
+          action: SupportedAction.ACTION_PAGE_UPDATE,
+          activities: [],
+          snapshot: '{}',
+        },
       });
 
       const res = await request(app)
@@ -474,7 +484,7 @@ describe('ProposalNotifier.notifyApplied', () => {
       });
 
       const notifications = await notificationsFor(revert._id);
-      expect(notifications.map((n) => n.user.toString()).sort()).toEqual(
+      expect(notifications.map((n) => n.userId).sort()).toEqual(
         [users.original._id, users.subscriber._id].map(String).sort(),
       );
       expect(
@@ -553,7 +563,7 @@ describe('ProposalNotifier.notifyApplied', () => {
       });
 
       const notifications = await notificationsFor(revert._id);
-      expect(notifications.map((n) => n.user.toString())).toEqual([
+      expect(notifications.map((n) => n.userId)).toEqual([
         users.original._id.toString(),
       ]);
       expect(snapshotOf(notifications, users.original)?.pages).toEqual([
@@ -605,7 +615,7 @@ describe('ProposalNotifier.notifyApplied', () => {
       const notifications = await notificationsFor(proposal._id);
       return notifications.map((n) => {
         const { proposalId: _ignored, ...rest } = JSON.parse(n.snapshot);
-        return { user: n.user.toString(), snapshot: rest };
+        return { user: n.userId, snapshot: rest };
       });
     };
 
@@ -671,7 +681,7 @@ describe('ProposalNotifier.notifyApplied', () => {
     const proposal = await storeProposal({ requester: users.requester }, [
       { input: editInput(page), status: 'applied' },
     ]);
-    vi.spyOn(InAppNotification, 'insertMany').mockRejectedValueOnce(
+    vi.spyOn(prisma.inappnotifications, 'createMany').mockRejectedValueOnce(
       new Error('insert failed'),
     );
 

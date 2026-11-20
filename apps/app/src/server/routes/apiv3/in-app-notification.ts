@@ -1,19 +1,34 @@
+import type { IUser } from '@growi/core/dist/interfaces';
 import { SCOPE } from '@growi/core/dist/interfaces';
-import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
+import {
+  serializeUserSecurely,
+  toLegacyUserShape,
+} from '@growi/core/dist/models/serializers';
 import type { Router } from 'express';
 import express from 'express';
+import { body } from 'express-validator';
 
 import { SupportedAction } from '~/interfaces/activity';
 import type { CrowiRequest } from '~/interfaces/crowi-request';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
+import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import loginRequiredFactory from '~/server/middlewares/login-required';
 
-import type { IInAppNotification } from '../../../interfaces/in-app-notification';
 import type { ApiV3Response } from './interfaces/apiv3-response';
 
 const router = express.Router();
+
+const validator = {
+  open: [
+    body('id')
+      .isString()
+      .bail()
+      .isMongoId()
+      .withMessage('id must be a valid notification id'),
+  ],
+};
 
 /**
  * @swagger
@@ -93,8 +108,6 @@ export const setup = (crowi: Crowi): Router => {
 
   const inAppNotificationService = crowi.inAppNotificationService;
 
-  const { User } = crowi.models;
-
   const activityEvent = crowi.events.activity;
 
   /**
@@ -169,41 +182,36 @@ export const setup = (crowi: Crowi): Router => {
           queryOptions,
         );
 
-      const getActionUsersFromActivities = (activities) =>
-        activities
-          .map(({ user }) => user)
+      const docObjs = paginationResult.docs.map(
+        ({ activities, user: docUser, ...doc }) => {
           // activity.user can be null: an activity settled without its
           // request context (bare activity, mostly from editor saves), or a
           // reference to a since-removed user. Exclude those so the API never
           // returns null entries in actionUsers.
-          .filter((user) => user != null)
-          .filter((user, i, self) => self.indexOf(user) === i);
+          const actionUsers = activities
+            .map(({ user: activityUser }) => activityUser)
+            .filter((activityUser) => activityUser != null)
+            .filter((activityUser, i, self) => {
+              return self.findIndex(({ id }) => id === activityUser.id) === i;
+            })
+            .map((activityUser) =>
+              serializeUserSecurely(toLegacyUserShape(activityUser) as IUser),
+            );
 
-      const docObjs: Array<IInAppNotification> = paginationResult.docs.map(
-        (doc) => {
-          if (doc.user != null && doc.user instanceof User) {
-            doc.user = serializeUserSecurely(doc.user);
-          }
-          // To add a new property into mongoose doc, need to change the format of doc to an object
-          const docObj: IInAppNotification = doc.toObject();
-          const actionUsersNew = getActionUsersFromActivities(doc.activities);
-
-          const serializedActionUsers = actionUsersNew.map((actionUser) => {
-            return serializeUserSecurely(actionUser);
-          });
-
-          docObj.actionUsers = serializedActionUsers;
-          return docObj;
+          return {
+            ...doc,
+            user:
+              docUser != null
+                ? serializeUserSecurely(toLegacyUserShape(docUser) as IUser)
+                : null,
+            actionUsers,
+          };
         },
       );
-      const serializedDocs =
-        await inAppNotificationService.populateTargetAttachments(
-          inAppNotificationService.hideChangeProposalTargets(docObjs),
-        );
 
       const serializedPaginationResult = {
         ...paginationResult,
-        docs: serializedDocs,
+        docs: docObjs,
       };
 
       return res.apiv3(serializedPaginationResult);
@@ -290,6 +298,8 @@ export const setup = (crowi: Crowi): Router => {
       acceptLegacy: true,
     }),
     loginRequiredStrictly,
+    validator.open,
+    apiV3FormValidator,
     async (req: CrowiRequest, res: ApiV3Response) => {
       // biome-ignore lint/style/noNonNullAssertion: user must be set by loginRequiredStrictly
       const user = req.user!;

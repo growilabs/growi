@@ -10,7 +10,6 @@ import { getInstance } from '^/test/setup/crowi';
 import { SupportedAction } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
 import { AccessToken } from '~/server/models/access-token';
-import { InAppNotification } from '~/server/models/in-app-notification';
 import type { PageDocument } from '~/server/models/page';
 import { UserStatus } from '~/server/models/user/conts';
 import addCustomFunctionToResponse from '~/server/routes/apiv3/response';
@@ -191,8 +190,8 @@ describe('change-proposal write routes', () => {
 
   afterAll(async () => {
     vi.restoreAllMocks();
-    await InAppNotification.deleteMany({
-      target: { $in: revertProposalIds },
+    await prisma.inappnotifications.deleteMany({
+      where: { target: { in: revertProposalIds.map(String) } },
     });
     await prisma.changeproposals.deleteMany({
       where: { id: { in: revertProposalIds } },

@@ -23,10 +23,18 @@ const isIPageBulkExportJob = (
 };
 
 // snapshots are infos about the target that are displayed in the notification, which should not change on target update/deletion
-export const generateSnapshot = async (
+export async function generateSnapshot(
+  targetModel: typeof SupportedTargetModel.MODEL_PAGE,
+  target: IPage,
+): Promise<string>;
+export async function generateSnapshot(
   targetModel: string,
   target: IUser | IPage | pagebulkexportjobs | auditlogbulkexportjobs,
-): Promise<string | undefined> => {
+): Promise<string | undefined>;
+export async function generateSnapshot(
+  targetModel: string,
+  target: IUser | IPage | pagebulkexportjobs | auditlogbulkexportjobs,
+): Promise<string | undefined> {
   let snapshot: string | undefined;
 
   if (isIPage(targetModel, target)) {
@@ -36,4 +44,4 @@ export const generateSnapshot = async (
   }
 
   return snapshot;
-};
+}

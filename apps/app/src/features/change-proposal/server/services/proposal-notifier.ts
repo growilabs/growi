@@ -4,7 +4,6 @@ import mongoose from 'mongoose';
 import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import { InAppNotificationStatuses } from '~/interfaces/in-app-notification';
 import type Crowi from '~/server/crowi';
-import { InAppNotification } from '~/server/models/in-app-notification';
 import Subscription from '~/server/models/subscription';
 import { UserStatus } from '~/server/models/user/conts';
 import loggerFactory from '~/utils/logger';
@@ -192,9 +191,9 @@ export const createProposalNotifier = (crowi: Crowi): ProposalNotifier => ({
 
       // One document per recipient, since each carries its own snapshot.
       const createdAt = new Date();
-      await InAppNotification.insertMany(
-        inputs.map(({ user, snapshot }) => ({
-          user,
+      await prisma.inappnotifications.createMany({
+        data: inputs.map(({ user, snapshot }) => ({
+          userId: user,
           targetModel: SupportedTargetModel.MODEL_CHANGE_PROPOSAL,
           target: proposal._id,
           action,
@@ -203,8 +202,7 @@ export const createProposalNotifier = (crowi: Crowi): ProposalNotifier => ({
           snapshot: JSON.stringify(snapshot),
           activities: [activityId],
         })),
-        { ordered: false },
-      );
+      });
       await crowi.inAppNotificationService.emitSocketIo(
         inputs.map(({ user }) => user),
       );

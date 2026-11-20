@@ -8,7 +8,6 @@ import { getInstance } from '^/test/setup/crowi';
 
 import type Crowi from '~/server/crowi';
 import { GlobalNotificationSettingEvent } from '~/server/models/GlobalNotificationSetting/consts';
-import { InAppNotification } from '~/server/models/in-app-notification';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import type {
   IPageOperation,
@@ -192,7 +191,9 @@ describe('create operation handler', () => {
     await prisma.revisions.deleteMany({
       where: { pageId: { in: pageIds.map((id) => id.toString()) } },
     });
-    await InAppNotification.deleteMany({ target: { $in: pageIds } });
+    await prisma.inappnotifications.deleteMany({
+      where: { target: { in: pageIds.map(String) } },
+    });
     await prisma.activities.deleteMany({ where: { ip: TEST_IP } });
     await Page.deleteMany({ _id: { $in: pageIds } });
     await mongoose
@@ -472,8 +473,8 @@ describe('create operation handler', () => {
       expect(spies.slackFire).toHaveBeenCalledTimes(1);
       expect(spies.userFire).not.toHaveBeenCalled();
       expect(
-        await InAppNotification.countDocuments({
-          target: new mongoose.Types.ObjectId(outcome.resultPageId),
+        await prisma.inappnotifications.count({
+          where: { target: outcome.resultPageId },
         }),
       ).toBe(0);
     });

@@ -9,7 +9,6 @@ import { getInstance } from '^/test/setup/crowi';
 import { SupportedAction } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
 import { GlobalNotificationSettingEvent } from '~/server/models/GlobalNotificationSetting/consts';
-import { InAppNotification } from '~/server/models/in-app-notification';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import type {
   IPageOperation,
@@ -153,11 +152,13 @@ describe('move operation handler', () => {
   };
 
   const countRenameNotifications = (pageId: mongoose.Types.ObjectId) =>
-    InAppNotification.countDocuments({
-      user: subscriber._id,
-      target: pageId,
-      action: SupportedAction.ACTION_PAGE_RENAME,
-    }).exec();
+    prisma.inappnotifications.count({
+      where: {
+        userId: String(subscriber._id),
+        target: String(pageId),
+        action: SupportedAction.ACTION_PAGE_RENAME,
+      },
+    });
 
   // The integration Crowi has no notification services; a real global one is
   // installed so its grant check runs, with only the mail/Slack senders stubbed.
@@ -245,7 +246,9 @@ describe('move operation handler', () => {
     await prisma.pageredirects.deleteMany({
       where: { fromPath: { startsWith: PREFIX } },
     });
-    await InAppNotification.deleteMany({ target: { $in: pageIds } });
+    await prisma.inappnotifications.deleteMany({
+      where: { target: { in: pageIds.map(String) } },
+    });
     await Subscription.deleteMany({ target: { $in: pageIds } });
     await prisma.activities.deleteMany({ where: { ip: TEST_IP } });
     await Page.deleteMany({ _id: { $in: pageIds } });

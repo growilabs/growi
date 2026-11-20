@@ -169,9 +169,7 @@ describe('ProposalApplier.apply', () => {
 
     const notifications = await aggregatedNotifications(proposal._id);
     expect(notifications).toHaveLength(1);
-    expect(notifications[0].user.toString()).toBe(
-      users.subscriber._id.toString(),
-    );
+    expect(notifications[0].userId).toBe(users.subscriber._id.toString());
     const [activity] = await waitForActivities(proposal._id, 1);
     expect(activity.action).toBe(SupportedAction.ACTION_CHANGE_PROPOSAL_APPLY);
     expect(activity).toMatchObject({
