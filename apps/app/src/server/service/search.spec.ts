@@ -3,10 +3,10 @@ import type { Model } from 'mongoose';
 import mongoose from 'mongoose';
 import { type MockProxy, mock, mockDeep } from 'vitest-mock-extended';
 
-import type { IAttachmentHit } from '~/features/search-attachments/interfaces/attachment-search';
 import type {
   AttachmentSearchInput,
   AttachmentSearchResultAggregator,
+  IPrimarySearchResult,
 } from '~/features/search-attachments/server/services/attachment-search-result-aggregator';
 import { SearchDelegatorName } from '~/interfaces/named-query';
 import type { IPageWithSearchMeta } from '~/interfaces/search';
@@ -342,7 +342,7 @@ describe('SearchService.canShowSnippet()', () => {
   });
 });
 
-describe('SearchService.searchByFacet() with resolve=full', () => {
+describe('SearchService.searchByFacet()', () => {
   const viewer = { user: null, userGroups: null };
   const input: AttachmentSearchInput = {
     queryString: 'word',
@@ -350,24 +350,10 @@ describe('SearchService.searchByFacet() with resolve=full', () => {
     resolvedFilterData: { groupIds: [], notGroupIds: [] },
     viewer,
   };
-  const hit = (pageId: string): IAttachmentHit => ({
-    attachmentId: `att-${pageId}`,
-    pageId,
-    fileName: 'a.pdf',
-    originalName: 'a.pdf',
-    fileFormat: 'pdf',
-    fileSize: 1,
-    snippets: [],
-    pageNumber: 1,
-    label: null,
-  });
-  const pageItem = (
-    id: string,
-    attachmentHits?: IAttachmentHit[],
-  ): IPageWithSearchMeta => ({
-    data: mock<IPageWithSearchMeta['data']>({ _id: id }),
-    meta: attachmentHits == null ? {} : { attachmentHits },
-  });
+  const primary: IPrimarySearchResult = {
+    items: [{ data: mock<IPageWithSearchMeta['data']>({ _id: 'p1' }) }],
+    meta: { primaryResultIncomplete: false },
+  };
 
   let service: TestSearchService;
   let aggregator: MockProxy<AttachmentSearchResultAggregator>;
@@ -376,86 +362,27 @@ describe('SearchService.searchByFacet() with resolve=full', () => {
     service = new TestSearchService();
     vi.spyOn(service, 'createAttachmentSearchInput').mockResolvedValue(input);
     aggregator = mock<AttachmentSearchResultAggregator>();
-    // the real aggregator rejects more than 20 ids per call
-    aggregator.resolveSecondary.mockImplementation(async (_in, opts) => {
-      if (opts.primaryIds.length > 20) throw new RangeError('too many ids');
-      return {
-        facet: 'all',
-        enrichments: Object.fromEntries(
-          opts.primaryIds
-            .filter((id) => id !== 'no-hit')
-            .map((id) => [id, { attachmentHits: [hit(id)] }]),
-        ),
-      };
-    });
-    service.setAttachmentSearchResultAggregator(aggregator);
-  });
-
-  it('attaches hits to the pages that came back without any, keeping the others as they are', async () => {
-    const kept = [hit('first')];
-    aggregator.searchPrimary.mockResolvedValue({
-      facet: 'pages',
-      primarySlot: 'pages',
-      items: [pageItem('first', kept), pageItem('second'), pageItem('no-hit')],
-      meta: { total: 3 },
-    });
-
-    const result = await service.searchByFacet('word', viewer, {
-      facet: 'all',
-      from: 20,
-      size: 20,
-      resolve: 'full',
-    });
-
-    expect(result.items.map((i) => i.meta?.attachmentHits)).toEqual([
-      kept,
-      [hit('second')],
-      undefined,
-    ]);
-    expect(result.meta).toEqual({ total: 3 });
-  });
-
-  it('enriches a page size above the secondary limit in full', async () => {
-    const ids = Array.from({ length: 45 }, (_, i) => `p${i}`);
-    aggregator.searchPrimary.mockResolvedValue({
-      facet: 'pages',
-      primarySlot: 'pages',
-      items: ids.map((id) => pageItem(id)),
-      meta: { total: 45 },
-    });
-
-    const result = await service.searchByFacet('word', viewer, {
-      facet: 'all',
-      from: 0,
-      size: 45,
-      resolve: 'full',
-    });
-
-    expect(
-      result.items.map((i) => i.meta?.attachmentHits?.[0]?.pageId),
-    ).toEqual(ids);
-  });
-
-  it.each([
-    { facet: 'all' as const, resolve: 'primary' as const },
-    { facet: 'attachments' as const, resolve: 'full' as const },
-  ])('returns the primary result untouched for facet=$facet resolve=$resolve', async ({
-    facet,
-    resolve,
-  }) => {
-    const primary = {
-      facet,
-      primarySlot: 'pages' as const,
-      items: [pageItem('second')],
-      meta: { total: 1 },
-    };
     aggregator.searchPrimary.mockResolvedValue(primary);
+  });
+
+  it('answers the attachment search for the parsed query and the requested page', async () => {
+    service.setAttachmentSearchResultAggregator(aggregator);
 
     const result = await service.searchByFacet('word', viewer, {
-      facet,
-      resolve,
+      from: 20,
+      size: 10,
     });
 
     expect(result).toBe(primary);
+    expect(aggregator.searchPrimary).toHaveBeenCalledWith(input, {
+      from: 20,
+      size: 10,
+    });
+  });
+
+  it('fails when the attachment search is not initialized', async () => {
+    await expect(service.searchByFacet('word', viewer, {})).rejects.toThrow(
+      'Attachment search is not initialized',
+    );
   });
 });

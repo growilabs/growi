@@ -10,7 +10,6 @@ import {
   FILTER_FIELDS,
   SEARCH_FILTER_PREFIXES,
 } from '~/features/search/utils/filter-fields';
-import { DEFAULT_PAGE_SIZE as MAX_SECONDARY_PAGE_IDS } from '~/features/search-attachments/server/queries';
 import type {
   AttachmentSearchInput,
   AttachmentSearchResultAggregator,
@@ -608,30 +607,6 @@ class SearchService implements SearchQueryParser, SearchResolver {
   }
 
   /**
-   * Page search for a parsed query, formatted exactly as `/_api/search`
-   * formats it (snippet rule, XSS filtering, page data from MongoDB).
-   */
-  async searchFormattedPages(
-    input: AttachmentSearchInput,
-    { from, size }: { from: number; size: number },
-  ): Promise<IFormattedSearchResult> {
-    const { queryString, terms, resolvedFilterData, viewer } = input;
-    const delegator = this.fullTextSearchDelegator;
-    const result = await delegator.search(
-      { queryString, terms, resolvedFilterData },
-      viewer.user,
-      viewer.userGroups,
-      { offset: from, limit: size },
-    );
-    return this.formatSearchResult(
-      result,
-      delegator.name ?? null,
-      viewer.user,
-      viewer.userGroups,
-    );
-  }
-
-  /**
    * Register an AttachmentSearchResultAggregator for faceted search routing.
    * Called by initAttachmentFullTextSearch.
    */
@@ -642,28 +617,18 @@ class SearchService implements SearchQueryParser, SearchResolver {
   }
 
   /**
-   * Facet-aware search entry point, routed through the
+   * The facet=attachments search, routed through the
    * AttachmentSearchResultAggregator. Callers check
    * isAttachmentFullTextSearchEnabled first.
    *
    * `viewer` is resolved the same way the page search route resolves it; a
    * null user means guest.
-   *
-   * resolve=full (facet=all): pages that came back without attachment hits
-   * (every page after the first result page) are enriched in the same call,
-   * as the secondary endpoint would.
    */
   async searchByFacet(
     keyword: string,
     viewer: AttachmentSearchViewer,
-    options: {
-      facet: 'all' | 'attachments';
-      from?: number;
-      size?: number;
-      resolve?: 'primary' | 'full';
-    },
+    options: { from?: number; size?: number },
   ): Promise<IPrimarySearchResult> {
-    const { facet } = options;
     const from = options.from ?? 0;
     const size = options.size ?? 20;
 
@@ -673,53 +638,12 @@ class SearchService implements SearchQueryParser, SearchResolver {
     }
 
     const input = await this.createAttachmentSearchInput(keyword, viewer);
-    const primary = await aggregator.searchPrimary(input, {
-      facet,
-      from,
-      size,
-    });
-    if (facet !== 'all' || options.resolve !== 'full') {
-      return primary;
-    }
-    return {
-      ...primary,
-      items: await this.attachSecondaryHits(aggregator, input, primary.items),
-    };
-  }
-
-  private async attachSecondaryHits(
-    aggregator: AttachmentSearchResultAggregator,
-    input: AttachmentSearchInput,
-    items: IPrimarySearchResult['items'],
-  ): Promise<IPrimarySearchResult['items']> {
-    const missing = items
-      .filter((item) => item.meta?.attachmentHits == null)
-      .map((item) => item.data._id.toString());
-    const chunks: string[][] = [];
-    for (let i = 0; i < missing.length; i += MAX_SECONDARY_PAGE_IDS) {
-      chunks.push(missing.slice(i, i + MAX_SECONDARY_PAGE_IDS));
-    }
-    const results = await Promise.all(
-      chunks.map((primaryIds) =>
-        aggregator.resolveSecondary(input, { facet: 'all', primaryIds }),
-      ),
-    );
-    const enrichments = Object.assign(
-      {},
-      ...results.map((r) => r.enrichments),
-    ) as IResolvedSecondaryResult['enrichments'];
-
-    return items.map((item) => {
-      const hits = enrichments[item.data._id.toString()]?.attachmentHits;
-      return hits == null || item.meta?.attachmentHits != null
-        ? item
-        : { ...item, meta: { ...item.meta, attachmentHits: hits } };
-    });
+    return aggregator.searchPrimary(input, { from, size });
   }
 
   /**
-   * Attachment hits for page ids the client got from a facet=all primary
-   * result. Empty when the attachment search is not initialized.
+   * Attachment hits for page ids the client got from the page search. Empty
+   * when the attachment search is not initialized.
    *
    * @throws {RangeError} when more than 20 distinct ids are given
    */

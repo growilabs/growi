@@ -1,14 +1,13 @@
 /**
- * Latency of the faceted search against the plain page search, on a real
+ * Latency of the attachment searches beside the plain page search, on a real
  * Elasticsearch and MongoDB. Run by hand, not in CI: a shared CI machine
  * cannot hold a latency ratio steady enough to gate on.
  *
  *   ATTACHMENT_SEARCH_PERF=1 env -u MONGO_URI pnpm vitest run attachment-search-performance.integ
  *
- * The behaviour past the time limits (facet=all falling back to the page
- * result, facet=attachments reporting an incomplete result, the secondary
- * search returning no enrichment) is pinned in
- * attachment-search-result-aggregator.spec.ts.
+ * The behaviour past the time limits (facet=attachments reporting an
+ * incomplete result, the secondary search returning no enrichment) is pinned
+ * in attachment-search-result-aggregator.spec.ts.
  */
 
 import { PageGrant } from '@growi/core';
@@ -207,7 +206,7 @@ describe.skipIf(
     });
   });
 
-  it('keeps facet=all within +30% of the page search, and the secondary search within 500ms (p95)', async () => {
+  it('keeps the secondary search within 500ms (p95)', async () => {
     const viewer = await resolveAttachmentSearchViewer(null);
     const query = `${TOKEN} report`;
 
@@ -232,12 +231,7 @@ describe.skipIf(
 
     const scenarios = {
       pages: pageSearch,
-      allFirstPage: () =>
-        searchService.searchByFacet(query, viewer, { facet: 'all' }),
-      allSecondPage: () =>
-        searchService.searchByFacet(query, viewer, { facet: 'all', from: 20 }),
-      attachments: () =>
-        searchService.searchByFacet(query, viewer, { facet: 'attachments' }),
+      attachments: () => searchService.searchByFacet(query, viewer, {}),
       secondary: () =>
         searchService.resolveAttachmentSecondary(query, viewer, {
           primaryIds,
@@ -246,11 +240,9 @@ describe.skipIf(
     type Scenario = keyof typeof scenarios;
     const names = Object.keys(scenarios) as Scenario[];
 
-    // not vacuous: the facet=all first page carries attachment hits
-    const sample = await scenarios.allFirstPage();
-    expect(
-      sample.items.some((i) => (i.meta?.attachmentHits?.length ?? 0) > 0),
-    ).toBe(true);
+    // not vacuous: the secondary search finds attachment hits
+    const sample = await scenarios.secondary();
+    expect(Object.keys(sample.enrichments).length).toBeGreaterThan(0);
 
     for (let i = 0; i < WARMUP; i++) {
       for (const name of names) {
@@ -281,12 +273,6 @@ describe.skipIf(
     // biome-ignore lint/suspicious/noConsole: the numbers are this test's output
     console.table(summary);
 
-    expect(summary.allFirstPage.p95).toBeLessThanOrEqual(
-      summary.pages.p95 * 1.3,
-    );
-    expect(summary.allSecondPage.p95).toBeLessThanOrEqual(
-      summary.pages.p95 * 1.3,
-    );
     expect(summary.secondary.p95).toBeLessThanOrEqual(500);
   }, 600_000);
 });

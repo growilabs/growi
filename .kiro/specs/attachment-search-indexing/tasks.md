@@ -376,7 +376,7 @@
 
 ## 12. ページと添付をまとめた検索 (`facet=all`) と `resolve` をやめる
 
-- [ ] 12.1 `GET /_api/search` から `facet=all` と `resolve` を取り除く
+- [x] 12.1 `GET /_api/search` から `facet=all` と `resolve` を取り除く
   - 機能が有効なとき、`facet` は `pages` と `attachments` だけを受け付け、それ以外 (`all` を含む) は `{ ok: false, code: 400 }` にする。`resolve` は読まない。機能が無効のときは、これまでどおり `facet` を読まない
   - `AttachmentSearchResultAggregator.searchPrimary` を `facet=attachments` の検索だけにする。facet=`all` の処理 (`searchPrimaryAll`、`snippetVisiblePageIds`、2 ページ目以降の分岐) と、`SearchService.searchByFacet` の `resolve` / `attachSecondaryHits` を消す
   - `SearchFacet` / `IFacetedSearchResultMeta` / `IPrimarySearchResult` を design.md の形にする。`GET /_api/search` の OpenAPI の説明から `all` と `resolve` を消す
