@@ -26,7 +26,7 @@ import type EventEmitter from 'events';
 import type { Cursor, HydratedDocument } from 'mongoose';
 import mongoose from 'mongoose';
 import pathlib from 'path';
-import { Readable, Writable } from 'stream';
+import { Writable } from 'stream';
 import { pipeline } from 'stream/promises';
 
 import type { ExternalUserGroupDocument } from '~/features/external-user-group/server/models/external-user-group';
@@ -91,8 +91,10 @@ import { getYjsService } from '../yjs';
 import { collectEmptyAncestorPaths } from './collect-empty-ancestor-paths';
 import { BULK_REINDEX_SIZE, LIMIT_FOR_MULTIPLE_PAGE_OP } from './consts';
 import { deleteCompletelyOperation as deleteCompletelyOperationImpl } from './delete-completely-operation';
+import { shouldNormalizeParent } from './duplicate/should-normalize-parent';
 import { onSeen } from './events/seen';
 import { isGrantImmutablePath } from './grant-immutable-path';
+import { PageCursorsForDescendantsFactory } from './page-cursors-for-descendants';
 import {
   PageOperationRefusalReason,
   PageOperationRefusedError,
@@ -119,92 +121,6 @@ const {
 } = pagePathUtils;
 
 const { addTrailingSlash } = pathUtils;
-
-// TODO: improve type
-class PageCursorsForDescendantsFactory {
-  private user: any; // TODO: Typescriptize model
-
-  private rootPage: any; // TODO: wait for mongoose update
-
-  private shouldIncludeEmpty: boolean;
-
-  private initialCursor: Cursor<any> | never[]; // TODO: wait for mongoose update
-
-  constructor(user: any, rootPage: any, shouldIncludeEmpty: boolean) {
-    this.user = user;
-    this.rootPage = rootPage;
-    this.shouldIncludeEmpty = shouldIncludeEmpty;
-  }
-
-  // prepare initial cursor
-  private async init() {
-    const initialCursor = await this.generateCursorToFindChildren(
-      this.rootPage,
-    );
-    this.initialCursor = initialCursor;
-  }
-
-  /**
-   * Returns Iterable that yields only descendant pages unorderedly
-   * @returns Promise<AsyncGenerator>
-   */
-  async generateIterable(): Promise<AsyncGenerator | never[]> {
-    // initialize cursor
-    await this.init();
-
-    return this.isNeverArray(this.initialCursor)
-      ? []
-      : this.generateOnlyDescendants(this.initialCursor);
-  }
-
-  /**
-   * Returns Readable that produces only descendant pages unorderedly
-   * @returns Promise<Readable>
-   */
-  async generateReadable(): Promise<Readable> {
-    return Readable.from(await this.generateIterable());
-  }
-
-  /**
-   * Generator that unorderedly yields descendant pages
-   */
-  private async *generateOnlyDescendants(cursor: Cursor<any>) {
-    for await (const page of cursor) {
-      const nextCursor = await this.generateCursorToFindChildren(page);
-      if (!this.isNeverArray(nextCursor)) {
-        yield* this.generateOnlyDescendants(nextCursor); // recursively yield
-      }
-
-      yield page;
-    }
-  }
-
-  private async generateCursorToFindChildren(
-    page: any,
-  ): Promise<Cursor<any> | never[]> {
-    if (page == null) {
-      return [];
-    }
-
-    const Page = mongoose.model<HydratedDocument<PageDocument>, PageModel>(
-      'Page',
-    );
-    const { PageQueryBuilder } = Page;
-
-    const builder = new PageQueryBuilder(Page.find(), this.shouldIncludeEmpty);
-    builder.addConditionToFilteringByParentId(page._id);
-
-    const cursor = builder.query
-      .lean()
-      .cursor({ batchSize: BULK_REINDEX_SIZE }) as Cursor<any>;
-
-    return cursor;
-  }
-
-  private isNeverArray(val: Cursor<any> | never[]): val is never[] {
-    return 'length' in val && val.length === 0;
-  }
-}
 
 class PageService implements IPageService {
   crowi: Crowi;
@@ -592,15 +508,6 @@ class PageService implements IPageService {
     const shouldUseV4Process = !isV5Compatible || isPageRestricted;
 
     return shouldUseV4Process;
-  }
-
-  private shouldNormalizeParent(page): boolean {
-    const Page = mongoose.model<IPage, PageModel>('Page');
-
-    return (
-      page.grant !== Page.GRANT_RESTRICTED &&
-      page.grant !== Page.GRANT_SPECIFIED
-    );
   }
 
   /**
@@ -1754,7 +1661,7 @@ class PageService implements IPageService {
     );
 
     // normalize parent of descendant pages
-    const shouldNormalize = this.shouldNormalizeParent(page);
+    const shouldNormalize = shouldNormalizeParent(page.grant);
     if (shouldNormalize) {
       try {
         await this.normalizeParentAndDescendantCountOfDescendants(
@@ -3214,7 +3121,7 @@ class PageService implements IPageService {
 
     const newPath = Page.getRevertDeletedPageName(page.path);
     // normalize parent of descendant pages
-    const shouldNormalize = this.shouldNormalizeParent(page);
+    const shouldNormalize = shouldNormalizeParent(page.grant);
     if (shouldNormalize) {
       try {
         await this.normalizeParentAndDescendantCountOfDescendants(
