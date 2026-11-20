@@ -92,7 +92,7 @@
   - _Boundary: runDescendantDuplicationV4_
   - _Depends: 2.1_
 
-- [ ] 2.8 止まった複製を回復する定期処理を実装する
+- [x] 2.8 止まった複製を回復する定期処理を実装する
   - 実行間隔の設定（既定は毎分、空なら止める、不正な式はログに出して起動を続ける）を追加する
   - 開始時に最大30秒待ち、保守モードの間は何もしない。「実行中なら何もしない」印は持たない
   - 引き受けられる PageOperation がなくなるまで、引き受けと回復を繰り返す
@@ -144,3 +144,4 @@
 - 2.2: 成功時の祖先の「足す」書き込みの直前にも `onBatchStart` を呼ぶ（書き込みの規則「各書き込みの直前に進捗を記録」を優先。設計書の手順3の文面は recount だけに渡すと読めるが、足す側にも渡す）。呼び出し元は写しの先頭ページが `toPath` に存在することを前提にしてよい（なければ例外）。`syncDescendantsUpdate` の第2引数は `{ _id }`（受け取り側は user を読まない）。
 - 2.5: `recoverInterruptedDuplicate` は `OwnershipLostError` 以外の例外（PageOperation の削除後に起きた通知の失敗を含む）を呼び出し元へ返す。2.6（run）と 2.8（cron）は、それを受け止めてログに出し、握りつぶさず・待たない Promise に再送出もしない。「本人がいない」は User のドキュメントがない、または `STATUS_DELETED`（GROWI の削除はドキュメントを残して status を書き換える）。User モデルの参照は design.md の Allowed Dependencies に未記載で、spec-cleanup のときに1行足す。
 - 2.7: v4 の複製も全文検索への通知（`syncDescendantsUpdate`、`{ path: newPagePath }`）を最後に1回出す。設計書の「PageOperation・サブオペレーションは持たない」は通知を除く意味（設計書を訂正済み）。3.1 は (1) `newPagePath` に XSS 無害化（`generalXssFilter.process`）後の値を渡す、(2) v4 の入力は `{ sourcePath: page.path, newPagePath, user }`、deps は `pageGrantService` と `pageEvent`、(3) 今の v4 は1回分の例外後も次の回へ進むが新しい処理はそこで止まる（設計どおり）。
+- 2.8: 起動関数 `startInterruptedDuplicateRecoveryCronIfEnabled` は `crowi` ではなく `{ duplicateDeps, appService, waitBeforeRun? }` を受け取る。3.2 は、3.1 で作る `duplicateDeps()`（`activityService` が null のときの確認入り）で `DuplicateDeps` を組み立てて渡す。壊れた PageOperation（保存値の欠落）は `CorruptDuplicatePageOperationError` で見分け、2〜3分ごとに引き受け直されてエラーログが出続ける（PageOperation は残り重なる操作を拒否し続ける）。spec-cleanup で design.md の duplicatePageOperation と Error Handling にこの扱いを足す。引き受けのたびに `new Date()` を読む（実行開始時刻の使い回しは不可）。

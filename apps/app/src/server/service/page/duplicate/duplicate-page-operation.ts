@@ -20,6 +20,20 @@ export class OwnershipLostError extends Error {
   }
 }
 
+/**
+ * Thrown by takeOverStalledDuplicate when the PageOperation it has just taken
+ * over lacks a stored value. The take-over has already rewritten the record,
+ * so it is not taken over again until it expires once more.
+ */
+export class CorruptDuplicatePageOperationError extends Error {
+  constructor(operationId: string) {
+    super(
+      `Duplicate PageOperation ${operationId} lacks toPath, page.grant or page.descendantCount`,
+    );
+    this.name = 'CorruptDuplicatePageOperationError';
+  }
+}
+
 /** A duplicate PageOperation together with the ownerToken this process holds. */
 export interface OwnedDuplicatePageOperation {
   readonly operationId: string;
@@ -87,9 +101,7 @@ const toStalledDuplicatePageOperation = (
     !isPageGrant(grant) ||
     typeof descendantCount !== 'number'
   ) {
-    throw new Error(
-      `Duplicate PageOperation ${operationId} lacks toPath, page.grant or page.descendantCount`,
-    );
+    throw new CorruptDuplicatePageOperationError(operationId);
   }
   return {
     operation: { operationId, ownerToken },
