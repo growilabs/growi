@@ -5,7 +5,6 @@ import { randomSleep } from '~/server/util/random-sleep';
 import loggerFactory from '~/utils/logger';
 
 import {
-  CorruptDuplicatePageOperationError,
   type StalledDuplicatePageOperation,
   takeOverStalledDuplicate,
 } from './duplicate-page-operation';
@@ -73,17 +72,13 @@ export class InterruptedDuplicateRecoveryCronService extends CronService {
     // Sequential on purpose: one take-over, then its recovery, until none is left.
     // The loop ends because a taken-over PageOperation carries a fresh
     // lastProgressAt and cannot be taken over again for STALL_THRESHOLD_MS,
-    // whether its recovery failed or its record is corrupt.
+    // even when its recovery failed.
     for (;;) {
       let stalled: StalledDuplicatePageOperation | null;
       try {
         // biome-ignore lint/performance/noAwaitInLoops: take over one at a time
         stalled = await takeOverStalledDuplicate(new Date());
       } catch (err) {
-        if (err instanceof CorruptDuplicatePageOperationError) {
-          logger.error(err, 'Skipping a corrupt duplicate PageOperation');
-          continue;
-        }
         // e.g. the DB is unreachable; retrying here would never end, so leave
         // the rest to the next run.
         logger.error(

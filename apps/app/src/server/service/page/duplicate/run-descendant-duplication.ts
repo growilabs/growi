@@ -13,7 +13,10 @@ import {
   recordProgress,
 } from './duplicate-page-operation';
 import type { DuplicateDeps } from './duplicate-page-port';
-import { recoverInterruptedDuplicate } from './recover-interrupted-duplicate';
+import {
+  countSourcePages,
+  recoverInterruptedDuplicate,
+} from './recover-interrupted-duplicate';
 import { runDuplicateSubOperation } from './run-duplicate-sub-operation';
 import { shouldNormalizeParent } from './should-normalize-parent';
 
@@ -130,7 +133,10 @@ async function handOverToRecovery(
       toPath: newPagePath,
       userId: user._id.toString(),
       shouldNormalizeParent: shouldNormalizeParent(sourcePage.grant),
-      sourcePageCount: sourcePage.descendantCount + 1,
+      sourcePageCount: countSourcePages(
+        sourcePage.descendantCount,
+        sourcePage.isEmpty,
+      ),
       cause: { kind: 'error', error },
     });
   } catch (recoveryError) {

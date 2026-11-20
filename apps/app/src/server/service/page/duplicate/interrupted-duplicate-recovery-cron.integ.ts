@@ -307,27 +307,6 @@ describe('InterruptedDuplicateRecoveryCronService', () => {
     }
   });
 
-  // An expired PageOperation with no toPath and no page.descendantCount: the
-  // take-over rewrites it but cannot build the recovery input from it, so it
-  // stays in the DB.
-  const insertExpiredCorruptOperation = async (): Promise<Types.ObjectId> => {
-    const corruptId = new mongoose.Types.ObjectId();
-    await PageOperation.collection.insertOne({
-      _id: corruptId,
-      actionType: PageActionType.Duplicate,
-      actionStage: PageActionStage.Main,
-      page: {
-        _id: new mongoose.Types.ObjectId(),
-        grant: PageGrant.GRANT_PUBLIC,
-      },
-      user: { _id: owner._id },
-      fromPath: `${PATH_ROOT}/corrupt`,
-      ownerToken: 'corrupt-owner',
-      lastProgressAt: new Date(Date.now() - STALL_THRESHOLD_MS - 1000),
-    });
-    return corruptId;
-  };
-
   it('stamps each take-over with the time it happens, not the start of the run (Req 4.4)', async () => {
     // Otherwise a take-over late in a long run writes an already-expired
     // lastProgressAt, and an overlapping run takes the record over again.
@@ -335,8 +314,21 @@ describe('InterruptedDuplicateRecoveryCronService', () => {
     await expire(slow.operation);
     const gate = createDeferred();
     const entered = createDeferred();
+    let next: Awaited<ReturnType<typeof seedCase>> | undefined;
+    // lastProgressAt of the next record as its recovery starts, i.e. before
+    // the recovery itself reports any progress
+    let stampedAtTakeOver: Date | undefined;
     const cron = createCron({
       pageService: pageServiceWith({
+        normalizeParentRecursively: async (...args) => {
+          const [paths] = args;
+          if (next != null && paths[0] === next.toPath) {
+            stampedAtTakeOver = (
+              await PageOperation.findById(next.operation.operationId).lean()
+            )?.lastProgressAt;
+          }
+          return crowi.pageService.normalizeParentRecursively(...args);
+        },
         updateDescendantCountOfSelfAndDescendants: async (
           path,
           onBatchStart,
@@ -355,38 +347,48 @@ describe('InterruptedDuplicateRecoveryCronService', () => {
 
     const run = cron.executeJob();
     let insertedAt: Date;
-    let corruptId: Types.ObjectId;
     try {
       await entered.promise;
       await new Promise((resolve) => setTimeout(resolve, 50));
       // Taken over by the same run once the slow recovery has finished.
-      corruptId = await insertExpiredCorruptOperation();
+      next = await seedCase('slow-next');
+      await expire(next.operation);
       insertedAt = new Date();
     } finally {
       gate.resolve();
       await run;
     }
 
-    const corrupt = await PageOperation.findById(corruptId).lean();
-    expect(corrupt?.ownerToken).not.toBe('corrupt-owner');
-    expect(corrupt?.lastProgressAt?.getTime()).toBeGreaterThanOrEqual(
+    expect(await isAttached(next)).toBe(true);
+    expect(stampedAtTakeOver?.getTime()).toBeGreaterThanOrEqual(
       insertedAt.getTime(),
     );
   });
 
-  it('skips a corrupt PageOperation and still recovers the others in the same run', async () => {
-    const seeded = await seedCase('beside-corrupt');
+  it('deletes a PageOperation lacking a stored value and still recovers the others in the same run', async () => {
+    const seeded = await seedCase('beside-incomplete');
     await expire(seeded.operation);
-    const corruptId = await insertExpiredCorruptOperation();
+    // No toPath and no page.descendantCount; the model would not save it.
+    const incompleteId = new mongoose.Types.ObjectId();
+    await PageOperation.collection.insertOne({
+      _id: incompleteId,
+      actionType: PageActionType.Duplicate,
+      actionStage: PageActionStage.Main,
+      page: {
+        _id: new mongoose.Types.ObjectId(),
+        grant: PageGrant.GRANT_PUBLIC,
+      },
+      user: { _id: owner._id },
+      fromPath: `${PATH_ROOT}/incomplete`,
+      ownerToken: 'incomplete-owner',
+      lastProgressAt: new Date(Date.now() - STALL_THRESHOLD_MS - 1000),
+    });
 
     await expect(createCron().executeJob()).resolves.toBeUndefined();
 
     expect(await isAttached(seeded)).toBe(true);
     expect(await operationExists(seeded.operation)).toBe(false);
-    // Taken over once (its owner changed), then left for a later run.
-    const corrupt = await PageOperation.findById(corruptId).lean();
-    expect(corrupt).not.toBeNull();
-    expect(corrupt?.ownerToken).not.toBe('corrupt-owner');
+    expect(await PageOperation.exists({ _id: incompleteId })).toBeNull();
   });
 
   it('does nothing while GROWI is in maintenance mode', async () => {

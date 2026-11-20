@@ -12,6 +12,7 @@ const stalled = (
   userId: 'user-1',
   sourceGrant: PageGrant.GRANT_PUBLIC,
   sourceDescendantCount: 4,
+  sourceIsEmpty: false,
   ...overrides,
 });
 
@@ -35,6 +36,14 @@ describe('toInterruptedDuplicate', () => {
       toInterruptedDuplicate(stalled({ sourceDescendantCount: 0 }))
         .sourcePageCount,
     ).toBe(1);
+  });
+
+  it('does not count an empty source top page, as descendantCount counts only non-empty pages', () => {
+    expect(
+      toInterruptedDuplicate(
+        stalled({ sourceDescendantCount: 4, sourceIsEmpty: true }),
+      ).sourcePageCount,
+    ).toBe(4);
   });
 
   it.each([

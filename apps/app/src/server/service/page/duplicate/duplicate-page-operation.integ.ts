@@ -102,6 +102,7 @@ describe('duplicate PageOperation ownership and progress', () => {
       userId,
       sourceGrant: PageGrant.GRANT_USER_GROUP,
       sourceDescendantCount: 7,
+      sourceIsEmpty: false,
     });
     expect(stalled?.operation.ownerToken).not.toBe(operation.ownerToken);
   });
@@ -117,6 +118,34 @@ describe('duplicate PageOperation ownership and progress', () => {
     await recordProgress(operation)();
 
     expect(await takeOverStalledDuplicate(new Date())).toBeNull();
+  });
+
+  it('reports an empty source top page as empty', async () => {
+    const createdAt = new Date();
+    const emptySource = await mongoose
+      .model<PageDocument, PageModel>('Page')
+      .create({
+        path: '/dup-page-op/empty-source',
+        grant: PageGrant.GRANT_PUBLIC,
+        descendantCount: 2,
+        isEmpty: true,
+      });
+    try {
+      await createDuplicatePageOperation({
+        page: emptySource,
+        userId,
+        fromPath: '/dup-page-op/empty-source',
+        toPath: '/dup-page-op/empty-copy',
+      });
+
+      const stalled = await takeOverStalledDuplicate(
+        later(createdAt, STALL_THRESHOLD_MS + 10 * SECOND_MS),
+      );
+
+      expect(stalled?.sourceIsEmpty).toBe(true);
+    } finally {
+      await mongoose.model('Page').deleteOne({ _id: emptySource._id });
+    }
   });
 
   it('lets only one of two simultaneous take-overs succeed', async () => {
@@ -187,6 +216,7 @@ describe('duplicate PageOperation ownership and progress', () => {
       userId,
       sourceGrant: PageGrant.GRANT_USER_GROUP,
       sourceDescendantCount: 7,
+      sourceIsEmpty: false,
     });
 
     // The taker now owns it like any other operation.
@@ -195,6 +225,91 @@ describe('duplicate PageOperation ownership and progress', () => {
     }
     await deleteDuplicatePageOperation(stalled.operation);
     expect(await exists(legacy._id.toString())).toBe(false);
+  });
+
+  // Written straight to the collection: the model would not let these be saved.
+  const incompleteRecords = [
+    {
+      missing: 'toPath',
+      fields: {
+        page: {
+          _id: new mongoose.Types.ObjectId(),
+          grant: PageGrant.GRANT_PUBLIC,
+          descendantCount: 0,
+        },
+      },
+    },
+    {
+      missing: 'a valid page.grant',
+      fields: {
+        page: {
+          _id: new mongoose.Types.ObjectId(),
+          grant: 99,
+          descendantCount: 0,
+        },
+        toPath: '/dup-page-op/incomplete-copy',
+      },
+    },
+    {
+      missing: 'page.descendantCount',
+      fields: {
+        page: {
+          _id: new mongoose.Types.ObjectId(),
+          grant: PageGrant.GRANT_PUBLIC,
+        },
+        toPath: '/dup-page-op/incomplete-copy',
+      },
+    },
+  ];
+
+  it.each(
+    incompleteRecords,
+  )('deletes an expired operation lacking $missing and returns the next expired one in the same call', async ({
+    fields,
+  }) => {
+    const createdAt = new Date();
+    const incompleteId = new mongoose.Types.ObjectId();
+    await PageOperation.collection.insertOne({
+      _id: incompleteId,
+      actionType: PageActionType.Duplicate,
+      actionStage: PageActionStage.Main,
+      user: { _id: user._id },
+      fromPath: '/dup-page-op/incomplete-source',
+      ownerToken: 'incomplete-owner',
+      lastProgressAt: createdAt,
+      ...fields,
+    });
+    const complete = await create();
+
+    const stalled = await takeOverStalledDuplicate(
+      later(createdAt, STALL_THRESHOLD_MS + 10 * SECOND_MS),
+    );
+
+    expect(stalled?.operation.operationId).toBe(complete.operationId);
+    expect(await exists(incompleteId.toString())).toBe(false);
+  });
+
+  it('deletes an incomplete PageOperation from a previous version once it is LEGACY_RECORD_MIN_AGE_MS old', async () => {
+    const createdAt = new Date();
+    // No ownerToken / lastProgressAt, as before they existed, and no toPath.
+    const legacy = await PageOperation.collection.insertOne({
+      actionType: PageActionType.Duplicate,
+      actionStage: PageActionStage.Main,
+      page: {
+        _id: sourcePage._id,
+        grant: PageGrant.GRANT_PUBLIC,
+        descendantCount: 0,
+      },
+      user: { _id: user._id },
+      fromPath: '/dup-page-op/source',
+    });
+
+    expect(
+      await takeOverStalledDuplicate(
+        later(createdAt, LEGACY_RECORD_MIN_AGE_MS + MINUTE_MS),
+      ),
+    ).toBeNull();
+    expect(await exists(legacy.insertedId.toString())).toBe(false);
   });
 
   it('does not take over PageOperations of other action types', async () => {

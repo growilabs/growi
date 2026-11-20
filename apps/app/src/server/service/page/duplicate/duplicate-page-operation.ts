@@ -4,9 +4,12 @@ import { Types } from 'mongoose';
 
 import { PageActionStage, PageActionType } from '~/interfaces/page-operation';
 import type { PageDocument } from '~/server/models/page';
-import PageOperation, {
-  type PageOperationDocument,
-} from '~/server/models/page-operation';
+import PageOperation from '~/server/models/page-operation';
+import loggerFactory from '~/utils/logger';
+
+const logger = loggerFactory(
+  'growi:services:page:duplicate:duplicate-page-operation',
+);
 
 // Values and the take-over conditions: design.md duplicatePageOperation / State Management.
 export const STALL_THRESHOLD_MS = 2 * 60 * 1000;
@@ -17,20 +20,6 @@ export class OwnershipLostError extends Error {
   constructor(operationId: string) {
     super(`No longer the owner of the duplicate PageOperation ${operationId}`);
     this.name = 'OwnershipLostError';
-  }
-}
-
-/**
- * Thrown by takeOverStalledDuplicate when the PageOperation it has just taken
- * over lacks a stored value. The take-over has already rewritten the record,
- * so it is not taken over again until it expires once more.
- */
-export class CorruptDuplicatePageOperationError extends Error {
-  constructor(operationId: string) {
-    super(
-      `Duplicate PageOperation ${operationId} lacks toPath, page.grant or page.descendantCount`,
-    );
-    this.name = 'CorruptDuplicatePageOperationError';
   }
 }
 
@@ -48,6 +37,7 @@ export interface StalledDuplicatePageOperation {
   readonly userId: string;
   readonly sourceGrant: PageGrant;
   readonly sourceDescendantCount: number;
+  readonly sourceIsEmpty: boolean;
 }
 
 export async function createDuplicatePageOperation(input: {
@@ -88,43 +78,14 @@ export function recordProgress(
 const isPageGrant = (value: unknown): value is PageGrant =>
   Object.values<unknown>(PageGrant).includes(value);
 
-const toStalledDuplicatePageOperation = (
-  doc: PageOperationDocument,
-  ownerToken: string,
-): StalledDuplicatePageOperation => {
-  const operationId = doc._id.toString();
-  const { toPath } = doc;
-  const { grant, descendantCount } = doc.page;
-  // A duplicate PageOperation always stores these; a missing one is corrupted data.
-  if (
-    toPath == null ||
-    !isPageGrant(grant) ||
-    typeof descendantCount !== 'number'
-  ) {
-    throw new CorruptDuplicatePageOperationError(operationId);
-  }
-  return {
-    operation: { operationId, ownerToken },
-    fromPath: doc.fromPath,
-    toPath,
-    userId: doc.user._id.toString(),
-    sourceGrant: grant,
-    sourceDescendantCount: descendantCount,
-  };
-};
-
-/** Atomically takes over one PageOperation judged expired by lastProgressAt. */
-export async function takeOverStalledDuplicate(
-  now: Date,
-): Promise<StalledDuplicatePageOperation | null> {
+/** Sets this ownerToken on the oldest expired duplicate PageOperation, if any, and returns it. */
+const takeOverOldestExpired = (now: Date, ownerToken: string) => {
   const stalledBefore = new Date(now.getTime() - STALL_THRESHOLD_MS);
   // ObjectId timestamps have second precision; createFromTime takes seconds.
   const legacyCreatedBefore = Types.ObjectId.createFromTime(
     Math.floor((now.getTime() - LEGACY_RECORD_MIN_AGE_MS) / 1000),
   );
-  const ownerToken = randomUUID();
-
-  const taken = await PageOperation.findOneAndUpdate(
+  return PageOperation.findOneAndUpdate(
     {
       actionType: PageActionType.Duplicate,
       $or: [
@@ -136,12 +97,57 @@ export async function takeOverStalledDuplicate(
       ],
     },
     { $set: { ownerToken, lastProgressAt: now } },
-    { new: true },
+    { new: true, sort: { _id: 1 } },
   );
-  if (taken == null) {
-    return null;
+};
+
+/**
+ * Atomically takes over one PageOperation judged expired by lastProgressAt.
+ * One that lacks a stored value cannot be recovered, so it is deleted and the
+ * next expired one is looked for instead.
+ */
+export async function takeOverStalledDuplicate(
+  now: Date,
+): Promise<StalledDuplicatePageOperation | null> {
+  for (;;) {
+    const ownerToken = randomUUID();
+    // biome-ignore lint/performance/noAwaitInLoops: whether to look further depends on what this take-over returns
+    const taken = await takeOverOldestExpired(now, ownerToken);
+    if (taken == null) {
+      return null;
+    }
+
+    const operationId = taken._id.toString();
+    const { toPath, page } = taken;
+    const { grant, descendantCount } = page;
+    if (
+      toPath != null &&
+      isPageGrant(grant) &&
+      typeof descendantCount === 'number'
+    ) {
+      return {
+        operation: { operationId, ownerToken },
+        fromPath: taken.fromPath,
+        toPath,
+        userId: taken.user._id.toString(),
+        sourceGrant: grant,
+        sourceDescendantCount: descendantCount,
+        sourceIsEmpty: page.isEmpty === true,
+      };
+    }
+
+    // A duplicate PageOperation always stores these; it cannot be recovered without them.
+    const missingValues = [
+      ...(toPath == null ? ['toPath'] : []),
+      ...(isPageGrant(grant) ? [] : ['page.grant']),
+      ...(typeof descendantCount === 'number' ? [] : ['page.descendantCount']),
+    ];
+    await PageOperation.deleteOne({ _id: taken._id, ownerToken });
+    logger.error(
+      { operationId, fromPath: taken.fromPath, missingValues },
+      'Deleted a duplicate PageOperation that lacks stored values needed for recovery',
+    );
   }
-  return toStalledDuplicatePageOperation(taken, ownerToken);
 }
 
 /** Deletes the PageOperation only if this process is the owner; throws OwnershipLostError otherwise. */

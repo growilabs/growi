@@ -35,7 +35,7 @@ export function buildCopyCurrentRevisionsPipeline(
         format: { $ifNull: ['$format', 'markdown'] },
         author: { $literal: toRawObjectId(authorId) },
         createdAt: '$$NOW',
-        __v: { $literal: 0 },
+        __v: { $toLong: 0 },
       },
     },
     {

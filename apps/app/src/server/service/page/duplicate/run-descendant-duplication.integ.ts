@@ -144,16 +144,21 @@ describe('runDescendantDuplication', () => {
     {
       nested,
       foreignGroupId,
+      emptySource = false,
     }: {
       nested: boolean;
       /** Adds src/foreign, granted only to this group (which the owner is not in). */
       foreignGroupId?: string;
+      /** Makes the source top page, and so the copy top page, empty. */
+      emptySource?: boolean;
     },
   ) => {
     const aPath = `${PATH_ROOT}/${name}`;
     const srcPath = `${aPath}/src`;
     const destPath = `${aPath}/dest`;
     const toPath = `${destPath}/copy`;
+    // An empty page is not counted in its ancestors' descendantCount.
+    const topPageCount = emptySource ? 0 : 1;
     const sourceDescendantCount =
       FLAT_CHILD_COUNT +
       (nested ? NESTED_NON_EMPTY_COUNT : 0) +
@@ -164,13 +169,14 @@ describe('runDescendantDuplication', () => {
       grant: PageGrant.GRANT_PUBLIC,
       parent: rootId,
       // src + its descendants + dest + copy top
-      descendantCount: 1 + sourceDescendantCount + 2,
+      descendantCount: topPageCount + sourceDescendantCount + 1 + topPageCount,
     });
     const src = await Page.create({
       path: srcPath,
       grant: PageGrant.GRANT_PUBLIC,
       parent: a._id,
       descendantCount: sourceDescendantCount,
+      isEmpty: emptySource,
     });
     await seedFlatChildren(srcPath, src._id);
     if (nested) {
@@ -186,13 +192,14 @@ describe('runDescendantDuplication', () => {
       path: destPath,
       grant: PageGrant.GRANT_PUBLIC,
       parent: a._id,
-      descendantCount: 1,
+      descendantCount: topPageCount,
     });
     const copyTop = await Page.create({
       path: toPath,
       grant: PageGrant.GRANT_PUBLIC,
       parent: dest._id,
       descendantCount: 0,
+      isEmpty: emptySource,
     });
 
     const operation = await createDuplicatePageOperation({
@@ -518,6 +525,27 @@ describe('runDescendantDuplication', () => {
         toPath: seeded.toPath,
         copiedPageCount: BULK_REINDEX_SIZE + 1,
         sourcePageCount: FLAT_CHILD_COUNT + 1,
+      });
+    });
+
+    it('counts neither an empty source top page nor its empty copy in the notification', async () => {
+      const seeded = await seedCase('error-empty-top', {
+        nested: false,
+        emptySource: true,
+      });
+
+      await runFailingAtSecondBatch(seeded);
+      await waitForNotification(seeded.copyTop._id);
+
+      const notifications = await InAppNotification.find({
+        target: seeded.copyTop._id,
+      }).lean();
+      expect(notifications).toHaveLength(1);
+      expect(
+        pageDuplicateInterruptedSnapshot.parse(notifications[0].snapshot),
+      ).toMatchObject({
+        copiedPageCount: BULK_REINDEX_SIZE,
+        sourcePageCount: FLAT_CHILD_COUNT,
       });
     });
 

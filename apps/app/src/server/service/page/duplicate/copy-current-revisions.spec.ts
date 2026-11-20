@@ -78,7 +78,7 @@ describe('buildCopyCurrentRevisionsPipeline', () => {
     expect(project).toMatchObject({
       author: { $literal: { $oid: authorId } },
       createdAt: '$$NOW',
-      __v: { $literal: 0 },
+      __v: { $toLong: 0 },
       format: { $ifNull: ['$format', 'markdown'] },
     });
   });

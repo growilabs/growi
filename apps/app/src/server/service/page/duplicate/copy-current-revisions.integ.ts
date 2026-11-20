@@ -14,7 +14,7 @@ const revisionsCollection = () => mongoose.connection.collection('revisions');
 
 const newId = (): string => new Types.ObjectId().toHexString();
 
-// Counts documents whose ObjectId / Date fields carry the right BSON types.
+// Counts documents whose ObjectId / Date / __v fields carry the right BSON types.
 // Checked server-side with $type: mongoose and the driver may bundle different
 // bson copies, so instanceof on the client side is unreliable.
 const countWithExpectedTypes = (id: string): Promise<number> =>
@@ -23,6 +23,7 @@ const countWithExpectedTypes = (id: string): Promise<number> =>
     pageId: { $type: 'objectId' },
     author: { $type: 'objectId' },
     createdAt: { $type: 'date' },
+    __v: { $type: 'long' },
   });
 
 const seedRevision = async (input: {

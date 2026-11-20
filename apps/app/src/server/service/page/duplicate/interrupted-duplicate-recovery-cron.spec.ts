@@ -34,7 +34,6 @@ import { PageGrant } from '@growi/core';
 import { mock } from 'vitest-mock-extended';
 
 import {
-  CorruptDuplicatePageOperationError,
   type StalledDuplicatePageOperation,
   takeOverStalledDuplicate,
 } from './duplicate-page-operation';
@@ -59,6 +58,7 @@ const stalled = (operationId: string): StalledDuplicatePageOperation => ({
   userId: '000000000000000000000001',
   sourceGrant: PageGrant.GRANT_PUBLIC,
   sourceDescendantCount: 0,
+  sourceIsEmpty: false,
 });
 
 beforeEach(() => {
@@ -107,7 +107,7 @@ describe('startInterruptedDuplicateRecoveryCronIfEnabled', () => {
 });
 
 describe('InterruptedDuplicateRecoveryCronService#executeJob', () => {
-  it('ends the run when taking over fails for a reason other than a corrupt record', async () => {
+  it('ends the run when taking over fails', async () => {
     // e.g. the DB is unreachable: retrying within the run would never end
     vi.mocked(takeOverStalledDuplicate)
       .mockRejectedValueOnce(new Error('connection refused'))
@@ -136,24 +136,5 @@ describe('InterruptedDuplicateRecoveryCronService#executeJob', () => {
         .mocked(recoverInterruptedDuplicate)
         .mock.calls.map(([, target]) => target.operation.operationId),
     ).toEqual(['op-1', 'op-2']);
-  });
-
-  it('goes on to the next PageOperation after taking over a corrupt one', async () => {
-    vi.mocked(takeOverStalledDuplicate)
-      .mockRejectedValueOnce(new CorruptDuplicatePageOperationError('op-1'))
-      .mockResolvedValueOnce(stalled('op-2'))
-      .mockResolvedValueOnce(null);
-    vi.mocked(recoverInterruptedDuplicate).mockResolvedValue({
-      status: 'recovered',
-      copiedPageCount: 1,
-    });
-    const cron = new InterruptedDuplicateRecoveryCronService(input());
-
-    await expect(cron.executeJob()).resolves.toBeUndefined();
-    expect(recoverInterruptedDuplicate).toHaveBeenCalledTimes(1);
-    expect(
-      vi.mocked(recoverInterruptedDuplicate).mock.calls[0][1].operation
-        .operationId,
-    ).toBe('op-2');
   });
 });

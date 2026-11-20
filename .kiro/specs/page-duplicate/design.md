@@ -68,7 +68,7 @@
 
 - `IPageService` のうち、`create`、`getParentAndFillAncestorsByUser`、`normalizeParentRecursively`、`updateDescendantCountOfSelfAndDescendants`、`updateDescendantCountOfPagesWithPaths`、`updateDescendantCountOfAncestors`。`duplicate/` からは、引数で受け取った窓口（`DuplicatePagePort`）経由で使い、`PageService` のクラスを import しない。
 - `IPageGrantService`（公開範囲の判定）、`PageOperationService.canOperate`。
-- `PageOperation` モデル、`Page` モデル（Mongoose）、`prisma.revisions.aggregateRaw`、`prisma.pagetagrelations`。
+- `PageOperation` モデル、`Page` モデル（Mongoose）、`User` モデル（回復時に複製した本人が存在し、削除されていないかの確認だけ）、`prisma.revisions.aggregateRaw`、`prisma.pagetagrelations`。
 - `ActivityService.createActivity`、`crowi.events.activity`（アプリ内通知の発行）。
 - `CronService`（node-cron）、`configManager`。
 - 依存の向き: 純粋な関数（パイプラインの組み立て、付帯情報の組み立て、`shouldNormalizeParent`）→ DB を扱う関数（PageOperation、revision の複製、1回分の複製、サブオペレーション）→ 流れを組む関数（配下の複製の実行、回復）→ 入口（`PageService` の委譲、定期処理）。逆向きの import は誤りとして扱う。
@@ -150,7 +150,7 @@ graph TB
 ```
 apps/app/src/server/service/page/
 ├── duplicate/
-│   ├── index.ts                                   # 外部に公開する入口: duplicatePage, startInterruptedDuplicateRecoveryCronIfEnabled
+│   ├── index.ts                                   # 外部に公開する入口: duplicatePage, DuplicatedPage（型）, DuplicateDeps（型）, shouldNormalizeParent（PageService の元に戻す処理が使う）, startInterruptedDuplicateRecoveryCronIfEnabled
 │   ├── duplicate-page-port.ts                     # DuplicatePagePort と DuplicateDeps（複製の部品が受け取る協力者の型）
 │   ├── duplicate-page.ts                          # 要求時の処理（検証・先頭ページの作成・タグ・裏の処理の開始）
 │   ├── run-descendant-duplication.ts              # v5 の裏の処理（読み出し・1回分ずつの複製・サブオペレーション・失敗時の回復）
@@ -183,10 +183,10 @@ apps/app/src/client/components/InAppNotification/ModelNotification/
   - `PageCursorsForDescendantsFactory` を新しいファイルから import する。
   - サブオペレーションで呼ぶ4つの処理（`normalizeParentRecursively`（中で再帰する `_normalizeParentRecursively` を含む）、`updateDescendantCountOfSelfAndDescendants`、`updateDescendantCountOfPagesWithPaths`、`recountAndUpdateDescendantCountOfPages`）に、任意の引数 `onBatchStart?: () => Promise<void>` を加える。1回分の処理を始める前に呼ぶ。
   - 同じ4つの処理の Writable の `write` の中身を try で包み、例外を `callback(err)` で返す。これで、例外が `pipeline` を通って呼び出し元へ返る。既存の呼び出し元にとっては、今は固まっていた例外が、例外として返るようになる（挙動の変更）。
-- `apps/app/src/server/service/page/page-service.ts` — `IPageService` から `duplicateRecursivelyMainOperation` を削除する（呼び出し元がない）。`normalizeParentRecursively` と `updateDescendantCountOfSelfAndDescendants` を追加する（`duplicate/` が窓口経由で使うため）。
+- `apps/app/src/server/service/page/page-service.ts` — `IPageService` から `duplicateRecursivelyMainOperation` を削除する（呼び出し元がない）。`normalizeParentRecursively` と `updateDescendantCountOfSelfAndDescendants` を追加する（`duplicate/` が窓口経由で使うため）。`duplicate` の型を `DuplicatedPage` を返すものにし、`duplicateDeps(): DuplicateDeps` を追加する（`crowi/index.ts` が定期処理へ渡すため。`activityService` が未設定なら明示的に例外を投げる）。
 - `apps/app/src/server/models/page-operation.ts` — 任意項目 `lastProgressAt`（日時）と `ownerToken`（文字列）を追加する。
 - `apps/app/src/server/service/page-operation.ts` — `init()` の削除対象から `Duplicate` を外す。
-- `apps/app/src/server/crowi/index.ts` — `setupCron` で `startInterruptedDuplicateRecoveryCronIfEnabled` を動的 import して呼ぶ。
+- `apps/app/src/server/crowi/index.ts` — `setupCron` で `startInterruptedDuplicateRecoveryCronIfEnabled({ duplicateDeps: this.pageService.duplicateDeps(), appService: this.appService })` を動的 import して呼ぶ（引数は `{ duplicateDeps, appService, waitBeforeRun? }`。`waitBeforeRun` はテストで開始のずらしを差し替えるためだけに使う）。
 - `apps/app/src/server/service/config-manager/config-definition.ts` — `app:interruptedDuplicateRecoveryCronSchedule` を追加する。
 - `apps/app/src/interfaces/activity.ts` — `ACTION_PAGE_DUPLICATE_INTERRUPTED` を追加し、`SupportedAction` と `EssentialActionGroup` に入れる。
 - `apps/app/src/server/service/in-app-notification.ts` — `'updated'` の受け取りで、任意の第4引数（組み立て済みの付帯情報）を受け取り、渡されたときは `generateSnapshot` の代わりに使う。
@@ -453,7 +453,7 @@ export interface InterruptedDuplicate {
   /** PageOperation stores only the user's id, so recovery works from the id alone. */
   readonly userId: string;
   readonly shouldNormalizeParent: boolean;
-  /** descendantCount of the source at the start, plus the top page itself */
+  /** descendantCount of the source at the start, plus the top page itself when it is not empty */
   readonly sourcePageCount: number;
   readonly cause: InterruptionCause;
 }
@@ -528,7 +528,7 @@ export function copyDescendantBatch(
 - 対応表を `REVISION_MERGE_CHUNK_SIZE`（10件）ずつに分け、1つずつ `$merge` を実行する。各実行の直前に `recordProgress` を呼ぶ。各実行には `maxTimeMS: MERGE_MAX_TIME_MS`（60秒）を付ける。
 - 集計の内容:
   - `$match`: `_id` が対応表の「元の revision の ID」の一覧に含まれるもの。ページ ID では照合しない（1.2）。
-  - `$project`: 出力を次の7項目に固定する。`_id`（新しい revision の ID）、`pageId`（新しいページ ID）、`body`（元の本文）、`format`（元の値。なければ `'markdown'`）、`author`（複製した本人）、`createdAt`（`$$NOW`）、`__v`（0）。`origin`・`hasDiffToPrev`・`proposalId`・`proposalOperationKey` は持ち込まない。
+  - `$project`: 出力を次の7項目に固定する。`_id`（新しい revision の ID）、`pageId`（新しいページ ID）、`body`（元の本文）、`format`（元の値。なければ `'markdown'`）、`author`（複製した本人）、`createdAt`（`$$NOW`）、`__v`（0。`$toLong` で64ビット整数にする。Prisma で作った revision と同じ型）。`origin`・`hasDiffToPrev`・`proposalId`・`proposalOperationKey` は持ち込まない。
   - `$merge`: `into: 'revisions'`、`on: '_id'`、`whenMatched: 'fail'`、`whenNotMatched: 'insert'`。
 - 新しい ID は、照合に使った「元の revision の ID」の並びと同じ並びの配列から、`$indexOfArray` と `$arrayElemAt` で引く。照合と対応表を同じ並びから作るので、見つからない（-1 が返る）ことはない。
 - ObjectId と日時は拡張 JSON（`toRawObjectId`）で渡す。生の文字列で渡すと、文字列として保存され、照合も黙って外れる。
@@ -580,7 +580,7 @@ export function copyCurrentRevisions(
      - `recount`（回復時）: `toPath` の祖先のパスについて `updateDescendantCountOfPagesWithPaths` で数え直す。
   4. 写しの先頭ページで `pageEvent 'syncDescendantsUpdate'` を発行し、全文検索に写しを反映する（今と同じイベント）。
   5. `toPath` 以下の空でないページ数を数えて返す（通知の件数に使う）。
-- 1、2、3（`recount`）の各処理に `onBatchStart` を渡し、1回分の処理を始める前に `lastProgressAt` を更新する。
+- 1、2、3（`recount`）の各処理に `onBatchStart` を渡し、1回分の処理を始める前に `lastProgressAt` を更新する。3 の `increment` は1回の書き込みだが、「書き込みの規則」に従い、その書き込みの直前にも `onBatchStart` を呼ぶ。
 
 **Contracts**: Service [x]
 
@@ -648,6 +648,8 @@ export interface StalledDuplicatePageOperation {
   readonly userId: string;
   readonly sourceGrant: PageGrant;
   readonly sourceDescendantCount: number;
+  /** page.isEmpty of the source top page; an empty page is not counted in descendantCount or in sourcePageCount */
+  readonly sourceIsEmpty: boolean;
 }
 
 export function createDuplicatePageOperation(input: {
@@ -683,6 +685,7 @@ export function deleteDuplicatePageOperation(
   - `ownerToken` を持つ PageOperation: `actionType: Duplicate` かつ `lastProgressAt < 今 − STALL_THRESHOLD_MS`。
   - `ownerToken` を持たない PageOperation（この変更より前のバージョンが作ったもの）: `actionType: Duplicate` かつ `_id` の作成時刻が `今 − LEGACY_RECORD_MIN_AGE_MS`（15分）より前。前のバージョンは `lastProgressAt` を更新しないので、それでは判断できない。段階的に入れ替える更新（古いプロセスと新しいプロセスが同時に動く間）に、古いプロセスが実行中の複製を誤って回復しないようにする。
 - 削除: `deleteOne({ _id, ownerToken })`。消せなければ `OwnershipLostError`。
+- 引き受けた記録の保存値が欠けている（`toPath`・`page.grant`・`page.descendantCount` のどれか）場合は、回復の材料にならないので、引き受けのときに書いた新しい `ownerToken` を条件にその記録を削除し、欠けた項目をログに出して、次の期限切れの記録を探す。残すと、2〜3分ごとに引き受け直されては失敗し、その範囲の複製・移動・改名を拒否し続けるため。複数の記録があるときは、`_id` の古い順に引き受ける。
 - 回復に必要な値（複製元・複製先のパス、本人の ID、元ページの配下ページ数と公開範囲）は、今の PageOperation の項目（`fromPath`、`toPath`、`user._id`、`page.descendantCount`、`page.grant`）から取れる。新しく保存する値は `lastProgressAt` と `ownerToken` だけ。
 - 既存の `unprocessableExpiryDate` は変えない。改名の再開判定が使う項目で、複製の判定には使わない。
 
@@ -775,7 +778,7 @@ export const pageDuplicateInterruptedSnapshot: {
 
 **revisions（複製されたページの revision）**
 
-- 出力項目は `_id`、`pageId`（ObjectId）、`body`、`format`、`author`（ObjectId）、`createdAt`（日時）、`__v: 0` の7項目。今の配下の複製が作る revision と同じ項目・同じ型にする。
+- 出力項目は `_id`、`pageId`（ObjectId）、`body`、`format`、`author`（ObjectId）、`createdAt`（日時）、`__v: 0`（64ビット整数）の7項目。今の配下の複製が作る revision と同じ項目・同じ型にする。
 - 本文は保存されている値をそのまま写す（今は Prisma 経由で読んだときの改行の正規化を経て書いている）。読むときに同じ正規化がかかるので、表示は変わらない。
 
 **pages（写しのページ）**
@@ -801,7 +804,8 @@ export const pageDuplicateInterruptedSnapshot: {
 | `OwnershipLostError` | 書き込みをやめる。PageOperation の削除と通知は、回復を引き受けた側が行う |
 | revision の一部を複製できない（元の revision が存在しない） | そのページは挿入せず、件数をログに出して続ける（停止の扱いにはしない） |
 | `$merge` が `maxTimeMS` で打ち切られた | 1回分の複製の例外として扱う |
-| 回復処理の中の例外 | ログに出す。PageOperation は残るので、`lastProgressAt` が古くなった後に再び回復される |
+| 回復処理の中の例外 | ログに出す。PageOperation は残るので、`lastProgressAt` が古くなった後に再び回復される。同じ理由で毎回失敗する場合は、2〜3分ごとにやり直し続け、その範囲の操作を拒否し続ける。これは受け入れる危険である。運用者は、ログに出る PageOperation の ID の記録を手で削除する |
+| 引き受けた PageOperation の保存値が欠けている | 引き受けのときに新しい `ownerToken` を条件にその記録を削除し、ログに出して、次の記録へ進む |
 | 回復時に写しの先頭ページがない | サブオペレーションと通知をせず、PageOperation だけ削除する |
 | 回復時に複製した本人がいない | サブオペレーションと削除は行い、通知はしない |
 | 定期処理の式が不正 | ログに出し、起動を続ける |
@@ -910,3 +914,4 @@ export const pageDuplicateInterruptedSnapshot: {
 
 - データの移行は不要。`lastProgressAt` と `ownerToken` は任意項目で、既存の複製の PageOperation は作成から15分を過ぎたら回復の対象になる。
 - 更新した直後の起動では、以前のバージョンが残した複製の PageOperation（途中で止まって残ったもの）も、定期処理が回復し、複製した本人に通知が届く。何週間も前の複製について通知が届く場合がある。作りかけの写しが残っていることを本人が知る機会になるので、そのまま通知する。
+- 段階的に入れ替える間に、古いバージョンのプロセスが再起動すると、古い `init()` は新しい形式の複製の PageOperation も削除する。そのとき動いていた新しいプロセスは、担当を外れたと判断して書き込みをやめ、回復も行われない。親のない写しが通知なしで残る。入れ替えの短い間だけの危険であり、受け入れる。

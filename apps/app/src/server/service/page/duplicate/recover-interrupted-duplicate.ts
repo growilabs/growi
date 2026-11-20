@@ -32,10 +32,19 @@ export interface InterruptedDuplicate {
   /** PageOperation stores only the user's id, so recovery works from the id alone. */
   readonly userId: string;
   readonly shouldNormalizeParent: boolean;
-  /** descendantCount of the source at the start, plus the top page itself */
+  /** see countSourcePages */
   readonly sourcePageCount: number;
   readonly cause: InterruptionCause;
 }
+
+/**
+ * The pages the source had at the start: descendantCount counts only non-empty
+ * pages, so the top page is added only when it is not empty.
+ */
+export const countSourcePages = (
+  descendantCount: number,
+  isEmpty: boolean,
+): number => descendantCount + (isEmpty ? 0 : 1);
 
 export type RecoveryOutcome =
   | { readonly status: 'recovered'; readonly copiedPageCount: number }
@@ -161,7 +170,10 @@ export function toInterruptedDuplicate(
     toPath: stalled.toPath,
     userId: stalled.userId,
     shouldNormalizeParent: shouldNormalizeParent(stalled.sourceGrant),
-    sourcePageCount: stalled.sourceDescendantCount + 1,
+    sourcePageCount: countSourcePages(
+      stalled.sourceDescendantCount,
+      stalled.sourceIsEmpty,
+    ),
     cause: { kind: 'stalled' },
   };
 }
