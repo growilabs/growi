@@ -3,6 +3,7 @@ export const forgotPasswordErrorCode = {
   TOKEN_NOT_FOUND: 'token-not-found',
   PASSWORD_RESET_ORDER_IS_NOT_APPROPRIATE:
     'password-reset-order-is-not-appropriate',
+  PASSWORD_RESET_REQUEST_FAILED: 'password-reset-request-failed',
 } as const;
 
 export type forgotPasswordErrorCode =

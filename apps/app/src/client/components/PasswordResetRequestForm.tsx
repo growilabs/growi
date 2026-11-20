@@ -1,22 +1,31 @@
 import type { FC } from 'react';
-import React, { useCallback, useState } from 'react';
+import { useCallback, useState } from 'react';
 import Link from 'next/link';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
 
 import { apiv3Post } from '~/client/util/apiv3-client';
 import { toastError, toastSuccess } from '~/client/util/toastr';
+import { forgotPasswordErrorCode } from '~/interfaces/errors/forgot-password';
 import { isMailerSetupAtom } from '~/states/server-configurations';
+import { toArrayIfNot } from '~/utils/array-utils';
 
 import styles from './PasswordResetRequestForm.module.scss';
 
 const moduleClass = styles['password-reset-request-form'] ?? '';
 
+const hasErrorCode = (e: unknown, code: string): boolean =>
+  typeof e === 'object' && e != null && 'code' in e && e.code === code;
+
+const isPasswordResetRequestFailure = (err: unknown): boolean =>
+  toArrayIfNot(err).some((e) =>
+    hasErrorCode(e, forgotPasswordErrorCode.PASSWORD_RESET_REQUEST_FAILED),
+  );
+
 const PasswordResetRequestForm: FC = () => {
   const { t } = useTranslation();
   const isMailerSetup = useAtomValue(isMailerSetupAtom);
   const [email, setEmail] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const changeEmail = useCallback((inputValue) => {
     setEmail(inputValue);
@@ -30,14 +39,17 @@ const PasswordResetRequestForm: FC = () => {
         return;
       }
 
-      setIsSubmitting(true);
+      // Acknowledge immediately and keep the form usable. The server answers
+      // every request 18 seconds later, and only a failure needs a toast.
+      toastSuccess(t('forgot_password.email_sent_if_account_exists'));
       try {
         await apiv3Post('/forgot-password', { email });
-        toastSuccess(t('forgot_password.email_sent_if_account_exists'));
       } catch (err) {
+        if (isPasswordResetRequestFailure(err)) {
+          toastError(t('forgot_password.request_failed'));
+          return;
+        }
         toastError(err);
-      } finally {
-        setIsSubmitting(false);
       }
     },
     [t, email],
@@ -74,21 +86,9 @@ const PasswordResetRequestForm: FC = () => {
             aria-label={t('forgot_password.email_address')}
             className="form-control mb-3"
             type="email"
-            disabled={!isMailerSetup || isSubmitting}
             onChange={(e) => changeEmail(e.target.value)}
           />
-          <button
-            className="btn btn-primary w-100 fw-bold"
-            type="submit"
-            disabled={!isMailerSetup || isSubmitting}
-          >
-            {isSubmitting && (
-              <span
-                className="spinner-border spinner-border-sm me-1"
-                role="status"
-                aria-hidden="true"
-              />
-            )}
+          <button className="btn btn-primary w-100 fw-bold" type="submit">
             {t('forgot_password.send')}
           </button>
           <p className="form-notice-sm text-center text-body-secondary mt-3 mb-1">
