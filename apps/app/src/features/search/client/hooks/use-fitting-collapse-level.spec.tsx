@@ -215,6 +215,19 @@ describe('useFittingCollapseLevel', () => {
       // Narrowing must not restart from the base form
       expect(renderedLevels).not.toContain(0);
     });
+
+    it('re-checks from level 0 when the container widened before a narrowing re-check was committed', () => {
+      availableWidth = 150;
+      render(<Probe />);
+      notifyWidth(150);
+      expect(renderedCollapseLevel()).toBe(2);
+
+      // The observer reports a narrowing, but the container is already wider by the time it is committed
+      availableWidth = 1000;
+      notifyWidth(140);
+      notifyWidth(1000);
+      expect(renderedCollapseLevel()).toBe(0);
+    });
   });
 
   // Web fonts change text width without resizing the container, so no

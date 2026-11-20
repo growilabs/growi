@@ -89,7 +89,21 @@ export const useFittingCollapseLevel = (
 
   // Runs after every commit, before paint, so intermediate levels are never shown
   useIsomorphicLayoutEffect(() => {
-    fittedWidthRef.current = containerRef.current?.clientWidth;
+    const width = containerRef.current?.clientWidth;
+    // This check only tells whether the current level overflows, not whether a
+    // lower one would fit. If the container widened since the level was fitted
+    // (e.g. between a narrowing notification and its commit), recording the new
+    // width without re-fitting would hide the widening from later notifications.
+    if (
+      collapseLevel > 0 &&
+      width != null &&
+      resolveResizeAction(fittedWidthRef.current, width) === 'recheckFromBase'
+    ) {
+      fittedWidthRef.current = width;
+      setState((prev) => ({ ...prev, level: 0 }));
+      return;
+    }
+    fittedWidthRef.current = width;
     if (collapseLevel >= maxCollapseLevel) return;
     if (
       isElementOverflowing(containerRef.current) ||
