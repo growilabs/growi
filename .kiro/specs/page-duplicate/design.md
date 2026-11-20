@@ -40,14 +40,14 @@
 
 - `canOperate` の判定規則。複製以外の操作の操作記録（作成・更新・改名・削除・元に戻す・正規化）。
 - 起動時の掃除（`init()`）のうち、複製以外の種類の扱い。
-- 親の付け直し（`normalizeParentRecursively`）と配下ページ数の数え直し（`updateDescendantCountOfSelfAndDescendants` / `updateDescendantCountOfPagesWithPaths`）の中身。この spec は呼び出すだけ。
+- 親の付け直し（`normalizeParentRecursively`）と配下ページ数の数え直し（`updateDescendantCountOfSelfAndDescendants` / `updateDescendantCountOfPagesWithPaths`）の規則。この spec は呼び出すだけで、変えるのは「1回分の処理を終えるたびに呼ぶ関数（`onBatchDone`）」を任意の引数として受け取れるようにすることだけ。
 - 全文検索の再索引のメモリと負荷。本文の切り詰め（`ELASTICSEARCH_MAX_BODY_LENGTH_TO_INDEX`）と送信件数（`ELASTICSEARCH_REINDEX_BULK_SIZE`）で上限が決まり、全文検索の機能が持つ。
 - Vault など、ページのイベントを受け取る側の処理。
 - 複製の経路（`POST /_api/v3/pages/duplicate`）の検証と応答。PR #12284 で導入した拒否の応答（`grant_not_assignable` / `operation_in_progress`）をそのまま使う。
 
 ### Allowed Dependencies
 
-- `IPageService` のうち、`create`、`getParentAndFillAncestorsByUser`、`normalizeParentRecursively`、`updateDescendantCountOfSelfAndDescendants`、`updateDescendantCountOfPagesWithPaths`。`duplicate/` からは引数で受け取った窓口（`DuplicatePagePort`）経由で使い、`PageService` のクラスを import しない。
+- `IPageService` のうち、`create`、`getParentAndFillAncestorsByUser`、`normalizeParentRecursively`、`updateDescendantCountOfSelfAndDescendants`、`updateDescendantCountOfPagesWithPaths`、`updateDescendantCountOfAncestors`。`duplicate/` からは引数で受け取った窓口（`DuplicatePagePort`）経由で使い、`PageService` のクラスを import しない。
 - `IPageGrantService`（公開範囲の判定）、`PageOperationService.canOperate`。
 - `PageOperation` モデル、`Page` モデル（Mongoose）、`prisma.revisions.aggregateRaw`、`prisma.pagetagrelations`。
 - `ActivityService.createActivity`、`crowi.events.activity`（アプリ内通知の発行）。
@@ -148,6 +148,7 @@ apps/app/src/client/components/InAppNotification/ModelNotification/
 
 - `apps/app/src/server/service/page/index.ts` — 複製の処理（`duplicate` から `duplicateDescendantsV4`、`duplicateTags` まで）を削除し、`duplicate` を `duplicatePage` への委譲にする。`PageCursorsForDescendantsFactory` を新しいファイルから import する。
 - `apps/app/src/server/service/page/page-service.ts` — `IPageService` から `duplicateRecursivelyMainOperation` を削除する（呼び出し元がない）。`normalizeParentRecursively` と `updateDescendantCountOfSelfAndDescendants` を追加する（`duplicate/` が窓口経由で使うため）。
+- `apps/app/src/server/service/page/index.ts`（同上のファイル）— `normalizeParentRecursively`、`updateDescendantCountOfSelfAndDescendants`、`recountAndUpdateDescendantCountOfPages` に、任意の引数 `onBatchDone?: () => Promise<void>` を加える。1回分の処理を終えるたびに呼び、それが例外を投げたら処理全体を止める（呼び出し元へ例外を返す）。既存の呼び出し元は渡さないので、挙動は変わらない。
 - `apps/app/src/server/models/page-operation.ts` — 任意項目 `leaseOwner`（文字列）を追加する。
 - `apps/app/src/server/service/page-operation.ts` — `init()` の削除対象から `Duplicate` を外す。
 - `apps/app/src/server/crowi/index.ts` — `setupCron` で `startInterruptedDuplicateRecoveryCronIfEnabled` を動的 import して呼ぶ。
@@ -191,8 +192,9 @@ sequenceDiagram
     Recover->>Recover: notifyDuplicateInterrupted
 ```
 
-- 期限は 1 回分の処理を終えるたびに延ばす。延長に失敗した（持ち主の印が変わっていた）ら、その時点で処理をやめる。
-- 整え処理の間は、進捗の合図を差し込めないので、一定間隔（`LEASE_KEEPALIVE_INTERVAL_MS`）で期限を延ばす。延長に失敗したら整え処理の完了を待ってから、片付けをせずに終わる（回復側が片付けと通知を行う）。
+- 期限は、配下の写しでも整え処理でも、1 回分の処理を終えるたびに延ばす。整え処理では `onBatchDone` として延長を渡す。時間で延ばす仕組みは使わない（処理が固まっても延び続けてしまうため）。
+- 延長に失敗した（持ち主の印が変わっていた）ら、`LeaseLostError` を投げてその時点で処理をやめ、片付けと通知をせずに終わる。片付けと通知は、確保した側が行う。整え処理は何度行っても同じ結果になるので、途中でやめても確保した側がやり直せる。
+- DB の接続には時間切れの設定がない（ドライバの既定）ので、1 回分の処理の中の DB の呼び出しが返らなくなることがありうる。その場合も期限は延びないので、止まったと見分けられる（4.2）。
 
 ### 操作記録の状態
 
@@ -229,7 +231,7 @@ stateDiagram-v2
 | 4.1 | 例外の失敗で記録を片付け写しを残す | runDescendantDuplication, recoverInterruptedDuplicate | `recoverInterruptedDuplicate` | 配下の複製 |
 | 4.2 | 停止・終了から 5 分以内に回復 | InterruptedDuplicateRecoveryCron, duplicateLease | `claimStalledDuplicate` | 操作記録の状態 |
 | 4.3 | 再起動から 5 分以内に回復 | InterruptedDuplicateRecoveryCron, PageOperationService.init | `claimStalledDuplicate` | 操作記録の状態 |
-| 4.4 | 進んでいる複製を止まったとみなさない | runDescendantDuplication, duplicateLease | `extendLease`, `keepLeaseAliveWhile` | 配下の複製 |
+| 4.4 | 進んでいる複製を止まったとみなさない | runDescendantDuplication, finalizeDuplicatedTree, duplicateLease | `extendLease`, `onBatchDone` | 配下の複製 |
 | 4.5 | 写しをツリーにつなぎ件数を合わせる | finalizeDuplicatedTree | `finalizeDuplicatedTree` | 配下の複製 |
 | 4.6 | 続きをやり直さない | recoverInterruptedDuplicate | `recoverInterruptedDuplicate` | — |
 | 4.7 | 回復は1回だけ | duplicateLease, recoverInterruptedDuplicate | `claimStalledDuplicate`, `releaseLease` | 操作記録の状態 |
@@ -282,7 +284,11 @@ export type DuplicatePagePort = Pick<
   | 'normalizeParentRecursively'
   | 'updateDescendantCountOfSelfAndDescendants'
   | 'updateDescendantCountOfPagesWithPaths'
+  | 'updateDescendantCountOfAncestors'
 >;
+
+/** Thrown by a progress callback when another process has claimed the operation. */
+export class LeaseLostError extends Error {}
 
 export interface DuplicateDeps {
   readonly pageService: DuplicatePagePort;
@@ -360,8 +366,9 @@ export function duplicatePage(
 
 - `PageCursorsForDescendantsFactory`（空ページを含む）で配下を読み、`BULK_REINDEX_SIZE` 件ずつ `copyDescendantBatch` に渡す。
 - 1 回分を終えるたびに `extendLease` を呼ぶ。`'lost'` が返ったら、それ以上書かずに終わる（他のプロセスが回復を始めている）。
-- すべて終えたら、`keepLeaseAliveWhile` の中で `finalizeDuplicatedTree` を行い、`releaseLease` で記録を片付ける。
-- 1 回分の処理、整え処理のどこかで例外が出たら、その場で `recoverInterruptedDuplicate` を `cause: { kind: 'error' }` で呼ぶ。今のように例外を握りつぶして次の回へ進むことはしない。
+- 写せたページ数（`insertedPageCount` の合計）を数えておく。
+- すべて終えたら、`finalizeDuplicatedTree` を `ancestorUpdate: { kind: 'increment', insertedPageCount }` と、延長を行う `onBatchDone` で呼び、`releaseLease` で記録を片付ける。
+- 1 回分の処理、整え処理のどこかで例外が出たら、その場で `recoverInterruptedDuplicate` を `cause: { kind: 'error' }` で呼ぶ。今のように例外を握りつぶして次の回へ進むことはしない。`LeaseLostError` の場合は回復を呼ばずに終わる。
 - 例外を、誰も待たない Promise に再送出しない（ログに出して終わる）。
 
 **Contracts**: Service [x]
@@ -406,7 +413,9 @@ export function runDescendantDuplication(
 **Responsibilities & Constraints**
 
 - 手順は「整え → 片付け → 通知」の順に固定する。
-- 整え処理（`finalizeDuplicatedTree`）は `keepLeaseAliveWhile` の中で行う。期限を延ばせなくなった（他のプロセスに確保された）ら、片付けと通知をせずに終わる。
+- 整え処理（`finalizeDuplicatedTree`）は `ancestorUpdate: { kind: 'recount' }` と、延長を行う `onBatchDone` で呼ぶ。期限を延ばせなくなった（他のプロセスに確保された）ら、片付けと通知をせずに終わる。
+- 祖先の配下ページ数は数え直す。止まった複製では、祖先をどこまで増やしたか分からず、回復処理自体が途中で止まって再び回復される場合もあるため、何度行っても同じ結果になる数え直しを使う。回復はまれなので、数え直しが他の操作の増分と重なる危険は小さい。
+- 写しの先頭ページが存在しない場合（削除された等）は、整え処理と通知をせずに記録だけ片付ける。複製した本人が存在しない（削除された）場合は、整え処理と片付けは行い、通知はしない。どちらもログに出す。
 - 片付け（`releaseLease`）が `'lost'` を返したら、通知しない。これで、1 つの止まった複製について通知が 1 回を超えない（4.7）。
 - 片付けの後、通知の前にプロセスが止まった場合は、通知が届かない。重複より欠落を選ぶ（4.7 を優先）。
 - 続きの複製はしない（4.6）。作りかけの写しは消さない（4.1、4.2）。
@@ -544,20 +553,30 @@ export function copyCurrentRevisions(
 - 手順:
   1. 元ページの公開範囲が「リンクを知っている人のみ」「特定のユーザー」以外なら（今の `shouldNormalizeParent` と同じ条件）、`normalizeParentRecursively([toPath], user, true)` で写しの親を付け直す。足りない中間のページは空ページとして作られる。
   2. `updateDescendantCountOfSelfAndDescendants(toPath)` で、写しの先頭から下の配下ページ数を数え直す。
-  3. `toPath` の祖先のパスについて `updateDescendantCountOfPagesWithPaths` で数え直す。今の「数えた件数だけ増やす」方式はやめる（件数が実際より多くなりうるため）。
+  3. 祖先の配下ページ数を、`ancestorUpdate` に従って直す。
+     - `increment`（成功時）: 写しの先頭ページから祖先へ、実際に挿入したページ数だけ `updateDescendantCountOfAncestors` で増やす。今と同じ増分の書き込みなので、並行する他の操作の増分を消さない。今の「読み出した件数」ではなく「挿入できた件数」を使うので、数え過ぎもなくなる。
+     - `recount`（回復時）: `toPath` の祖先のパスについて `updateDescendantCountOfPagesWithPaths` で数え直す。
   4. 写しの先頭ページで `pageEvent 'syncDescendantsUpdate'` を発行し、全文検索に写しを反映する（今と同じイベント）。
   5. `toPath` 以下の空でないページ数を数えて返す（通知の件数に使う）。
+- 1、2、3（`recount`）の各処理に `onBatchDone` を渡し、1 回分の処理を終えるたびに期限を延ばす。
 
 **Contracts**: Service [x]
 
 ##### Service Interface
 
 ```typescript
+export type AncestorUpdate =
+  | { readonly kind: 'increment'; readonly insertedPageCount: number }
+  | { readonly kind: 'recount' };
+
 export interface FinalizeInput {
   readonly toPath: string;
   /** normalizeParentRecursively in duplicate mode applies no grant filter, so the id suffices. */
   readonly user: Pick<IUserHasId, '_id'>;
   readonly shouldNormalizeParent: boolean;
+  readonly ancestorUpdate: AncestorUpdate;
+  /** Called after each batch; throwing (e.g. LeaseLostError) aborts the finalize. */
+  readonly onBatchDone: () => Promise<void>;
 }
 
 export function finalizeDuplicatedTree(
@@ -590,11 +609,8 @@ export function startDuplicateLease(input: StartLeaseInput): Promise<DuplicateLe
 /** Conditional on ownerToken; 'lost' when another process has claimed it. */
 export function extendLease(lease: DuplicateLease): Promise<LeaseUpdateResult>;
 
-/** Runs task while extending the lease every LEASE_KEEPALIVE_INTERVAL_MS. */
-export function keepLeaseAliveWhile<T>(
-  lease: DuplicateLease,
-  task: () => Promise<T>,
-): Promise<{ readonly result: T; readonly lease: LeaseUpdateResult }>;
+/** extendLease as an onBatchDone callback: throws LeaseLostError when 'lost'. */
+export function extendLeaseOrThrow(lease: DuplicateLease): () => Promise<void>;
 
 /** Atomically takes over one Duplicate operation whose lease has expired. */
 export function claimStalledDuplicate(
@@ -611,9 +627,10 @@ export function releaseLease(lease: DuplicateLease): Promise<'released' | 'lost'
 - `leaseOwner` に、記録を持つプロセスの印（実行ごとの乱数）を入れる。
 - 作成時: `leaseOwner = 新しい印`、`unprocessableExpiryDate = 今 + STALL_THRESHOLD_MS`。
 - 延長: `updateOne({ _id, leaseOwner }, { unprocessableExpiryDate: 今 + STALL_THRESHOLD_MS })`。一致しなければ `'lost'`。
-- 確保: `findOneAndUpdate({ actionType: Duplicate, unprocessableExpiryDate: { $lt: 今 } }, { leaseOwner: 新しい印, unprocessableExpiryDate: 今 + STALL_THRESHOLD_MS })`。1 件ずつ確保し、確保したプロセスだけが回復する（4.7）。
+- 確保: `findOneAndUpdate(条件, { leaseOwner: 新しい印, unprocessableExpiryDate: 今 + STALL_THRESHOLD_MS })`。1 件ずつ確保し、確保したプロセスだけが回復する（4.7）。条件は次のどちらか。
+  - `leaseOwner` を持つ記録: `unprocessableExpiryDate < 今`。
+  - `leaseOwner` を持たない記録（この変更より前のバージョンが作ったもの）: `_id` の作成時刻が `LEGACY_RECORD_MIN_AGE_MS`（15 分）より前。前のバージョンは期限を延ばさないので期限では判断できず、段階的に入れ替える更新（古いプロセスと新しいプロセスが同時に動く間）に、古いプロセスが実行中の複製を誤って回復しないようにする。
 - 片付け: `deleteOne({ _id, leaseOwner })`。消せなければ `'lost'`。
-- `leaseOwner` を持たない複製の記録（この変更より前のバージョンが作ったもの）は、作成時の期限（10 秒後）を過ぎているので、確保の対象になる。
 - 回復に必要な値（複製元・複製先のパス、本人の ID、元ページの配下ページ数と公開範囲）は、今の記録の項目（`fromPath`、`toPath`、`user._id`、`page.descendantCount`、`page.grant`）から取れる。新しく保存する値は `leaseOwner` だけ。
 
 ### 入口
@@ -700,7 +717,7 @@ export const pageDuplicateInterruptedSnapshot: {
 | `unprocessableExpiryDate` | Date | 意味を定める | 複製の記録では「延長がなければ止まったとみなす時刻」 |
 
 - 索引は追加しない。複製の記録は同時に数件しか存在せず、確保の問い合わせは全件を読んでも小さい。
-- 既存の記録との互換: `leaseOwner` がない記録は、期限切れとして確保の対象になる。
+- 既存の記録との互換: `leaseOwner` がない記録は、作成から 15 分を過ぎたら確保の対象になる。
 
 **revisions（写しの版）**
 
@@ -730,6 +747,8 @@ export const pageDuplicateInterruptedSnapshot: {
 | 期限の延長が `'lost'` | 書き込みをやめる。片付けと通知は回復した側が行う |
 | 版の一部を写せない（元の版が存在しない） | そのページは挿入せず、件数を数えて続ける（停止の扱いにはしない） |
 | 回復処理の中の例外 | ログに出す。記録は残るので、期限切れになった後に再び回復される |
+| 回復時に写しの先頭ページがない | 整え処理と通知をせず、記録だけ片付ける |
+| 回復時に複製した本人がいない | 整え処理と片付けは行い、通知はしない |
 | 定期処理の式が不正 | ログに出し、起動を続ける |
 
 ### Monitoring
@@ -753,14 +772,23 @@ export const pageDuplicateInterruptedSnapshot: {
 - 停止の回復: 期限切れの記録を作り、`claimStalledDuplicate` → `recoverInterruptedDuplicate` で、写しがつながり、記録が消え、通知が 1 件届くこと（4.2、4.5、5.1）。
 - 1 回だけ: 同じ期限切れの記録に対して回復を並行に 2 つ走らせ、通知が 1 件だけであること（4.7）。
 - 持ち主の交代: 確保された後に元の実行が `extendLease` を呼ぶと `'lost'` になり、以降の書き込みをしないこと（4.4）。
-- 起動時の掃除: `init()` が複製の記録を消さず、他の種類は今どおり消すこと（4.3）。
+- 起動時の掃除: `init()` が複製の記録を消さず、他の種類は今どおり消すこと（4.3）。既存の `service/page-operation.integ.ts`（84〜101 行付近）は「複製の記録も消す」ことを確かめているので、この期待を書き換える。
+- 前のバージョンの記録: `leaseOwner` を持たない記録は、作成から 15 分たつまで確保されず、たった後に確保されること（段階的な更新での誤回復を防ぐ）。
+- 進捗の合図: `normalizeParentRecursively` と数え直しに渡した `onBatchDone` が 1 回分ごとに呼ばれ、例外を投げると処理全体が止まること（4.4）。
+- 祖先の配下ページ数: 成功時は挿入できたページ数だけ増え、`onlyDuplicateUserRelatedResources` で除外したページを数えないこと。回復時は数え直しで実際の数と一致すること（4.5）。
+- 写しの先頭ページがない・本人がいない場合の回復: 記録が片付き、通知が送られないこと。
 - 重なる操作: 実行中は重なる複製・移動・改名が `operation_in_progress` で拒否され、完了後と回復後は受け付けられること（3.1〜3.3）。
-- 既存の挙動: 既存の複製のテスト（`v5.public-page.integ.ts`、`v5.non-public-page.integ.ts`、`routes/apiv3/pages/duplicate.integ.ts`）が変更なしで通ること（6.1〜6.4）。
+- 既存の挙動: 既存の複製のテスト（`v5.public-page.integ.ts`、`v5.non-public-page.integ.ts`、`routes/apiv3/pages/duplicate.integ.ts`）が変更なしで通ること（6.1〜6.4）。`service/page-operation.integ.ts` だけは上記のとおり期待を書き換える。
 
 ### Performance
 
-- 本文の大きさによらないこと（2.1、2.2）: 本文が約 15MB の版を持つページを 1 回分の件数いっぱい（100 件）配下に置き、複製中の `VmHWM`（OS が記録するプロセスのメモリのピーク）の増加が、本文 1KB の場合と同じ水準であることを確かめる。CI では重いので、手元で実行する検証用のスクリプトとして用意し、結果を `research.md` に記録する。
-- 今回の規模での計測（2.3）: 配下 83 ページ・1505 版の構成を合成データで再現し、変更前（約 300MB）と変更後の増加量を `research.md` に記録する。
+- 本文の大きさによらないこと（2.1、2.2）: 本文が約 15MB の版を持つページを 1 回分の件数いっぱい（100 件）配下に置き、複製中の `VmHWM`（OS が記録するプロセスのメモリのピーク）の増加が、本文 1KB の場合と同じ水準であることを確かめる。CI では重いので、手元で実行する検証用のスクリプトとして用意する。
+- 今回の規模での計測（2.3）: 配下 83 ページ・1505 版の構成を合成データで再現し、変更前（約 300MB）と変更後の増加量を測る。
+- どちらの結果も、実装の完了時にこの設計書の「計測結果」に記録する（要件 2.3）。
+
+### 計測結果
+
+（実装の完了時に記入する。変更前の値は、本番データを使った再現計測で、複製中の増加が約 300MB、うち全版の読み込みだけで約 305MB。最新版だけを読む方式なら約 20MB だった。）
 
 ## Security Considerations
 
@@ -769,5 +797,5 @@ export const pageDuplicateInterruptedSnapshot: {
 
 ## Migration Strategy
 
-- データの移行は不要。`leaseOwner` は任意項目で、既存の記録は期限切れとして回復の対象になる。
+- データの移行は不要。`leaseOwner` は任意項目で、既存の記録は作成から 15 分を過ぎたら回復の対象になる。
 - 更新した直後の起動では、以前のバージョンが残した複製の記録（途中で止まって残った記録）も、定期処理が回復し、複製した本人に通知が届く。何週間も前の複製について通知が届く場合がある。これは、作りかけの写しが残っていることを本人が知る機会になるので、そのまま通知する。
