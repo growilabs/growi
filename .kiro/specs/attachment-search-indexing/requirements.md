@@ -219,4 +219,5 @@ GROWI の Elasticsearch 連携では Page の `path` / `body` / `comments` の�
 2. The 添付 ES インデックス構成 shall 既存 Page インデックスの検索クエリ応答時間を `extractorUri` 設定前と比べて意味ある程度に劣化させない <!-- derived from umbrella R14.4 -->
 3. When `extractorUri` 設定前後で検索 API が呼ばれる, the apps/app shall 既存クライアントが破壊的変更なしに応答を解釈できるよう API の後方互換を保つ <!-- derived from umbrella R14.5 -->
 4. The apps/app shall `IPageWithSearchMeta.meta.attachmentHits` を optional フィールドとして追加し、既存の必須フィールド形状を変更しない
-5. Where 機能が有効である, the apps/app shall 既存のキーワード検索 API (`GET /_api/search`) を、添付だけを対象にした検索 (`facet=attachments`) が指定されない限り、機能が無効のときと同じ処理・同じ応答 (並べ替え・件数・ページ送りを含む) にする。ページ検索の結果のページに付ける添付ヒットは、ページ ID を受け取る別の要求 (`GET /_api/v3/search/attachments`) で返し、ページと添付の点数を混ぜた順位は作らない
+5. Where 機能が有効である, the apps/app shall 既存のキーワード検索 API (`GET /_api/search`) を、`facet` を付けないとき、または `facet=pages` のとき、機能が無効のときと同じ処理・同じ応答 (並べ替え・件数・ページ送りを含む) にする。`facet=attachments` は添付だけを対象にした検索とし、それ以外の `facet` の値は `{ ok: false, code: 400 }` で断る。ページ検索の結果のページに付ける添付ヒットは、ページ ID を受け取る別の要求 (`GET /_api/v3/search/attachments`) で返し、ページと添付の点数を混ぜた順位は作らない
+6. If ページ検索の結果のページに付ける添付ヒットの取得 (`GET /_api/v3/search/attachments`) で、権限確認か添付の検索が失敗するか時間の上限を超える, the apps/app shall 空の結果で隠さず、エラーを返す

@@ -26,7 +26,7 @@ UI 拡張は 3 領域に分かれる。第 1 に検索結果画面で、左ペ�
 - **In scope (feature responsibility)**:
   - 検索結果画面 (`SearchPage` / `SearchResultList` / `SearchResultContent`) への添付ヒット表示統合
   - 検索対象の切り替え UI と state 管理
-  - ページ検索の結果のページに付ける添付ヒットの取得 (表示中のページごと、ページ検索の結果を受け取るたび) と、取得中・取得失敗の表示
+  - ページ検索の結果のページに付ける添付ヒットの取得 (ページ検索の結果を受け取るたび、そのページの id を 20 件ずつに分けて要求する) と、取得中・取得失敗の表示
   - 添付ファイル一覧モーダル (`PageAttachmentList`) への個別「再抽出」ボタン追加と結果フィードバック UI
   - 管理画面 (`ElasticsearchManagement`) への設定セクション・ガイダンス表示・rebuildIndex チェックボックス・失敗ログパネル追加
   - 機能有効/無効に応じた UI 全体の表示制御 (機能ゲート hook)
@@ -47,8 +47,8 @@ UI 拡張は 3 領域に分かれる。第 1 に検索結果画面で、左ペ�
   - 上流 spec の `GET /_api/v3/search/attachments` は、受け取ったページ ID (重複を除いて 20 件まで) のうち閲覧者が本文の抜粋を見てよいページの添付ヒットを返し、失敗や時間切れはエラーで返す (空の結果で隠さない)
   - 上流 spec の `GET /_api/search?facet=attachments` は、添付ヒットを点数順に、親ページごとにまとめて返す。件数 (`total`) は返さない
   - 上流 spec が `POST /_api/v3/attachments/:id/reextract`、admin 系 apiv3 (`config` / `failures`)、`PUT /_api/v3/search/indices` の `includeAttachments` フラグを提供する
-  - 上流 spec が Config キー `app:attachmentFullTextSearch:*` (`extractorUri` / `timeoutMs` / `maxFileSizeBytes` の 3 キーのみ。旧 `enabled` / `maxConcurrency` は削除済み) の読み書き API を提供する
-  - 上流 spec が SSR prop `searchConfig.isAttachmentFullTextSearchEnabled: boolean` を「ES 有効 AND `extractorUri` 設定済み」の算出値として供給する (shape は `boolean` で不変)
+  - 上流 spec が Config キー `app:attachmentFullTextSearch:*` (`extractorUri` / `extractorToken` / `timeoutMs` / `maxFileSizeBytes` の 4 キー。`extractorToken` は書き込みだけができ、値は返らない。旧 `enabled` / `maxConcurrency` は削除済み) の読み書き API を提供する
+  - 上流 spec が SSR prop `searchConfig.isAttachmentFullTextSearchEnabled: boolean` を「ES 有効 AND `extractorUri` 設定済み AND `extractorToken` 設定済み」の算出値として供給する (shape は `boolean` で不変)
   - 上流 spec が Socket.io `AddAttachmentProgress` / `FinishAddAttachment` / `AttachmentRebuildingFailed` イベントを発行する
   - 上流 spec の `PUT /_api/v3/search/indices` (`includeAttachments=true`) は作り直しの完了を待たずに応答し、実行中の再要求には 409 `rebuild_in_progress` を返す
   - 既存 SearchPage / SearchResultList / SearchResultContent / PageAttachmentList / ElasticsearchManagement が拡張可能な構造を維持している

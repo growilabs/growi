@@ -381,12 +381,14 @@
   - `AttachmentSearchResultAggregator.searchPrimary` を `facet=attachments` の検索だけにする。facet=`all` の処理 (`searchPrimaryAll`、`snippetVisiblePageIds`、2 ページ目以降の分岐) と、`SearchService.searchByFacet` の `resolve` / `attachSecondaryHits` を消す
   - `SearchFacet` / `IFacetedSearchResultMeta` / `IPrimarySearchResult` を design.md の形にする。`GET /_api/search` の OpenAPI の説明から `all` と `resolve` を消す
   - 消した処理のテストを消し、機能が有効でも `facet` なし・`facet=pages` の `GET /_api/search` が添付 index に触れず、機能が無効のときと同じ応答を返すことを結合テストで固定する。権限の比較の結合テスト (`attachment-search-permission.integ.ts`) は、検索結果のページへの添付ヒットと `facet=attachments` の 2 経路にする
+  - `attachment-search-routes.integ.ts` は、ゲスト・アクセストークン・トークンの範囲・機能が無効のときの確認を facet=`all` で行っている。これらは消さずに `facet=attachments` に移す
   - _Requirements: 9.1, 9.3, 9.5_
-  - _Boundary: apps/app/src/server/routes/search.ts, SearchService, AttachmentSearchResultAggregator, interfaces/search.ts_
+  - _Boundary: apps/app/src/server/routes/search.ts (と `search.spec.ts`), SearchService (と `search.spec.ts`), AttachmentSearchResultAggregator, `features/search-attachments/server/routes/apiv1/facet-search-contract.ts` (と `.spec.ts`), interfaces/search.ts, `attachment-search-routes.integ.ts`, `attachment-search-permission.integ.ts`_
 
 - [ ] 12.2 `GET /_api/v3/search/attachments` の失敗を、空の結果で隠さずエラーで返す
   - `resolveSecondary` は、権限確認か添付の検索が失敗するか 500ms を超えたら例外を投げる。ルートは 500 を返す
   - `resolveSecondary` の `facet` 引数と、応答の `facet` を消す (応答は `{ enrichments }`)
-  - _Requirements: 4.1, 9.5_
-  - _Boundary: AttachmentSearchResultAggregator, features/search-attachments/server/routes/apiv3_
+  - 機能が無効のときなど aggregator が無いとき、`SearchService.resolveAttachmentSecondary` が空の結果を返す分岐も、例外にする。`routes/apiv3/search-attachments.ts` の先頭の説明に 500 を足す
+  - _Requirements: 4.1, 9.5, 9.6_
+  - _Boundary: AttachmentSearchResultAggregator, SearchService, features/search-attachments/server/routes/apiv3 (`search-attachments.ts` と `.spec.ts`)_
   - _Depends: 12.1_

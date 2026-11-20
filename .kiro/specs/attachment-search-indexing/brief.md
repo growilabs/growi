@@ -38,7 +38,7 @@
 - **Client package**: `packages/attachment-text-extractor-client/` を新規追加。orval が `apps/attachment-text-extractor` の OpenAPI spec (commit 済みの `openapi.json`) を入力に TS クライアントを自動生成 (pdf-converter-client と同パターン)
 - **Config keys**: `app:attachmentFullTextSearch:extractorUri` / `extractorToken` / `timeoutMs` / `maxFileSizeBytes` の 4 つを [config-definition.ts](apps/app/src/server/service/config-manager/config-definition.ts) に追加。有効・無効は「検索サービスが設定済み AND URI とトークンが設定済み」の算出値で、`enabled` のキーは無い
 - **検索クエリ**: ページ検索 (`GET /_api/search`) は機能導入前のまま動く。その結果のページの添付ヒットは、別の API (`GET /_api/v3/search/attachments`) が、ページを判定してから、そのページの添付だけを検索して返す (pageId ごとに上位 5 件)。`facet=attachments` は添付 index を検索してから親ページを判定する。ページと添付の点数を混ぜた順位は作らない
-- **性能 fallback**: 添付の検索が閾値 (800ms) を超えたら添付ヒットを除外し Page 結果のみ返す safety net
+- **時間の上限**: `facet=attachments` は 800ms を超えたら空の結果と `primaryResultIncomplete: true` を返す。`GET /_api/v3/search/attachments` は 500ms を超えたらエラー (500) を返す
 - **rebuildIndex 互換**: チェックボックス追加のみで既存挙動を保つ (OFF 時は Page/Comment のみ処理)
 
 ## Scope

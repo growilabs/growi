@@ -51,7 +51,7 @@
 ### Out of Boundary
 
 - 抽出サービス本体 (HTTP ルータを含む)、Dockerfile、docker-compose、運用者向け手順書 `docker/README.md` (ネットワーク分離などの運用条件を含む) (**`attachment-search-text-extractor` spec**)
-- 検索結果 UI コンポーネント (`AttachmentHitCard` / `AttachmentSubEntry` / `SearchResultFacetTabs`)、添付モーダルの「再抽出」ボタン、管理画面 (`AttachmentSearchSettings` / `AttachmentExtractionFailures` / `RebuildWithAttachmentsCheckbox`)、ユーザ向けガイダンス文言 (**`attachment-search-ui` spec**)
+- 検索結果 UI コンポーネント (`AttachmentHitCard` / `AttachmentSubEntry` / 検索対象の切り替え)、添付モーダルの「再抽出」ボタン、管理画面 (`AttachmentSearchSettings` / `AttachmentExtractionFailures` / `RebuildWithAttachmentsCheckbox`)、ユーザ向けガイダンス文言 (**`attachment-search-ui` spec**)
 - 添付ファイル保管方式 (`FileUploader` 抽象は据え置き)
 - 既存 Page 検索 (Page/Comment) のクエリ・ランキング・権限モデル本体の改変
 - `apps/pdf-converter` の責務・実装
@@ -366,9 +366,9 @@ sequenceDiagram
 - `pageIds` はクライアントが送る値なので、毎回 `searchAccessiblePages` (viewer filter と `canShowSnippetForGrant`、MongoDB での確認) を必ず通し、消失・権限のないページ、検索演算子が除くページを外す
 - 添付を検索するのは、判定を通ったページの添付だけである。見えない添付は、応答の中身にも、検索の回数にも影響しない (research.md 10.1)
 - 添付の検索は `collapse` で pageId ごとにまとめ、`inner_hits` で 1 ページあたり上位 5 件を返す。1 つの長いファイル (1 添付 = N 文書) が枠を使い切って、ほかのページの添付が出なくなるのを防ぐ (research.md 10.2)
-- `pageIds` は重複を除いて 20 件まで (ページ検索の画面が 1 回に読む件数と同じ)。`terms` は常に 20 件以下なので、`max_terms_count` / `max_clause_count` に触れない
+- `pageIds` は重複を除いて 20 件まで。検索画面は 1 回に 50 件 (`customize:showPageLimitationL` の既定) を読むので、受け取ったページの id を 20 件ずつに分けて送る。時間の上限 (500ms) と速さの目標は、この 1 回の要求ごとに当てる。`terms` は常に 20 件以下なので、`max_terms_count` / `max_clause_count` に触れない
 - どの添付検索も `_source` から `content` を除く。ヒットは強調表示の断片だけで見せるので、抽出した全文を応答に載せない
-- 失敗と時間切れ (500ms) は、空の `enrichments` で隠さずエラーで返す。画面が「取得中」「取得できなかった」「ヒットが無い」を区別して出せるようにするため
+- 失敗と時間切れ (500ms) は、空の `enrichments` で隠さずエラーで返す。画面が「取得中」「取得できなかった」「ヒットが無い」を区別して出せるようにするため (Req 9.6)
 - 2 ページ目以降も、ページ検索の結果を受け取るたびに同じ要求で取る。1 ページ目だけを特別に扱う経路は無い
 
 #### 2.2 添付だけを対象にした検索 (`GET /_api/search?facet=attachments`)
@@ -533,7 +533,7 @@ Key decisions:
 | 2.5 | 文書フィールド定義 (権限フィールドを**持たない**) | ES attachments mapping (grant/granted_users/granted_groups/creator なし) | Logical Data Model | — |
 | 2.6 | ページに属さない添付は対象外 | AttachmentSearchIndexer (`pageId` の gate) + `indexable-attachments.ts` (一括再インデックスと `requiresReindex` の件数) + reextract route | — | Flow 1 / Flow 4 / Flow 5 |
 | 3.1 | 添付削除連動 | AttachmentSearchIndexer.onDetach | `addDetachHandler` | — |
-| 3.2 | 親ページ削除連動 (eventual cleanup) | AttachmentOrphanSweeper (rebuildIndex 時) + 検索時の権限判定 (親ページの無い添付ヒットはどの経路でも返らない) | searchAccessiblePages, snippetVisiblePageIds | Flow 5 / Flow 2 |
+| 3.2 | 親ページ削除連動 (eventual cleanup) | AttachmentOrphanSweeper (rebuildIndex 時) + 検索時の権限判定 (親ページの無い添付ヒットはどの経路でも返らない) | searchAccessiblePages | Flow 5 / Flow 2 |
 | 3.3 | 権限変更連動 (query-time) | 検索時の権限判定 (searchAccessiblePages) — **添付 ES 文書は更新しない** | searchAccessiblePages | Flow 2 / Flow 3 (コード不要) |
 | 3.4 | 削除/orphan sweep 失敗ログ | pino + FailureLogService | — | — |
 | 4.1 | viewer フィルタ (query-time) | AttachmentSearchResultAggregator + searchAccessiblePages (facet=attachments と検索結果のページへの添付ヒット。page_index と MongoDB の両方で確認) | — | Flow 2 |
@@ -571,6 +571,7 @@ Key decisions:
 | 9.3 | API 後方互換 | `IPageWithSearchMeta.meta.attachmentHits` optional | — | — |
 | 9.4 | optional フィールド | `interfaces/search.ts` 差分 (`IPageSearchMeta.attachmentHits`) | — | — |
 | 9.5 | 有効時もページ検索は不変、添付ヒットは別の要求 | `GET /_api/search` は `facet=attachments` のときだけ aggregator を呼ぶ。検索結果のページへの添付ヒットは `GET /_api/v3/search/attachments` | AttachmentSearchResultAggregator.resolveSecondary | Flow 2 |
+| 9.6 | 添付ヒットの取得の失敗はエラーで返す | `resolveSecondary` は失敗と 500ms 超過で例外を投げ、ルートは 500 を返す | AttachmentSearchResultAggregator.resolveSecondary | Flow 2.1 |
 
 ## Components and Interfaces
 
@@ -586,9 +587,9 @@ Key decisions:
 | ElasticsearchDelegator extension | Server | 添付 index の名前・mapping・ライフサイクル・bulk 書き込み・削除 (権限フィールドなし) | 2.2, 2.5, 3.1, 6.1, 7.1, 9.2 | ES client (P0) | Service |
 | searchAccessiblePages | Server | 添付ヒットの親ページの判定 (page_index の viewer filter・演算子 + 本文の抜粋の規則 + MongoDB) | 4.1, 4.3, 4.4, 4.5, 4.7 | 既存 ESDelegator の query builder (P0), Page model (P0) | Service |
 | ExtractionFailureLogService | Server | 失敗の Mongo 永続化 + 集計 | 3.4, 8.1, 8.3, 8.4 | Prisma モデル `extractionfailurelogs` (P0) | Service |
-| AttachmentSearchResultAggregator | Server | facet=attachments の検索と、検索結果のページへの添付ヒット。添付ヒットは見てよいページのものだけ、検索演算子の振り分け | 3.3, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 9.1, 9.3, 9.5 | searchAccessiblePages (P0), query builder 2 つ (P0), 既存 Page 検索 (P0) | Service |
+| AttachmentSearchResultAggregator | Server | facet=attachments の検索と、検索結果のページへの添付ヒット。添付ヒットは見てよいページのものだけ、検索演算子の振り分け | 3.3, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 9.1, 9.3, 9.5, 9.6 | searchAccessiblePages (P0), query builder 2 つ (P0), 既存 Page 検索 (P0) | Service |
 | apiv3: attachment-reextract | Server | `POST /attachments/:id/reextract` | 7.1–7.7 | AttachmentSearchIndexer (P0), reextract-gate (P0) | API |
-| apiv3: search-attachments | Server | `GET /search/attachments` (検索結果のページへの添付ヒット) | 4.1, 9.1, 9.3, 9.5 | AttachmentSearchResultAggregator (P0) | API |
+| apiv3: search-attachments | Server | `GET /search/attachments` (検索結果のページへの添付ヒット) | 4.1, 9.1, 9.3, 9.5, 9.6 | AttachmentSearchResultAggregator (P0) | API |
 | apiv3: attachment-search-admin | Server | failures / config 取得更新 | 5.1, 5.2, 5.3, 5.6, 8.4 | ConfigManager (P0), FailureLogService (P0) | API |
 | apiv3: search indices extended | Server | `includeAttachments` フラグ受理、作り直しを裏で起動して即応答 | 6.1, 6.5, 6.6 | AttachmentReindexBatch (P0) | API |
 | Response type (`IPageSearchMeta` / `IFacetedSearchResult`) | Interface | optional `meta.attachmentHits[]` 追加、facet 付き検索の応答 | 9.3, 9.4 | 既存 interfaces/search.ts (P0) | Contract |
@@ -867,7 +868,7 @@ export interface ExtractionFailureLogService {
 | Field | Detail |
 |-------|--------|
 | Intent | `facet=attachments` の検索と、検索結果のページへの添付ヒットの取得を担う。ページと添付の点数を混ぜず、添付ヒットは見てよいページのものだけを返す。検索演算子は本文語と絞り込み条件に振り分けて適用する |
-| Requirements | 3.3, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 9.1, 9.3, 9.5 |
+| Requirements | 3.3, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 9.1, 9.3, 9.5, 9.6 |
 
 **Contracts**: **Service [x]**
 
@@ -975,7 +976,7 @@ export type IFacetedSearchResultMeta = {
   facet: 'attachments';
   total: null;                         // 閲覧者に見えないヒットを数えないため、常に null
   hitsCount: number;                   // data の件数
-  primaryResultIncomplete: boolean;    // 添付の検索か権限確認が失敗したときだけ true
+  primaryResultIncomplete: boolean;    // 添付の検索か権限確認が失敗したときだけ true。成功したときも false で必ず入る
 };
 
 // { data: IPageWithSearchMeta[]; meta: IFacetedSearchResultMeta }
@@ -1362,12 +1363,12 @@ Index は migration `20261117120000-add-indexes-to-extractionfailurelogs.js` が
 - `searchAccessiblePages`: 生成される page_index クエリに `ids` filter・viewer filter・演算子の絞り込み条件が含まれ、本文語の match 句は含まれないこと。`_source` が `path` / `grant` / `granted_users` / `granted_groups` / `updated_at` に限定されること (Page body 非帯同の保証)。page_index では通っても MongoDB の文書で通らないページは返らないこと
 - `GET /_api/search`: `facet` なし・`facet=pages` では、機能が有効でも aggregator を呼ばず attachments_index を触らないこと。`facet=all` と `resolve` は受け付けない (機能が有効なら `facet=all` は 400)
 - `AttachmentSearchResultAggregator.searchPrimary` (`facet=attachments`):
-  - 権限・絞り込みで落ちるヒットがあっても無くても、見えるヒットの並びと `meta` (`total: null`、`primaryResultIncomplete` なし) が同じであること。`primaryResultIncomplete: true` になるのは検索か権限確認が失敗したときだけであること
+  - 権限・絞り込みで落ちるヒットがあっても無くても、見えるヒットの並びと `meta` (`total: null`、`primaryResultIncomplete: false`) が同じであること。`primaryResultIncomplete: true` になるのは検索か権限確認が失敗したときだけであること
   - 添付 index に送る本文クエリに演算子トークン (`author:jim` 等) が含まれないこと。本文語が空のクエリでは添付 index に問い合わせないこと
   - named query (`nq:`) で DEFAULT 以外の delegator に解決されたクエリは facet 指定にかかわらず pages 経路になること
   - 800ms を超えるか失敗したら、空 items + `primaryResultIncomplete: true` を返すこと
 - `AttachmentSearchResultAggregator.resolveSecondary`:
-  - `primaryIds.length > ページサイズ` で 400 相当のエラーを返す
+  - `primaryIds` が重複を除いて 20 件を超えると `RangeError` を投げる (ルートはその前に 400 で断る)
   - `primaryIds` を `searchAccessiblePages` で判定し、通った id だけが `terms: { pageId }` に入ること。見えないページの添付が何件あっても、応答が変わらないこと。1 ページあたりのヒットが 5 件までであること
   - 権限確認か添付の検索が失敗するか 500ms を超えたら、空の結果ではなく例外になること (ルートは 500)
 - `AttachmentSearchIndexer` dual-write 分岐:
