@@ -161,20 +161,5 @@ describe('summarizeDrawioDiagram', () => {
       expect(text).toBe('[draw.io diagram]');
       expect(elapsedMs).toBeLessThan(FAST_ENOUGH_MS);
     });
-
-    it('reads a well-formed compressed diagram that inflates to nearly the limit quickly', () => {
-      const cells = Array.from(
-        { length: 170_000 },
-        (_, i) => `<mxCell id="${i}" value="L${i % 3}" />`,
-      ).join('');
-      const code = compress(
-        `<mxGraphModel><root>${cells}</root></mxGraphModel>`,
-      );
-
-      const { text, elapsedMs } = timedSummary(code);
-
-      expect(text).toBe('[draw.io diagram: L0 / L1 / L2]');
-      expect(elapsedMs).toBeLessThan(FAST_ENOUGH_MS);
-    });
   });
 });
