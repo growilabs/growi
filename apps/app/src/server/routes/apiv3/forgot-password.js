@@ -48,23 +48,17 @@ import { body } from 'express-validator';
 const router = express.Router();
 
 /**
-const router = express.Router();
-
-/**
  * Every password reset request is answered exactly this long after it was
  * received, whatever the outcome, so the response time does not reveal
  * whether the email is registered. Delivery not finished by then is a failure.
  */
-const PASSWORD_RESET_RESPONSE_DELAY_MS = 18 * 1000;
+const PASSWORD_RESET_RESPONSE_DELAY_MS = 18_000;
 
 /**
  * @param {import('~/server/crowi').default} crowi Crowi instance
  * @returns {import('express').Router} router
  */
 export const setup = (crowi) => {
-  const { appService, mailService } = crowi;
-  ...（以降はそのまま）
-
   const { appService, mailService } = crowi;
   const { User } = crowi.models;
 

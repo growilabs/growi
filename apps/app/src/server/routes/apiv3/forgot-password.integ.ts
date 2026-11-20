@@ -60,10 +60,8 @@ describe('POST /forgot-password when the activity could not be created', () => {
       next();
     });
 
-    const routerModule = await import('./forgot-password');
-    // WHY: the route is a CommonJS module without type information
-    const routerFactory = (routerModule as any).default ?? routerModule;
-    app.use('/', routerFactory(crowiMock));
+    const { setup } = await import('./forgot-password');
+    app.use('/', setup(crowiMock));
 
     vi.useFakeTimers({
       shouldAdvanceTime: true,

@@ -125,7 +125,7 @@ describe('processPasswordResetRequest', () => {
     expect(state.outcome).toBe('failed');
   });
 
-  it('records the outcome of a delivery that settles after the response time', async () => {
+  it('records a delivery failure that occurs after the response time', async () => {
     const error = new Error('smtp timeout');
     const deps = createDeps({
       sendPasswordResetMail: vi.fn(() =>
@@ -140,5 +140,23 @@ describe('processPasswordResetRequest', () => {
 
     await vi.advanceTimersByTimeAsync(5000);
     expect(deps.onError).toHaveBeenCalledWith(error);
+  });
+
+  it('records nothing for a delivery that succeeds after the response time', async () => {
+    const deps = createDeps({
+      sendPasswordResetMail: vi.fn(() =>
+        delayed(RESPOND_AT + 5000, () => undefined),
+      ),
+    });
+    const state = start(deps);
+
+    await vi.advanceTimersByTimeAsync(RESPOND_AT);
+    expect(state.outcome).toBe('failed');
+
+    await vi.advanceTimersByTimeAsync(5000);
+    // the request was already answered as failed; a late success must not
+    // emit the "mail sent" activity after the response
+    expect(deps.onMailSent).not.toHaveBeenCalled();
+    expect(deps.onError).not.toHaveBeenCalled();
   });
 });

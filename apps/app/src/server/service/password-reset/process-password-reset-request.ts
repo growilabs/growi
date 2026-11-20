@@ -11,7 +11,7 @@ export interface ProcessPasswordResetRequestDeps {
   readonly isResettableAccount: (email: string) => Promise<boolean>;
   /** Create the reset order and deliver the reset mail. */
   readonly sendPasswordResetMail: (email: string) => Promise<void>;
-  /** Called when the reset mail has been delivered (also after the deadline). */
+  /** Called when the reset mail has been delivered before the deadline. */
   readonly onMailSent: () => void;
   /** Called as soon as an error occurs (also after the deadline). */
   readonly onError: (err: unknown) => void;
@@ -46,8 +46,10 @@ const handle = async (
       return 'failed';
     }
     deps.onDeadlineExceeded();
-    // Delivery is not cancelled; record its final outcome when it settles.
-    sendTask?.then(deps.onMailSent, deps.onError);
+    // Delivery is not cancelled. Only a late failure is reported: the request
+    // has already been answered as failed, so a late success must not record
+    // anything (e.g. an activity emitted after the response is sent).
+    sendTask?.catch(deps.onError);
     return 'failed';
   }
 };
