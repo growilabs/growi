@@ -49,9 +49,10 @@
 - `@growi/core/dist/models` の `DevidedPagePath`（`evalDatePath` によるページ名決定・former/latter 分割に利用のみ）。
 - `@growi/core/dist/utils` の `normalizePath`・`pagePathUtils.isTrashPage` / `isTrashTopPage`。
 - `~/models/linked-page-path` の `LinkedPagePath`（各祖先の href 導出に利用のみ）。
-- 移設後の `~/client/util/format-truncated-page-path`（`formatTruncatedPagePath`）。
+- 移設後の `~/client/util/format-truncated-page-path`（`parsePagePath` / `formatTruncatedPagePath`）。
 - 既存の検索結果データ `pageData.path` / `elasticSearchResult.highlightedPath`（追加取得なし）。
-- `usehooks-ts`（既存依存, 2.16）の `useResizeObserver` / `useIsomorphicLayoutEffect`。ResizeObserver の無い環境（jsdom・SSR）では何もしないため、テストや初回描画で例外にならない。
+- `usehooks-ts`（既存依存, 2.16）の `useIsomorphicLayoutEffect`。
+- ブラウザの `ResizeObserver`。全行で 1 つのインスタンスを共有する（`observeElementWidth`）。ResizeObserver の無い環境（jsdom・SSR）では何もしないため、テストや初回描画で例外にならない。
 
 ### Revalidation Triggers
 - `formatTruncatedPagePath` の戻り値（`TruncatedPagePath.parts` の形状・順序）が変わる場合。
@@ -94,7 +95,7 @@ graph TB
     SearchResultPagePath --> FormatTruncatedPagePath
     SearchResultPagePath --> UseFittingCollapseLevel
     SearchResultAncestorPath --> UseFittingCollapseLevel
-    UseFittingCollapseLevel --> UseResizeObserver[usehooks-ts useResizeObserver]
+    UseFittingCollapseLevel --> SharedResizeObserver[observeElementWidth 共有 ResizeObserver]
 ```
 
 **Architecture Integration**:
@@ -114,7 +115,7 @@ graph TB
 | Frontend | React 18 / Next.js（既存, `next/link`） | 祖先パスのリンク描画 | 新規ライブラリ追加なし |
 | Frontend | `url-join`（既存依存） | href の正規化結合 | `PagePathHierarchicalLink` と同じ利用パターン |
 | Styling | CSS Modules（既存, Biome/Stylelint 対象） | 1 行固定（祖先・区切り・省略記号は縮めず、ページ名だけを縮める） | 共通 mixin `_truncated-path-row.scss` を両コンポーネントの module から `@use` する |
-| Frontend | `usehooks-ts` 2.16（既存依存） | パス表示の幅の変化を検知する（`useResizeObserver`） | 新規ライブラリ追加なし |
+| Frontend | `usehooks-ts` 2.16（既存依存） | 描画後・表示前に溢れを確認する（`useIsomorphicLayoutEffect`） | 新規ライブラリ追加なし |
 
 ## File Structure Plan
 
@@ -173,7 +174,11 @@ apps/app/src/
     │   ├── layout-test-utils.ts                # 新規: テスト用に要素の幅と ResizeObserver を与えるヘルパー（両コンポーネントのテストで共用）
     │   ├── use-fitting-collapse-level.ts       # 新規: 描画結果の溢れを見て段階を選ぶフック（段階の意味は持たない）
     │   ├── use-path-collapse-level.ts          # 新規: パスから最大段階を求めて上記を呼ぶ。両描画コンポーネントで共有
-    │   └── use-fitting-collapse-level.spec.tsx # 新規
+    │   ├── use-fitting-collapse-level.spec.tsx # 新規
+    │   ├── shared-resize-observer.ts           # 新規: 全行で 1 つの ResizeObserver を共有して要素ごとの幅を知らせる
+    │   ├── shared-resize-observer.spec.ts      # 新規
+    │   ├── web-fonts-loaded.ts                 # 新規: Web フォント読み込み完了を全行へ知らせる（リスナーは 1 つだけ登録）
+    │   └── web-fonts-loaded.spec.ts            # 新規
     └── components/
         ├── _truncated-path-row.scss            # 変更: 祖先は縮めない／ページ名だけ縮む、に組み替え
         ├── truncated-path-row-classes.ts       # 変更: 文字単位の省略クラスをページ名専用にする
@@ -195,7 +200,7 @@ apps/app/src/
 
 ```mermaid
 flowchart TD
-    Start[pageData.path + highlightedPath] --> Format[formatTruncatedPagePath path]
+    Start[pageData.path + highlightedPath] --> Parse[parsePagePath path] --> Format[formatTruncatedPagePath parsed]
     Format --> DropName[末尾のページ名パーツを除去]
     DropName --> HasAncestors{祖先パーツが 1 つ以上ある?}
     HasAncestors -->|no| HomeOnly[ルートのアイコンと / のみ描画]
@@ -244,7 +249,7 @@ flowchart TD
 | 3.2–3.3 | 先頭側から段階的に畳む・省略記号は 1 つ | `formatTruncatedPagePath`（`collapseLevel`）, `useFittingCollapseLevel` | `collapseLevel` / `maxCollapseLevel` | 畳み込み段階の選択 |
 | 3.4–3.5 | 祖先を文字単位で切らない・`//` を出さない | 共通 1 行 CSS レシピ（祖先は縮めない） | — | — |
 | 3.6 | ページ名のみ文字単位で切り詰め（モーダル） | `SearchResultPagePath`, `SearchResultPagePath.module.scss` | — | 畳み込み段階の選択: Last |
-| 3.7 | 幅の変化で判定し直す | `useFittingCollapseLevel`（`useResizeObserver`） | — | 畳み込み段階の選択: Resize |
+| 3.7 | 幅の変化で判定し直す | `useFittingCollapseLevel`（`observeElementWidth`） | — | 畳み込み段階の選択: Resize |
 | 3.8 | 横幅を超えない | `useFittingCollapseLevel`, 共通 1 行 CSS レシピ（行の `overflow: hidden`） | — | — |
 | 3.9 | 両画面で同一の規則 | `formatTruncatedPagePath`, `useFittingCollapseLevel`（両コンポーネントで共有） | — | — |
 | 4.1 | 省略時のフルパスホバー | `SearchResultPagePath`, `SearchResultAncestorPath` | `fullPath` → `title` 属性 | System Flows: Render |
@@ -261,7 +266,7 @@ flowchart TD
 | `formatTruncatedPagePath` | Shared util | プレーンパス文字列から、指定された畳み込み段階の表示パーツ列と祖先部分を決定する | 1, 2, 3, 7 | `DevidedPagePath`（P0） | Service |
 | `alignHighlightedPathSegments` | Shared util（`client/util/`） | ハイライト markup をプレーンパスのセグメントに対応付ける（祖先行・ページ名行で共用） | 6, 7 | `normalizePath`（P0） | Service |
 | `buildAncestorPathNodes` | Shared util（`client/util/`） | 中間省略判定と `LinkedPagePath`・ハイライトを橋渡しし、React 非依存のレンダリング計画を返す | 2, 5, 6 | `formatTruncatedPagePath`（P0）, `LinkedPagePath`（P0）, `alignHighlightedPathSegments`（P0） | Service |
-| `useFittingCollapseLevel` | `features/search` hook | 描画結果の溢れと幅の変化から、収まる最小の畳み込み段階を選ぶ | 3 | `useResizeObserver`（P0） | State |
+| `useFittingCollapseLevel` | `features/search` hook | 描画結果の溢れと幅の変化から、収まる最小の畳み込み段階を選ぶ | 3 | `observeElementWidth`（P0） | State |
 | `SearchResultAncestorPath` | `features/search` component | 検索結果一覧の祖先パス部分を 1 行・リンク付き・ハイライト付きで描画する | 1, 2, 3, 4, 5, 6 | `buildAncestorPathNodes`（P0）, `usePathCollapseLevel`（P0） | State |
 | `SearchResultPagePath` | `features/search` component | 検索モーダルのパスを、選ばれた段階で 1 行描画する | 1, 2, 3, 4 | `formatTruncatedPagePath`（P0）, `usePathCollapseLevel`（P0） | State |
 | `PageListItemL` | `client/components/PageList` | オプトイン prop に応じて祖先パス描画先を切り替え、`evalDatePath` を統一する | 7, 8, 9 | `alignHighlightedPathSegments`（P0）, `PagePathHierarchicalLink`（P0, 既存） | State |
@@ -287,6 +292,20 @@ export type PagePathPart =
   | { readonly type: 'segment'; readonly text: string; readonly isPageName: boolean }
   | { readonly type: 'ellipsis' };
 
+/** パスを 1 回だけ分割した結果。最大段階と各段階の parts はここから作る */
+export interface ParsedPagePath {
+  readonly path: string; // 渡されたままのパス（ハイライトの対応付けに使う）
+  readonly isRoot: boolean;
+  readonly fullPath: string;
+  readonly ancestorPath: string;
+  readonly pageName: string;
+  readonly visibleAncestors: readonly string[]; // 基本形で見えている祖先
+  readonly hasMiddleEllipsis: boolean;
+  readonly maxCollapseLevel: number;
+}
+
+export const parsePagePath: (path: string) => ParsedPagePath;
+
 export interface TruncatedPagePath {
   readonly isRoot: boolean;
   readonly parts: readonly PagePathPart[];
@@ -298,11 +317,12 @@ export interface TruncatedPagePath {
 }
 
 export const formatTruncatedPagePath: (
-  path: string,
+  parsed: ParsedPagePath,
   collapseLevel?: number, // 既定 0 = 基本形。0〜maxCollapseLevel に丸める
 ) => TruncatedPagePath;
 ```
-- Preconditions: `path` は正規化前後を問わない任意のページパス文字列。
+- 「パスを祖先とページ名に分け、最大段階を求める」（`parsePagePath`）と「段階に応じて parts を作る」（`formatTruncatedPagePath`）を分ける。描画側は 1 回分割した結果を、段階の選択と parts の生成の両方に使うので、同じパスを 2 回解析しない。
+- Preconditions: `parsePagePath` の `path` は正規化前後を問わない任意のページパス文字列。
 - Postconditions: 段階 0 の `parts` は「全祖先＋ページ名」または「先頭祖先＋省略記号＋直近祖先＋ページ名」のいずれか。段階を上げるごとに、残っている祖先を先頭側から 1 つ省略記号に畳む。最後の `segment` が常に `isPageName: true`。
 - Invariants: どの段階でも省略記号は高々 1 個で、省略記号より後ろの祖先は元の並びの末尾と一致する（`buildAncestorPathNodes` の対応付けがこれに依存する）。
 - Invariants: 副作用なし。同一入力に対し常に同一出力。
@@ -343,12 +363,12 @@ export interface AncestorPathPlan {
 }
 
 export const buildAncestorPathNodes: (
-  path: string,
+  parsed: ParsedPagePath, // parsePagePath の結果。ハイライトの対応付けには parsed.path を使う
   highlightedPath?: string | null,
   collapseLevel?: number, // formatTruncatedPagePath にそのまま渡す。既定 0
 ) => AncestorPathPlan;
 ```
-- 最大段階は計画には含めない。段階を決める前に必要なので、両画面とも `usePathCollapseLevel` が `formatTruncatedPagePath(path).maxCollapseLevel` から求める。
+- 最大段階は計画には含めない。段階を決める前に必要なので、両画面とも `usePathCollapseLevel` が `parsePagePath` の結果の `maxCollapseLevel` を使う。
 - Preconditions: `path` は対象ページの完全パス。`highlightedPath` は Elasticsearch のハイライト markup を含む文字列、または未取得時は `null`/`undefined`。
 - Postconditions: `nodes` の `link` 要素の順序は root→leaf。`ellipsis` は高々 1 件、リンクを持たない。
 - Invariants: `path` と `collapseLevel` が変わらない限り `nodes` の件数・順序は不変（ハイライトの有無は `highlightedHtml` の有無にのみ影響する）。
@@ -364,10 +384,10 @@ export const buildAncestorPathNodes: (
 
 **Responsibilities & Constraints**
 - 描画後・表示前に溢れを確認し、溢れていれば段階を 1 つ上げて描画し直す（System Flows「畳み込み段階の選択」）。
-- コンテナの幅の変化を `useResizeObserver` で検知する。広がったら段階 0 から、狭まったら現在の段階から判定し直す。`resetKey` が変わったら段階 0 に戻す。
-- 段階の意味（何をどう畳むか）は持たない。両画面は `usePathCollapseLevel(path, highlightedPath?)` 経由で使い、これが最大段階を求め、パスとハイライトを `resetKey` にする（ハイライトは太字で幅が変わるため、同じページでもハイライトが変われば基本形から判定し直す）。
+- コンテナの幅の変化を `observeElementWidth` で検知する（`/_search` の最大 200 行で ResizeObserver のインスタンスを 1 つにするため、全行で共有する。測る要素と幅は行ごと）。広がったら段階 0 から、狭まったら現在の段階から判定し直す。`resetKey` が変わったら段階 0 に戻す。
+- 段階の意味（何をどう畳むか）は持たない。両画面は `usePathCollapseLevel(parsed, highlightedPath?)` 経由で使い、これが `parsePagePath` の結果から最大段階を取り出し、パスとハイライトを `resetKey` にする（ハイライトは太字で幅が変わるため、同じページでもハイライトが変われば基本形から判定し直す）。
 - ResizeObserver の無い環境では幅の変化を検知しないだけで、初回の判定は行う。
-- 幅の変化は「段階を決めたときのコンテナ幅」と比べて判断する。同じ幅の通知（監視開始直後の通知を含む）は無視し、全行が判定をやり直さないようにする。段階を決めてから監視が始まるまでの間に幅が変わっていても取りこぼさない。
+- 幅の変化は「段階を決めたときのコンテナ幅」と比べて判断する。同じ幅の通知（監視開始直後の通知を含む）は無視し、全行が判定をやり直さないようにする。段階を決めてから監視が始まるまでの間に幅が変わっていても取りこぼさない。描画のたびに溢れを確認する処理は「今の段階で溢れるか」しか見ないので、そのときの幅が段階を決めたときより広ければ、その幅を記録するだけで済ませず段階 0 から判定し直す（狭まった通知の反映前に幅が広がった場合に、畳んだまま戻らなくなるのを防ぐ）。
 - **幅の前提**: `containerRef` を付ける要素の幅は、中身の長さで決まってはいけない。中身の長さで決まると、`collapseLevel` を上げた後に幅が広がっても検知できず、祖先セグメントが `…` に置き換えられたままになる。この前提は呼び出し側ではなく、パス表示の要素自身が満たす。共通 mixin `row` の `flex: 1 1 0` と `min-width: 0` により、flex の行に直接置けば残りの幅いっぱいになり、block 要素の中に置けば親の幅いっぱいになる。そのため、呼び出し側（`SearchResultMenuItem`・`PageListItemL`）はパス表示を包む要素を挟まずに、行へ直接置く。`SearchResultPagePath` は、呼び出し側が余白を指定するための `className` を受け取る。
 
 **Contracts**: State [x]
@@ -388,7 +408,7 @@ export const useFittingCollapseLevel: (
 ```
 
 **Implementation Notes**
-- Web フォントの読み込みが段階を決めた後に終わると、コンテナ幅は変わらず文字幅だけが変わる。`document.fonts` の `loadingdone` で段階 0 から判定し直す（判断の理由は research.md「Web フォントの読み込み」）。
+- Web フォントの読み込みが段階を決めた後に終わると、コンテナ幅は変わらず文字幅だけが変わる。`document.fonts` の `loadingdone` で段階 0 から判定し直す（判断の理由は research.md「Web フォントの読み込み」）。`/_search` では最大 200 行が表示されるため、`loadingdone` のリスナーは行ごとではなくモジュールで 1 つだけ登録し、そこから各行へ知らせる（`subscribeWebFontsLoaded`）。幅は行ごとに使える幅が違いうるので、測定は行ごとのまま。
 
 #### `SearchResultAncestorPath`（新規）
 

@@ -191,11 +191,12 @@
 - 既存依存で、ResizeObserver の無い環境（jsdom・SSR）では何もしないため、既存テストへの影響がない。
 - 一覧の幅を 1 回だけ測って全行で共有する案は、行ごとにチェックボックス・アイコン等の兄弟要素で使える幅が変わりうるため採らなかった。ResizeObserver 自体は 200 件程度の監視なら軽い。
 - 幅が広がったときだけ段階 0 からやり直す。縮小中に毎回段階 0 へ戻すと、ドラッグ中にちらつくため。ResizeObserver の通知は描画のタイミングと揃わないことがあり、広がった直後に 1 フレームだけ基本形が `overflow: hidden` で切れて見える可能性があるが、`//` にはならないので許容する。
+- **PR #12255 レビュー後に変更**: 測る要素と幅は行ごとのまま、ResizeObserver のインスタンスは全行で 1 つを共有する（`observeElementWidth`）。1 つのインスタンスで複数の要素を監視できるため、行ごとにインスタンスを作る理由がない。これに伴い `useResizeObserver` は使わなくなった。
 
 ### Web フォントの読み込み: 対策しない（→ PR レビュー後に対応、下記）
 - フォント読み込みで文字幅が変わってもコンテナ幅は変わらず、判定し直されない。ただし行の `overflow: hidden` で横幅は超えず、祖先は縮まないので `//` も出ない。検索モーダル・`/_search` の結果はページ読み込み後に表示されるので、通常はフォント読み込み済み。発生しても次のリサイズまで畳み方が最適でないだけなので、`document.fonts` の監視は入れない（Simplification）。
 
-- **Superseded (PR #12255 review)**: a late font swap leaves ancestors clipped mid-character at the row edge (or over-collapsed) until the next resize, which is the very look this revision removes. The hook now listens to `document.fonts` `loadingdone` and re-fits from level 0; the cost is one re-fit per font load.
+- **Superseded (PR #12255 review)**: a late font swap leaves ancestors clipped mid-character at the row edge (or over-collapsed) until the next resize, which is the very look this revision removes. The hook now listens to `document.fonts` `loadingdone` and re-fits from level 0; the cost is one re-fit per font load. All rows share a single `loadingdone` listener (registered at module level while any row is mounted) instead of one per row, since `/_search` renders up to 200 rows.
 
 ### フックの置き場所: `features/search/client/hooks/`
 - 現時点の消費者は `features/search` 内の 2 コンポーネントのみ。roadmap Phase 2（パンくず）で必要になった時点で共有の場所へ移す。
