@@ -16,7 +16,7 @@ import { killStrayChildren } from './runner/spec-support';
 import { type RunningService, startService } from './service';
 
 // The composition root (design.md judgement 5): settings -> runner -> app ->
-// listener, from the environment alone. Req 1.4 / 1.5: no token, no service.
+// listener, from the environment alone. No token, no service.
 // Stopping drains like uvicorn on SIGTERM: no new connections, the requests
 // in flight still get their answers, however long they take.
 

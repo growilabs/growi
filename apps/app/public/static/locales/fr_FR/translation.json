@@ -835,6 +835,7 @@
     "successfully_created": "Utilisateur {{username}} crée.",
     "can_not_activate_maximum_number_of_users": "Ne peut activer au dessus du nombre maximal d'utilisateur.",
     "failed_to_activate": "Échec de l'activation.",
+    "only_invited_user_can_activate": "Seul un utilisateur invité peut activer un compte.",
     "unable_to_use_this_user": "Impossible d'utiliser cet utilisateur",
     "complete_to_install1": "Complétez pour installer GROWI! Connectez vous en tant qu'administrateur",
     "complete_to_install2": "Complétez pour installer GROWI! Vérifier les paramètres de la page.",

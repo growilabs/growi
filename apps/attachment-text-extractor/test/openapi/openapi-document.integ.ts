@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+
+import { APP_ID_PATTERN } from '../../src/http/app-label';
 import { ERROR_TABLE } from '../../src/http/error-table';
 import {
   type Answer,
@@ -17,8 +20,8 @@ import { useTestService } from '../../src/http/spec-support/test-service';
 import { responseChecker, schemaChecker, textAt } from './openapi-support';
 
 // The document is generated from the route definitions (research.md 17.13).
-// Checked here: (1) what a client generated from it keeps for POST /extract
-// (Req 7.1, 7.2): the request fields and whether they are required, the
+// Checked here: (1) what a client generated from it keeps for POST /extract:
+// the request fields and whether they are required, the
 // answer types, the ErrorCode values; (2) real answers fit the documented
 // schemas, read in the strict view (17.7 2 (iv)): an undocumented field or
 // status fails.
@@ -34,6 +37,24 @@ const service = useTestService(() => {
 const served = async (): Promise<Record<string, unknown>> =>
   jsonOf(await getPath(service.current().url, '/openapi.json'));
 
+/** major.minor.patch only: a pre-release or build suffix fails rather than compares. */
+const versionParts = (version: string): readonly number[] => {
+  if (!/^\d+\.\d+\.\d+$/.test(version)) {
+    throw new Error(`not a major.minor.patch version: ${version}`);
+  }
+  return version.split('.').map(Number);
+};
+
+/** Negative, zero or positive as `a` is older than, the same as or newer than `b`. */
+const compareVersions = (a: string, b: string): number => {
+  const left = versionParts(a);
+  const right = versionParts(b);
+  const differing = left.findIndex((part, i) => part !== right[i]);
+  return differing === -1
+    ? 0
+    : (left[differing] ?? 0) - (right[differing] ?? 0);
+};
+
 const EXTRACT = ['paths', '/extract', 'post'] as const;
 const PAGE = { pageNumber: 1, label: '1', content: 'x' };
 const EXTRACTED = {
@@ -42,7 +63,7 @@ const EXTRACTED = {
   extractedCharacters: 1,
 };
 
-describe('what a client generated from the document keeps (Req 7.1, 7.2)', () => {
+describe('what a client generated from the document keeps', () => {
   it('documents POST /extract, GET /healthz and GET /readyz', async () => {
     const doc = await served();
 
@@ -67,6 +88,34 @@ describe('what a client generated from the document keeps (Req 7.1, 7.2)', () =>
     expect(fits({ mimeType: 'text/plain' })).not.toEqual([]);
     expect(fits({ file: 'x', mimeType: 1 })).not.toEqual([]);
     expect(fits({ file: 'x', mime_type: 'text/plain' })).not.toEqual([]);
+  });
+
+  it('POST /extract documents one optional header, X-Growi-App-Id, shaped as the log accepts it', async () => {
+    const doc = await served();
+    const parameters = textAt(doc, [...EXTRACT, 'parameters']);
+
+    expect(parameters).toEqual([
+      {
+        in: 'header',
+        name: 'X-Growi-App-Id',
+        required: false,
+        schema: { type: 'string', pattern: APP_ID_PATTERN.source },
+      },
+    ]);
+  });
+
+  // At least, not equal: the written version is raised in the PR that adds the
+  // changeset, and package.json catches up only when the release PR merges.
+  it('is not older than the package version', async () => {
+    const documented = textAt(await served(), ['info', 'version']);
+    const packaged: unknown = JSON.parse(
+      readFileSync(new URL('../../package.json', import.meta.url), 'utf8'),
+    ).version;
+    if (typeof documented !== 'string' || typeof packaged !== 'string') {
+      throw new Error('a version is missing');
+    }
+
+    expect(compareVersions(documented, packaged)).toBeGreaterThanOrEqual(0);
   });
 
   it('names the schemas the client and apps/app use', async () => {

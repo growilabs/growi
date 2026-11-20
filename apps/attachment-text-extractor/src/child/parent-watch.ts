@@ -33,7 +33,7 @@ const endNow = (): void => {
 
 /**
  * Starts a thread that ends this process as soon as the parent's end of fd 4
- * closes, even while the main thread is stuck in synchronous code (Req 3.11).
+ * closes, even while the main thread is stuck in synchronous code.
  * Resolves once that thread is reading fd 4. A child without its watch must
  * not go on converting, so a failing watch ends the process.
  */

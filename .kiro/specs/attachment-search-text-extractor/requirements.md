@@ -18,6 +18,7 @@ GROWI monorepo には添付ファイル (PDF / Office / テキスト系) から�
 - サービスはステートレスで、k8s の共有 Deployment として運用でき、Docker image を使う OSS の環境でも動かせる
 - 外部バイナリ・ネットワーク egress を要求せず、npm から取得できる部品 (ビルド済みのネイティブ部品と WebAssembly を含む) だけで完結する
 - 悪意ある大容量 / 細工された / ハングを起こす添付に対するリソース保護 (最大サイズ / タイムアウト / 同時実行上限 / 展開量などの上限) が組み込まれている
+- 複数の GROWI の app で 1 つのサービスを共有するとき、運用者がログの行から呼び出し元の app を見分けられ、処理中の件数・応答の数・所要時間・プロセスの状態を監視システム (Prometheus) で集められる
 - 日本語の添付を検索で見つけられる形のテキストを返す (抽出時に入る語の途中の空白・改行を残さない)
 - Image サイズは 400MB 以下に収まる
 - 経路の定義から作る OpenAPI の文書を、下流の生成クライアント (`packages/attachment-text-extractor-client`) の入力として書き出せる
@@ -29,7 +30,7 @@ GROWI monorepo には添付ファイル (PDF / Office / テキスト系) から�
 
 ### スコープ
 
-- **In**: `apps/attachment-text-extractor/` ディレクトリ全体 (package 設定 / src / テスト / scripts / ベンチマーク / Dockerfile / 運用者向けの文書 `docker/README.md` / `AGENTS.md`) / Hono アプリ (`POST /extract` multipart、`GET /healthz`、`GET /readyz`、`GET /openapi.json`) / 形式別の変換と形式の対応表 / リソース保護 / 日本語テキストの正規化 / API のスキーマ / 経路の定義から作る OpenAPI の文書とその書き出し / 専用 CI workflow (`.github/workflows/ci-attachment-text-extractor.yml`) / サービス単体テスト
+- **In**: `apps/attachment-text-extractor/` ディレクトリ全体 (package 設定 / src / テスト / scripts / ベンチマーク / Dockerfile / 運用者向けの文書 `docker/README.md` / `AGENTS.md`) / Hono アプリ (`POST /extract` multipart と任意のヘッダー `X-Growi-App-Id`、`GET /healthz`、`GET /readyz`、`GET /openapi.json`、`GET /metrics`) / 形式別の変換と形式の対応表 / リソース保護 / 日本語テキストの正規化 / 呼び出し元の app を出すログと稼働状況の指標 / API のスキーマ / 経路の定義から作る OpenAPI の文書とその書き出し / 専用 CI workflow (`.github/workflows/ci-attachment-text-extractor.yml`) / サービス単体テスト
 - **Out**: GROWI 側統合 (AttachmentService ハンドラ登録、ES インデックス化、生成クライアントを使う側の実装、検索結果 UI、管理画面、抽出失敗ログの Mongo 永続化等) は下流 spec の責務。k8s の manifest の例は持たない (動かすときに守る条件は `docker/README.md` に文章で書く)。画像 OCR / 音声動画文字起こし / YouTube / Azure DI / ZIP 再帰展開 / Docling 等の高精度抽出 / Outlook MSG は本 spec のスコープ外
 
 ### 制約
@@ -48,7 +49,7 @@ GROWI monorepo には添付ファイル (PDF / Office / テキスト系) から�
 
 本 spec は、GROWI の添付ファイル全文検索機能 (umbrella `attachment-search`) を 3-way split した結果のうち、**添付ファイルからテキストを抽出する Node.js マイクロサービス**単体を対象とする。`apps/attachment-text-extractor/` 配下の Hono アプリケーション、Dockerfile、運用者向けの文書、OpenAPI の書き出し、CI を一つの閉じた成果物として完成させる。
 
-抽出サービスは純粋に「バイト列 → `pages[]` 構造の Markdown テキスト」への変換のみを責務とする。形式判定、形式別の位置情報抽出 (PDF ページ / PPTX スライド / XLSX シート)、リソース保護 (サイズ / タイムアウト / 同時実行)、外部 egress 遮断下での動作、コンテナのセキュリティハードニング、OpenAPI の文書の書き出し、コードの構成が本 spec の範囲である。
+抽出サービスは純粋に「バイト列 → `pages[]` 構造の Markdown テキスト」への変換のみを責務とする。形式判定、形式別の位置情報抽出 (PDF ページ / PPTX スライド / XLSX シート)、リソース保護 (サイズ / タイムアウト / 同時実行)、外部 egress 遮断下での動作、コンテナのセキュリティハードニング、運用者が負荷を見るためのログと指標、OpenAPI の文書の書き出し、コードの構成が本 spec の範囲である。
 
 GROWI 本体 (apps/app) との統合、生成クライアントの利用、Elasticsearch インデックス化、検索結果 UI、管理画面は下流 spec (`attachment-search-indexing` / `attachment-search-ui`) の責務であり、本 spec には含めない。本 spec が安定した API 契約と Docker image を提供することで、下流 spec が並行して開発可能となる。
 
@@ -65,6 +66,8 @@ GROWI 本体 (apps/app) との統合、生成クライアントの利用、Elast
   - 外部 egress 遮断下での動作と、外部バイナリを要しない依存 (例外は util-linux の `prlimit`。AC 1.7 の注記)
   - API のスキーマ (`ExtractResponse` / `PageInfo` / `ErrorResponse` / `ErrorCode`) と API 契約
   - Dockerfile (multi-stage、非 root、セキュリティハードニング対応) と、動かすときに守る条件を理由つきで書いた運用者向けの文書 (`docker/README.md`)
+  - 呼び出し元の app が名乗る `X-Growi-App-Id` ヘッダーの受け取りと、`/extract` のログの行への出力 (Req 8)
+  - 稼働状況の指標を Prometheus のテキスト形式で返す `GET /metrics` (Req 9)
   - 経路の定義から作る OpenAPI の文書と、その書き出し (`scripts/export-openapi.ts` → `packages/attachment-text-extractor-client/openapi.json`)、書き出した文書と commit 済みの文書の食い違いの検査。文書が変わったときの生成クライアントの作り直しと、それに合わせる apps/app の呼び出し側の名前と型の書き方の修正 (Req 7)
   - 専用 CI workflow (lint / 型の検査 / vitest / image の確認)
   - サービス単体テストと、検索の品質のベンチマーク
@@ -75,11 +78,15 @@ GROWI 本体 (apps/app) との統合、生成クライアントの利用、Elast
   - 画像 OCR / 音声動画文字起こし / YouTube 取り込み / Azure Document Intelligence / ZIP 再帰展開 / Docling 等の高精度抽出
   - Outlook MSG
   - Elasticsearch / MongoDB への直接アクセス (サービスはステートレス、DB 依存ゼロ)
+  - `X-Growi-App-Id` の値を使った判断 (認可、上限、配分) と、その値をメトリクスのラベルにすること
+  - `/metrics` を集める側 (Prometheus の設定、ダッシュボード、自動スケールの設定)
+  - 変換の子が親の環境変数やほかの要求のファイルを読めることへの対策 (umbrella `attachment-search` の roadmap の (h))
 - **Adjacent expectations**:
   - 採用する部品 (research.md §1「決定事項」) が、対象プラットフォーム (linux x64 / arm64) 向けのビルド済みのネイティブ部品、または WebAssembly として npm から取得可能である
   - 実行用の image (`node:24-slim` 系、Debian の util-linux) に `/usr/bin/prlimit` が入っている
   - Docker / Kubernetes のランタイム (cgroups v2 / seccomp / NetworkPolicy 対応 CNI) が前提
-  - 下流 spec (`attachment-search-indexing`) は本 spec が書き出す OpenAPI の文書を入力として orval で生成クライアントを作り、HTTP multipart で `POST /extract` を呼ぶ
+  - 下流 spec (`attachment-search-indexing`) は本 spec が書き出す OpenAPI の文書を入力として orval で生成クライアントを作り、HTTP multipart で `POST /extract` を呼ぶ。GROWI.cloud の app (`GROWI_APP_ID_FOR_GROWI_CLOUD` が設定された app) は `X-Growi-App-Id` を付けて送り、OSS の app は付けない
+  - トークンの要らないパス (`/healthz`・`/readyz`・`/openapi.json`・`/metrics`) に届く要求は、ネットワークの設定 (内向きの通信の制限) で、GROWI の app と監視システムからだけに絞られている
 
 ## Requirements
 
@@ -125,6 +132,13 @@ GROWI 本体 (apps/app) との統合、生成クライアントの利用、Elast
 7. If 1 件の抽出処理が異常終了する (ライブラリ内部の想定外エラーやプロセスの異常終了を含む), the 抽出サービス shall そのリクエストにエラーコードを返却し、他のリクエストの処理を継続する
 8. If CSV / TSV または HTML のファイルサイズが、形式ごとに設定された上限を超える, the 抽出サービス shall 変換用の子プロセスを起動せず、上限超過を示すエラーコードを返却する
 9. When 呼び出し側が抽出処理の途中で接続を切る, the 抽出サービス shall 当該抽出処理の実行そのものを停止し、使っていた同時実行の枠とメモリを解放する
+10. If PPTX または XLSX として渡されたファイルが ZIP ではない (検証に通る ZIP の終わりの記録がファイルのどこにも無い。暗号化された OOXML と旧形式の PPT / XLS はこれに当たる。検証の条件は design.md §ArchiveGuard), the 抽出サービス shall ファイル全体を、形式を明示して anydoc に渡す
+11. If PPTX または XLSX として渡されたファイルが ZIP であるのに、エントリの一覧を最後まで読めない (読めない名前、扱えない版の印を持つエントリ、ZIP の読み手が開けない), the 抽出サービス shall 変換を行わず、`extraction_failed` (422) を返す
+12. If PPTX または XLSX として渡された ZIP に、必要な部品 (`ppt/presentation.xml` または `xl/workbook.xml`) が無いか、同じ名前で 2 つ以上ある, the 抽出サービス shall 変換を行わず、`extraction_failed` (422) を返す
+13. The 抽出サービス shall 2.11 と 2.12 の拒否を、壊れたファイルと同じ `extraction_failed` (HTTP 422) で返し、これらの拒否のための専用の `ErrorCode` を持たない
+14. When PDF のページ、または PPTX のスライドを 1 つ読み終える, the 抽出サービス shall それまでに読んだ `content` の UTF-8 のバイト数の合計 (改行を LF に揃えた後の値。`label` は数えない) が `MAX_RESULT_BYTES` を超えたら、残りを読まずに `result_too_large` で止める
+15. The 抽出サービス shall 2.14 の合計を、全経路の最後に行う結果の大きさの確かめと同じ数え方で数える
+16. The 抽出サービス shall 2.14 の途中の確かめに加えて、全経路の最後にも結果の大きさを確かめる
 
 **自動テストで検証できない残存ギャップ**: k8s (cgroup v2) の既定では、コンテナがメモリの上限に達すると抽出サービス全体が止まり、2.7 の「他のリクエストを継続する」は成り立たない。これは親の RSS 監視で上限の手前で止めることに頼っており、実際のクラスタでは確かめていない。2.8 の大きさの上限は早めに断るためのもので、通ることの保証ではない (小さな CSV や異常な HTML でも RSS の上限で止まる)。同じく `MAX_XLSX_CELLS` のセル数の検査も早めに断るためのもので、すり抜ける形があり、守りの境界は RSS の上限である (research.md §4.11)。2.3 は、1 つの接続に 2 件続けて送ると、1 件目の変換中に 2 件目が枠を取りに行くので、枠が 1 つのときは 2 件目が 503 になる (apps/app はこの送り方をしない)。2.4 は、CI が外向き通信を遮断したコンテナで抽出を確かめている (research.md §4.13)。
 
@@ -140,6 +154,13 @@ GROWI 本体 (apps/app) との統合、生成クライアントの利用、Elast
 2. The GROWI.cloud (k8s) 配布 shall 抽出サービスを共有 Deployment として提供し、負荷に応じて HPA により自動スケールする <!-- derived from umbrella R13.2 -->
 3. The 抽出サービスの運用者向けの文書 (`apps/attachment-text-extractor/docker/README.md`) shall read-only root filesystem、非 root 実行、capabilities drop、network egress 遮断、tmpfs ベースの一時領域 (必要な場合) を推奨設定として、それぞれ理由を付けて提供する <!-- derived from umbrella R13.3 -->
 4. The 抽出サービス shall 状態を持たず (ステートレス)、任意のレプリカ数でスケール可能である <!-- derived from umbrella R13.5 -->
+5. When `/readyz` の確認が終わる, the 抽出サービス shall その結果 (準備完了と準備未完了のどちらも) を、確認を終えた時点から 10 秒間、続く `/readyz` の呼び出しに返す
+6. When 覚えた結果が 10 秒より古くなった後に `/readyz` が呼ばれる, the 抽出サービス shall 確認用の子を起動して確かめ直す
+7. While 確認が実行中である, the 抽出サービス shall 同時に届いた `/readyz` の呼び出しに、その 1 回の確認の結果を共有する
+8. The 抽出サービス shall トークンなしで `/readyz` を休みなく呼ばれても、確認用の子を、前の確認が終わってから 10 秒に 1 回より多くは起動しない
+9. The 運用者向けの文書 (`apps/attachment-text-extractor/docker/README.md`) shall 変換の子が親と同じ uid で動くこと、トークンは子に渡さないが、子は親の環境変数をトークンを含めて `/proc` から読めることを書く
+10. The 運用者向けの文書 shall 3.9 の記述の根拠 (確かめた環境と、確かめていない環境。GROWI.cloud のノードでは試していないこと) を、確かめた範囲を超えない言い方で書く
+11. The 運用者向けの文書 shall 3.9 の事実への対策を決めていないこと (umbrella `attachment-search` の roadmap の (h) で決めること) を書く
 
 **自動テストで検証できない残存ギャップ**: k8s の manifest は持たないので、3.2 の共有 Deployment と自動スケールの設定は、運用者が `docker/README.md` の条件から書く。そこにある CPU の requests / limits と自動スケールの値は出発点で、測った値ではない。CI は image のビルド、大きさ、read-only rootfs・uid 10001・ネットワークなしでの起動、`/readyz`、PDF と DOCX の抽出を確かめている (research.md §4.13)。確かめていないのは、linux-arm64 の image、展開した image の大きさ、本物のオーケストレーターの下での動き (確認、入れ替え、停止の猶予) である。
 
@@ -190,9 +211,43 @@ GROWI 本体 (apps/app) との統合、生成クライアントの利用、Elast
 
 #### Acceptance Criteria
 
-1. The 抽出サービス shall `GET /openapi.json` と書き出しの手順で出す OpenAPI の文書を、経路の定義と、その横に書いたスキーマから作る。文書そのものを手で書いたファイルとして持たない。操作の名前 (`operationId`) とスキーマの名前は、文書を作る道具の既定に従う。文書は、操作 (`POST /extract`、`GET /healthz`、`GET /readyz`)、`POST /extract` に渡す項目 (`file` は必須、`mimeType` は任意)、`POST /extract` の成功とエラーの応答の項目と型、`ErrorCode` の 8 つの値を載せる
+1. The 抽出サービス shall `GET /openapi.json` と書き出しの手順で出す OpenAPI の文書を、経路の定義と、その横に書いたスキーマから作る。文書そのものを手で書いたファイルとして持たない。操作の名前 (`operationId`) とスキーマの名前は、文書を作る道具の既定に従う。文書は、操作 (`POST /extract`、`GET /healthz`、`GET /readyz`)、`POST /extract` に渡す項目 (`file` は必須、`mimeType` は任意)、`POST /extract` が受け付ける任意のヘッダー `X-Growi-App-Id` (AC 8.2 の形の文字列)、`POST /extract` の成功とエラーの応答の項目と型、`ErrorCode` の 8 つの値を載せる
 2. When 文書から orval で生成クライアントを作り直す, the 生成クライアント shall `POST /extract` に渡す項目の名前と必須かどうか、成功とエラーの応答の型、`ErrorCode` の値を、文書のとおりに持つ。関数名と型名は文書の名前から決まる
 3. The CI shall 抽出サービスが出力する OpenAPI の文書と、commit 済みの `openapi.json` が JSON として食い違ったら失敗する
 4. When 経路の定義かスキーマの変更で文書が変わる, the 変更作業 shall commit 済みの `openapi.json` と生成クライアントを同じ変更で作り直し、apps/app の呼び出し側 (`attachment-text-extractor.ts` とそのテスト) を、名前の置き換えと項目の型に合わせる型の書き方の修正の範囲で直す。`POST /extract` に渡す項目の名前、応答の型、`ErrorCode` の値が変わる場合は、下流 spec (`attachment-search-indexing`) の見直しを要する (design.md §Revalidation Triggers)
 5. When 生成クライアントの関数名と型名が変わる, the 変更作業 shall 変わる前と変わった後の名前の対応を research.md に記録する
 6. The 文書を作る仕組み shall 名前や並び順をほかの文書に合わせるための指定と、作った文書を後から書き換える処理を持たない。文書のためだけに書く設定は、文書の題名・説明・版と、OpenAPI が必須にしている応答の説明にとどめる
+
+### Requirement 8: 呼び出し元の app をログに出す
+
+**Objective:** GROWI.cloud の運用者として、抽出サービスのログの行から、要求を送った app を見分けたい。なぜなら、共有している抽出サービスの負荷が、どの顧客から来ているかを抽出サービスの側で知りたいから。
+
+#### Acceptance Criteria
+
+1. When `POST /extract` の要求が認証を通る, the 抽出サービス shall その要求の `/extract` のログの行の最後に ` app=<値>` を付けて出す
+2. When 要求の `X-Growi-App-Id` ヘッダーの値が `^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$` に合う, the 抽出サービス shall その値をそのまま `app=` の値にする
+3. If 要求に `X-Growi-App-Id` ヘッダーが無い, the 抽出サービス shall `app=-` と出す
+4. If `X-Growi-App-Id` ヘッダーの値が 8.2 の形に合わない (空、65 文字以上、使えない文字を含む、同じヘッダーが 2 つ以上ある), the 抽出サービス shall `app=(invalid)` と出し、受け取った値はログに写さない
+5. The 抽出サービス shall `X-Growi-App-Id` の値の有無と形によって、応答のステータス、応答の本文、枠の取り方、変換の上限を変えない
+6. When 本文を受け取る前か変換の前に要求を断る (`service_busy`、`file_too_large`、`upload_timeout`、`invalid_upload`、`client_disconnected`), the 抽出サービス shall その行にも 8.1〜8.4 のとおり `app=` を付ける
+7. The 抽出サービス shall OpenAPI の文書で、`POST /extract` に任意のヘッダー `X-Growi-App-Id` (8.2 の形の文字列) を受け付けることを示す
+
+**`X-Growi-App-Id` の値について**: この値は app が自分で名乗るもので、認証されていない。ほかの app の ID を名乗ることもできる。負荷の内訳を見るためだけに使い、認可・上限・処理の分岐のどれにも使わない (ユーザーの決定)。8.5 は、この値で要求の扱いが変わらないことを求めている。値を送る側 (apps/app) の決まりは `attachment-search-indexing` の requirements.md にある。
+
+### Requirement 9: 稼働状況の指標 (`GET /metrics`)
+
+**Objective:** GROWI.cloud の運用者として、抽出サービスの処理中の件数、応答の数、所要時間、プロセスの状態を監視システムで集めたい。なぜなら、負荷を見て、埋まっている枠の数で自動スケールしたいから。
+
+#### Acceptance Criteria
+
+1. When `GET /metrics` が呼ばれる, the 抽出サービス shall Prometheus のテキスト形式で、この 9.2〜9.6 の値を返す
+2. The 抽出サービス shall いま変換のために取られている枠の数と、枠の上限 (`MAX_CONCURRENCY`) を、それぞれ gauge として出す
+3. The 抽出サービス shall 応答の数を、エンドポイントと HTTP ステータスごとに数えたカウンタとして出す。エンドポイントの値は、サービスが答える 5 つの経路 (`/extract`、`/healthz`、`/readyz`、`/openapi.json`、`/metrics`) と、それ以外すべてをまとめた `other` だけにする
+4. The 抽出サービス shall 9.3 のカウンタに、401 と 404 の応答も含める
+5. The 抽出サービス shall `/extract` の 1 件ごとの結果 (ログの `result=` と同じ値) ごとに、件数のカウンタと所要時間のヒストグラムを出す
+6. The 抽出サービス shall HTTP を受けるプロセスの CPU 時間、メモリ、イベントループの遅れを出す
+7. The 抽出サービス shall どのメトリクスのラベルにも `X-Growi-App-Id` の値を使わない
+8. When `GET /metrics` がトークンなしで呼ばれる, the 抽出サービス shall トークンを求めずに答える。ただし、認証を外すかどうかは、`/healthz` などと同じく、送られた要求の文字列そのもの (`?` より前) が `/metrics` と完全に一致するかで決める
+9. The 抽出サービス shall `GET /metrics` の呼び出しでログの行を出さず、変換の子を起動しない
+
+**自動テストで検証できない残存ギャップ**: 9.3 の数には、Node の HTTP の層が Hono に渡さずに自分で返す答え (壊れた要求と `Host` の無い要求の 400、431、417、408) と、答える前に閉じた接続は入らない (design.md §Monitoring)。`/metrics` を本物の Prometheus で集めることと、`attachment_extractor_slots_in_use / attachment_extractor_slots_max` で自動スケールすることは、運用者の側の設定で、本 spec では確かめていない。

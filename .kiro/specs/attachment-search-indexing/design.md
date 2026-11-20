@@ -545,7 +545,7 @@ Key decisions:
 - **rebuild window 中の dual-write**: `AttachmentSearchIndexer.onAttach/onDetach` が `AttachmentReindexBatch.isRebuilding()` を参照し、true の間は live alias (`{page}-attachments-alias`) と、作り直し先の index (`getTmpIndexName()` が返す名前) の**両方**に書き込む。これにより alias swap 後に新規アップロードや削除が失われない。ただし削除には、作り直しの走査がその添付を読んで抽出している間に起きた場合の穴がある。削除はその時点の両 index に効くが、走査はその後で抽出結果を作り直し先へ書くので、削除済みの添付が戻ってしまう。そこで `onDetach` は削除した添付の id を `AttachmentReindexBatch.recordDetached()` に渡し、batch は作り直し中に渡された id を覚えておく。走査と orphan sweep が終わったら、alias swap の直前にそれらを作り直し先から消す (`removeAttachmentsFromIndex`)。delete-by-query は refresh 前の文書を見ないので、添付の削除はどれも先に対象 index を refresh してから行い、消せなかった文書 (`failures`) があれば失敗として扱う。ふだんのアップロードと再抽出では、抽出中に削除された添付の文書が書き込みで戻らないよう、書いた後に MongoDB にまだ添付があるか確かめ、無ければ消す (research.md 8.6)。この時点で走査は終わっているので、以後の削除は二重削除だけで足りる。`getTmpIndexName()` は作り直し先の index を作り終えてから名前を返す。それより前の書き込みは live だけに入るが、走査はその後に MongoDB を読むので、その添付も新しい index に入る
 - **dual-write の冪等性**: tmp index への書き込みは、bulk upsert が後から同 `_id` で上書きする可能性があるが、doc ID が `${attachmentId}_${pageNumber ?? 0}` で決定的なため順序に依存しない。bulk 側が後勝ちでも real-time 側が後勝ちでも最終状態は同一
 - **dual-write 失敗時**: tmp 側 write の失敗は live 側の成功を阻害しない (pino 記録して continue)。alias swap 後は live が単一 source になり自動的に整合
-- **orphan sweeper**: real-time cascade (pageEvent 購読による即時削除) は採用しない。`AttachmentService.removeAllAttachments()` (ページ削除に伴う一括削除) は detach handler を呼ばないため、ページ削除で残った添付 doc もここで回収する。`AttachmentOrphanSweeper` が MongoDB Page collection と照合して親 Page 不在の添付 doc を eventual に cleanup する。query-time permission 判定により、sweeper 実行までの間も snippet 漏洩は発生しない (`facet=attachments` primary の ids 検索で親 Page 不在 → 該当添付ヒットを drop、`facet=all` の 1 ページ目と secondary が検索するのは、判定を通ったページの添付だけなので、孤児添付は含まれない)。集める pageId は最大 10,000 件で、それを超える分は確かめない (分かっている制限。research.md 10.10、tasks.md 6.4)
+- **orphan sweeper**: real-time cascade (pageEvent 購読による即時削除) は採用しない。`AttachmentService.removeAllAttachments()` (ページ削除に伴う一括削除) は detach handler を呼ばないため、ページ削除で残った添付 doc もここで回収する。`AttachmentOrphanSweeper` が MongoDB Page collection と照合して親 Page 不在の添付 doc を eventual に cleanup する。query-time permission 判定により、sweeper 実行までの間も snippet 漏洩は発生しない (`facet=attachments` primary の ids 検索で親 Page 不在 → 該当添付ヒットを drop、`facet=all` の 1 ページ目と secondary が検索するのは、判定を通ったページの添付だけなので、孤児添付は含まれない)
 - **sweep タイミング**: sweep は tmp への bulk 完了後、alias swap**前**に実行する。rebuild window 中の real-time `onAttach` で追加された doc は `AttachmentService` 自身が Attachment を作成する前提なので、MongoDB の Page collection に親 Page が存在する限り orphan にはならない。rebuild window 中の親 Page 削除は real-time cascade しない設計のため、次回 rebuild で eventual cleanup される (query-time permission により漏洩は防止される)
 
 ## Requirements Traceability
@@ -556,6 +556,7 @@ Key decisions:
 | 1.2 | 構造化ログ | AttachmentSearchIndexer + pino | — | — |
 | 1.3 | 到達不可時も継続 | AttachmentTextExtractorService catch-all | — | Flow 1 |
 | 1.4 | serviceUnreachable 正規化 | AttachmentTextExtractorService | `ExtractionOutcome` | — |
+| 1.5〜1.8 | `X-Growi-App-Id` ヘッダーの付け方 | AttachmentTextExtractorService (`toGrowiAppIdHeaderValue`) | `postExtract` の `headers` | — |
 | 2.1 | 自動インデックス化 | AttachmentSearchIndexer.onAttach | `AttachmentService.addAttachHandler` | Flow 1 |
 | 2.2 | 1 添付 = N 文書 | ES attachments mapping + bulk upsert | Logical Data Model | Flow 1 |
 | 2.3 | URI 未設定時の完全互換 | isFeatureEnabled gate (算出値) | `isAttachmentFullTextSearchEnabled()` (検索サービス設定済み AND `extractorUri` / `extractorToken` が空白以外で設定済み) | — |
@@ -596,7 +597,7 @@ Key decisions:
 | 8.2 | 監視メトリクス | **未実装** (tasks.md 3.4)。件数と所要時間を数値で取り出す口は無い | — | — |
 | 8.3 | Mongo 永続化 + TTL | `extractionfailurelogs` Prisma モデル + index を作る migration (`occurredAt_1` に 90 日の TTL) | — | — |
 | 8.4 | 失敗取得 API | apiv3 admin failures | `GET /admin/attachment-search/failures` | — |
-| 9.1 | 無効時完全互換 | isFeatureEnabled gate 全経路 (既知のずれ: 無効でも不正な `facet` に 400 を返す。tasks.md 9.4) | — | — |
+| 9.1 | 無効時完全互換 | isFeatureEnabled gate 全経路 (無効時は `facet` / `resolve` を読まない) | — | — |
 | 9.2 | Page index 非劣化 | 添付は別 index、Page mapping 不変 | — | — |
 | 9.3 | API 後方互換 | `IPageWithSearchMeta.meta.attachmentHits` optional | — | — |
 | 9.4 | optional フィールド | `interfaces/search.ts` 差分 (`IPageSearchMeta.attachmentHits`) | — | — |
@@ -608,7 +609,7 @@ Key decisions:
 | Component | Domain/Layer | Intent | Req Coverage | Key Dependencies (P0/P1) | Contracts |
 |-----------|--------------|--------|--------------|--------------------------|-----------|
 | AttachmentTextExtractorClient (packages) | Package (TS) | 抽出 API の型安全クライアント (orval 生成) | 2.1, 6.1, 7.1, 1.3 | orval (P0), upstream 抽出サービス (P0) | Service |
-| AttachmentTextExtractorService | Server | クライアント wrapper + 失敗正規化 + 到達不可 fallback + 同時実行数の上限 | 1.1, 1.2, 1.3, 1.4, 2.1, 7.6 | AttachmentTextExtractorClient (P0), FileUploader (P0) | Service |
+| AttachmentTextExtractorService | Server | クライアント wrapper + 失敗正規化 + 到達不可 fallback + 同時実行数の上限 | 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 2.1, 7.6 | AttachmentTextExtractorClient (P0), FileUploader (P0) | Service |
 | AttachmentSearchIndexer | Server | attach/detach/reextract の単一窓口、rebuild window 中は live + tmp への dual-write | 2.1–2.6, 3.1, 3.4, 7.1 | TextExtractor (P0), ESDelegator extension (P0), AttachmentReindexBatch (P0, lifecycle 参照), FailureLogService (P1) | Service, Event |
 | AttachmentOrphanSweeper | Server | rebuildIndex 内で親 Page 不在の添付 doc を eventual cleanup | 3.2, 4.4 | Page model (P0), ESDelegator extension (P0) | Batch |
 | AttachmentReindexBatch | Server | ページと添付の一括再インデックスを裏で実行 (`startRebuild`) + progress + orphan sweeper 統合 + 実行中状態 (`isRebuilding/getTmpIndexName`) 公開 | 6.1, 6.2, 6.3, 6.4, 6.5, 6.6 | TextExtractor (P0), ESDelegator extension (P0), AttachmentOrphanSweeper (P0), Socket.io (P1) | Batch |
@@ -643,6 +644,7 @@ Key decisions:
   - フォームの `mimeType` は、使える拡張子が無く、保存してある MIME type (`fileFormat`) が空でないときだけ送る。抽出サービスは、知っている `mimeType` を拡張子より優先するので、ブラウザが申告した MIME type が拡張子と食い違うファイル (Windows の Excel で開ける CSV は `application/vnd.ms-excel` で保存される) を、誤った形式で読ませないためである
 - **503 `service_busy` retry (burst 耐性)**: 上流が 503 `service_busy` を返した場合、exponential backoff + jitter で**最大 1 回だけ retry** (default 500ms + jitter(0-500ms) 待機)。2 回目も 503 なら `serviceBusy` として正規化し ExtractionFailureLog に記録。待ち時間の定数 (`RETRY_BASE_DELAY_MS` / `RETRY_JITTER_MAX_MS`) は export する (テスト容易性)。複雑な queue / BullMQ は初期実装では導入しない (k8s HPA が pod 増設で対応する前提)
 - **Bearer auth**: 呼び出しごとに `configManager.getConfig('app:attachmentFullTextSearch:extractorToken')` を取得し 前後の空白を除いて `Authorization: Bearer <token>` ヘッダに付与 (secret のファイルから読んだ値の末尾の改行を落とす)。token 未設定時は `isFeatureEnabled()` 段階で早期 return するので通常は到達しないが、保険として未設定検出時は `serviceUnreachable` 正規化
+- **`X-Growi-App-Id` ヘッダー**: 呼び出しごとに `configManager.getConfig('app:growiAppIdForCloud')` を、URI やトークンと同じく読み直す。この値は型の宣言 (`number | undefined`) と違い、環境変数の文字列がそのまま入るので、`String(value)` で文字列にしてから扱う。純関数 `toGrowiAppIdHeaderValue` (`growi-app-id-header.ts`) が、値が無い、または文字列が表示できる ASCII 文字 (0x21〜0x7E) だけでできていないときは `undefined` を返し、そうでなければ文字列をそのまま (前後の空白も取り除かずに) 返す。`undefined` のときはヘッダーを付けず、抽出は続ける (Node は改行などを含むヘッダーの値で要求を作らずに例外を投げ、抽出が失敗してしまうため、それを避ける検査である)。`^[A-Za-z0-9]…` の形の検査は抽出サービスだけが行い、apps/app では繰り返さない (形の決まりを 1 か所にするため)。ヘッダーは、生成クライアントの `postExtract` の axios の引数 `headers` に、`Authorization` と並べて入れる。この値は GROWI.cloud の app の ID であり、秘密ではない (抽出サービスのログの `app=` に出る)
 - **extractorUri DNS rebinding 対策 (メタデータの宛先のみ)**: 送信前に URI の host を名前解決し、結果がクラウドのメタデータの宛先 (リンクローカル `169.254.0.0/16` / `fd00:ec2::254` / `100.100.100.200` / `192.0.0.192`) なら request を送らず `serviceUnreachable` 正規化。IPv6 の literal は `URL#hostname` が `[` `]` 付きで返すので、外してから解決する。名前解決そのものが失敗した場合も `serviceUnreachable`。k8s 内部 DNS / loopback / RFC1918 への解決は許可
 - **リダイレクトには従わない** (`maxRedirects: 0`)。リダイレクト先が内部のアドレスを指しうるため
 - **Bearer auth 失敗**: 上流 401 `unauthorized` は `extraction_failed` ではなく**`serviceUnreachable` に正規化** (機能を soft-disable 相当に degrade、admin が token 不整合に気付くよう pino ERROR ログ + ExtractionFailureLog 記録)。token 回転中の一時的な不一致も自動的に failing open せず、新 token が伝搬するまで抽出は停止。**pino ログ出力時は `Authorization` ヘッダ値をログオブジェクトに含めない** (request オブジェクトや headers をそのまま渡さない。token が共有リソースである extractor へのアクセス権そのものであるため、ログ経由の漏洩を防ぐ)
@@ -678,7 +680,7 @@ export interface AttachmentTextExtractorService {
 ```
 
 - Postconditions: どの失敗でも throw せず `ExtractionOutcome` を返す (ネットワーク障害は `serviceUnreachable`、添付が無ければ `failed` / `attachment_not_found`、ファイルを読めなければ `failed` / `file_read_failed`)
-- Invariants: 1 呼び出しで送る multipart request は 1 回 (混雑時の再試行があれば 2 回)。ファイルは全体をメモリに読んでから送る (ストリーミング不採用)。応答の大きさの上限と、呼び出し全体の制限時間は無い (tasks.md 3.3)
+- Invariants: 1 呼び出しで送る multipart request は 1 回 (混雑時の再試行があれば 2 回)。ファイルは全体をメモリに読んでから送る (ストリーミング不採用)。抽出サービスの応答は 64MiB まで受け取り、超えたら `resourceLimit` にする。1 回の呼び出しは、応答を受け取り終えるまでの全体を `timeoutMs` で打ち切り、`serviceUnreachable` にする (research.md 10.13)
 
 ### AttachmentSearchIndexer
 
@@ -730,7 +732,7 @@ export interface AttachmentSearchIndexer {
 
 **Responsibilities & Constraints**
 - `AttachmentReindexBatch` から呼び出される。独立トリガは持たない (定期 cron や pageEvent 購読は行わない)
-- 作り直し先の index を埋めた後に、その index にある pageId を terms aggregation で集め (最大 10,000 件)、Page collection に無い pageId の文書を作り直し先から削除する。添付を持つページが 10,000 を超えると、超えた分は確かめない (分かっている制限。research.md 10.10、tasks.md 6.4)
+- 作り直し先の index を埋めた後に、その index にある pageId を composite aggregation で 1,000 件ずつ最後まで取り出し、取り出すたびに Page collection と照合して、無い pageId の文書を作り直し先から削除する。添付を持つページの数に上限は無い (research.md 10.10)。一覧と削除は `AttachmentIndexOperations` の `listPageIds` / `removePagesFromIndex` で行う
 - 失敗しても rebuildIndex 本体の成功を阻害しない (pino ログに記録し continue)
 - query-time permission lookup により「sweep までの間の snippet 漏洩」は発生しないため、定期実行は不要 (R4.4 は query-time で、R3.2 は eventual cleanup で満たす二段構え)
 
@@ -798,6 +800,8 @@ export interface AttachmentIndexOperations {
   swapAttachmentAlias(index: string): Promise<void>;                                                  // 1 回の updateAliases で alias を index へ付け替え、前の実 index を削除
   dropRebuildIndex(index: string): Promise<void>;                                                     // alias が指していなければ index を削除 (失敗時の後始末)
   removeAttachmentsFromIndex(attachmentIds: string[], index: string): Promise<void>;                 // refresh してから指定添付の文書を delete-by-query で消す (swap 直前)
+  listPageIds(index: string, after: string | undefined): Promise<{ pageIds: string[]; after: string | undefined }>; // index に文書がある pageId を id の順に 1,000 件ずつ返す (orphan sweep 用。after が undefined なら終わり)
+  removePagesFromIndex(pageIds: string[], index: string): Promise<void>;                             // 指定ページの文書を delete-by-query で消す (orphan sweep 用)
   syncAttachmentIndexed(attachmentId: string, pageId: string, docs: IAttachmentEsDoc[], targetIndex: string): Promise<void>; // alias 宛てだけ require_alias: true。bulk の項目エラーは例外
   removeStaleAttachmentDocs(attachmentId: string, currentDocs: IAttachmentEsDoc[], index: string): Promise<void>; // その添付の文書のうち currentDocs 以外を消す (再抽出の成功後)
   syncAttachmentRemoved(attachmentId: string, targetIndexes: string[]): Promise<void>;                // index ごとの失敗はログに残して続ける
@@ -811,7 +815,7 @@ export interface AttachmentIndexOperations {
 - rebuild window 中: `AttachmentSearchIndexer` が `reindexBatch.getTmpIndexName()` から作り直し先 (例: `'{page}-attachments-2'`) を得て、live alias と作り直し先に 1 回ずつ書く (live を先に書き、作り直し先の失敗は live の成功を妨げない)。書き込み先は抽出の後で決める (抽出中に作り直しが始まることがあるため)
 
 - ES 8/9 mapping 変種を version-aware に選択 (**権限フィールドは mapping に含めない**)
-- 削除 (`removeAttachmentsFromIndex` / `removeStaleAttachmentDocs` / `syncAttachmentRemoved`) は、どれも対象の index を refresh してから delete-by-query を行い、消せなかった文書が返ってきたら失敗として扱う。alias がまだ無い場合 (機能を 1 度も有効にしていない) は何もせずに終わる (`ignore_unavailable`)
+- 削除 (`removeAttachmentsFromIndex` / `removePagesFromIndex` / `removeStaleAttachmentDocs` / `syncAttachmentRemoved`) は、どれも対象の index を refresh してから delete-by-query を行い、消せなかった文書が返ってきたら失敗として扱う。alias がまだ無い場合 (機能を 1 度も有効にしていない) は何もせずに終わる (`ignore_unavailable`)
 - 検索クエリの組み立ては、この拡張ではなく `queries/` の pure function が受け持つ (次の節)
 
 ### 添付検索のクエリ builder と searchAccessiblePages
@@ -994,7 +998,7 @@ resolveAttachmentSecondary(
 
 | Method | Endpoint | Request | Response | Errors |
 |--------|----------|---------|----------|--------|
-| GET | /_api/search (既存 apiv1 の拡張) | `?q=&facet=all\|pages\|attachments&offset=&limit=&resolve=primary\|full` (`facet` 省略時は `pages` = 従来どおり。facet を処理するのは機能が有効で `nq` が無いときだけ。`resolve` は `facet` があるときだけ読む) | `facet` 省略時・`facet=pages`・機能無効・`nq` 付きは既存の `IFormattedSearchResult`。それ以外は `IFacetedSearchResult` (下記) | 既存どおり。`facet` / `resolve` が決まった値でなければ `{ ok: false, code: 400 }` (apiv1 の慣習どおり HTTP 200。機能が無効でも返る)。facet を処理するときは、`limit` が 1〜200 の整数 (既定 50)、`offset` が 0 以上の整数でなければ同じく 400。`limit + offset` が 10,000 を超えると、facet の検査より前に、既存のページ検索と同じ `{ ok: false, error: '(limit + offset) must be less than or equal to 10000' }` を返す (`code` は付かず、HTTP 200) |
+| GET | /_api/search (既存 apiv1 の拡張) | `?q=&facet=all\|pages\|attachments&offset=&limit=&resolve=primary\|full` (`facet` 省略時は `pages` = 従来どおり。facet を処理するのは機能が有効で `nq` が無いときだけ。`resolve` は `facet` があるときだけ読む) | `facet` 省略時・`facet=pages`・機能無効・`nq` 付きは既存の `IFormattedSearchResult`。それ以外は `IFacetedSearchResult` (下記) | 既存どおり。`facet` / `resolve` が決まった値でなければ `{ ok: false, code: 400 }` (apiv1 の慣習どおり HTTP 200。機能が有効なときだけ検査する)。facet を処理するときは、`limit` が 1〜200 の整数 (既定 50)、`offset` が 0 以上の整数でなければ同じく 400。`limit + offset` が 10,000 を超えると、facet の検査より前に、既存のページ検索と同じ `{ ok: false, error: '(limit + offset) must be less than or equal to 10000' }` を返す (`code` は付かず、HTTP 200) |
 | GET | /_api/v3/search/attachments | `?q=&pageIds=id1,id2,...` (`pageIds` はコンマ区切りか繰り返し。重複を除いて 1〜20 件の ObjectId) | `IResolvedSecondaryResult` (`{ facet: 'all', enrichments }`) | 400 `invalid_query` / `invalid_page_ids`, 403 (未ログインでゲストの閲覧が許可されていない), 500, 503 `feature_disabled` |
 | POST | /_api/v3/attachments/:id/reextract | — | `{ outcome: { kind } }` (`ReextractResponse`。抽出テキストは返さない) | 400 (id が ObjectId でない), 404 `notfound_or_forbidden` (添付なし・ページに属さない・親ページなし・admin でもページを閲覧できる利用者でもない、を区別しない同一応答), 429 (回数制限: 添付ごとに 1 分あたり 5 回。rate-limiter が `res.sendStatus(429)` で返すので、本文は `Too Many Requests` の文字だけで、エラーコードは無い), 500 `reextract_failed` (最後まで進められなかった) / `internal_server_error`, 503 `feature_disabled` / `reextract_timeout` (`timeoutMs × 2 + 30 秒` を超えた。抽出の順番待ちを含む) |
 | GET | /_api/v3/admin/attachment-search/failures | `?limit=N&since=iso` (`limit` は 1〜200、既定 50) | `{ items: ExtractionFailureEntry[], total: number }` (新しい順。`total` は `since` 以降の全件数) | 400 validation, 403 forbidden |
@@ -1023,7 +1027,7 @@ export type IFacetedSearchResult = IDataWithRequiredMeta<IPageWithSearchMeta[], 
 **`GET /_api/search` の互換性** (Req 9.1 / 9.3):
 - `facet` を付けない既存の利用者 (UI 以外の API 利用者、MCP など) には、機能の有効・無効にかかわらず従来と同じ処理・同じ応答を返す。UI は既定で `facet=all` を明示して送る
 - 機能無効時に `facet=all` / `attachments` が来た場合は `pages` として処理する (503 にはしない。検索そのものは成立するため)
-- **既知のずれ**: `facet` / `resolve` の値の検査は、機能の有効・無効を見る前に行う。そのため機能が無効でも、不正な `facet` (と、`facet` 付きの不正な `resolve`) には 400 が返る。機能導入前は未知のクエリとして無視されていたので、Req 9.1 の「無効時は導入前と同一」から外れている (直すタスクは tasks.md 9.4)
+- **機能が無効のとき**: `facet` / `resolve` を読まない。値が不正でも検査せず、従来のページ検索をそのまま行う (Req 9.1。機能導入前は未知のクエリとして無視されていたのと同じ動き)
 - 応答の外形 (`ApiResponse.success` + `IFormattedSearchResult`) は変えず、追加分はすべて optional
 
 **`GET /_api/v3/search/attachments` の制約**:
@@ -1386,6 +1390,7 @@ Index は migration `20261117120000-add-indexes-to-extractionfailurelogs.js` が
 
 - `AttachmentTextExtractorService` の失敗正規化: `service_busy` / `timeout` / `unreachable` / upstream 5xx がそれぞれ `ExtractionOutcome` の正しい variant にマップされること。**上流 401 `unauthorized` は `serviceUnreachable` に正規化される**こと
 - `AttachmentTextExtractorService` Bearer auth: 呼び出しごとに最新の `extractorToken` を取得し `Authorization: Bearer <token>` ヘッダが付与されること。token 未設定時は `serviceUnreachable` を返すこと
+- `AttachmentTextExtractorService` の `X-Growi-App-Id`: 設定 `app:growiAppIdForCloud` に値があるとヘッダーが付くこと (数値に見える文字列も、前後の空白を取り除かずに送られること)。値が無い・空・空白や改行や非 ASCII の文字を含むときは、ヘッダーが付かずに抽出が続くこと。送るたびに設定を読み直すこと。判定の純関数 `toGrowiAppIdHeaderValue` は、送る処理とは別にテストする
 - `AttachmentTextExtractorService` DNS rebinding 対策: `extractorUri` の host が metadata IP literal (`169.254.169.254` 等) に解決される場合のみ、request を送信せず `serviceUnreachable` になること。k8s 内部 DNS / loopback / RFC1918 に解決される場合は許可されること
 - extractorUri allowlist (admin PUT): `file://` / `ftp://` / `data:` / `http://169.254.169.254/` / `http://fd00:ec2::254/` / `http://100.100.100.200/` / `http://192.0.0.192/` が 400 `invalid_extractor_uri` で reject されること。`http://127.0.0.1/` / `http://attachment-text-extractor.default.svc.cluster.local/` / `http://10.0.0.1/` は受理されること
 - admin GET `/attachment-search/config` が `extractorToken` の値を返さず、`hasExtractorToken: boolean` だけ返すこと
@@ -1437,6 +1442,7 @@ Index は migration `20261117120000-add-indexes-to-extractionfailurelogs.js` が
   - 同時に走る抽出が 3 件を超えず、超えた呼び出しが到着順に実行されること (`concurrency-limit`)
   - ファイルの読み込みが `timeoutMs` を超えたら stream を閉じて `failed` (`file_read_failed`) になること。`signal` の中断でも止まること (`read-file-chunks`)
   - `maxFileSizeBytes` を超える添付は読まずに `tooLarge` になること
+  - 上限を超える大きさの応答が `resourceLimit` になり、少しずつ届き続ける応答が `timeoutMs` で打ち切られて `serviceUnreachable` になり、接続が閉じること (本物の生成クライアントを代わりのサーバに向ける。`attachment-text-extractor.response-limits.spec.ts`)
 - 作り直しの失敗の上限 (`rebuild-failure-budget`):
   - 障害を疑う結果が `20 + ceil(対象数 × 5%)` に達した時点で止まること。ファイルごとの結果 (`unsupported` など) は数えないこと
   - 全件が障害を疑う結果なら、上限に届かなくても最後に失敗になること。1 件も処理していなければ失敗にならないこと
@@ -1571,4 +1577,4 @@ flowchart LR
 7. **`packages/attachment-text-extractor-client` の公開境界**: server 専用依存として apps/app から import し、UI 側に混入させないレイヤリング制約を lint ルール化するか検討
 8. **`requiresReindex` cardinality agg の共有 ES コスト**: 30 秒のキャッシュはインスタンスごとに独立しているので、複数インスタンスでは admin GET のたびに各インスタンスが集計を投げうる。`precision_threshold` の指定、共有のキャッシュ、MongoDB 上の件数の記録への置き換えのどれかを、リリース後に検討する
 9. **複数インスタンスでの作り直し**: 実行中の判定と、作り直し中の削除の記録はインスタンスごとのメモリにある (research.md 8.6 の「残っている制約」)
-10. **残っている作業**: tasks.md の未完了のタスク (3.3 応答の大きさと呼び出し全体の制限時間、3.4 監視メトリクス、6.4 10,000 ページを超える orphan sweep、9.4 無効時の `facet` の検査、10.8 検索の速さ)
+10. **残っている作業**: tasks.md の未完了のタスク (3.4 監視メトリクス、10.8 検索の速さ)

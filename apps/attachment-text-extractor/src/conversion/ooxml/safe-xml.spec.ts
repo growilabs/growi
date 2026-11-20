@@ -240,7 +240,7 @@ describe('serializeXmlPart', () => {
 });
 
 // Node-specific expectations (research.md 18.7 item 9, 22.6): recorded
-// differences from Python's parse, not to be aligned back (Req 2.3).
+// differences from Python's parse, not to be aligned back.
 describe('parseXmlPart where Node deliberately differs from Python', () => {
   it('caps namespace declarations at 1,000 (Python accepts more)', async () => {
     const declarations = (count: number): Buffer =>

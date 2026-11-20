@@ -4,13 +4,18 @@ import {
   buildCorruptPdf,
   buildDocx,
   buildEncryptedDocx,
+  buildEncryptedWithFarEndRecord,
   buildOwnerPasswordOnlyPdf,
   buildUserPasswordPdf,
+  buildZip,
   ENCRYPTED_MARKER,
   JAPANESE_SAMPLE,
   LEGACY_DOC_PATH,
   LEGACY_PPT_PATH,
   PLAIN_DOCUMENTS,
+  pptxParts,
+  xlsxParts,
+  type ZipEntry,
 } from '../../test/fixtures';
 import type {
   ConversionLimits,
@@ -282,7 +287,7 @@ describe('convert', () => {
     });
   });
 
-  describe('normalization: newlines everywhere, Japanese joining only on the PDF route (Req 2.5)', () => {
+  describe('normalization: newlines everywhere, Japanese joining only on the PDF route', () => {
     it('keeps the Japanese line break of plain text and unifies its newlines', async () => {
       const outcome = await succeed(
         Buffer.from('障害対応メモ\r\n本番環境で発生\r別行'),
@@ -421,6 +426,258 @@ describe('convert', () => {
       const outcome = await fail(buildEncryptedDocx(), 'a.docx');
 
       expect(JSON.stringify(outcome)).not.toContain(ENCRYPTED_MARKER);
+    });
+  });
+
+  describe('PPTX and XLSX ZIPs the archive pre-check cannot read', () => {
+    const END_RECORD_SIZE = 22;
+    const END_RECORD_DIRECTORY_SIZE = 12;
+    const END_RECORD_DIRECTORY_OFFSET = 16;
+    const CENTRAL_VERSION_NEEDED = 6;
+    const CENTRAL_FLAGS = 8;
+    const CENTRAL_NAME = 46;
+    const UTF8_NAME_FLAG = 0x0800;
+
+    // 100,000 cells, over the default cell limit of 70,000.
+    const overCellLimit = xlsxParts([
+      {
+        name: 'Big',
+        rows: Array.from({ length: 50_000 }, (_, r) => [`r${r}a`, `r${r}b`]),
+      },
+    ]);
+    const odd: ZipEntry = { name: 'odd.bin', data: 'x', method: 'stored' };
+    // With them the archive is over the default entry limit of 10,000.
+    const filler = Array.from(
+      { length: 12_000 },
+      (_, i): ZipEntry => ({ name: `f${i}.bin`, data: '', method: 'stored' }),
+    );
+    const deck = pptxParts([{ title: 'Deck title', body: 'deck body' }]);
+
+    /** Patches the first central directory record, found from the end record. */
+    const withFirstEntry = (
+      data: Buffer,
+      patch: (record: number) => void,
+    ): Buffer => {
+      patch(
+        data.readUInt32LE(
+          data.length - END_RECORD_SIZE + END_RECORD_DIRECTORY_OFFSET,
+        ),
+      );
+      return data;
+    };
+
+    const versionNeeded10First = (entries: readonly ZipEntry[]): Buffer => {
+      const data = buildZip([odd, ...entries]);
+      return withFirstEntry(data, (record) => {
+        data.writeUInt16LE(100, record + CENTRAL_VERSION_NEEDED);
+      });
+    };
+
+    const nonUtf8NameFirst = (entries: readonly ZipEntry[]): Buffer => {
+      const data = buildZip([odd, ...entries]);
+      return withFirstEntry(data, (record) => {
+        data.writeUInt16LE(
+          data.readUInt16LE(record + CENTRAL_FLAGS) | UTF8_NAME_FLAG,
+          record + CENTRAL_FLAGS,
+        );
+        data[record + CENTRAL_NAME] = 0xff;
+      });
+    };
+
+    const twice = (parts: readonly ZipEntry[], name: string): Buffer => {
+      const part = parts.find((entry) => entry.name === name);
+      if (part == null) {
+        throw new Error(`fixture lacks ${name}`);
+      }
+      return buildZip([...parts, part]);
+    };
+
+    it.each([
+      [
+        'with xl/workbook.xml twice',
+        () => twice(overCellLimit, 'xl/workbook.xml'),
+      ],
+      [
+        'with an entry needing version 10.0 to extract',
+        () => versionNeeded10First(overCellLimit),
+      ],
+      [
+        'with a UTF-8-flagged name that is not UTF-8',
+        () => nonUtf8NameFirst(overCellLimit),
+      ],
+      [
+        'with 12,000 more entries and one needing version 10.0',
+        () => versionNeeded10First([...overCellLimit, ...filler]),
+      ],
+    ])('refuses a 100,000-cell XLSX %s as malformed', async (_, build) => {
+      const outcome = await fail(build(), 'a.xlsx', null, conversionLimits());
+
+      expect(outcome.failure).toBe('malformed');
+    });
+
+    it('still applies the cell limit when the end record understates the directory size', async () => {
+      const data = buildZip(overCellLimit);
+      const field = data.length - END_RECORD_SIZE + END_RECORD_DIRECTORY_SIZE;
+      data.writeUInt32LE(data.readUInt32LE(field) - 3, field);
+
+      const outcome = await fail(data, 'a.xlsx', null, conversionLimits());
+
+      expect(outcome.failure).toBe('limit_exceeded');
+    });
+
+    it.each([
+      [
+        'with ppt/presentation.xml twice',
+        () => twice(deck, 'ppt/presentation.xml'),
+      ],
+      [
+        'without ppt/presentation.xml',
+        () =>
+          buildZip(
+            deck.map((entry) =>
+              entry.name === 'ppt/presentation.xml'
+                ? { ...entry, name: 'ppt/deck.xml' }
+                : entry,
+            ),
+          ),
+      ],
+    ])('refuses a PPTX %s as malformed', async (_, build) => {
+      const outcome = await fail(build(), 'a.pptx', null, conversionLimits());
+
+      expect(outcome.failure).toBe('malformed');
+    });
+
+    describe('with more stray bytes after the archive than the last 64 KiB', () => {
+      const MIB = 1024 * 1024;
+      const END_SIGNATURE = 0x06054b50;
+      const SEARCH_WINDOW = 0xffff + END_RECORD_SIZE;
+      const TRAILER = 70_000;
+
+      const smallWorkbook = xlsxParts([{ name: 'Small', rows: [['cell']] }]);
+
+      /** End records whose size and offset point at no central directory. */
+      const decoys = (length: number, positions: readonly number[]): Buffer => {
+        const bytes = Buffer.alloc(length);
+        for (const at of positions) {
+          bytes.writeUInt32LE(END_SIGNATURE, at);
+          bytes.writeUInt32LE(0x1234, at + END_RECORD_DIRECTORY_SIZE);
+          bytes.writeUInt32LE(0x5678, at + END_RECORD_DIRECTORY_OFFSET);
+        }
+        return bytes;
+      };
+
+      const understated = (parts: readonly ZipEntry[]): Buffer => {
+        const data = buildZip(parts);
+        const field = data.length - END_RECORD_SIZE + END_RECORD_DIRECTORY_SIZE;
+        data.writeUInt32LE(data.readUInt32LE(field) - 3, field);
+        return data;
+      };
+
+      const around = (archive: Buffer, before: number, after: Buffer): Buffer =>
+        Buffer.concat([Buffer.alloc(before), archive, after]);
+
+      it.each([
+        [
+          '100,000 cells, 70,000 zeros after',
+          () => around(buildZip(overCellLimit), 0, Buffer.alloc(TRAILER)),
+        ],
+        [
+          '100,000 cells, 2 MiB of zeros after',
+          () => around(buildZip(overCellLimit), 0, Buffer.alloc(2 * MIB)),
+        ],
+        [
+          '100,000 cells, 100 bytes before and 70,000 after',
+          () => around(buildZip(overCellLimit), 100, Buffer.alloc(TRAILER)),
+        ],
+        [
+          '12,000 more entries, 70,000 zeros after',
+          () =>
+            around(
+              buildZip([...smallWorkbook, ...filler]),
+              0,
+              Buffer.alloc(TRAILER),
+            ),
+        ],
+        [
+          '12,000 more entries, 100 bytes before and 70,000 after',
+          () =>
+            around(
+              buildZip([...smallWorkbook, ...filler]),
+              100,
+              Buffer.alloc(TRAILER),
+            ),
+        ],
+        [
+          '100,000 cells, 70,000 bytes after holding end records that lead nowhere',
+          () =>
+            around(
+              buildZip(overCellLimit),
+              0,
+              decoys(TRAILER, [0, 1_000, TRAILER - SEARCH_WINDOW - 1]),
+            ),
+        ],
+        [
+          '100,000 cells and 10 bytes after, an end signature cut short by the end of the file',
+          () =>
+            around(
+              buildZip(overCellLimit),
+              0,
+              Buffer.from([0x50, 0x4b, 0x05, 0x06, 0, 0, 0, 0, 0, 0]),
+            ),
+        ],
+      ])('still applies the limits to an XLSX of %s', async (_, build) => {
+        const outcome = await fail(build(), 'a.xlsx', null, conversionLimits());
+
+        expect(outcome.failure).toBe('limit_exceeded');
+      });
+
+      it.each([
+        [
+          'an end record that leads nowhere in the last 64 KiB',
+          () =>
+            around(
+              buildZip(overCellLimit),
+              0,
+              decoys(TRAILER, [TRAILER - 1_000]),
+            ),
+        ],
+        [
+          'an understated directory size',
+          () => around(understated(overCellLimit), 0, Buffer.alloc(TRAILER)),
+        ],
+        [
+          'an understated directory size and 100 bytes before',
+          () => around(understated(overCellLimit), 100, Buffer.alloc(TRAILER)),
+        ],
+      ])('refuses a 100,000-cell XLSX followed by 70,000 bytes with %s', async (_, build) => {
+        const outcome = await fail(build(), 'a.xlsx', null, conversionLimits());
+
+        expect(outcome.failure).toBe('malformed');
+      });
+
+      it.each([
+        ['a.xlsx', smallWorkbook],
+        ['a.pptx', deck],
+      ])('converts a small %s followed by 70,000 zeros as without them', async (fileName, parts) => {
+        const archive = buildZip(parts);
+        const expected = await succeed(archive, fileName);
+
+        const outcome = await succeed(
+          around(archive, 0, Buffer.alloc(TRAILER)),
+          fileName,
+        );
+
+        expect(outcome.pages).toEqual(expected.pages);
+      });
+
+      it('still reports an encrypted XLSX holding an end record far from its end as encrypted', async () => {
+        const outcome = await fail(
+          buildEncryptedWithFarEndRecord(smallWorkbook),
+          'a.xlsx',
+        );
+
+        expect(outcome.failure).toBe('encrypted');
+      });
     });
   });
 

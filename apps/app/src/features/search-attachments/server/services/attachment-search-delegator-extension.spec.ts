@@ -1,6 +1,6 @@
 import type { estypes } from '@elastic/elasticsearch8';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { type DeepMockProxy, mockDeep } from 'vitest-mock-extended';
+import { type DeepMockProxy, mock, mockDeep } from 'vitest-mock-extended';
 
 import type { IAttachmentEsDoc } from '~/features/search-attachments/interfaces/attachment-search';
 import type { ES8ClientDelegator } from '~/server/service/search-delegator/elasticsearch-client-delegator/es8-client-delegator';
@@ -9,6 +9,7 @@ import { mappings as es8Mappings } from '../mappings/attachments-mappings-es8';
 import {
   AttachmentSearchDelegatorExtension,
   attachmentIndexNames,
+  PAGE_IDS_PER_LISTING,
 } from './attachment-search-delegator-extension';
 
 /** An ES 8 client whose writes succeed; index and alias calls are set per test. */
@@ -361,6 +362,121 @@ describe('AttachmentSearchDelegatorExtension', () => {
   // ----------------------------------------------------------------
   // Index lifecycle (alias over two alternating physical indices)
   // ----------------------------------------------------------------
+  describe('listPageIds', () => {
+    /** Answers a composite aggregation over `pageId` the way Elasticsearch does. */
+    const givenDocsOfPages = (pageIdsInIndex: string[]) => {
+      client.search.mockImplementation(async (request) => {
+        const composite = Object.values(request?.aggs ?? {})[0]?.composite;
+        const after = composite?.after?.pageId;
+        const buckets = [...pageIdsInIndex]
+          .sort()
+          .filter((id) => after == null || id > String(after))
+          .slice(0, composite?.size)
+          .map((id) => ({ key: { pageId: id }, doc_count: 1 }));
+        return mock<estypes.SearchResponse>({
+          aggregations: { [Object.keys(request?.aggs ?? {})[0]]: { buckets } },
+        });
+      });
+    };
+
+    const listAll = async (index: string): Promise<string[]> => {
+      const all: string[] = [];
+      let after: string | undefined;
+      do {
+        const listing = await ext.listPageIds(index, after);
+        all.push(...listing.pageIds);
+        after = listing.after;
+      } while (after != null);
+      return all;
+    };
+
+    it('lists every page id of an index larger than one listing, each exactly once', async () => {
+      const pageIds = Array.from(
+        { length: PAGE_IDS_PER_LISTING * 2 + 3 },
+        (_, i) => `page-${String(i).padStart(6, '0')}`,
+      );
+      givenDocsOfPages(pageIds);
+
+      expect(await listAll('growi-attachments-2')).toEqual(pageIds);
+    });
+
+    it('ends the listing of an index that holds exactly one listing of page ids', async () => {
+      const pageIds = Array.from(
+        { length: PAGE_IDS_PER_LISTING },
+        (_, i) => `page-${String(i).padStart(6, '0')}`,
+      );
+      givenDocsOfPages(pageIds);
+
+      expect(await listAll('growi-attachments-2')).toEqual(pageIds);
+    });
+
+    it('refreshes the index before the first listing, so docs written just before are listed', async () => {
+      const order: string[] = [];
+      client.indices.refresh.mockImplementation(() => {
+        order.push('refresh');
+        return Promise.resolve({
+          _shards: { total: 1, successful: 1, failed: 0 },
+        });
+      });
+      client.search.mockImplementation(() => {
+        order.push('search');
+        return Promise.resolve(
+          mock<estypes.SearchResponse>({
+            aggregations: { page_ids: { buckets: [] } },
+          }),
+        );
+      });
+
+      await ext.listPageIds('growi-attachments-2', undefined);
+
+      expect(order).toEqual(['refresh', 'search']);
+      expect(client.indices.refresh).toHaveBeenCalledWith({
+        index: 'growi-attachments-2',
+        ignore_unavailable: true,
+      });
+    });
+
+    it('lists nothing for an empty index', async () => {
+      givenDocsOfPages([]);
+
+      expect(await ext.listPageIds('growi-attachments-2', undefined)).toEqual({
+        pageIds: [],
+        after: undefined,
+      });
+    });
+  });
+
+  describe('removePagesFromIndex', () => {
+    it('deletes every doc of the given pages from the index', async () => {
+      await ext.removePagesFromIndex(['p1', 'p2'], 'growi-attachments-2');
+
+      expect(client.deleteByQuery).toHaveBeenCalledWith(
+        expect.objectContaining({
+          index: 'growi-attachments-2',
+          query: { terms: { pageId: ['p1', 'p2'] } },
+        }),
+      );
+    });
+
+    it('rejects when Elasticsearch reports docs it could not delete', async () => {
+      client.deleteByQuery.mockResolvedValue({
+        deleted: 0,
+        failures: [
+          {
+            id: 'a1_0',
+            index: 'growi-attachments-2',
+            status: 409,
+            cause: { type: 'version_conflict_engine_exception', reason: 'x' },
+          },
+        ],
+      });
+
+      await expect(
+        ext.removePagesFromIndex(['p1'], 'growi-attachments-2'),
+      ).rejects.toThrow();
+    });
+  });
+
   describe('index lifecycle', () => {
     const NAMES = {
       alias: 'att-alias',

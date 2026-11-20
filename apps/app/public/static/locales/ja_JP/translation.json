@@ -833,6 +833,7 @@
     "successfully_created": "{{username}} が作成されました。",
     "can_not_activate_maximum_number_of_users": "ユーザーが上限に達したためアクティベートできません。",
     "failed_to_activate": "アクティベートに失敗しました。",
+    "only_invited_user_can_activate": "招待されたユーザーのみアカウントを有効化できます。",
     "unable_to_use_this_user": "利用できないユーザーIDです。",
     "complete_to_install1": "GROWI のインストールが完了しました！管理者アカウントでログインしてください。",
     "complete_to_install2": "GROWI のインストールが完了しました！はじめに、このページで各種設定を確認してください。",
