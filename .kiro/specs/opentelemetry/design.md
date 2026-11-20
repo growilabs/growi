@@ -37,7 +37,7 @@
 - `node-sdk-resource.ts` の `getResource()` / `setResource()`（NodeSDK private `_resource` への reflective アクセサ）。
 - `logger.ts` の `DiagLoggerPinoAdapter` と `initLogger()`。
 - 同一プロセス内の SDK インスタンス二重生成防止（`sdkInstance` モジュール変数）。
-- `otel:anonymizeInBestEffort` が `true` のときのみ、`opentelemetry-anonymization` の `httpInstrumentationConfig` を HTTP instrumentation の constructor 引数に渡す判断。
+- `otel:anonymizeInBestEffort` が `true` のときのみ、`opentelemetry-anonymization` の `httpInstrumentationConfig` を HTTP instrumentation の constructor 引数に、`serverSpanAnonymizer` を span processor の列に渡す判断。
 
 #### Layer 2: Resource Attribute（identity 専用）
 
@@ -108,7 +108,7 @@ HTTP の匿名化（`anonymization/`）は `opentelemetry-anonymization` が担�
 1. **SDK ライフサイクル** — `node-sdk.ts` が `node-sdk-configuration.ts` / `node-sdk-resource.ts` / `logger.ts` および `custom-metrics/index.ts` を統括する。
 2. **Resource Attribute** — `custom-resource-attributes/` を `node-sdk-configuration.ts` の 2 段階目（`generateAdditionalResourceAttributes`）が consumer として呼ぶ。
 3. **Custom Metric** — `custom-metrics/index.ts` の `setupCustomMetrics()` が起動時に 4 モジュールを順次登録。各モジュールは `growiInfoService` または Node.js stdlib を参照。
-4. **HTTP Anonymization** — `opentelemetry-anonymization` が担う。`node-sdk-configuration.ts` が `otel:anonymizeInBestEffort` に応じて、その `httpInstrumentationConfig` を auto-instrumentation 構築時に注入する。
+4. **HTTP Anonymization** — `opentelemetry-anonymization` が担う。`node-sdk-configuration.ts` が `otel:anonymizeInBestEffort` に応じて、その `httpInstrumentationConfig` を auto-instrumentation 構築時に、`serverSpanAnonymizer` を span processor の列に注入する。
 5. **SemConv** — `semconv.ts` は Layer 1, 2 から参照される葉ノード。
 
 各レイヤは独立に拡張可能で、横断的な相互依存は存在しない。
@@ -312,7 +312,7 @@ export const __testing__: { getSdkInstance, reset };
 **Responsibilities & Constraints**
 - 1 段階目 Resource: `{ service.name: 'growi', service.version: <growi-version> }`。
 - 2 段階目 Resource: `{ service.instance.id?, ...osAttrs, ...appAttrs }` を merge。
-- Trace exporter: `OTLPTraceExporter()`（引数なし）。
+- Span processor: `[serverSpanAnonymizer（enableAnonymization が true のときのみ）, new BatchSpanProcessor(new OTLPTraceExporter())]` を `spanProcessors` に渡す。NodeSDK は `spanProcessors` を渡すと `traceExporter` を使わないため、exporter は `BatchSpanProcessor` に包んで自分で渡す。`OTLPTraceExporter()` は引数なし。
 - Metric reader: `PeriodicExportingMetricReader({ exporter: new OTLPMetricExporter(), exportIntervalMillis: 300000 })`。
 - Instrumentation: `HttpInstrumentation` / `ExpressInstrumentation` / `MongoDBInstrumentation` / `MongooseInstrumentation` の 4 class を直接 `new` し、`instrumentations` 配列に inline 構築。`@opentelemetry/auto-instrumentations-node` および `OTEL_AUTO_INSTRUMENTATION_PROFILE` 環境変数は一切参照しない。
 - `enableAnonymization` が `true` のときのみ `HttpInstrumentation` の constructor 第 1 引数に `httpInstrumentationConfigForAnonymize` を渡し、falsy / 未指定のときは引数なしで呼び出す。

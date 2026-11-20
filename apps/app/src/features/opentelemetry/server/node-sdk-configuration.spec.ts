@@ -30,6 +30,12 @@ vi.mock('./anonymization', () => ({
   httpInstrumentationConfig: {
     startIncomingSpanHook: vi.fn(),
   },
+  serverSpanAnonymizer: {
+    onStart: vi.fn(),
+    onEnd: vi.fn(),
+    forceFlush: vi.fn(),
+    shutdown: vi.fn(),
+  },
 }));
 
 vi.mock('~/utils/growi-version', () => ({
@@ -121,5 +127,63 @@ describe('generateNodeSDKConfiguration', () => {
         mockHttpInstrumentationConstructor.mock.calls[0][0];
       expect(httpConstructorArg).toBeUndefined();
     });
+  });
+
+  describe('spanProcessors', () => {
+    it('should anonymize server spans when enableAnonymization=true', async () => {
+      const { generateNodeSDKConfiguration } = await import(
+        './node-sdk-configuration'
+      );
+      const { serverSpanAnonymizer } = await import('./anonymization');
+
+      const { spanProcessors } = generateNodeSDKConfiguration({
+        enableAnonymization: true,
+      });
+
+      expect(spanProcessors).toContain(serverSpanAnonymizer);
+    });
+
+    it.each`
+      enableAnonymization
+      ${false}
+      ${undefined}
+    `(
+      'should not anonymize server spans when enableAnonymization=$enableAnonymization',
+      async ({ enableAnonymization }) => {
+        const { generateNodeSDKConfiguration } = await import(
+          './node-sdk-configuration'
+        );
+        const { serverSpanAnonymizer } = await import('./anonymization');
+
+        const { spanProcessors } = generateNodeSDKConfiguration({
+          enableAnonymization,
+        });
+
+        expect(spanProcessors).not.toContain(serverSpanAnonymizer);
+      },
+    );
+
+    it.each`
+      enableAnonymization
+      ${true}
+      ${false}
+      ${undefined}
+    `(
+      'should export traces when enableAnonymization=$enableAnonymization',
+      async ({ enableAnonymization }) => {
+        const { generateNodeSDKConfiguration } = await import(
+          './node-sdk-configuration'
+        );
+        const { BatchSpanProcessor } = await import(
+          '@opentelemetry/sdk-trace-node'
+        );
+
+        const { spanProcessors } = generateNodeSDKConfiguration({
+          enableAnonymization,
+        });
+
+        expect(spanProcessors).toContainEqual(expect.any(BatchSpanProcessor));
+      },
+    );
   });
 });

@@ -41,7 +41,7 @@ GROWI の OpenTelemetry 統合 (`apps/app/src/features/opentelemetry/`) を **�
 2. The GROWI server shall `otel:enabled` 設定値と `OTEL_SDK_DISABLED` 環境変数の値が矛盾している場合、`OTEL_SDK_DISABLED` を上書きして整合性を取り、その旨を warn ログとして出力する。
 3. The GROWI server shall NodeSDK 初期化を「SDK 構築・Resource 静的部分のセット」「DB 初期化後の Resource 追加注入」「`start()` 呼び出しと Custom Metric 登録」の 3 段階で行う。各段階は `otel:enabled` を再確認した上で実行する。
 4. The GROWI server shall 同一プロセス内で `initInstrumentation()` を二重に呼ばれても、SDK インスタンスを重複生成しない（再初期化は警告を出してスキップする）。
-5. The GROWI server shall `otel:anonymizeInBestEffort` が `true` のときのみ、匿名化 hook（`httpInstrumentationConfig`）を HTTP instrumentation に渡す。`false` のときは hook を渡さず、HTTP instrumentation の標準動作のみを行う。
+5. The GROWI server shall `otel:anonymizeInBestEffort` が `true` のときのみ、匿名化 hook（`httpInstrumentationConfig`）を HTTP instrumentation に渡し、匿名化の span processor（`serverSpanAnonymizer`）を span processor の列に加える。`false` のときはどちらも渡さず、HTTP instrumentation と Next.js の標準の記録のみを行う。
 
 ### Requirement 2: identity 専用 Resource Attribute
 

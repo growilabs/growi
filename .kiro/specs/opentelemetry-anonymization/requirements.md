@@ -18,7 +18,7 @@
 ## Boundary Context
 
 - **In scope**:
-  - GROWI サーバーが受け取る HTTP リクエスト（サーバー側の span）の URL 属性。
+  - GROWI サーバーが受け取る HTTP リクエスト（サーバー側の span）の URL 属性。HTTP の計測部品の span に加え、Next.js が同じリクエストについて作るサーバー側の span を含む。
   - 匿名化を有効・無効にしたときの挙動と、匿名化した値をすべての URL 属性に反映すること。
   - 利用者データと秘密の値を、パスまたはクエリに含むすべての URL の形。Next.js の画面内遷移用データ URL（`/_next/data/...`）を含む。
   - 一覧表の作成と、一覧表と実際の挙動・実際のルートとのずれを検出する自動テスト。
@@ -44,6 +44,7 @@
 3. When リクエストの URL を匿名化したとき, the GROWI server shall `http.target` と `http.url` の両方に、匿名化した後の値を記録する。`http.url` には、元の URL のスキームとホストに匿名化した後のパスとクエリをつないだ値を記録する。
 4. Where 環境変数 `OTEL_SEMCONV_STABILITY_OPT_IN` で HTTP の新しい形式の属性が有効になっている, the GROWI server shall `url.path` と `url.query` にも、匿名化した後の値を記録する。
 5. When リクエストの URL が匿名化の対象に当てはまらないとき, the GROWI server shall URL 属性を書き換えない。
+6. While `otel:anonymizeInBestEffort` が `true` のとき, the GROWI server shall Next.js が受け取ったリクエストについて作るサーバー側の span の `http.target` にも、同じリクエストの HTTP の計測部品の span と同じ匿名化した値を記録する。
 
 ### Requirement 2: 匿名化対象の一覧表
 
