@@ -26,7 +26,7 @@
  * entry owns its own edit / delete-confirmation state, which is why editing
  * one no longer hides the rest of the thread.
  */
-import { type FC, type JSX, useEffect, useMemo, useRef, useState } from 'react';
+import { type FC, type JSX, useMemo, useRef, useState } from 'react';
 import { UserPicture } from '@growi/ui/dist/components';
 import type { VirtualElement } from '@popperjs/core';
 import { createPortal } from 'react-dom';
@@ -43,6 +43,7 @@ import { useCommentInputControls } from '../MentionAwareCommentInput/use-comment
 import { rangeToVirtualElement } from '../SelectionPopover/selection-virtual-element';
 import { usePopperPosition } from '../SelectionPopover/use-popper-position';
 import { InlineCommentPopoverEntry } from './InlineCommentPopoverEntry';
+import { useCloseOnOutsideMouseDown } from './use-close-on-outside-mouse-down';
 
 import styles from './InlineCommentPreviewPopover.module.scss';
 
@@ -136,35 +137,11 @@ export const InlineCommentPreviewPopover: FC<
 
   usePopperPosition(virtualElement, popperElement);
 
-  // A click/mousedown outside the popover closes it -- SelectionPopover has
-  // no such behavior, so it's implemented directly here.
-  useEffect(() => {
-    const handlePointerDown = (event: MouseEvent): void => {
-      const target = event.target as Node | null;
-      if (
-        popperElement != null &&
-        target != null &&
-        popperElement.contains(target)
-      ) {
-        return;
-      }
-      // The mention-completion popup (typing "@" inside any
-      // MentionAwareCommentInput in this popover -- an edit form or the
-      // reply composer) is portaled to document.body, outside popperElement,
-      // exactly like InlineCommentForm.tsx's own outside-click guard has to
-      // account for.
-      if (
-        target instanceof Element &&
-        target.closest('.cm-tooltip-autocomplete') != null
-      ) {
-        return;
-      }
-      onClose();
-    };
-
-    document.addEventListener('mousedown', handlePointerDown);
-    return () => document.removeEventListener('mousedown', handlePointerDown);
-  }, [popperElement, onClose]);
+  // SelectionPopover has no outside-click-to-close behavior, so this popover adds its own.
+  const { onMouseDownCapture } = useCloseOnOutsideMouseDown(
+    popperElement,
+    onClose,
+  );
 
   const [resolveError, setResolveError] = useState<string>();
   const isResolved = comment.resolvedAt != null;
@@ -221,6 +198,7 @@ export const InlineCommentPreviewPopover: FC<
       // flat on this surface instead of in a box of its own.
       className={`card rounded-4 shadow ${styles['inline-comment-preview-popover-styles']}`}
       onMouseEnter={onPointerEnter}
+      onMouseDownCapture={onMouseDownCapture}
     >
       <div className="card-body">
         <div data-testid="inline-comment-preview-popover-origin">
