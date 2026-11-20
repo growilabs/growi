@@ -83,6 +83,8 @@ describe('decide-release.sh', () => {
     for (const tag of [
       'pdf-converter/v1.0.0',
       'pdf-converter/v2.0.0-RC.0',
+      // The same name one level down: ls-remote matches the tail of a ref name.
+      'other/pdf-converter/v3.0.0',
       'vault-manager/v1.1.7',
       'attachment-text-extractor/v1.0.0',
     ]) {
@@ -129,6 +131,13 @@ describe('decide-release.sh', () => {
     expect(result.output).toBe('should-release=true');
   });
 
+  it('does not take a tag of the same name under another path for the tag being released', () => {
+    const result = decide(checkout, ['3.0.0', 'pdf-converter']);
+
+    expect(result.status).toBe(0);
+    expect(result.output).toBe('should-release=true');
+  });
+
   it('never publishes a prerelease version, without reading the remote', () => {
     const result = decide(unreachable, ['1.2.0-rc.1', 'vault-manager']);
 
@@ -146,12 +155,11 @@ describe('decide-release.sh', () => {
     );
   });
 
-  it('reads the tags from a remote given as the third argument', () => {
-    const remote = join(root, 'remote');
-    const result = decide(unreachable, ['1.1.7', 'vault-manager', remote]);
+  it('fails on an empty version instead of naming a tag that never exists', () => {
+    const result = decide(checkout, ['', 'pdf-converter']);
 
-    expect(result.status).toBe(0);
-    expect(result.output).toBe('should-release=false');
+    expect(result.status).toBe(1);
+    expect(result.output).toBe('');
   });
 
   it('fails on a missing argument', () => {

@@ -1,30 +1,36 @@
 #!/usr/bin/env bash
 # Decide whether a package version still needs publishing.
 #
-# Usage: decide-release.sh <version> <tag-prefix> [remote]
+# Usage: decide-release.sh <version> <tag-prefix>
 #
 # The release workflows publish a Docker image and then create the tag
 # "<tag-prefix>/v<version>", so the tag's presence means the version is already on
 # Docker Hub. Writes "should-release=true|false" to $GITHUB_OUTPUT.
 #
-# The tag is looked up on the remote: actions/checkout fetches a single commit, so the
-# clone has no tags of its own. ls-remote exits 0 when the tag exists and 2 when it does
-# not; any other status means the lookup itself failed, which must never be read as
-# "not published yet".
+# The tag is looked up on the remote (origin): actions/checkout fetches a single commit,
+# so the clone has no tags of its own. ls-remote exits 0 when the tag exists and 2 when
+# it does not; any other status means the lookup itself failed, which must never be read
+# as "not published yet".
 #
 # bin/release/decide-release.spec.ts covers this script.
 
 set -euo pipefail
 
-if [[ $# -lt 2 || $# -gt 3 ]]; then
-  echo "usage: $0 <version> <tag-prefix> [remote]" >&2
+if [[ $# -ne 2 ]]; then
+  echo "usage: $0 <version> <tag-prefix>" >&2
   exit 64
 fi
 
 VERSION=$1
 TAG_PREFIX=$2
-REMOTE=${3:-origin}
 : "${GITHUB_OUTPUT:?GITHUB_OUTPUT is not set}"
+
+# An empty version would name the tag "<tag-prefix>/v", which never exists, and the
+# publish job would then push "latest" alone.
+if [[ -z "$VERSION" || -z "$TAG_PREFIX" ]]; then
+  echo "::error::The version and the tag prefix must not be empty."
+  exit 1
+fi
 
 TAG="${TAG_PREFIX}/v${VERSION}"
 
@@ -36,7 +42,7 @@ if [[ "$VERSION" == *-* ]]; then
 fi
 
 set +e
-git ls-remote --exit-code --tags "$REMOTE" "refs/tags/${TAG}" > /dev/null
+git ls-remote --exit-code --tags origin "refs/tags/${TAG}" > /dev/null
 STATUS=$?
 set -e
 
