@@ -66,7 +66,7 @@
   - _Requirements: 5.3, 5.4, 5.6_
   - _Depends: 2.3_
 
-- [ ] 2.5 止まった複製の回復を実装する
+- [x] 2.5 止まった複製の回復を実装する
   - 引き受けた PageOperation の保存値から回復の材料を組み立てる処理を作る（親を付け直すかは 1.3 の規則で決める）
   - 「サブオペレーション（祖先は数え直し）→ PageOperation の削除 → 通知」の順に行う。担当を外れたら削除も通知もしない。続きの複製はせず、写しは消さない
   - 写しの先頭ページがない場合は PageOperation だけ削除し、本人がいない場合は通知だけしない
@@ -142,3 +142,4 @@
 - 環境: この worktree では pnpm・turbo・npx を使わず `node_modules/.bin` を直接呼ぶ。コミットは `--no-verify`（前処理が `pnpm install` を始めるため）。
 - 2.1: タグは「実際に挿入できたページ」の分だけ写す（変更前は空・閲覧不可のページ ID 分の関連も作っていた）。写しのページに付くタグは同じ。「自分が閲覧可能なページのみ」で本人の GRANT_OWNER ページが外れる挙動は変更前から同じで、この spec の範囲外（別 issue 扱い）。
 - 2.2: 成功時の祖先の「足す」書き込みの直前にも `onBatchStart` を呼ぶ（書き込みの規則「各書き込みの直前に進捗を記録」を優先。設計書の手順3の文面は recount だけに渡すと読めるが、足す側にも渡す）。呼び出し元は写しの先頭ページが `toPath` に存在することを前提にしてよい（なければ例外）。`syncDescendantsUpdate` の第2引数は `{ _id }`（受け取り側は user を読まない）。
+- 2.5: `recoverInterruptedDuplicate` は `OwnershipLostError` 以外の例外（PageOperation の削除後に起きた通知の失敗を含む）を呼び出し元へ返す。2.6（run）と 2.8（cron）は、それを受け止めてログに出し、握りつぶさず・待たない Promise に再送出もしない。「本人がいない」は User のドキュメントがない、または `STATUS_DELETED`（GROWI の削除はドキュメントを残して status を書き換える）。User モデルの参照は design.md の Allowed Dependencies に未記載で、spec-cleanup のときに1行足す。
