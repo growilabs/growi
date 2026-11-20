@@ -167,12 +167,11 @@ describe.skipIf(!process.env.CHANGE_PROPOSAL_MEASURE_TIMING)(
       mailSend.mockClear();
 
       const start = performance.now();
-      const result = await service.approve(
-        proposalId,
-        users.requester,
-        'all',
-        BACKGROUND,
-      );
+      const result = await service.approve(proposalId, {
+        user: users.requester,
+        channel: 'ui',
+        trigger: BACKGROUND,
+      });
       const approveMs = performance.now() - start;
       const expectedPerPage =
         mode === 'on' ? EDIT_COUNT * subscriberIds().length : 0;

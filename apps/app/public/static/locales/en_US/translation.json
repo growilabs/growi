@@ -443,7 +443,9 @@
     "user_not_admin": "Only admin user can delete",
     "single_deletion_empty_pages": "Empty pages cannot be single deleted",
     "complete_deletion_not_allowed_for_user": "You are not allowed to delete this page completely",
-    "deletion_not_allowed_for_user": "You are not allowed to delete this page"
+    "deletion_not_allowed_for_user": "You are not allowed to delete this page",
+    "grant_not_assignable": "The page cannot be placed at this path with its current permission, because the parent page is open to fewer users.",
+    "operation_in_progress": "Another operation on this page or a nearby page is still in progress. Please try again later."
   },
   "page_history": {
     "revision_list": "Revision list",
@@ -839,6 +841,7 @@
     "successfully_created": "The user {{username}} is successfully created.",
     "can_not_activate_maximum_number_of_users": "Can not activate more than the maximum number of users.",
     "failed_to_activate": "Failed to activate.",
+    "only_invited_user_can_activate": "Only an invited user can activate an account.",
     "unable_to_use_this_user": "Unable to use this user.",
     "complete_to_install1": "Complete to Install GROWI ! Please login as admin account.",
     "complete_to_install2": "Complete to Install GROWI ! Please check each settings on this page first.",
@@ -1292,6 +1295,15 @@
     },
     "achievement": {
       "settled_with_percent": "Completed ({{percent}}% achieved)"
+    },
+    "review_term": {
+      "reviewer": "Reviewer",
+      "approve": "Approve",
+      "reject": "Reject",
+      "abstain": "Abstain",
+      "comment": "Comment",
+      "purpose": "Purpose of the change",
+      "decision": "Decision"
     }
   },
   "plantuml": {

@@ -429,7 +429,9 @@
     "user_not_admin": "仅管理员用户可以删除",
     "single_deletion_empty_pages": "空的页面不能被单一删除",
     "complete_deletion_not_allowed_for_user": "您无权永久删除该页面",
-    "deletion_not_allowed_for_user": "您无权删除该页面"
+    "deletion_not_allowed_for_user": "您无权删除该页面",
+    "grant_not_assignable": "上级页面的公开范围更窄，因此无法以当前的公开范围将页面放在此路径下。",
+    "operation_in_progress": "此页面或相邻页面上的其他操作仍在进行中，请稍后再试。"
   },
   "page_history": {
     "revision_list": "修订清单",
@@ -820,6 +822,7 @@
     "successfully_created": "已成功创建用户{{username}。",
     "can_not_activate_maximum_number_of_users": "无法激活超过最大用户数的用户。",
     "failed_to_activate": "无法激活。",
+    "only_invited_user_can_activate": "只有受邀用户才能激活账户。",
     "unable_to_use_this_user": "无法使用此用户。",
     "complete_to_install1": "完成安装GROWI！请以管理员帐户登录。",
     "complete_to_install2": "完成安装GROWI！请先检查此页上的每个设置。",
@@ -1239,6 +1242,15 @@
     },
     "achievement": {
       "settled_with_percent": "已完成（完成度 {{percent}}%）"
+    },
+    "review_term": {
+      "reviewer": "批准人",
+      "approve": "批准",
+      "reject": "驳回",
+      "abstain": "弃权",
+      "comment": "评论",
+      "purpose": "变更目的",
+      "decision": "决定"
     }
   },
   "plantuml": {

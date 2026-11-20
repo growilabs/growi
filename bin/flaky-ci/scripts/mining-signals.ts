@@ -2,7 +2,7 @@
 /**
  * The material for `detect-flaky-ci/SKILL.md`'s ② (sandwich pattern) and ③
  * (matrix divergence) checks — two of the five mechanical "Cheap Suspicion
- * Mining" signals evaluated for every fresh vitest failure. Both checks only
+ * Mining" signals evaluated for every fresh observation. Both checks only
  * re-read data already fetched elsewhere in the same scan (Step 1's run list
  * for ②, the jobs-list call already made for the failing run's commit for
  * ③), so this script makes no `gh api` call of its own — it is a pure
@@ -32,9 +32,11 @@
  * window where Step 2 already found this same identity failing this scan
  * (② looks only at *fresh* observations from this scan, never at an
  * existing issue's recorded history — that is check ④, a separate
- * mechanism). `siblingJobs` is the raw jobs list for `targetRun`'s commit
+ * mechanism). `siblingJobs` comes from the jobs list for `targetRun`'s commit
  * (`gh api repos/growilabs/growi/actions/runs/{RUN_ID}/jobs`), including
- * `jobName` itself.
+ * `jobName` itself. Every row sharing `jobName`'s base name counts as a
+ * sibling, so the procedure passes only the cells that ran the same test —
+ * for a Playwright identity, the same browser and shard (see ③ there).
  *
  * Output fields (exit 0): `sandwich: { hit, evidence }`,
  * `matrixSplit: { hit, evidence }` — both a boolean and a one-line reason,

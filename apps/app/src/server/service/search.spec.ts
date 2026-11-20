@@ -3,12 +3,18 @@ import type { Model } from 'mongoose';
 import mongoose from 'mongoose';
 import { type MockProxy, mock, mockDeep } from 'vitest-mock-extended';
 
+import type {
+  AttachmentSearchInput,
+  AttachmentSearchResultAggregator,
+  IPrimarySearchResult,
+} from '~/features/search-attachments/server/services/attachment-search-result-aggregator';
 import { SearchDelegatorName } from '~/interfaces/named-query';
+import type { IPageWithSearchMeta } from '~/interfaces/search';
 import type Crowi from '~/server/crowi';
 import { UserStatus } from '~/server/models/user/conts';
 import { configManager } from '~/server/service/config-manager/config-manager';
 
-import type { SearchDelegator } from '../interfaces/search';
+import type { QueryTerms, SearchDelegator } from '../interfaces/search';
 import SearchService from './search';
 import type ElasticsearchDelegator from './search-delegator/elasticsearch';
 
@@ -288,5 +294,147 @@ describe('SearchService.searchAuditlogSuggestions()', () => {
     expect(
       searchService.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard,
     ).not.toHaveBeenCalled();
+  });
+});
+
+describe('SearchService.canShowSnippet()', () => {
+  const groupId = new mongoose.Types.ObjectId();
+  const groupPage = {
+    grant: 5,
+    grantedUsers: [],
+    // the Mongo shape: one { item, type } entry per granted group
+    grantedGroups: [{ item: groupId, type: 'UserGroup' }],
+  };
+
+  it('shows the snippet of a group page to a member of the group', () => {
+    const service = new TestSearchService();
+
+    expect(
+      service.canShowSnippet(groupPage, mock<IUser>(), [
+        new mongoose.Types.ObjectId(groupId.toString()),
+      ]),
+    ).toBe(true);
+  });
+
+  it.each([
+    ['an entry without item', [{ type: 'UserGroup' }]],
+    ['a null entry', [null]],
+    ['a bare group id', [groupId]],
+  ])('hides the snippet, without throwing, when grantedGroups holds %s', (_label, grantedGroups) => {
+    const service = new TestSearchService();
+    const legacyPage = { ...groupPage, grantedGroups };
+
+    expect(
+      service.canShowSnippet(legacyPage, mock<IUser>(), [
+        new mongoose.Types.ObjectId(groupId.toString()),
+      ]),
+    ).toBe(false);
+  });
+
+  it('hides the snippet of a group page from a user outside the group', () => {
+    const service = new TestSearchService();
+
+    expect(
+      service.canShowSnippet(groupPage, mock<IUser>(), [
+        new mongoose.Types.ObjectId(),
+      ]),
+    ).toBe(false);
+  });
+});
+
+describe('SearchService.searchByFacet()', () => {
+  const viewer = { user: null, userGroups: null };
+  const input: AttachmentSearchInput = {
+    queryString: 'word',
+    terms: mock<QueryTerms>(),
+    resolvedFilterData: { groupIds: [], notGroupIds: [] },
+    viewer,
+  };
+  const primary: IPrimarySearchResult = {
+    items: [{ data: mock<IPageWithSearchMeta['data']>({ _id: 'p1' }) }],
+    meta: { primaryResultIncomplete: false },
+  };
+
+  let service: TestSearchService;
+  let aggregator: MockProxy<AttachmentSearchResultAggregator>;
+
+  beforeEach(() => {
+    service = new TestSearchService();
+    vi.spyOn(service, 'createAttachmentSearchInput').mockResolvedValue(input);
+    aggregator = mock<AttachmentSearchResultAggregator>();
+    aggregator.searchPrimary.mockResolvedValue(primary);
+  });
+
+  it('answers the attachment search for the parsed query and the requested page', async () => {
+    service.setAttachmentSearchResultAggregator(aggregator);
+
+    const result = await service.searchByFacet('word', viewer, {
+      from: 20,
+      size: 10,
+    });
+
+    expect(result).toBe(primary);
+    expect(aggregator.searchPrimary).toHaveBeenCalledWith(input, {
+      from: 20,
+      size: 10,
+    });
+  });
+
+  it('fails when the attachment search is not initialized', async () => {
+    await expect(service.searchByFacet('word', viewer, {})).rejects.toThrow(
+      'Attachment search is not initialized',
+    );
+  });
+});
+
+describe('SearchService.resolveAttachmentSecondary()', () => {
+  const viewer = { user: null, userGroups: null };
+  const input: AttachmentSearchInput = {
+    queryString: 'word',
+    terms: mock<QueryTerms>(),
+    resolvedFilterData: { groupIds: [], notGroupIds: [] },
+    viewer,
+  };
+
+  let service: TestSearchService;
+
+  beforeEach(() => {
+    service = new TestSearchService();
+    vi.spyOn(service, 'createAttachmentSearchInput').mockResolvedValue(input);
+  });
+
+  it('answers the enrichments the aggregator resolves for the client-supplied ids', async () => {
+    const aggregator = mock<AttachmentSearchResultAggregator>();
+    aggregator.resolveSecondary.mockResolvedValue({ enrichments: {} });
+    service.setAttachmentSearchResultAggregator(aggregator);
+
+    const result = await service.resolveAttachmentSecondary('word', viewer, {
+      primaryIds: ['p1'],
+    });
+
+    expect(result).toEqual({ enrichments: {} });
+    expect(aggregator.resolveSecondary).toHaveBeenCalledWith(input, {
+      primaryIds: ['p1'],
+    });
+  });
+
+  it('propagates a failure of the aggregator', async () => {
+    const aggregator = mock<AttachmentSearchResultAggregator>();
+    aggregator.resolveSecondary.mockRejectedValue(new Error('es down'));
+    service.setAttachmentSearchResultAggregator(aggregator);
+
+    await expect(
+      service.resolveAttachmentSecondary('word', viewer, {
+        primaryIds: ['p1'],
+      }),
+    ).rejects.toThrow('es down');
+  });
+
+  it('fails instead of answering an empty result when the attachment search is not initialized', async () => {
+    await expect(
+      service.resolveAttachmentSecondary('word', viewer, {
+        primaryIds: ['p1'],
+      }),
+    ).rejects.toThrow('Attachment search is not initialized');
   });
 });

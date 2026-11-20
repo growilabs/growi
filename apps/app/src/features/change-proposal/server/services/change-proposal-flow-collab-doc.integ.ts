@@ -140,12 +140,11 @@ describe('change proposal flow: the collaborative document after an apply', () =
     });
     if (!created.ok) throw new Error(JSON.stringify(created.error));
 
-    const approved = await service.approve(
-      created.value.proposalId,
-      users.requester,
-      'all',
-      BACKGROUND,
-    );
+    const approved = await service.approve(created.value.proposalId, {
+      user: users.requester,
+      channel: 'ui',
+      trigger: BACKGROUND,
+    });
 
     expect(approved).toMatchObject({
       ok: true,

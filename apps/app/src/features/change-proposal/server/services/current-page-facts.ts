@@ -1,6 +1,7 @@
-import type { IUserHasId } from '@growi/core';
+import type { HasObjectId, IUserHasId } from '@growi/core';
 import { getIdStringForRef } from '@growi/core';
 import type { HydratedDocument } from 'mongoose';
+import mongoose from 'mongoose';
 
 import type { PageDocument } from '~/server/models/page';
 
@@ -8,6 +9,7 @@ import type { OperationRecord } from '../../interfaces';
 import {
   type CurrentPageFacts,
   targetPageIdOf,
+  type ViewerIdentity,
   type VisibilityContext,
 } from '../domain';
 import { pageModel } from './operation-handlers/page-model';
@@ -52,9 +54,24 @@ const findDeletedPageIds = async (
   return new Set(unique.filter((id) => !existingIds.has(id)));
 };
 
+// null makes findByIdsAndViewer read the user's groups again.
+const groupIdsOf = (
+  identity: ViewerIdentity | undefined,
+): mongoose.Types.ObjectId[] | null =>
+  identity == null
+    ? null
+    : [...identity.userGroupIds, ...identity.externalUserGroupIds].map(
+        (id) => new mongoose.Types.ObjectId(id),
+      );
+
+/**
+ * `identity`, when the caller has already read the viewer's groups
+ * (loadViewerIdentity), is used as the viewer's membership as it is.
+ */
 export const loadViewablePages = async (
   pageIds: readonly string[],
-  viewer: IUserHasId,
+  viewer: HasObjectId,
+  identity?: ViewerIdentity,
 ): Promise<ViewablePages> => {
   const Page = pageModel();
   const found =
@@ -63,7 +80,7 @@ export const loadViewablePages = async (
       : await Page.findByIdsAndViewer(
           [...new Set(pageIds)],
           viewer,
-          null,
+          groupIdsOf(identity),
           false,
           true,
         );

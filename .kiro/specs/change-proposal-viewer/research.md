@@ -150,7 +150,7 @@ umbrella の判断は [../change-proposal/research.md](../change-proposal/resear
 - **Trade-offs**: 部品の props が core の応答の型に依存する。core の応答の形が変わったときは、Revalidation Triggers に従って ai-agent の部品も確かめ直す。
 
 ### Decision: 完了と達成度は依頼した人にだけ表示する
-- **Context**: 要件 11。core は段階と達成度を依頼した人にだけ返す（core の research.md の「段階と達成度は依頼した人にだけ返す」）。
+- **Context**: 要件 11。core は段階と達成度を依頼した人にだけ返す（core の research.md の「Proposal のライフサイクルと適用率は Proposal 作成者にだけ返す」）。
 - **Selected Approach**: core の `requesterState` があるときだけ表示する。完了なら達成度の割合（切り捨て）を添え、分母が 0 なら「完了」だけにする。破棄は「残りを反映せずに閉じた」と表示する。
 - **Rationale**: 割合を四捨五入すると、1 つだけ反映されなかった案が「100%」に見えることがあるので、切り捨てる。破棄は、依頼した人が残りを反映しないと決めたことなので、失敗のように見えない言葉にする。
 
