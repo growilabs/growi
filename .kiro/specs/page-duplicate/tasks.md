@@ -110,7 +110,7 @@
   - _Requirements: 1.1, 3.1, 6.1, 6.2, 6.3_
   - _Depends: 2.6, 2.7_
 
-- [ ] 3.2 起動時の掃除と定期処理の起動を配線する
+- [x] 3.2 起動時の掃除と定期処理の起動を配線する
   - 起動時の掃除の削除対象から、複製の PageOperation を外す
   - 起動時に回復の定期処理を（遅延読み込みで）始める
   - 既存の PageOperation のテストのうち「複製の PageOperation も削除する」期待を書き換え、複製の PageOperation が残り、他の種類は今どおり削除されることを確かめる
@@ -146,3 +146,4 @@
 - 2.7: v4 の複製も全文検索への通知（`syncDescendantsUpdate`、`{ path: newPagePath }`）を最後に1回出す。設計書の「PageOperation・サブオペレーションは持たない」は通知を除く意味（設計書を訂正済み）。3.1 は (1) `newPagePath` に XSS 無害化（`generalXssFilter.process`）後の値を渡す、(2) v4 の入力は `{ sourcePath: page.path, newPagePath, user }`、deps は `pageGrantService` と `pageEvent`、(3) 今の v4 は1回分の例外後も次の回へ進むが新しい処理はそこで止まる（設計どおり）。
 - 2.8: 起動関数 `startInterruptedDuplicateRecoveryCronIfEnabled` は `crowi` ではなく `{ duplicateDeps, appService, waitBeforeRun? }` を受け取る。3.2 は、3.1 で作る `duplicateDeps()`（`activityService` が null のときの確認入り）で `DuplicateDeps` を組み立てて渡す。壊れた PageOperation（保存値の欠落）は `CorruptDuplicatePageOperationError` で見分け、2〜3分ごとに引き受け直されてエラーログが出続ける（PageOperation は残り重なる操作を拒否し続ける）。spec-cleanup で design.md の duplicatePageOperation と Error Handling にこの扱いを足す。引き受けのたびに `new Date()` を読む（実行開始時刻の使い回しは不可）。
 - 3.1: `PageService.duplicateDeps()`（`IPageService` にも追加）が `DuplicateDeps` を組み立てる。`activityService` は呼ぶたびに読み、null なら明示的に例外。3.2 は `crowi.pageService.duplicateDeps()` を起動関数に渡す。`duplicate/index.ts`（barrel）は `startInterruptedDuplicateRecoveryCronIfEnabled` も出すので、crowi/index.ts は barrel からの動的 import で呼ぶ（読み込み時期は PageService の静的 import により実質早まる）。v5 の `toPath` と配下の `newPagePath` は XSS 無害化後の値に統一（経路の検証を通ったパスは変わらない）。PageOperation には populated な page と `{ _id }` の user を保存する。`v5.public-page.integ.ts` と `v5.non-public-page.integ.ts` に `duplicateRecursivelyMainOperation` を指す古いコメントが残る（4.1 か spec-cleanup で直す）。
+- 3.2: crowi の `setupCron` 配線（Req 4.3 を本番で成り立たせる唯一の箇所）には自動テストがない（同じ関数の兄弟の cron にもない）。4.1 か kiro-validate-impl で、起動して `Scheduled the interrupted duplicate recovery (cron: ...)` のログが出ることを1度確かめる。
