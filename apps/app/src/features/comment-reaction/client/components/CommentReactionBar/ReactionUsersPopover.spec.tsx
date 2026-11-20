@@ -1,0 +1,90 @@
+// @vitest-environment happy-dom
+
+import { render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+
+import type { ReactionUser } from '../../../interfaces';
+import { ReactionUsersPopover } from './ReactionUsersPopover';
+
+vi.mock('next-i18next', () => ({
+  useTranslation: () => ({ t: (key: string) => key }),
+}));
+vi.mock('./CommentReactionBar.module.scss', () => ({ default: {} }));
+
+// The anchor must already be in the DOM when the popover mounts, as the chip is in ReactionChip.
+const anchors: HTMLElement[] = [];
+
+const renderPopover = (users: readonly ReactionUser[]): HTMLElement => {
+  const anchor = document.createElement('button');
+  anchors.push(anchor);
+  anchor.textContent = 'anchor';
+  document.body.appendChild(anchor);
+  render(<ReactionUsersPopover target={{ current: anchor }} users={users} />);
+  return anchor;
+};
+
+afterEach(() => {
+  for (const anchor of anchors.splice(0)) {
+    anchor.remove();
+  }
+});
+
+describe('ReactionUsersPopover', () => {
+  it('lists the display names of the users in the given order', async () => {
+    const anchor = renderPopover([
+      { _id: 'u2', username: 'bob', name: 'Bob B.', imageUrlCached: '' },
+      { _id: 'u1', username: 'alice', name: 'Alice A.', imageUrlCached: '' },
+    ]);
+
+    await userEvent.hover(anchor);
+    const items = await screen.findAllByRole('listitem');
+
+    expect(items.map((item) => item.textContent)).toEqual([
+      'Bob B.',
+      'Alice A.',
+    ]);
+  });
+
+  it('is titled with the reacted-by label', async () => {
+    const anchor = renderPopover(['u1']);
+
+    await userEvent.hover(anchor);
+    const list = await screen.findByRole('list');
+    const popover = list.closest('.popover');
+
+    expect(popover).not.toBeNull();
+    expect(
+      within(popover as HTMLElement).getByText('comment_reaction.reacted_by'),
+    ).toBeInTheDocument();
+  });
+
+  it('shows nothing until its target is hovered or focused', () => {
+    renderPopover(['u1']);
+
+    expect(screen.queryByRole('list')).toBeNull();
+  });
+
+  it('stays open when clicked inside while the target has focus, taking the focus so its text can be selected', async () => {
+    const anchor = renderPopover(['u1', 'u2']);
+    anchor.focus();
+    const item = (await screen.findAllByRole('listitem'))[0];
+
+    await userEvent.click(item);
+
+    expect(screen.getByRole('list')).toBeInTheDocument();
+    expect(document.activeElement?.closest('.popover')).not.toBeNull();
+  });
+
+  it('closes when the focus leaves its target for somewhere outside it', async () => {
+    const anchor = renderPopover(['u1']);
+    const elsewhere = document.createElement('button');
+    anchors.push(elsewhere);
+    document.body.appendChild(elsewhere);
+    anchor.focus();
+    await screen.findByRole('list');
+
+    elsewhere.focus();
+
+    await waitFor(() => expect(screen.queryByRole('list')).toBeNull());
+  });
+});

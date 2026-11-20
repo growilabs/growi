@@ -7,6 +7,7 @@ import mongoosePaginate from 'mongoose-paginate-v2';
 import type {
   AttachmentSnapshot,
   ChangeProposalReviewSnapshot,
+  CommentReactionSnapshot,
   IActivity,
   ISnapshot,
   SupportedActionType,
@@ -243,8 +244,9 @@ export type IActivityUpdateParameters = Omit<
  * casts. Add a new variant here when ISnapshot gains one, or its fields are
  * silently dropped on save.
  */
-type PersistableSnapshotFields = AttachmentSnapshot &
-  ChangeProposalReviewSnapshot;
+type PersistableSnapshotFields = Partial<
+  AttachmentSnapshot & ChangeProposalReviewSnapshot & CommentReactionSnapshot
+>;
 
 /**
  * Converts a plain `ISnapshot` to the Prisma composite update envelope.
@@ -278,6 +280,7 @@ function buildSnapshotUpdateEnvelope(
       pagePath: snap.pagePath,
       pageId: snap.pageId,
       fileSize: snap.fileSize,
+      emoji: snap.emoji,
       reviewChannel: snap.reviewChannel,
     },
   };
@@ -463,6 +466,7 @@ export const extension = Prisma.defineExtension((client) => {
               pagePath: snap?.pagePath,
               pageId: snap?.pageId,
               fileSize: snap?.fileSize,
+              emoji: snap?.emoji,
               reviewChannel: snap?.reviewChannel,
             };
 

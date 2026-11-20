@@ -1,0 +1,1 @@
+export const MAX_REACTION_KINDS_PER_COMMENT = 20;

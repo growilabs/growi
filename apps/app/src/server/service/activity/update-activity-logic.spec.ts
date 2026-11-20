@@ -54,6 +54,7 @@ function makeActivity(overrides: { userId?: string | null; createdAt?: Date }) {
       pageId: null,
       fileSize: null,
       reviewChannel: null,
+      emoji: null,
     },
     event: null,
     eventModel: null,

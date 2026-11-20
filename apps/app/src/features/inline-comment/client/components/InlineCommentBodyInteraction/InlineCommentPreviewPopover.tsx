@@ -226,6 +226,7 @@ export const InlineCommentPreviewPopover: FC<
         <div data-testid="inline-comment-preview-popover-origin">
           <InlineCommentPopoverEntry
             id={comment.id}
+            pageId={comment.pageId}
             creator={comment.creator}
             createdAt={comment.createdAt}
             commentText={comment.comment}
@@ -310,6 +311,7 @@ export const InlineCommentPreviewPopover: FC<
               >
                 <InlineCommentPopoverEntry
                   id={reply.id}
+                  pageId={comment.pageId}
                   creator={reply.creator}
                   createdAt={reply.createdAt}
                   commentText={reply.comment}

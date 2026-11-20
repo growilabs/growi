@@ -69,7 +69,10 @@ type InlineCommentUpdateResult = Prisma.Result<
 >;
 
 export interface InlineCommentServiceDeps {
-  prisma: Pick<PrismaClient, 'comments' | 'activities'>;
+  prisma: Pick<
+    PrismaClient,
+    'comments' | 'commentreactions' | 'activities' | '$transaction'
+  >;
   commentService: Pick<CommentService, 'prepareMentionNotifications'>;
   /** Recomputes `Page.commentCount`; failures must never undo the comment write. */
   updateCommentCount: (pageId: string) => Promise<void>;
@@ -537,7 +540,10 @@ export class InlineCommentService {
     });
   }
 
-  /** Deletes a single reply — no cascade needed, unlike `deleteComment()`. */
+  /**
+   * Deletes a single reply and its reactions in one transaction (reactions
+   * first). A reply has no replies of its own, unlike `deleteComment()`.
+   */
   async deleteReply(id: string, actorId: string): Promise<void> {
     const target = await this.deps.prisma.comments.findUnique({
       where: { id },
@@ -554,7 +560,12 @@ export class InlineCommentService {
       );
     }
 
-    await this.deps.prisma.comments.delete({ where: { id } });
+    await this.deps.prisma.$transaction([
+      this.deps.prisma.commentreactions.deleteMany({
+        where: { commentId: id },
+      }),
+      this.deps.prisma.comments.delete({ where: { id } }),
+    ]);
 
     await this.refreshCommentCount(target.pageId);
 

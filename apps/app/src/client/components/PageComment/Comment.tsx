@@ -4,6 +4,10 @@ import { format } from 'date-fns/format';
 import { parseISO } from 'date-fns/parseISO';
 import { UncontrolledTooltip } from 'reactstrap';
 
+import {
+  CommentReactionBar,
+  CommentReactionHeaderButton,
+} from '~/features/comment-reaction/client';
 import type { RendererOptions } from '~/interfaces/renderer-options';
 
 import RevisionRenderer from '../../../components/PageView/RevisionRenderer';
@@ -192,6 +196,12 @@ export const Comment = (props: CommentProps): JSX.Element => {
                   revisionId={String(comment.revision)}
                 />
               </span>
+              <CommentReactionHeaderButton
+                pageId={pageId}
+                commentId={commentId}
+                isReadOnly={isReadOnly}
+                className={`ms-1 ${styles['reaction-add-control']}`}
+              />
               {/* In the header row's own flex flow (`ms-auto`), not
                   `position: absolute` -- absolute ignored
                   `.page-comment-main`'s padding, sitting flush against the
@@ -226,6 +236,11 @@ export const Comment = (props: CommentProps): JSX.Element => {
                   </>
                 )}
               </div>
+              <CommentReactionBar
+                pageId={pageId}
+                commentId={commentId}
+                isReadOnly={isReadOnly}
+              />
               {deleteError != null && (
                 <span
                   className="text-danger d-block"

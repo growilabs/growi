@@ -137,7 +137,18 @@ export const extension = Prisma.defineExtension((client) => {
         async removeWithReplies(commentId: string) {
           const context =
             Prisma.getExtensionContext<typeof prisma.comments>(this);
+          const replies = await context.findMany({
+            where: { replyToId: commentId },
+            select: { id: true },
+          });
+          // Children first (reactions -> replies -> comment): see the
+          // deletion-path extension section of design.md.
           await client.$transaction([
+            client.commentreactions.deleteMany({
+              where: {
+                commentId: { in: [commentId, ...replies.map((r) => r.id)] },
+              },
+            }),
             context.deleteMany({
               where: {
                 replyToId: commentId,

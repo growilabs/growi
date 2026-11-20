@@ -30,6 +30,10 @@ import { DeleteConfirmAlert } from '~/client/components/PageComment/DeleteConfir
 import RevisionRenderer from '~/components/PageView/RevisionRenderer';
 import { Username } from '~/components/User/Username';
 import type { ICommentCreatorSummary } from '~/features/comment/interfaces';
+import {
+  CommentReactionBar,
+  CommentReactionHeaderButton,
+} from '~/features/comment-reaction/client';
 import type { RendererOptions } from '~/interfaces/renderer-options';
 
 import { MentionPickerButton } from '../InlineCommentForm/MentionPickerButton';
@@ -40,6 +44,7 @@ import styles from './InlineCommentPreviewPopover.module.scss';
 
 type InlineCommentPopoverEntryProps = {
   id: string;
+  pageId: string;
   /** `null` when the creator relation could not be resolved, as both comment DTOs allow. */
   creator: ICommentCreatorSummary | null;
   /**
@@ -69,6 +74,7 @@ export const InlineCommentPopoverEntry = (
 ): JSX.Element => {
   const {
     id,
+    pageId,
     creator,
     createdAt,
     commentText,
@@ -129,7 +135,7 @@ export const InlineCommentPopoverEntry = (
   };
 
   return (
-    <>
+    <div>
       <div
         data-testid={`${testIdPrefix}-header`}
         className="d-flex align-items-center gap-2"
@@ -152,6 +158,12 @@ export const InlineCommentPopoverEntry = (
           <FormattedDistanceDate id={id} date={createdAt} />
         </span>
         <span className="ms-auto d-flex align-items-center gap-2">
+          {/* First, so the controls below keep their positions and the close button stays last. */}
+          <CommentReactionHeaderButton
+            pageId={pageId}
+            commentId={id}
+            isReadOnly={false}
+          />
           {/* The author-only controls come first so `headerExtra`'s close
               button stays the last element of the row. They are hidden while
               this entry is being edited or awaiting delete confirmation --
@@ -251,6 +263,8 @@ export const InlineCommentPopoverEntry = (
         </div>
       )}
 
+      <CommentReactionBar pageId={pageId} commentId={id} isReadOnly={false} />
+
       {editError != null && (
         <span
           className="text-danger d-block"
@@ -274,6 +288,6 @@ export const InlineCommentPopoverEntry = (
           onConfirm={handleDeleteConfirm}
         />
       )}
-    </>
+    </div>
   );
 };
