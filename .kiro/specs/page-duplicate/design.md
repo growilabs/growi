@@ -192,7 +192,7 @@ apps/app/src/client/components/InAppNotification/ModelNotification/
 - `apps/app/src/server/service/in-app-notification.ts` — `'updated'` の受け取りで、任意の第4引数（組み立て済みの付帯情報）を受け取り、渡されたときは `generateSnapshot` の代わりに使う。
 - `apps/app/src/client/components/InAppNotification/ModelNotification/useActionAndMsg.ts` — 新しい種類の主文（英語の固定文、既存と同じ扱い）を追加する。
 - `apps/app/src/client/components/InAppNotification/ModelNotification/PageModelNotification.tsx` — 新しい種類のときに補足文を表示する。
-- `apps/app/public/static/locales/{en_US,ja_JP,zh_CN,fr_FR,ko_KR}/translation.json` — 補足文の文言を追加する。
+- `apps/app/public/static/locales/{en_US,ja_JP,zh_CN,fr_FR,ko_KR}/commons.json` の `in_app_notification.page_duplicate_interrupted.{summary,advice}` — 補足文の文言を追加する。
 
 ## System Flows
 

@@ -86,7 +86,11 @@
     "notifications": "通知",
     "filter_all": "すべて",
     "no_news": "ニュースはありません",
-    "view_detail": "詳細を見る"
+    "view_detail": "詳細を見る",
+    "page_duplicate_interrupted": {
+      "summary": "{{fromPath}} の複製が途中で止まりました。{{toPath}} に複製できたのは、{{sourcePageCount}} ページのうち {{copiedPageCount}} ページだけです。",
+      "advice": "不完全な複製を削除するか、別の名前で複製し直してください。"
+    }
   },
   "personal_dropdown": {
     "home": "ホーム",
