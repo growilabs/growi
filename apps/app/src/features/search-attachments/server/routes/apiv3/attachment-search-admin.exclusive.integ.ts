@@ -212,6 +212,9 @@ describe.skipIf(process.env.ELASTICSEARCH_URI == null)(
       await createAttachments(1);
       invalidateRequiresReindexCache();
       expect(await requiresReindex()).toBe(true);
-    });
+      // This sequence makes well over a dozen real HTTP/Elasticsearch/Mongo
+      // round-trips (including a full index rebuild); the default testTimeout
+      // is sometimes too tight for that under ordinary CI contention.
+    }, 60_000);
   },
 );
