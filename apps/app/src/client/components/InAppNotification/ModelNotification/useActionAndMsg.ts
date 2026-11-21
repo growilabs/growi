@@ -36,6 +36,10 @@ export const useActionMsgAndIconForModelNotification = (
       actionMsg = 'duplicated';
       actionIcon = 'file_copy';
       break;
+    case SupportedAction.ACTION_PAGE_DUPLICATE_INTERRUPTED:
+      actionMsg = 'duplicate was interrupted for';
+      actionIcon = 'error';
+      break;
     case SupportedAction.ACTION_PAGE_DELETE:
       actionMsg = 'deleted';
       actionIcon = 'delete';
