@@ -5,6 +5,7 @@ import { randomSleep } from '~/server/util/random-sleep';
 import loggerFactory from '~/utils/logger';
 
 import {
+  STALL_THRESHOLD_MS,
   type StalledDuplicatePageOperation,
   takeOverStalledDuplicate,
 } from './duplicate-page-operation';
@@ -20,6 +21,13 @@ const logger = loggerFactory(
 
 /** Upper bound of the random wait at the start of each run. */
 export const RECOVERY_JITTER_MS = 30 * 1000;
+
+/**
+ * Delay of the single run after start-up. A PageOperation left by the process
+ * that just died expires only STALL_THRESHOLD_MS after its last progress, so an
+ * earlier run would find nothing to recover.
+ */
+export const BOOT_RUN_DELAY_MS = STALL_THRESHOLD_MS;
 
 export interface InterruptedDuplicateRecoveryCronInput {
   readonly duplicateDeps: DuplicateDeps;
@@ -111,14 +119,33 @@ export class InterruptedDuplicateRecoveryCronService extends CronService {
   }
 }
 
+export interface StartInterruptedDuplicateRecoveryCronInput
+  extends InterruptedDuplicateRecoveryCronInput {
+  /** Defaults to BOOT_RUN_DELAY_MS. */
+  readonly bootRunDelayMs?: number;
+}
+
+const scheduleBootRun = (
+  service: InterruptedDuplicateRecoveryCronService,
+  delayMs: number,
+): void => {
+  // unref: a pending start-up run must not keep the process alive at shutdown
+  setTimeout(() => {
+    service.executeJob().catch((err) => {
+      logger.error(err, 'The start-up interrupted duplicate recovery failed');
+    });
+  }, delayMs).unref();
+};
+
 /**
  * Starts the recovery cron IFF `app:interruptedDuplicateRecoveryCronSchedule`
- * is non-empty. An invalid expression is logged and skipped rather than allowed
- * to break the boot, as for startWipPageCleanupCronIfEnabled (whose comment
- * describes the node-cron behavior this catch relies on).
+ * is non-empty, and runs the recovery once BOOT_RUN_DELAY_MS after start-up.
+ * An invalid expression is logged and skipped (start-up run included) rather
+ * than allowed to break the boot, as for startWipPageCleanupCronIfEnabled
+ * (whose comment describes the node-cron behavior this catch relies on).
  */
 export const startInterruptedDuplicateRecoveryCronIfEnabled = (
-  input: InterruptedDuplicateRecoveryCronInput,
+  input: StartInterruptedDuplicateRecoveryCronInput,
 ): void => {
   const schedule = configManager.getConfig(
     'app:interruptedDuplicateRecoveryCronSchedule',
@@ -129,7 +156,9 @@ export const startInterruptedDuplicateRecoveryCronIfEnabled = (
   }
 
   try {
-    new InterruptedDuplicateRecoveryCronService(input).startCron();
+    const service = new InterruptedDuplicateRecoveryCronService(input);
+    service.startCron();
+    scheduleBootRun(service, input.bootRunDelayMs ?? BOOT_RUN_DELAY_MS);
     logger.info(
       `Scheduled the interrupted duplicate recovery (cron: '${schedule}')`,
     );

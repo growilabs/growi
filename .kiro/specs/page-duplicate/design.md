@@ -30,7 +30,7 @@
 
 - 複製されたページの revision の本文を、元ページの最新の revision にそろえる（1.1〜1.3）。
 - 複製中の GROWI のプロセスのメモリ増加を、本文の大きさ・revision の数・ページ数によらない量にする（2.1〜2.4）。
-- 止まった複製を5分以内に回復し、作りかけの写しをページツリーにつなぎ、本人に通知する（3.1〜3.3、4.1〜4.7、5.1〜5.6）。
+- 止まった複製を、プロセスが再起動した場合は再起動から5分以内に、それ以外は15分以内に回復し、作りかけの写しをページツリーにつなぎ、本人に通知する（3.1〜3.3、4.1〜4.7、5.1〜5.6）。
 - 受け付け方、応答、写る範囲、公開範囲、タグの扱いを変えない（6.1〜6.4）。
 
 ### Non-Goals
@@ -218,7 +218,7 @@ sequenceDiagram
     Run->>SubOp: runDuplicateSubOperation with recordProgress before each batch
     Run->>DupPageOp: deleteDuplicatePageOperation
     Note over Run,Recover: on error the run calls recoverInterruptedDuplicate itself
-    Note over Cron,Recover: every minute the cron takes over expired PageOperations
+    Note over Cron,Recover: once after start-up and then every 10 minutes the cron takes over expired PageOperations
     Cron->>DupPageOp: takeOverStalledDuplicate
     Cron->>Recover: recoverInterruptedDuplicate
     Recover->>SubOp: runDuplicateSubOperation
@@ -264,7 +264,7 @@ stateDiagram-v2
 | 3.2 | 完了で受け付けに戻る | runDescendantDuplication, duplicatePageOperation | `deleteDuplicatePageOperation` | PageOperation の状態 |
 | 3.3 | 回復で受け付けに戻る | recoverInterruptedDuplicate | `deleteDuplicatePageOperation` | PageOperation の状態 |
 | 4.1 | 例外の失敗で PageOperation を削除し写しを残す | runDescendantDuplication, recoverInterruptedDuplicate | `recoverInterruptedDuplicate` | 配下の複製 |
-| 4.2 | 停止・終了から5分以内に回復 | InterruptedDuplicateRecoveryCron, duplicatePageOperation | `takeOverStalledDuplicate` | PageOperation の状態 |
+| 4.2 | 停止・終了から15分以内に回復 | InterruptedDuplicateRecoveryCron, duplicatePageOperation | `takeOverStalledDuplicate` | PageOperation の状態 |
 | 4.3 | 再起動から5分以内に回復 | InterruptedDuplicateRecoveryCron, PageOperationService.init | `takeOverStalledDuplicate` | PageOperation の状態 |
 | 4.4 | 進んでいる複製を止まったとみなさない | runDescendantDuplication, runDuplicateSubOperation, duplicatePageOperation | `recordProgress`, `onBatchStart` | 書き込みの規則 |
 | 4.5 | 写しをツリーにつなぎ件数を合わせる | runDuplicateSubOperation | `runDuplicateSubOperation` | 配下の複製 |
@@ -702,12 +702,14 @@ export function deleteDuplicatePageOperation(
 
 ##### Batch / Job Contract
 
-- Trigger: `app:interruptedDuplicateRecoveryCronSchedule`（既定 `* * * * *`、毎分）。空にすると止まる（WIP の掃除と同じ扱い）。不正な式はログに出して起動を続ける。
+- Trigger: 起動の `BOOT_RUN_DELAY_MS`（`STALL_THRESHOLD_MS` と同じ2分）後に1回、その後は `app:interruptedDuplicateRecoveryCronSchedule`（既定 `*/10 * * * *`、10分ごと）。空にすると、定期処理も起動後の1回も止まる（WIP の掃除と同じ扱い）。不正な式はログに出して起動を続け、起動後の1回も行わない。
+- 起動後の1回を2分後にするのは、直前に終了したプロセスの PageOperation が、最後の進捗の `STALL_THRESHOLD_MS` 後に初めて期限切れと判定されるため。それより早く動いても何も見つからない。起動後の1回のタイマーは `unref` し、プロセスの終了を妨げない。
+- 定期処理の間隔を長くするのは、まれにしか起きない回復のために、すべてのプロセスが頻繁に MongoDB へ問い合わせないため。1回の問い合わせは、ほぼ空の PageOperation のコレクションへの `findOneAndUpdate` 1回だけだが、テナントが多い構成（GROWI.cloud など）でも負荷を増やさないことを優先する。
 - 開始時に最大 `RECOVERY_JITTER_MS`（30秒）の待ちを入れ、複数のプロセスが同時に動かないようにする。保守モードの間は何もしない。
 - 「前回の実行が終わっていなければ今回は何もしない」印（プロセス内の実行中の印）は持たない。回復を1回に限ることは、`takeOverStalledDuplicate` の条件付きの書き換えと、`ownerToken` を条件にした削除が保証する。回復が固まっても、その PageOperation は `lastProgressAt` が古くなれば次の回に引き受け直され、他の止まった複製の回復も止まらない。
 - 1回の実行で、`takeOverStalledDuplicate` が `null` を返すまで、引き受けと回復を繰り返す。引き受けた値は `toInterruptedDuplicate` で回復の材料に変える。
-- 起動時の掃除（`init()`）は複製の PageOperation を削除しなくなるので、再起動後は、この定期処理が期限切れの PageOperation を回復する（4.3）。
-- 時間の見積もり: 止まってから判定まで最大 `STALL_THRESHOLD_MS`（2分）、定期処理の実行間隔（1分）、開始のずらし（30秒）で、最大3.5分で回復を始める。サブオペレーションの所要時間は写しのページ数に比例するので、5分以内に収まることを性能の検証で確かめる（4.2）。
+- 起動時の掃除（`init()`）は複製の PageOperation を削除しなくなるので、再起動後は、起動後の1回が期限切れの PageOperation を回復する（4.3）。
+- 時間の見積もり: プロセスが再起動した場合は、起動処理が定期処理の登録（`setupCron`）まで進んだ時点から、`BOOT_RUN_DELAY_MS`（2分）と開始のずらし（最大30秒）で回復を始め、そこまでが2分半以内なら、起動から5分以内に終わる（4.3）。再起動されない場合（処理が固まったプロセス、別のプロセスが残る構成）は、止まってから判定まで最大 `STALL_THRESHOLD_MS`（2分）、定期処理の実行間隔（10分）、開始のずらし（30秒）で、最大12.5分で回復を始める。サブオペレーションの所要時間は写しのページ数に比例するので、15分以内に収まることを性能の検証で確かめる（4.2）。
 
 #### PageService.duplicate（委譲）
 
@@ -834,7 +836,7 @@ export const pageDuplicateInterruptedSnapshot: {
 - 担当の交代: 回復を引き受けられた後に元の担当プロセスが `recordProgress` を呼ぶと `OwnershipLostError` になり、以降の書き込みをしないこと（4.4）。
 - 書き込みの直前の更新: `copyDescendantBatch` が、revision の複製（10件ごと）、ページの挿入、タグの複製のそれぞれの直前に `recordProgress` を呼ぶこと。`recordProgress` が投げたら、その書き込みが行われないこと（4.4）。
 - 既存の4つの処理の例外の伝わり方: `onBatchStart` が例外を投げると、`normalizeParentRecursively`・`updateDescendantCountOfSelfAndDescendants`・`updateDescendantCountOfPagesWithPaths` の呼び出しが、その例外で失敗すること（固まらないこと）。1回分の処理の中の DB の例外でも同じ（4.2）。
-- 定期処理: 1つの回復が固まっても、次の回の定期処理が他の期限切れの PageOperation を回復すること（4.2）。
+- 定期処理: 1つの回復が固まっても、次の回の定期処理が他の期限切れの PageOperation を回復すること（4.2）。起動の `BOOT_RUN_DELAY_MS` 後に1回だけ動き、空の設定・不正な式では動かないこと（4.3）。
 - 起動時の掃除: `init()` が複製の PageOperation を削除せず、他の種類は今どおり削除すること（4.3）。既存の `service/page-operation.integ.ts`（84〜101行付近）は「複製の PageOperation も削除する」ことを確かめているので、この期待を書き換える。
 - 前のバージョンの PageOperation: `ownerToken` を持たない PageOperation は、作成から15分たつまで回復を引き受けられず、たった後に引き受けられること。
 - 祖先の配下ページ数: 成功時は挿入できたページ数だけ増え、`onlyDuplicateUserRelatedResources` で除外したページを数えないこと。回復時は数え直しで実際の数と一致すること（4.5）。
@@ -846,7 +848,7 @@ export const pageDuplicateInterruptedSnapshot: {
 
 - 本文の大きさによらないこと（2.1、2.2）: 本文が約15MB の revision を持つページを1回分の件数いっぱい（100件）配下に置き、複製中の `VmHWM`（OS が記録するプロセスのメモリのピーク）の増加が、本文1KB の場合と同じ水準であることを確かめる。CI では重いので、手元で実行する検証用のスクリプトとして用意する。
 - 1回の書き込みの所要時間（4.4）: 同じ構成で、`$merge` 1回（10件、最大約160MB）が `STALL_THRESHOLD_MS` の半分（1分）以内に終わることを確かめる。
-- 今回の規模での計測（2.3）: 配下83ページ・1505版の構成を合成データで再現し、変更前（約300MB）と変更後の増加量を測る。あわせて、回復時のサブオペレーションの所要時間を測り、回復の開始（最大3.5分）と合わせて5分以内に収まることを確かめる（4.2）。
+- 今回の規模での計測（2.3）: 配下83ページ・1505版の構成を合成データで再現し、変更前（約300MB）と変更後の増加量を測る。あわせて、回復時のサブオペレーションの所要時間を測り、回復の開始（最大12.5分、再起動した場合は約2.5分）と合わせて、15分以内（再起動した場合は5分以内）に収まることを確かめる（4.2、4.3）。
 - 結果は、実装の完了時にこの設計書の「計測結果」に記録する（要件 2.3）。
 
 ### 計測結果
@@ -871,9 +873,9 @@ export const pageDuplicateInterruptedSnapshot: {
 - (A) 本文が約15,000倍になっても、増加は 1KB の場合と同じ 2〜5 MiB に収まった（2.1、2.2）。V8 のヒープ上のオブジェクトの増加（`heapUsed` のピーク）は 1KB で 35.7 MiB、15MB で 41.0〜41.2 MiB、Buffer の増加（`external`）は 0.7 MiB と 0.9 MiB だった。どちらも、本文の合計（約1.5GB）とは桁が違う。15MB の場合、mongod のメモリは計測前の約3.3GB から最大約6.2GB まで増えた。本文の複製の負荷は DB 側が受け持っている。
 - (B) 1回の `$merge` は最大でも 335 ms で、`MERGE_MAX_TIME_MS`（60秒）にも、`STALL_THRESHOLD_MS` の半分（1分）にも、十分収まる（4.4）。
 - (C) 変更前は 187〜226 MiB 増え、変更後は約3 MiB だった（2.3）。V8 のヒープ上のオブジェクトの増加（`heapUsed` のピーク）でも、変更前は 144.9〜150.3 MiB、変更後は 7.4〜32.3 MiB だった。本番の約300MB より小さいのは、本文の大きさの分布が本番と違うためと考えられる（本番の分布は分からないので、全版を同じ大きさにした）。
-- (D) 回復が終わるまでの最悪の時間は、止まったと判定されるまでの2分、定期処理の実行間隔の1分、開始のずらしの30秒、測った定期処理1回の最大 158 ms の合計で、**3分30.2秒**になり、5分以内に収まる（4.2）。
-  - 1ページあたりの時間は、83ページで約1.9 ms（158 ms ÷ 83）、10,000ページで約0.71 ms（7,115 ms ÷ 10,000）だった。10,000ページでも 3分37.1秒で収まる（実測）。
-  - 残りの90秒に収まるページ数を、1ページあたりの時間から直線で見積もると、83ページの値（遅い方）で約47,000ページ、10,000ページの値で約126,000ページになる。これは**見積もり（外挿）**で、測っていない。同じくらいの深さのツリーを前提にしている。
+- (D) 回復が終わるまでの最悪の時間は、止まったと判定されるまでの2分、定期処理の実行間隔の10分、開始のずらしの30秒、測った定期処理1回の最大 158 ms の合計で、**12分30.2秒**になり、15分以内に収まる（4.2）。再起動した場合は、定期処理の登録までの時間、起動後の1回までの2分、開始のずらしの30秒、158 ms の合計で、登録までが2分半以内なら、起動から5分以内に収まる（4.3）。
+  - 1ページあたりの時間は、83ページで約1.9 ms（158 ms ÷ 83）、10,000ページで約0.71 ms（7,115 ms ÷ 10,000）だった。10,000ページでも 12分37.1秒で収まる（実測の 7,115 ms を使った計算）。
+  - 15分までの残りの約150秒に収まるページ数を、1ページあたりの時間から直線で見積もると、83ページの値（遅い方）で約78,000ページ、10,000ページの値で約210,000ページになる。これは**見積もり（外挿）**で、測っていない。同じくらいの深さのツリーを前提にしている。
 
 **計測の方法**
 
@@ -899,11 +901,11 @@ export const pageDuplicateInterruptedSnapshot: {
 **注意点**
 
 - 全文検索の再索引は含まない（テスト用の組み立てでは全文検索のサービスを動かさない。research.md のとおり、この spec の範囲外）。
-- DB が同じマシンにあるので、ネットワークの遅れがない。本番の DB では、(B) と回復の時間は長くなりうる。ただし (B) は上限の60秒まで約180倍、回復は5分まで約90秒の余裕がある。
+- DB が同じマシンにあるので、ネットワークの遅れがない。本番の DB では、(B) と回復の時間は長くなりうる。ただし (B) は上限の60秒まで約180倍、回復は15分まで約150秒の余裕がある（再起動した場合の5分までの余裕も、再起動の時間を除いて約150秒）。
 - 変更前の増加は、計測ごとに 187〜226 MiB と幅がある（基準の値が低かった1回で小さかった）。
 - 本番のツリーの深さと本文の大きさの分布は分からない。
 - プロセスのメモリ（RSS）の増加は、実際に使ったメモリより小さく出ることがある。変更後の計測では、`heapUsed` が最大 41 MiB 増えても RSS は約3 MiB しか増えておらず、すでに確保済みのヒープの中で使われたと考えられる。15MB と 1KB の比較は、両方が同じ条件なので影響を受けないが、「本番でも増加は約3 MiB」とは読まないこと。
-- 3分30.2秒は、止まった複製が1つで、ほとんど空の wiki での値である。定期処理は止まった複製を1つずつ順に回復するので、同時に複数止まっていると時間は足し合わさる。また、ここでの祖先（`/` を含む）は子が少ないが、大きな wiki では祖先の数え直しで読む子ページが増える。どちらも約90秒の余裕に比べて小さいと考えられるが、測っていない。
+- 12分30.2秒は、止まった複製が1つで、ほとんど空の wiki での値である。定期処理は止まった複製を1つずつ順に回復するので、同時に複数止まっていると時間は足し合わさる。また、ここでの祖先（`/` を含む）は子が少ないが、大きな wiki では祖先の数え直しで読む子ページが増える。どちらも約150秒の余裕に比べて小さいと考えられるが、測っていない。
 
 ## Security Considerations
 
@@ -912,6 +914,6 @@ export const pageDuplicateInterruptedSnapshot: {
 
 ## Migration Strategy
 
-- データの移行は不要。`lastProgressAt` と `ownerToken` は任意項目で、既存の複製の PageOperation は作成から15分を過ぎたら回復の対象になる。
+- データの移行は不要。`lastProgressAt` と `ownerToken` は任意項目で、既存の複製の PageOperation は作成から15分を過ぎたら回復の対象になり、その後の10分ごとの定期処理で回復される（更新の直前に始まった複製では、最悪で作成から約25.5分）。
 - 更新した直後の起動では、以前のバージョンが残した複製の PageOperation（途中で止まって残ったもの）も、定期処理が回復し、複製した本人に通知が届く。何週間も前の複製について通知が届く場合がある。作りかけの写しが残っていることを本人が知る機会になるので、そのまま通知する。
 - 段階的に入れ替える間に、古いバージョンのプロセスが再起動すると、古い `init()` は新しい形式の複製の PageOperation も削除する。そのとき動いていた新しいプロセスは、担当を外れたと判断して書き込みをやめ、回復も行われない。親のない写しが通知なしで残る。入れ替えの短い間だけの危険であり、受け入れる。

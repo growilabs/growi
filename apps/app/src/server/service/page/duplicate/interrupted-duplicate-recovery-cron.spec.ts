@@ -8,6 +8,8 @@
 //   - takeOverStalledDuplicate : mocked — a DB failure cannot be produced in
 //                                the integration test
 //   - recoverInterruptedDuplicate : mocked — never reached with a real record
+//   - logger                   : mocked — a failed start-up run must end in a
+//                                logged error, not an unhandled rejection
 const { getConfig } = vi.hoisted(() => ({ getConfig: vi.fn() }));
 vi.mock('~/server/service/config-manager', () => ({
   configManager: { getConfig },
@@ -19,6 +21,16 @@ const { cronScheduleMock, scheduledTask } = vi.hoisted(() => ({
 }));
 vi.mock('node-cron', () => ({
   default: { schedule: cronScheduleMock },
+}));
+
+const { loggerError } = vi.hoisted(() => ({ loggerError: vi.fn() }));
+vi.mock('~/utils/logger', () => ({
+  default: () => ({
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: loggerError,
+  }),
 }));
 
 vi.mock(import('./duplicate-page-operation'), async (importOriginal) => ({
@@ -34,6 +46,7 @@ import { PageGrant } from '@growi/core';
 import { mock } from 'vitest-mock-extended';
 
 import {
+  STALL_THRESHOLD_MS,
   type StalledDuplicatePageOperation,
   takeOverStalledDuplicate,
 } from './duplicate-page-operation';
@@ -68,6 +81,80 @@ beforeEach(() => {
 });
 
 describe('startInterruptedDuplicateRecoveryCronIfEnabled', () => {
+  // node-cron is mocked, so every take-over in these tests comes from the
+  // start-up run.
+  const startUpRunCount = (): number =>
+    vi.mocked(takeOverStalledDuplicate).mock.calls.length;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.mocked(takeOverStalledDuplicate).mockResolvedValue(null);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('runs the recovery once, as soon as a PageOperation left by the previous process can have expired', async () => {
+    getConfig.mockReturnValue('*/10 * * * *');
+
+    startInterruptedDuplicateRecoveryCronIfEnabled(input());
+
+    await vi.advanceTimersByTimeAsync(STALL_THRESHOLD_MS - 1);
+    expect(startUpRunCount()).toBe(0);
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(startUpRunCount()).toBe(1);
+
+    await vi.advanceTimersByTimeAsync(STALL_THRESHOLD_MS * 10);
+    expect(startUpRunCount()).toBe(1);
+  });
+
+  it('runs the start-up recovery after the injected delay', async () => {
+    getConfig.mockReturnValue('*/10 * * * *');
+
+    startInterruptedDuplicateRecoveryCronIfEnabled({
+      ...input(),
+      bootRunDelayMs: 100,
+    });
+
+    await vi.advanceTimersByTimeAsync(99);
+    expect(startUpRunCount()).toBe(0);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(startUpRunCount()).toBe(1);
+  });
+
+  it('logs a failed start-up run instead of leaving the rejection unhandled', async () => {
+    getConfig.mockReturnValue('*/10 * * * *');
+    const failure = new Error('maintenance check failed');
+
+    startInterruptedDuplicateRecoveryCronIfEnabled({
+      ...input(),
+      waitBeforeRun: () => Promise.reject(failure),
+      bootRunDelayMs: 100,
+    });
+    await vi.advanceTimersByTimeAsync(100);
+
+    expect(loggerError).toHaveBeenCalledWith(failure, expect.any(String));
+  });
+
+  it('does not let the pending start-up run keep the process alive', () => {
+    vi.useRealTimers();
+    getConfig.mockReturnValue('*/10 * * * *');
+    // Only timers that keep the process alive are listed.
+    const countAliveTimers = (): number =>
+      process.getActiveResourcesInfo().filter((r) => r === 'Timeout').length;
+    const before = countAliveTimers();
+
+    startInterruptedDuplicateRecoveryCronIfEnabled({
+      ...input(),
+      // the largest delay setTimeout accepts; the run never fires in this test
+      bootRunDelayMs: 2_147_483_647,
+    });
+
+    expect(countAliveTimers()).toBe(before);
+  });
+
   it('schedules the recovery with the configured expression', () => {
     getConfig.mockReturnValue('*/2 * * * *');
 
@@ -78,31 +165,38 @@ describe('startInterruptedDuplicateRecoveryCronIfEnabled', () => {
     expect(scheduledTask.start).toHaveBeenCalledTimes(1);
   });
 
-  it('schedules nothing when the schedule is blank (the opt-out)', () => {
-    getConfig.mockReturnValue('   ');
+  it.each([
+    ['empty (the opt-out)', ''],
+    ['blank', '   '],
+    ['unset', undefined],
+  ])('neither schedules nor runs the recovery when the schedule is %s', async (_, schedule) => {
+    getConfig.mockReturnValue(schedule);
 
-    startInterruptedDuplicateRecoveryCronIfEnabled(input());
+    startInterruptedDuplicateRecoveryCronIfEnabled({
+      ...input(),
+      bootRunDelayMs: 100,
+    });
+    await vi.advanceTimersByTimeAsync(STALL_THRESHOLD_MS * 10);
 
     expect(cronScheduleMock).not.toHaveBeenCalled();
+    expect(startUpRunCount()).toBe(0);
   });
 
-  it('schedules nothing when the schedule is unset', () => {
-    getConfig.mockReturnValue(undefined);
-
-    startInterruptedDuplicateRecoveryCronIfEnabled(input());
-
-    expect(cronScheduleMock).not.toHaveBeenCalled();
-  });
-
-  it('does not throw when the expression is invalid, so the boot survives', () => {
+  it('neither throws nor runs the recovery when the expression is invalid, so the boot survives', async () => {
     getConfig.mockReturnValue('not-a-cron-expression');
     cronScheduleMock.mockImplementation(() => {
       throw new Error('Invalid cron expression');
     });
 
     expect(() =>
-      startInterruptedDuplicateRecoveryCronIfEnabled(input()),
+      startInterruptedDuplicateRecoveryCronIfEnabled({
+        ...input(),
+        bootRunDelayMs: 100,
+      }),
     ).not.toThrow();
+    await vi.advanceTimersByTimeAsync(STALL_THRESHOLD_MS * 10);
+
+    expect(startUpRunCount()).toBe(0);
   });
 });
 

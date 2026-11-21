@@ -54,7 +54,7 @@ import {
   waitUntilOperationGone,
 } from './perf-fixtures';
 
-const CRON_INTERVAL_MS = 60 * 1000;
+const CRON_INTERVAL_MS = 10 * 60 * 1000;
 const scenarioName = process.env.PERF_SCENARIO ?? '';
 
 const summarize = (values: readonly number[]) => {
