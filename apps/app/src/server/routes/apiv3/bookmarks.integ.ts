@@ -107,74 +107,74 @@ vi.mock('~/server/middlewares/login-required', () => ({
   default: () => passthroughMiddleware,
 }));
 
+let app: express.Application;
+let crowi: Crowi;
+
+// Injected into req.user by middleware below.
+let currentUser: HydratedDocument<IUser> | undefined;
+
+beforeAll(async () => {
+  crowi = await getInstance();
+});
+
+beforeEach(async () => {
+  currentUser = undefined;
+
+  app = express();
+  app.use(express.json());
+
+  // Re-create the apiv3 response helpers.
+  app.use((_req, res: ApiV3Response, next) => {
+    res.apiv3 = (data: unknown) => res.json(data);
+    res.apiv3Err = (error: unknown, statusCode?: number) => {
+      const status = statusCode ?? (Array.isArray(error) ? 400 : 500);
+      const message =
+        typeof error === 'object' &&
+        error !== null &&
+        'message' in error &&
+        typeof error.message === 'string'
+          ? error.message
+          : String(error);
+      return res.status(status).json({ error: message });
+    };
+    next();
+  });
+
+  // Inject crowi and user into request.
+  app.use((req: TestRequest, _res, next) => {
+    req.crowi = crowi;
+    req.user = currentUser;
+    next();
+  });
+
+  // Mount the real router (same factory the production server mounts).
+  const { setup } = await import('./bookmarks');
+  app.use('/', setup(crowi));
+});
+
+afterEach(async () => {
+  await Promise.all([
+    prisma.bookmarks.deleteMany({}),
+    prisma.bookmarkfolders.deleteMany({}),
+    mongoose.model('Page').deleteMany({}),
+    mongoose.model('User').deleteMany({}),
+    mongoose.model('UserGroup').deleteMany({}),
+    mongoose.model('UserGroupRelation').deleteMany({}),
+  ]);
+
+  // Config docs live in a separate collection that survives the deletes above,
+  // so reset the policies these tests toggle back to their defaults (false).
+  await configManager.updateConfigs(
+    {
+      'security:list-policy:hideRestrictedByOwner': false,
+      'security:list-policy:hideRestrictedByGroup': false,
+      'security:disableUserPages': false,
+    },
+    { skipPubsub: true },
+  );
+});
+
 describe('GET /bookmarks/:userId', () => {
-  let app: express.Application;
-  let crowi: Crowi;
-
-  // Injected into req.user by middleware below.
-  let currentUser: HydratedDocument<IUser> | undefined;
-
-  beforeAll(async () => {
-    crowi = await getInstance();
-  });
-
-  beforeEach(async () => {
-    currentUser = undefined;
-
-    app = express();
-    app.use(express.json());
-
-    // Re-create the apiv3 response helpers.
-    app.use((_req, res: ApiV3Response, next) => {
-      res.apiv3 = (data: unknown) => res.json(data);
-      res.apiv3Err = (error: unknown, statusCode?: number) => {
-        const status = statusCode ?? (Array.isArray(error) ? 400 : 500);
-        const message =
-          typeof error === 'object' &&
-          error !== null &&
-          'message' in error &&
-          typeof error.message === 'string'
-            ? error.message
-            : String(error);
-        return res.status(status).json({ error: message });
-      };
-      next();
-    });
-
-    // Inject crowi and user into request.
-    app.use((req: TestRequest, _res, next) => {
-      req.crowi = crowi;
-      req.user = currentUser;
-      next();
-    });
-
-    // Mount the real router (same factory the production server mounts).
-    const { setup } = await import('./bookmarks');
-    app.use('/', setup(crowi));
-  });
-
-  afterEach(async () => {
-    await Promise.all([
-      prisma.bookmarks.deleteMany({}),
-      prisma.bookmarkfolders.deleteMany({}),
-      mongoose.model('Page').deleteMany({}),
-      mongoose.model('User').deleteMany({}),
-      mongoose.model('UserGroup').deleteMany({}),
-      mongoose.model('UserGroupRelation').deleteMany({}),
-    ]);
-
-    // Config docs live in a separate collection that survives the deletes above,
-    // so reset the policies these tests toggle back to their defaults (false).
-    await configManager.updateConfigs(
-      {
-        'security:list-policy:hideRestrictedByOwner': false,
-        'security:list-policy:hideRestrictedByGroup': false,
-        'security:disableUserPages': false,
-      },
-      { skipPubsub: true },
-    );
-  });
-
   describe('general behavior and edge cases', () => {
     it('returns 400 when userId is not a valid ObjectId', async () => {
       const res = await request(app).get('/not-a-valid-object-id');
