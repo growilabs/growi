@@ -1,4 +1,5 @@
 import { SpanKind } from '@opentelemetry/api';
+import { HttpInstrumentation } from '@opentelemetry/instrumentation-http';
 import type { Span, SpanProcessor } from '@opentelemetry/sdk-trace-node';
 
 import { ATTR_HTTP_TARGET } from '../semconv';
@@ -7,7 +8,8 @@ import { ANONYMIZATION_RULES } from './rules';
 
 // Its spans start with the target startIncomingSpanHook already anonymized;
 // anonymizing that again would hash a hashed path (see design.md ServerSpanAnonymizer)
-const HTTP_INSTRUMENTATION_SCOPE = '@opentelemetry/instrumentation-http';
+const HTTP_INSTRUMENTATION_SCOPE = new HttpInstrumentation({ enabled: false })
+  .instrumentationName;
 
 const anonymizeTarget = (span: Span): void => {
   if (

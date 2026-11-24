@@ -55,7 +55,6 @@
 - `@growi/core` の `isCreatablePage` の禁止パターン、`isPermalink`、`AllLang` の変更。
 - `@opentelemetry/instrumentation-http` が URL を記録する属性の変更（semconv の更新）。
 - Next.js の更新で、サーバー側の span に記録する URL 属性が変わる（`http.target` 以外の URL 属性の追加、または `http.target` を span の開始後に設定するようになる）→ `serverSpanAnonymizer` が書き換えられず平文で残る。単体テストでは検出できないため、ローカルの Collector で Next.js の span（`next.span_type` が `BaseServer.handleRequest`）の属性を確かめる。
-- HTTP の計測部品の instrumentation scope 名（`@opentelemetry/instrumentation-http`）の変更 → `serverSpanAnonymizer` が匿名化済みの値をもう一度匿名化し、ハッシュ値が変わる。`anonymize-server-spans.spec.ts` が実際の `HttpInstrumentation` の名前を使うため、テストが失敗して気づける。
 - Express 5 への移行 → ルート列挙の処理（`app._router`）が動かなくなる。
 - Mongoose instrumentation に `dbStatementSerializer` を設定する、または MongoDB instrumentation の `enhancedDatabaseReporting` を有効にする → DB の span に値が記録されるため、本 spec の範囲外で別途の対策が要る。
 
@@ -261,7 +260,7 @@ export const anonymizeUrl = (
 #### ServerSpanAnonymizer（`anonymize-server-spans.ts`）
 
 - Next.js は受け取ったリクエストについて自分の tracer（instrumentation scope `next.js`）でもサーバー側の span を作り、`http.target` に生の `req.url` を記録する。`startIncomingSpanHook` は HTTP の計測部品の span にしか効かないため、この span は SpanProcessor で扱う。
-- `onStart(span)`: span の種類が `SERVER` で、instrumentation scope が `@opentelemetry/instrumentation-http` でなく、`http.target` が文字列なら、`anonymizeUrl(target, ANONYMIZATION_RULES)` の結果で `http.target` を上書きする（`null` なら書き換えない）。HTTP の計測部品の span は開始時点で hook が匿名化した値を持っているため除外する。
+- `onStart(span)`: span の種類が `SERVER` で、instrumentation scope が HTTP の計測部品のもの（`HttpInstrumentation` の `instrumentationName` から取り、パッケージ側の名前の変更に追従する）でなく、`http.target` が文字列なら、`anonymizeUrl(target, ANONYMIZATION_RULES)` の結果で `http.target` を上書きする（`null` なら書き換えない）。HTTP の計測部品の span は開始時点で hook が匿名化した値を持っているため除外する。
 - Next.js は `http.target` を span の作成時の属性として渡すので、`onStart` の時点で値が入っている。ほかの URL 属性（`http.url`、`url.path`、`url.query`）は記録しないため扱わない（Revalidation Triggers）。
 - 同じ規則・同じ実行関数を使うので、同じリクエストの 2 つの span は同じハッシュ値になる。
 - 公開面は `httpInstrumentationConfig` と `serverSpanAnonymizer`。
