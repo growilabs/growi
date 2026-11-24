@@ -168,6 +168,7 @@ GROWI の Elasticsearch 連携では Page の `path` / `body` / `comments` の�
 4. Where `extractorUri` が未設定または空である (すなわち算出値 `isAttachmentFullTextSearchEnabled` が false), the apps/app shall 添付ヒットを検索結果に含めず、抽出サービスへの新規呼び出しを行わない <!-- derived from umbrella R9.4 -->
 5. When `extractorUri` が未設定または空である期間中に新規添付がアップロードされる, the apps/app shall 添付の保存を継続し、`extractorUri` 再設定後の一括再インデックスで取り込めるようにする <!-- derived from umbrella R9.5 -->
 6. When 設定 API (`PUT /_api/v3/admin/attachment-search/config`) で設定が更新される, the apps/app shall 監査ログに `ADMIN_ATTACHMENT_SEARCH_SETTINGS_UPDATE` を記録する。記録にトークンの値を含めない。更新が拒否されたか失敗した場合、記録は `UNSETTLED` のままにする
+7. The apps/app shall 設定 API 応答 (`GET /_api/v3/admin/attachment-search/config`) に、4 つの Config キーが環境変数で固定されているか (`env:useOnlyEnvVars:app:attachmentFullTextSearch`) を `useOnlyEnvVars: boolean` として含める
 
 ### Requirement 6: 一括再インデックスのサーバ処理 <!-- derived from umbrella R10.2, R10.4 -->
 
@@ -221,3 +222,4 @@ GROWI の Elasticsearch 連携では Page の `path` / `body` / `comments` の�
 4. The apps/app shall `IPageWithSearchMeta.meta.attachmentHits` を optional フィールドとして追加し、既存の必須フィールド形状を変更しない
 5. Where 機能が有効である, the apps/app shall 既存のキーワード検索 API (`GET /_api/search`) を、`facet` を付けないとき、または `facet=pages` のとき、機能が無効のときと同じ処理・同じ応答 (並べ替え・件数・ページ送りを含む) にする。`facet=attachments` は添付だけを対象にした検索とし、それ以外の `facet` の値は `{ ok: false, code: 400 }` で断る。ページ検索の結果のページに付ける添付ヒットは、ページ ID を受け取る別の要求 (`GET /_api/v3/search/attachments`) で返し、ページと添付の点数を混ぜた順位は作らない
 6. If ページ検索の結果のページに付ける添付ヒットの取得 (`GET /_api/v3/search/attachments`) で、権限確認か添付の検索が失敗するか時間の上限を超える, the apps/app shall 空の結果で隠さず、エラーを返す
+7. When 添付だけを対象にした検索 (`GET /_api/search?facet=attachments`) が結果を返す, the apps/app shall 各項目の `data` に、ページ検索と同じ形のページ文書を入れる。MongoDB に無いページの項目は返さず、`meta.hitsCount` は除く前の項目数にする
