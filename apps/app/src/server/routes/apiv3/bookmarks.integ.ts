@@ -32,6 +32,7 @@ interface SeedPageOptions {
   grantedUsers?: HydratedDocument<IUser>[];
   grantedGroups?: { item: Types.ObjectId; type: 'UserGroup' }[];
   isEmpty?: boolean;
+  status?: string;
 }
 
 const seedPage = async (
@@ -49,6 +50,7 @@ const seedPage = async (
       grantedUsers: options.grantedUsers?.map((u) => u._id),
       grantedGroups: options.grantedGroups,
       isEmpty: options.isEmpty,
+      status: options.status,
     },
   ]);
   return page;
@@ -516,6 +518,37 @@ describe('GET /bookmarks/info', () => {
     expect(res.status).toBe(200);
     expect(res.body.sumOfBookmarks).toBe(1);
     expect(res.body.isBookmarked).toBe(false);
+    expect(bookmarkedUserIds(res)).toEqual([owner._id.toString()]);
+  });
+
+  it('returns bookmark info for a public page to a guest', async () => {
+    const owner = await seedUser('owner');
+    const page = await seedPage({ path: '/public-page', creator: owner });
+    await seedBookmark(owner, page);
+    currentUser = undefined;
+
+    const res = await request(app).get(`/info?pageId=${page._id.toString()}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.sumOfBookmarks).toBe(1);
+    expect(res.body.isBookmarked).toBe(false);
+    expect(bookmarkedUserIds(res)).toEqual([owner._id.toString()]);
+  });
+
+  it('returns bookmark info for a page in the trash', async () => {
+    const owner = await seedUser('owner');
+    const viewer = await seedUser('viewer');
+    const page = await seedPage({
+      path: '/trash/deleted-page',
+      creator: owner,
+      status: 'deleted',
+    });
+    await seedBookmark(owner, page);
+    currentUser = viewer;
+
+    const res = await request(app).get(`/info?pageId=${page._id.toString()}`);
+
+    expect(res.status).toBe(200);
     expect(bookmarkedUserIds(res)).toEqual([owner._id.toString()]);
   });
 
