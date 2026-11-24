@@ -19,6 +19,7 @@ import type {
   QueryTerms,
   ResolvedFilterData,
 } from '~/server/interfaces/search';
+import { withTimeout } from '~/server/util/with-timeout';
 import loggerFactory from '~/utils/logger';
 
 import { buildAttachmentSearchQuery } from '../queries/build-attachment-search-query';
@@ -168,25 +169,11 @@ export class AttachmentSearchTimeoutError extends Error {
   }
 }
 
-export const withTimeout = async <T>(
+const withAttachmentSearchTimeout = <T>(
   promise: Promise<T>,
   ms: number,
-): Promise<T> => {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  try {
-    return await Promise.race([
-      promise,
-      new Promise<T>((_, reject) => {
-        timer = setTimeout(
-          () => reject(new AttachmentSearchTimeoutError(ms)),
-          ms,
-        );
-      }),
-    ]);
-  } finally {
-    clearTimeout(timer);
-  }
-};
+): Promise<T> =>
+  withTimeout(promise, ms, () => new AttachmentSearchTimeoutError(ms));
 
 const failureKind = (err: unknown): 'timeout' | 'error' =>
   err instanceof AttachmentSearchTimeoutError ? 'timeout' : 'error';
@@ -241,7 +228,7 @@ export class AttachmentSearchResultAggregator {
     if (pageIds.length === 0) {
       return new Set();
     }
-    const pages = await withTimeout(
+    const pages = await withAttachmentSearchTimeout(
       this.attachmentClient.searchAccessiblePages(pageIds, viewer, filter),
       timeoutMs,
     );
@@ -313,7 +300,7 @@ export class AttachmentSearchResultAggregator {
     // Stops the collector once this request has its answer (or timed out)
     const collecting = new AbortController();
     try {
-      const pages = await withTimeout(
+      const pages = await withAttachmentSearchTimeout(
         collectVisibleAttachmentHits(
           {
             searchHits: async (hitsFrom, hitsSize) =>
@@ -382,7 +369,7 @@ export class AttachmentSearchResultAggregator {
     }
 
     return {
-      enrichments: await withTimeout(
+      enrichments: await withAttachmentSearchTimeout(
         this.doResolveSecondary(splitInput(input), distinctIds),
         this.SECONDARY_TIMEOUT_MS,
       ),

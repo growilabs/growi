@@ -8,12 +8,11 @@ import {
   FILTER_FIELDS,
   SEARCH_FILTER_PREFIXES,
 } from '~/features/search/utils/filter-fields';
-import {
-  type AttachmentSearchInput,
-  type AttachmentSearchResultAggregator,
-  type IPrimarySearchResult,
-  type IResolvedSecondaryResult,
-  withTimeout,
+import type {
+  AttachmentSearchInput,
+  AttachmentSearchResultAggregator,
+  IPrimarySearchResult,
+  IResolvedSecondaryResult,
 } from '~/features/search-attachments/server/services/attachment-search-result-aggregator';
 import type { AttachmentSearchViewer } from '~/features/search-attachments/server/services/search-accessible-pages';
 import type {
@@ -48,6 +47,7 @@ import type {
 import NamedQuery from '../models/named-query';
 import type { PageModel } from '../models/page';
 import { SearchError } from '../models/vo/search-error';
+import { withTimeout } from '../util/with-timeout';
 import { configManager } from './config-manager';
 import { canShowSnippetOfPage } from './search/can-show-snippet';
 import {
