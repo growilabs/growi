@@ -11,7 +11,7 @@ import type { PageDocument, PageModel } from '~/server/models/page';
 import { configManager } from '~/server/service/config-manager';
 import { prisma } from '~/utils/prisma';
 
-import type { ApiV3Response } from './interfaces/apiv3-response';
+import addCustomFunctionToResponse from './response';
 
 // bookmarks / bookmarkfolders are Prisma-backed since v8, so fixtures go through
 // Prisma. Pages, users and groups stay on mongoose (not yet migrated).
@@ -125,20 +125,12 @@ beforeEach(async () => {
   app = express();
   app.use(express.json());
 
-  // Re-create the apiv3 response helpers.
-  app.use((_req, res: ApiV3Response, next) => {
-    res.apiv3 = (data: unknown) => res.json(data);
-    res.apiv3Err = (error: unknown, statusCode?: number) => {
-      const status = statusCode ?? (Array.isArray(error) ? 400 : 500);
-      const message =
-        typeof error === 'object' &&
-        error !== null &&
-        'message' in error &&
-        typeof error.message === 'string'
-          ? error.message
-          : String(error);
-      return res.status(status).json({ error: message });
-    };
+  const responseHelpers: { response: Record<string, unknown> } = {
+    response: {},
+  };
+  addCustomFunctionToResponse(responseHelpers);
+  app.use((_req, res, next) => {
+    Object.assign(res, responseHelpers.response);
     next();
   });
 
@@ -435,6 +427,11 @@ describe('GET /bookmarks/info', () => {
     });
   };
 
+  // The whole body, so a 404 that still carried bookmark info would fail.
+  const notFoundOrForbiddenBody = {
+    errors: [expect.objectContaining({ code: 'notfound_or_forbidden' })],
+  };
+
   it('returns 404 without bookmark info for a page the viewer cannot see', async () => {
     const owner = await seedUser('owner');
     const outsider = await seedUser('outsider');
@@ -445,8 +442,7 @@ describe('GET /bookmarks/info', () => {
     const res = await request(app).get(`/info?pageId=${page._id.toString()}`);
 
     expect(res.status).toBe(404);
-    expect(res.body.bookmarkedUsers).toBeUndefined();
-    expect(res.body.sumOfBookmarks).toBeUndefined();
+    expect(res.body).toEqual(notFoundOrForbiddenBody);
   });
 
   it('returns 404 without bookmark info for a guest on a non-public page', async () => {
@@ -458,8 +454,7 @@ describe('GET /bookmarks/info', () => {
     const res = await request(app).get(`/info?pageId=${page._id.toString()}`);
 
     expect(res.status).toBe(404);
-    expect(res.body.bookmarkedUsers).toBeUndefined();
-    expect(res.body.sumOfBookmarks).toBeUndefined();
+    expect(res.body).toEqual(notFoundOrForbiddenBody);
   });
 
   it('responds to a nonexistent page the same way as to a forbidden one', async () => {
@@ -471,6 +466,7 @@ describe('GET /bookmarks/info', () => {
     );
 
     expect(res.status).toBe(404);
+    expect(res.body).toEqual(notFoundOrForbiddenBody);
   });
 
   it('returns bookmark info for a non-public page the viewer can see', async () => {
