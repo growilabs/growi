@@ -521,4 +521,46 @@ describe('GET /bookmarks/info', () => {
       [owner._id.toString()],
     );
   });
+
+  it('returns bookmark info for a group-restricted page to a fellow member', async () => {
+    const owner = await seedUser('owner');
+    const member = await seedUser('member');
+    const group = await seedGroup('team');
+    await addUserToGroup(group, owner);
+    await addUserToGroup(group, member);
+    const page = await seedPage({
+      path: '/group/secret',
+      creator: owner,
+      grant: PageGrant.GRANT_USER_GROUP,
+      grantedGroups: [{ item: group._id, type: 'UserGroup' }],
+    });
+    await seedBookmark(owner, page);
+    currentUser = member;
+
+    const res = await request(app).get(`/info?pageId=${page._id.toString()}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.bookmarkedUsers.map((u: { _id: string }) => u._id)).toEqual(
+      [owner._id.toString()],
+    );
+  });
+
+  it('returns bookmark info for an "anyone with the link" page to another user', async () => {
+    const owner = await seedUser('owner');
+    const viewer = await seedUser('viewer');
+    const page = await seedPage({
+      path: '/link-only',
+      creator: owner,
+      grant: PageGrant.GRANT_RESTRICTED,
+    });
+    await seedBookmark(owner, page);
+    currentUser = viewer;
+
+    const res = await request(app).get(`/info?pageId=${page._id.toString()}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.bookmarkedUsers.map((u: { _id: string }) => u._id)).toEqual(
+      [owner._id.toString()],
+    );
+  });
 });
