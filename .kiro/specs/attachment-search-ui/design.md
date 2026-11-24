@@ -36,7 +36,7 @@
 - 既存の検索結果画面 (`SearchPage` / `SearchPageBase` / `SearchResultList` / `SearchResultContent`) と行の部品 (`PageListItemL`) への差し込み口の追加と、検索対象の切り替えの配線
 - `@growi/ui` の `Attachment` への追加の操作ボタンの差し込み口の追加と、添付ファイル一覧 (`PageAttachmentList`) での再抽出ボタンの配置
 - 管理画面 (`ElasticsearchManagementPage` / `ElasticsearchManagement`) への設定の区画・作り直しの選択と進み具合・抽出の失敗の区画の追加
-- 機能が有効かどうかを表す atom `isAttachmentFullTextSearchEnabledAtom` と、その値の注入 (基本レイアウトと管理画面の検索ページ)
+- 機能が有効かどうかを表す atom `isAttachmentFullTextSearchEnabledAtom` と、その値の注入 (基本レイアウト)
 - 追加する画面の文言の i18n キー (5 言語すべて。翻訳もこの spec の中で行う)
 
 ### Out of Boundary
@@ -62,7 +62,7 @@
   - U2. `GET /_api/v3/admin/attachment-search/config` の `config` に `useOnlyEnvVars: boolean` (4 つの設定が環境変数で固定されているか。上流の `env:useOnlyEnvVars:app:attachmentFullTextSearch`) を足す
 - 既存の apps/app の部品と仕組み: `useSWRINFxSearch` と `stores/search.tsx` の関数、`InfiniteScroll`、`apiGet` (apiv1) / `apiv3Get` / `apiv3Put` / `apiv3Post`、`toastSuccess` / `toastError` / `toastWarning`、`useAdminSocket`、`useIndexManagement`、`IndexManagementSection` の `extraContent`
 - Jotai、SWR、next-i18next、Bootstrap 5、Material Symbols
-- 依存の向き: `features/search` と `client/components` の既存部品は `features/search-attachments/client` を import しない。差し込み口に渡す中身は、ページ単位の画面 (`SearchPage`、`PageAttachmentList`、`ElasticsearchManagement`) が組み立てる。`features/search-attachments/client` はサーバ専用のモジュール (`features/search-attachments/server`、`packages/attachment-text-extractor-client`) を import しない
+- 依存の向き: `features/search-attachments/client` を import してよいのは、差し込み口の中身を組み立てる画面 `SearchPage`・`PageAttachment`・`ElasticsearchManagement`・`ElasticsearchManagementPage` だけである。差し込み口を持つ部品 `SearchPageBase`・`SearchResultList`・`SearchResultContent`・`PageListItemL`・`PageAttachmentList`・`@growi/ui` の `Attachment` は import しない (添付の検索を知らない)。`features/search-attachments/client` はサーバ専用のモジュール (`features/search-attachments/server`、`packages/attachment-text-extractor-client`) を import しない
 
 ### Revalidation Triggers
 
@@ -86,7 +86,7 @@
 - **検索語**: 画面に入力した `?q=` (演算子を含む) に、`includeTrashPages` / `includeUserPages` に応じた `-prefix:/trash` / `-prefix:/user` を足したもの (`createSearchQuery` の結果。以下「送る検索語」) をサーバに送る
 - **添付ファイル一覧**: `PageAttachment` が `PageAttachmentList` に一覧を渡し、各行は `@growi/ui` の `Attachment`。行の操作はダウンロードと削除で固定されていて、操作を足す口が無い
 - **管理画面**: `ElasticsearchManagementPage` が `ElasticsearchManagement` (ページの索引の管理) と監査ログの索引の管理を並べる。作り直しは `useIndexManagement` が担い、`FinishAddPage` を受けた時点で完了とする。`IndexManagementSection` は作り直しの操作の下に `extraContent` を出せる
-- **機能が有効かどうか**: SSR prop `searchConfig.isAttachmentFullTextSearchEnabled` は基本レイアウトのページと管理画面の検索ページに届くが、クライアントには atom も読む箇所もまだ無い
+- **機能が有効かどうか**: SSR prop `searchConfig.isAttachmentFullTextSearchEnabled` は基本レイアウトのページ (検索ページと通常のページを含む) と管理画面の検索ページに届くが、クライアントには atom も読む箇所もまだ無い
 
 ### Architecture Pattern & Boundary Map
 
@@ -227,17 +227,17 @@ apps/app/src/features/search-attachments/client/
 ### Modified Files
 
 - `apps/app/src/states/server-configurations/server-configurations.ts` — `isAttachmentFullTextSearchEnabledAtom` (既定 false) を足す
-- `apps/app/src/pages/basic-layout-page/hydrate.ts`、`apps/app/src/pages/admin/search.page.tsx` — `searchConfig?.isAttachmentFullTextSearchEnabled ?? false` を atom に入れる
+- `apps/app/src/pages/basic-layout-page/hydrate.ts` — `searchConfig?.isAttachmentFullTextSearchEnabled ?? false` を atom に入れる (検索ページと通常のページはこの hydrate を通る)
 - `apps/app/src/stores/search.tsx` — `createSearchQuery` を export する (ページ検索・添付ヒット・添付だけの検索が同じ「送る検索語」を使うため)。`mutateSearchInfiniteChunks` に書き換える対象のキーの先頭 (`keyHead`) を引数で渡せるようにする (既定は `'/search/infinite'`)
 - `apps/app/src/features/search/client/util/apply-search-item-mutation.ts` — `{ data: IPageWithSearchMeta[] }` を持つまとまりなら型によらず使えるようにする (`IFacetedSearchResult` も書き換えられるように)
 - `apps/app/src/features/search/client/components/SearchPage/SearchPage.tsx` — 検索対象の state、2 つの無限読み込みの hook の切り替え、20 ページの組の計算、差し込み口に渡す中身の組み立て、`SearchTargetSwitch` の配置、`resetKey` に検索対象を含める、「添付ファイル」のときは並べ替えを出さない
-- `apps/app/src/features/search/client/components/SearchPage/SearchPageBase.tsx` — optional な `renderRowExtra?: (page: IPageWithSearchMeta) => ReactNode` と `renderPreviewExtra?: (page: IPageWithSearchMeta) => ReactNode` を受け取り、一覧とプレビューに渡す
+- `apps/app/src/features/search/client/components/SearchPage/SearchPageBase.tsx` — `infiniteScroll.swrInfiniteResponse` の型を `IFormattedSearchResult` 固定から外す (添付だけの検索の `IFacetedSearchResult` も渡すため。`InfiniteScroll` はすでに型引数を取る)。optional な `renderRowExtra?: (page: IPageWithSearchMeta) => ReactNode` と `renderPreviewExtra?: (page: IPageWithSearchMeta) => ReactNode` を受け取り、一覧とプレビューに渡す
 - `apps/app/src/features/search/client/components/SearchPage/SearchResultList.tsx` — `renderRowExtra` を受け取り、各行の `PageListItemL` の `extraContent` に渡す
 - `apps/app/src/client/components/PageList/PageListItemL.tsx` — optional な `extraContent?: ReactNode` を、本文の抜粋の下に出す
 - `apps/app/src/features/search/client/components/SearchPage/SearchResultContent.tsx` — optional な `headerContent?: ReactNode` を、ページのパスの表示 (`PagePathNav`) と本文の間に出す
 - `packages/ui/src/components/Attachment.tsx` — optional な `additionalActions?: ReactNode` を、ダウンロードと削除の前に出す (`@growi/ui` は公開パッケージではないので changeset は要らない)
 - `apps/app/src/client/components/PageAttachment/PageAttachmentList.tsx`、`apps/app/src/client/components/PageAccessoriesModal/PageAttachment.tsx` — 機能が有効で、ログイン済みかつ読み取り専用でない利用者のとき、各行に `ReextractButton` を渡す
-- `apps/app/src/client/components/Admin/ElasticsearchManagement/ElasticsearchManagement.tsx` — 機能が有効なら `extraContent` に `AttachmentRebuildOption` を出し、作り直しの操作を「添付も対象にする」の選択で切り替える
+- `apps/app/src/client/components/Admin/ElasticsearchManagement/ElasticsearchManagement.tsx` — 設定の取得 API で機能が有効なら `extraContent` に `AttachmentRebuildOption` を出し、作り直しの操作を「添付も対象にする」の選択で切り替える
 - `apps/app/src/client/components/Admin/ElasticsearchManagementPage.tsx` — ページの索引の管理の後に「添付ファイル全文検索」の見出しと `AttachmentSearchSettings` / `AttachmentExtractionFailures` を出す
 - `apps/app/public/static/locales/{en_US,ja_JP,fr_FR,ko_KR,zh_CN}/translation.json` — 検索結果画面と再抽出の文言 (`search_result.attachment_hits.*`、`attachment_reextract.*`)
 - `apps/app/public/static/locales/{en_US,ja_JP,fr_FR,ko_KR,zh_CN}/admin.json` — 管理画面の文言 (`attachment_full_text_search.*`)
@@ -373,11 +373,11 @@ stateDiagram-v2
 | 5.6 | 環境変数で固定なら読み取り専用 | AttachmentSearchSettings, 上流 U2 | `useOnlyEnvVars` | — |
 | 6.1 | 「添付も対象にする」を既定 ON で出す | AttachmentRebuildOption, ElasticsearchManagement | — | 3 |
 | 6.2 | 処理済み件数と総件数を出す | 既存の進み具合 (ページ), AttachmentRebuildOption (添付) | `AttachmentRebuildState` | 3 |
-| 6.3 | 機能が無効なら選択を出さない | ElasticsearchManagement | — | — |
+| 6.3 | 機能が無効なら選択を出さない | ElasticsearchManagement, useSWRxAttachmentSearchConfig | `isAttachmentFullTextSearchEnabled` | — |
 | 6.4 | 失敗を表示し、押せる状態に戻す | useAttachmentRebuild, attachmentRebuildReducer | `AttachmentRebuildState` | 3 |
 | 6.5 | 409 なら進行中と表示し、始めない | useAttachmentRebuild | — | 3 |
 | 7.1 | 失敗の件数と最近の数件を一覧で出す | AttachmentExtractionFailures, useSWRxAttachmentExtractionFailures | `ExtractionFailureEntry` | — |
-| 7.2 | 機能が無効なら出さない | ElasticsearchManagementPage, AttachmentExtractionFailures | — | — |
+| 7.2 | 機能が無効なら出さない | ElasticsearchManagementPage, AttachmentExtractionFailures, useSWRxAttachmentSearchConfig | `isAttachmentFullTextSearchEnabled` | — |
 | 7.3 | 取得の失敗を示し、他を妨げない | AttachmentExtractionFailures | — | — |
 
 ## Components and Interfaces
@@ -386,7 +386,7 @@ stateDiagram-v2
 
 | Component | Domain/Layer | Intent | Req Coverage | Key Dependencies (P0/P1) | Contracts |
 |-----------|--------------|--------|--------------|--------------------------|-----------|
-| isAttachmentFullTextSearchEnabledAtom | State | 機能が有効かどうか | 3.5, 4.1, 4.4, 6.3, 7.2 | SSR prop (P0) | State |
+| isAttachmentFullTextSearchEnabledAtom | State | 機能が有効かどうか (管理画面の外) | 3.5, 4.1, 4.4 | SSR prop (P0) | State |
 | useAttachmentHits | Hook | 1 行分の添付ヒットの状態 | 1.2, 1.6, 1.7, 1.8, 2.1 | GET search attachments (P0) | Service, State |
 | groupPageIdsForAttachmentHits | Util | 20 ページの組 | 1.6, 1.7 | — | Service |
 | useSWRINFxAttachmentSearch | Hook | 添付だけの検索の無限読み込み | 1.5, 3.4 | GET search facet=attachments (P0), 上流 U1 (P0) | Service |
@@ -406,18 +406,18 @@ stateDiagram-v2
 
 | Field | Detail |
 |-------|--------|
-| Intent | 機能が有効かどうかを、検索結果画面・添付ファイル一覧・管理画面の外側の判定に使う |
-| Requirements | 3.5, 4.1, 4.4, 6.3, 7.2 |
+| Intent | 機能が有効かどうかを、検索結果画面と添付ファイル一覧の判定に使う |
+| Requirements | 3.5, 4.1, 4.4 |
 
 **Responsibilities & Constraints**
 - `atom<boolean>(false)`。既存の `isSearchServiceConfiguredAtom` と同じファイルに置く
-- `basic-layout-page/hydrate.ts` と `pages/admin/search.page.tsx` で、`searchConfig?.isAttachmentFullTextSearchEnabled ?? false` を入れる (SSR prop は optional なので、無い経路では false にする)
+- `basic-layout-page/hydrate.ts` で、`searchConfig?.isAttachmentFullTextSearchEnabled ?? false` を入れる (SSR prop は optional なので、無い経路では false にする)
 - 値はページを読み込んだ時点のもの。管理画面で設定を保存しても、ほかのタブの利用者には次にページを読み込むまで反映しない (要件はその場の反映を求めていない)
 
 **Contracts**: State [x]
 
 ##### State Management
-- 管理画面の設定の区画では、保存した直後の状態をその場で反映するため、この atom ではなく設定の取得 API の `config.isAttachmentFullTextSearchEnabled` を使う (下の AttachmentSearchSettings)
+- 管理画面 (設定・作り直しの選択・失敗の区画) はこの atom を読まない。保存した直後の状態をその場で反映するため、設定の取得 API の `config.isAttachmentFullTextSearchEnabled` を使う (下の AttachmentSearchSettings)
 
 ### 検索結果画面
 
@@ -679,7 +679,7 @@ export function shouldShowReindexGuidance(
   - トークンの削除は入力欄とは別の操作にし、確認の後に `{ extractorToken: null }` を送る (5.5)
   - `validateConfigForm` (5.3): URI は空か、`http:` / `https:` の URL として読めること。時間切れは 1000〜600000 の整数、大きさの上限は 1〜524288000 の整数。誤りがあれば欄に出し、保存を押せなくする。サーバの 400 `invalid_extractor_uri` は URI の欄の誤りとして出す
   - 保存に成功したら `mutate` で設定を取り直す。`shouldShowReindexGuidance` が true (保存前の `extractorUri` が null か空で、保存した URI が空でない) なら、「既存の添付を検索対象にするには、一括の作り直しが必要です」と、作り直しの操作への移動を出す (5.2)
-- 機能が有効かどうかの表示と、同じ画面の失敗の区画の表示の判定は、`data.isAttachmentFullTextSearchEnabled` を使う。保存の後の `mutate` で、画面を読み込み直さずに切り替わる
+- 機能が有効かどうかの表示と、同じ画面の作り直しの選択・失敗の区画の表示の判定は、`data.isAttachmentFullTextSearchEnabled` を使う。3 つとも同じ SWR のキーを読むので、保存の後の `mutate` で、画面を読み込み直さずにそろって切り替わる (初めて URI とトークンを保存した直後に、案内に従って添付を含む作り直しができる)
 - 取得に失敗したら区画の中にエラーを出し、ほかの区画の表示を妨げない
 - 管理者以外の遮断 (5.4) は既存の管理画面の仕組みと上流の `adminRequired` が行い、この部品は何もしない
 
@@ -755,7 +755,7 @@ type AttachmentRebuildOptionProps = {
 
 **Responsibilities & Constraints**
 - 状態の移り方は Flow 3 のとおり。`pageFailed` と、`pagePhase` の後の `attachmentFailed` では通知しない。`attachmentPhase` での `attachmentFailed` で `toastError` を出す
-- `ElasticsearchManagement` は、機能が有効 (`isAttachmentFullTextSearchEnabledAtom`) なときだけ `extraContent` に `AttachmentRebuildOption` を出し、`includeAttachments` の初期値を true にする (6.1 / 6.3)。作り直しの操作は、`includeAttachments` なら `useAttachmentRebuild().start`、そうでなければ既存の `rebuildIndices` を呼ぶ。押せる条件は `isRebuildEnabled && !isRunning`
+- `ElasticsearchManagement` は、設定の取得 API (`useSWRxAttachmentSearchConfig`) の `isAttachmentFullTextSearchEnabled` が true のときだけ `extraContent` に `AttachmentRebuildOption` を出し、`includeAttachments` の初期値を true にする (6.1 / 6.3)。作り直しの操作は、`includeAttachments` なら `useAttachmentRebuild().start`、そうでなければ既存の `rebuildIndices` を呼ぶ。押せる条件は `isRebuildEnabled && !isRunning`
 - `AttachmentRebuildOption` は、`attachmentPhase` と `completed` で添付の段階の処理済み件数と総件数を出す (6.2)。`failed` では失敗の表示、`busyElsewhere` では「作り直しが進行中です」を出す (6.4 / 6.5)
 
 **Dependencies**

@@ -99,8 +99,8 @@ _Generated: 2026-04-17 (3-way split から派生)。2026-11-24 に、今の API 
 
 ### 4.8 管理画面の外の機能の判定は SSR の値、管理画面の中は設定の API の値を使う
 
-- 判断: 検索結果画面と添付ファイル一覧は `isAttachmentFullTextSearchEnabledAtom` (SSR の値) を使う。管理画面の設定と失敗の区画は、設定の取得 API の `isAttachmentFullTextSearchEnabled` を使う
-- 理由: 管理者以外は設定の API を呼べない。管理画面では、保存の直後に画面を読み込み直さずに切り替える必要がある。設定の API の値なら、保存の後の `mutate` で切り替わる
+- 判断: 検索結果画面と添付ファイル一覧は `isAttachmentFullTextSearchEnabledAtom` (SSR の値) を使う。管理画面の設定・作り直しの選択・失敗の区画は、どれも設定の取得 API の `isAttachmentFullTextSearchEnabled` を使い、atom を読まない
+- 理由: 管理者以外は設定の API を呼べない。管理画面では、保存の直後に画面を読み込み直さずに切り替える必要がある。設定の API の値なら、保存の後の `mutate` で 3 つの区画がそろって切り替わる。作り直しの選択だけを atom で判定すると、初めて設定を保存した直後に「作り直しが必要」と案内しながら、添付を含める選択が読み込み直すまで出ず、ページだけの作り直しが走ってしまう
 
 ## 5. Design Synthesis
 

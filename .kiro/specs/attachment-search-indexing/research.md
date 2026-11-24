@@ -474,6 +474,28 @@ umbrella gap analysis 時点では「親ページ権限変更のイベントフ�
   - 追い続けるのが難しい。区別するには、本文を保存するたびにそのページの添付の文書を更新する必要があるが、共同編集 (Yjs) の保存はページの保存イベントを出さないので、文書が本文とずれていく
 - 採らなかった案: 検索結果に「本文で使われていない」と印を付ける。要件に無く、印の計算には各ページの本文が要る
 
+## 14. 下流の画面のための追加 (2026-11-24)
+
+下流 `attachment-search-ui` の設計を今の API に合わせて作り直したときに決めた (tasks.md 13)。
+
+### 14.1 添付だけの検索の項目に、ページ検索と同じページ文書を入れる
+
+- 判断: `GET /_api/search?facet=attachments` の各項目の `data` に、`findPageListByIds` で読んだページ文書を入れる。MongoDB に無いページの項目は落とし、`meta.hitsCount` は落とす前の項目数にする
+- 理由:
+  - 検索結果の行 (`PageListItemL`) とプレビュー (`SearchResultContent`) は、ページ文書の `path`・`revision`・`lastUpdateUser`・`updatedAt` を使う。`_id` だけでは描けない
+  - 複数のページ ID からページ文書をまとめて返す API は無い (`/page-listing/info` は付随情報だけ、`/page-listing/item` と `/page` は 1 回に 1 ページ)。画面が別に取る形は、新しい API と追加の要求が要る
+  - 添付だけの検索の行の中心は親ページなので、後から取ると、届くまで行に何も書けない
+  - ページ検索の `formatSearchResult` が同じ関数を使っており、1 回呼ぶだけで済む
+- `hitsCount` を落とす前の数にする理由: 下流は `hitsCount < limit` を続きが無い合図にする。落とした後の数にすると、MongoDB からページが消えていただけで、続きがあるのに読み込みが止まる。ページ検索の `hitsCount` も、MongoDB に無いページを落とす前の数である
+- 続きが無いことの判定 (`hitsCount < limit`) が正しい理由: 権限確認の窓 (`collect-visible-attachment-hits.ts`) は、どの `offset` でも添付ヒットの上位 200 件で頭打ちになり、各要求が同じ範囲を見る。短い応答の後の要求が、それより多くの項目を返すことは無い。`primaryResultIncomplete` が true の応答は失敗であり、終わりではない
+- 採らなかった案: 画面がページ ID の一覧から別の要求でページ文書を取る (利用者と検討して採らなかった)
+
+### 14.2 設定の取得 API で、環境変数で固定されているかを返す
+
+- 判断: `GET /_api/v3/admin/attachment-search/config` の `config` に `useOnlyEnvVars` を足す
+- 理由: GROWI.cloud では運用側が 4 つのキーを環境変数で固定し (`env:useOnlyEnvVars:app:attachmentFullTextSearch`)、利用組織の管理者に上書きさせない。いまの GET はそれを返さないので、画面は設定の欄を読み取り専用にできず、保存しても値が使われないのに保存できたように見える
+- 残っていること: 固定されているときの `PUT /config` は、いまも保存を受け付ける (値は使われない)。API を直接使う場合に断るかは決めていない (design.md の Open Questions)
+
 ## 参照
 
 

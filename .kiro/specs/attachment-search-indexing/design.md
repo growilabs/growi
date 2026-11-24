@@ -401,8 +401,8 @@ sequenceDiagram
 - ページングは `offset` / `limit` (`from` / `size`) だけで行う。カーソル (`nextCursor`、`search_after`) は無い。`limit` は 1〜200 (既定 50)、`offset` は 0 以上の整数で、それ以外は 400
 - 権限判定は、1 回の往復で窓の中の unique pageId (最大 200 件) を `searchAccessiblePages` に渡す。結果は「見えるヒットだけを並べた列」の上で決めるので、窓が 200 件に達するまでは、見えないヒットがあっても無くても同じ結果になる。200 件より下位にある見えるヒットには届かない
 - `meta.total` は常に null、`primaryResultIncomplete` は検索か権限確認が失敗 (800ms 超過を含む) したときだけ true。権限で落ちた件数に応じて変わる値は返さない
-- 「続きを読み込む」の終わりは、`meta.hitsCount` が `limit` に満たないことで判定できる。窓はどの `offset` でも上位 200 件で頭打ちになり、各要求が同じ範囲を見るので、短い応答の後に続きは出ない (下流 `attachment-search-ui` の research.md 4.3)
-- 各項目の `data` は、ページ検索と同じ形のページ文書である。route が `findPageListByIds` で読み、`lastUpdateUser` を `serializeUserSecurely` で直し、`seenUserCount` を入れる (ページ検索の `formatSearchResult` と同じ処理)。MongoDB に無いページの項目は落とす。`meta.hitsCount` は落とす前の項目数にする (ページ検索の `hitsCount` と同じ数え方。落としたことで続きの読み込みが止まらないように)。下流の画面は、ページ検索と同じ一覧とプレビューの部品でこの結果を描く (Req 9.7)
+- 「続きを読み込む」の終わりは、`meta.hitsCount` が `limit` に満たないことで判定できる。窓はどの `offset` でも上位 200 件で頭打ちになり、各要求が同じ範囲を見るので、短い応答の後に続きは出ない (research.md 14.1)
+- 各項目の `data` は、ページ検索と同じ形のページ文書である。route が `findPageListByIds` で読み、`lastUpdateUser` を `serializeUserSecurely` で直し、`seenUserCount` を入れる (ページ検索の `formatSearchResult` と同じ処理)。MongoDB に無いページの項目は落とす。`meta.hitsCount` は落とす前の項目数にする (ページ検索の `hitsCount` と同じ数え方。落としたことで続きの読み込みが止まらないように)。下流の画面は、ページ検索と同じ一覧とプレビューの部品でこの結果を描く (Req 9.7、research.md 14.1)
 - `sort` / `order` / `type` は適用しない (点数順だけ)
 
 #### 2.3 API 呼び出しパターン (アプリ実装)
