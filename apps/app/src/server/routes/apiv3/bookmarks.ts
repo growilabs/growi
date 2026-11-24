@@ -138,6 +138,8 @@ export const setup = (crowi: Crowi): Router => {
    *              application/json:
    *                schema:
    *                  $ref: '#/components/schemas/BookmarkInfo'
+   *          404:
+   *            description: Page is not found or forbidden.
    */
   router.get(
     '/info',
