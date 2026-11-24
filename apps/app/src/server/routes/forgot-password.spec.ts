@@ -4,7 +4,7 @@ import { mock } from 'vitest-mock-extended';
 
 import { forgotPasswordErrorCode } from '~/interfaces/errors/forgot-password';
 import type Crowi from '~/server/crowi';
-import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
+import addCustomFunctionToResponse from '~/server/routes/apiv3/response';
 
 import { checkForgotPasswordEnabledMiddlewareFactory } from './forgot-password';
 
@@ -21,13 +21,10 @@ const crowiWithPasswordReset = (isEnabled: boolean): Crowi => {
   return mock<Crowi>({ configManager, passportService });
 };
 
+addCustomFunctionToResponse(express);
+
 const appFor = (crowi: Crowi, forApi: boolean) => {
   const app = express();
-  app.use((_req, res, next) => {
-    (res as ApiV3Response).apiv3Err = (errors, status = 400) =>
-      res.status(status).json({ errors: [errors] });
-    next();
-  });
   app.use(checkForgotPasswordEnabledMiddlewareFactory(crowi, forApi));
   app.post('/', (_req, res) => {
     res.sendStatus(200);
