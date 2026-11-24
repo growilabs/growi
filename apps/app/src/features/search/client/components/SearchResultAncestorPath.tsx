@@ -5,14 +5,15 @@ import { pagePathUtils } from '@growi/core/dist/utils';
 
 import type { AncestorPathNode } from '~/client/util/build-ancestor-path-nodes';
 import { buildAncestorPathNodes } from '~/client/util/build-ancestor-path-nodes';
+import { parsePagePath } from '~/client/util/format-truncated-page-path';
 import { PagePathHierarchicalLink } from '~/components/Common/PagePathHierarchicalLink';
 import { LinkedPagePath } from '~/models/linked-page-path';
 
+import { usePathCollapseLevel } from '../hooks/use-path-collapse-level';
 import { PathSeparator } from './PathSeparator';
 import {
   FIXED_PART_CLASS_NAME,
   ROW_CLASS_NAME,
-  SEGMENT_CLASS_NAME,
 } from './truncated-path-row-classes';
 
 import styles from './SearchResultAncestorPath.module.scss';
@@ -31,7 +32,8 @@ const ROOT_LINKED_PAGE_PATH = new LinkedPagePath('/');
 // A surviving ancestor segment (`link`) is rendered as a next/link, either as
 // plain text or, when a corresponding highlight was resolved, with the
 // Elasticsearch <em> markup applied. `ellipsis` renders as plain, non-link text
-// (Requirement 5.2: the ellipsis is never itself a navigation target).
+// (the ellipsis is never itself a navigation target). Neither
+// ever shrinks: an ancestor is shown in full or collapsed into the ellipsis.
 const AncestorNode = ({
   node,
 }: {
@@ -42,11 +44,7 @@ const AncestorNode = ({
   }
 
   return (
-    <Link
-      href={node.href}
-      prefetch={false}
-      className={`${styles.segment} ${SEGMENT_CLASS_NAME}`}
-    >
+    <Link href={node.href} prefetch={false} className={FIXED_PART_CLASS_NAME}>
       {node.highlightedHtml != null ? (
         <span
           // biome-ignore lint/security/noDangerouslySetInnerHtml: highlight markup is sanitized
@@ -60,16 +58,21 @@ const AncestorNode = ({
 };
 
 // Stable key per node: link nodes are keyed by their (unique) href, and at
-// most one ellipsis node ever appears in a plan, so a constant key is safe.
+// most one ellipsis node ever appears in a plan at any collapse level, so a
+// constant key is safe.
 const nodeKey = (node: AncestorPathNode): string =>
   node.type === 'ellipsis' ? 'ellipsis' : node.href;
 
 /**
  * Presentational component that renders the ancestor-path portion of a search
- * result row on a single line, with Notion-style middle truncation. Surviving
+ * result row on a single line, with Notion-style middle truncation. When the
+ * base form does not fit, ancestors are folded into the ellipsis one by one
+ * (the parent last), following the same rule as the search modal. Since the
+ * page name sits on its own row, nothing here is character-truncated. The
+ * row sizes itself to the free space of its flex parent. Surviving
  * ancestor segments stay individually clickable and keep search-keyword
  * highlighting; the page name itself is rendered separately by the caller
- * (see research.md "Row 1 vs Row 2 scope").
+ * on its own row.
  *
  * The full path (including the page name) is always exposed via the native
  * `title` attribute so it can be inspected on hover, regardless of whether the
@@ -77,9 +80,14 @@ const nodeKey = (node: AncestorPathNode): string =>
  */
 export const SearchResultAncestorPath = memo(
   ({ path, highlightedPath }: SearchResultAncestorPathProps): JSX.Element => {
+    const parsed = useMemo(() => parsePagePath(path), [path]);
+    const { containerRef, collapseLevel } = usePathCollapseLevel(
+      parsed,
+      highlightedPath,
+    );
     const { nodes, fullPath } = useMemo(
-      () => buildAncestorPathNodes(path, highlightedPath),
-      [path, highlightedPath],
+      () => buildAncestorPathNodes(parsed, highlightedPath, collapseLevel),
+      [parsed, highlightedPath, collapseLevel],
     );
     // Like PageListItemL's legacy row, the trash icon marks pages *inside*
     // /trash; the /trash page itself sits directly under the top page.
@@ -87,6 +95,7 @@ export const SearchResultAncestorPath = memo(
 
     return (
       <span
+        ref={containerRef}
         className={`${styles['search-result-ancestor-path']} ${ROW_CLASS_NAME}`}
         title={fullPath}
       >

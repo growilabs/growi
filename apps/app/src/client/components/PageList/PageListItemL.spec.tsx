@@ -185,6 +185,21 @@ describe('PageListItemL', () => {
       expect(screen.queryByRole('link', { name: 'A' })).toBeNull();
     });
 
+    it('places the injected ancestor path directly in the flex row, without a wrapper of its own', () => {
+      render(
+        <PageListItemL
+          page={createPageWithMeta(createPageData({ path: '/A/B/C' }))}
+          isReadOnlyUser={false}
+          renderTruncatedAncestorPath={renderAncestorPathStub}
+        />,
+      );
+
+      // The truncated path sizes itself as a flex item of this row; a wrapper
+      // in between would decide its width instead.
+      const ancestorRow = screen.getByText('ancestor-row:/A/B/C|');
+      expect(ancestorRow.parentElement).toHaveClass('d-flex');
+    });
+
     it('bundles a trailing date into a single page name in the title row', () => {
       const { container } = render(
         <PageListItemL

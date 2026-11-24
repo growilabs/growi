@@ -25,7 +25,7 @@
 ### This Spec Owns
 - 検索モーダルの各結果行における**ページパスの表示形式**（中間省略の判定・レンダリング・1 行制御・ホバーでのフルパス提示）。
 - 中間省略の判定を行う純粋関数（`path` 文字列 → 表示パーツ列）。
-- 上記表示コンポーネント専用の CSS（1 行固定・オーバーフロー安全網）。
+- 上記表示コンポーネントの CSS のうちモーダル固有の部分（区切りの余白など）。1 行表示の共通 CSS と、幅が足りないときの段階的な畳み込み（`useFittingCollapseLevel`）は検索結果一覧と共有しており、`.kiro/specs/page-path-truncation/` が持つ。
 
 ### Out of Boundary
 - `PagePathLabel`（@growi/ui）/ `DevidedPagePath`・`LinkedPagePath` の実装。
@@ -71,7 +71,7 @@ graph LR
 | Layer | Choice / Version | Role in Feature | Notes |
 |-------|------------------|-----------------|-------|
 | Frontend | React 18 / Next.js 14 (Pages Router) | 表示コンポーネント | 既存スタック |
-| Frontend | SCSS module | 1 行固定・ellipsis 安全網 | 既存パターン（`*.module.scss`） |
+| Frontend | SCSS module | 1 行固定（共通 mixin `_truncated-path-row.scss` を `@use`） | 既存パターン（`*.module.scss`） |
 | Shared util | `@growi/core/dist/utils` `normalizePath` | パス正規化 | 既存依存 |
 | Shared model | `@growi/core/dist/models` `DevidedPagePath` | ページ名決定（末尾日付束ね） | 既存依存・利用のみ |
 
@@ -87,12 +87,12 @@ apps/app/src/features/search/client/
 │   └── format-truncated-page-path.spec.ts    # 純粋関数のユニットテスト
 └── components/
     ├── SearchResultPagePath.tsx              # 表示コンポーネント（パス span を所有）
-    ├── SearchResultPagePath.module.scss      # 1 行固定・ellipsis 安全網の CSS
+    ├── SearchResultPagePath.module.scss      # 1 行固定の CSS（共通 mixin を `@use`）
     └── SearchResultPagePath.spec.tsx         # コンポーネントの contract テスト（RTL）
 ```
 
 ### Modified Files
-- `apps/app/src/features/search/client/components/SearchResultMenuItem.tsx` — パス表示部の `<span className="ms-3 text-break text-wrap"><PagePathLabel .../></span>` を `<SearchResultPagePath path={item.data.path} />` に差し替え。行内で幅が正しく縮むよう、パス要素に flex 伸縮（`flex-grow` + `min-width: 0`）を持たせ、footprint span には縮小防止（`flex-shrink-0`）を付与する。`PagePathLabel` の import を削除。
+- `apps/app/src/features/search/client/components/SearchResultMenuItem.tsx` — パス表示部の `<span className="ms-3 text-break text-wrap"><PagePathLabel .../></span>` を `<SearchResultPagePath path={item.data.path} />` に差し替え。`SearchResultPagePath` は包む要素を挟まずに `<li>` の直下に置き、左の余白は `className="ms-3"` で渡す。footprint span には縮小防止（`flex-shrink-0`）を付与する。`PagePathLabel` の import を削除。
 
 > `PagePathLabel`（@growi/ui）・`SearchMenuItem`・SCSS 変数等の共有資産は変更しない。
 
@@ -114,7 +114,7 @@ flowchart TD
 判定ルール（決定事項）:
 - ページ名（`pageName`）は `new DevidedPagePath(path, false, true)` の `latter`（末尾日付は 1 単位に束ねる現行規則）。祖先セグメント（`ancestors`）は `former` を `/` 分割し空要素を除いたもの。root（`/`）は `isRoot: true`。
 - 表示単位数 = `ancestors.length + 1`（ページ名）。`<= 3` は全単位表示（中間に隠せる祖先が無い）。`>= 4` は先頭祖先・親（＝末尾の祖先）・ページ名を残し、中間の祖先を `…` に畳む。ちょうど 4 は中間の祖先 1 個のみ省略。
-- CSS の 1 行 ellipsis（横幅安全網）は判定とは独立に常時適用され、保持したどの単位が長くてもオーバーフローさせない。
+- 上記は基本形（段階 0）の決め方。基本形が横幅に収まらない場合の段階的な畳み込みは `.kiro/specs/page-path-truncation/` の design.md「畳み込み段階の選択」に従う。
 
 ## Requirements Traceability
 
@@ -127,7 +127,7 @@ flowchart TD
 | 2.2 | ルートは現行表現 | formatTruncatedPagePath, SearchResultPagePath | `isRoot` | 判定フロー |
 | 2.3 | ちょうど 4 セグは中間 1 個省略 | formatTruncatedPagePath | `parts` | 判定フロー |
 | 3.1, 3.3 | 1 行固定・深さ/長さに依らずオーバーフローしない | SearchResultPagePath.module.scss, SearchResultMenuItem | — | — |
-| 3.2 | 保持セグメントが長い場合 ellipsis 切り詰め | SearchResultPagePath.module.scss | — | — |
+| 3.2 | 収まらない場合は祖先を段階的に畳み、最後にページ名のみ切り詰め | SearchResultPagePath, `useFittingCollapseLevel`（page-path-truncation） | `collapseLevel` | page-path-truncation「畳み込み段階の選択」 |
 | 4.1, 4.2 | 省略時ホバーでフルパス | SearchResultPagePath | `title` 属性 / `fullPath` | — |
 | 5.1 | クリック遷移維持 | SearchResultMenuItem（非改変部） | Downshift `getItemProps` | — |
 | 5.2 | 既読数等パス以外維持 | SearchResultMenuItem | — | — |
@@ -202,9 +202,9 @@ interface SearchResultPagePathProps {
 
 **Implementation Notes**
 - **描画**: root は `/` を現行同様に表示（2.2）。非 root は先頭に `/`、以降 `segment` を `/` 区切りで描画。`isPageName` のセグメントは `<strong>` で太字（1.3）。`ellipsis` パーツは中間省略と分かる独立要素（`…`、muted 表示）として描画（1.4）。ハイライト HTML を含まないためプレーンテキストとして描画する。
-- **1 行安全網（3.x）**: ルート要素は 1 行固定（`white-space: nowrap; overflow: hidden`）。各 `segment` に `text-overflow: ellipsis; overflow: hidden; min-width: 0`。`flex-shrink` で縮小優先度を制御し、先頭・親セグメントを先に縮め、ページ名は最後に縮む（`flex-shrink` を小さく）ことで、どのセグメントが長くても 1 行内に収める。区切り `/` と `…` は縮小・折り返し不可（`flex-shrink: 0; white-space: nowrap`）。CSS 値の詳細は `*.module.scss` で定義。
-- **行レイアウト連携**: `SearchResultMenuItem` の `<li>`（`d-flex`）内で本要素が可変幅を占めるよう `flex-grow: 1; min-width: 0`。footprint（既読数）は縮小しないよう `flex-shrink-0`。
-- **ツールチップ（4.x）**: ルート要素へ `title={fullPath}` を常時付与する。中間省略は静的に判定できるが、CSS の per-segment ellipsis は実行時の幅依存で発生し得るため、DOM 計測を避けつつ「省略時に必ずフルパスを提示する（4.1）」を満たす最小実装として、常に `title` を付与する（非省略の短いパスでは可視文字列と一致するだけで害はない）。
+- **1 行表示（3.x）**: ルート要素は 1 行固定。祖先セグメント・区切り `/`・`…` は縮めず、ページ名だけが縮んで文字単位で切り詰められる。幅が足りないときの畳み込みは `.kiro/specs/page-path-truncation/` の design.md（`useFittingCollapseLevel`・`SearchResultPagePath`）に従う。
+- **行レイアウト連携**: 本要素は `SearchResultMenuItem` の `<li>`（`d-flex`）の直下に置き、共通 mixin の `flex: 1 1 0; min-width: 0` によって、パスの長さに関係なく行の残りの幅いっぱいになる（`page-path-truncation` の design.md「幅の前提」）。footprint（既読数）は縮小しないよう `flex-shrink-0`。
+- **ツールチップ（4.x）**: ルート要素へ `title={fullPath}` を常時付与する。祖先の畳み込みとページ名の切り詰めは実行時の幅で決まるため、「省略時に必ずフルパスを提示する（4.1）」を最も単純に満たす実装として、常に `title` を付与する（非省略の短いパスでは可視文字列と一致するだけで害はない）。
 - **非破壊（5.x）**: 本要素はパス `<span>` の内部のみを所有し、`<li>` のクリック遷移（`getItemProps`）・footprint 表示には関与しない。
 
 ## Testing Strategy
@@ -230,4 +230,3 @@ interface SearchResultPagePathProps {
 ## Open Questions / Risks
 
 - **ページ名の日付束ねは現行踏襲**: `DevidedPagePath` の `evalDatePath` を利用してページ名（`latter`）を決定するため、日付で終わるページ（例 `/notes/2024/01/01`）はページ名 `2024/01/01` を太字表示する現行挙動を維持する。中間省略は祖先パスに対してのみ働く。→ 浅いパスは現行と完全一致、深いパスは日付ページ名を保ったまま祖先中間のみ `…` に畳む。
-- **CSS 縮小優先度の詰め**: `flex-shrink` による「ページ名を最後に縮める」挙動はライト/ダーク両テーマ・各種幅で目視検証が必要（実装時に確認）。ページ名が日付束ね（`2024/01/01`）の場合も 1 単位として扱われ、長い場合は 1 行内で ellipsis 切り詰めされる。

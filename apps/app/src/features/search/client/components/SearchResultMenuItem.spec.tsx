@@ -111,11 +111,11 @@ describe('SearchResultMenuItem', () => {
       expect(container.querySelector('.text-break')).toBeNull();
     });
 
-    it('should let the path fill the row and shrink below its content width', () => {
+    it('should place the path directly in the row, not inside a wrapper that could size it by its content', () => {
       mockSearchResult(buildSearchResultItem());
       const { getItemProps } = setupGetItemProps();
 
-      const { container } = render(
+      render(
         <SearchResultMenuItem
           activeIndex={null}
           searchKeyword="memo"
@@ -123,12 +123,10 @@ describe('SearchResultMenuItem', () => {
         />,
       );
 
-      // The wrapper that owns the path must grow and be allowed to shrink
-      // (min-width:0) so the 1-line ellipsis can engage.
-      const wrapper = container.querySelector('.flex-grow-1');
-      expect(wrapper).not.toBeNull();
-      expect((wrapper as HTMLElement).style.minWidth).toMatch(/^0(px)?$/);
-      expect(wrapper?.textContent).toContain('memo');
+      // The path sizes itself as a flex item of the row; a wrapper in between
+      // would decide its width instead (see _truncated-path-row.scss).
+      const path = screen.getByTitle(DEEP_PATH);
+      expect(path.parentElement?.tagName).toBe('LI');
     });
   });
 
@@ -137,7 +135,7 @@ describe('SearchResultMenuItem', () => {
       mockSearchResult(buildSearchResultItem());
       const { getItemProps } = setupGetItemProps();
 
-      const { container } = render(
+      render(
         <SearchResultMenuItem
           activeIndex={null}
           searchKeyword="memo"
@@ -145,10 +143,12 @@ describe('SearchResultMenuItem', () => {
         />,
       );
 
-      expect(screen.getByText(String(SEEN_USERS_COUNT))).toBeInTheDocument();
+      const count = screen.getByText(String(SEEN_USERS_COUNT));
+      expect(count).toBeInTheDocument();
 
-      // The footprint must not be squeezed out of the row.
-      expect(container.querySelector('.flex-shrink-0')).not.toBeNull();
+      // The footprint itself (not just any fixed part of the path) must not be
+      // squeezed out of the row.
+      expect(count.parentElement).toHaveClass('flex-shrink-0');
     });
   });
 

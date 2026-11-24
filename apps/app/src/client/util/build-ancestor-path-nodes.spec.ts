@@ -1,9 +1,20 @@
-import { buildAncestorPathNodes } from './build-ancestor-path-nodes';
+import {
+  type AncestorPathPlan,
+  buildAncestorPathNodes,
+} from './build-ancestor-path-nodes';
+import { parsePagePath } from './format-truncated-page-path';
+
+const build = (
+  path: string,
+  highlightedPath?: string | null,
+  collapseLevel?: number,
+): AncestorPathPlan =>
+  buildAncestorPathNodes(parsePagePath(path), highlightedPath, collapseLevel);
 
 describe('buildAncestorPathNodes', () => {
   describe('when the path is the root', () => {
     it.each(['/', ''])('returns no nodes for %j', (path) => {
-      const result = buildAncestorPathNodes(path);
+      const result = build(path);
 
       expect(result.nodes).toEqual([]);
     });
@@ -11,7 +22,7 @@ describe('buildAncestorPathNodes', () => {
 
   describe('when the path has no ancestors (only a page name)', () => {
     it('returns no nodes', () => {
-      const result = buildAncestorPathNodes('/A');
+      const result = build('/A');
 
       expect(result.nodes).toEqual([]);
       expect(result.fullPath).toBe('/A');
@@ -20,7 +31,7 @@ describe('buildAncestorPathNodes', () => {
 
   describe('when the unit count is 3 or fewer (no truncation)', () => {
     it('returns every ancestor as a link node, in root-to-leaf order', () => {
-      const result = buildAncestorPathNodes('/A/B/C');
+      const result = build('/A/B/C');
 
       expect(result.nodes).toEqual([
         { type: 'link', href: '/A', text: 'A' },
@@ -32,7 +43,7 @@ describe('buildAncestorPathNodes', () => {
 
   describe('when the unit count is 4 or more (truncated)', () => {
     it('returns only the first ancestor and the immediate parent, with an ellipsis between them', () => {
-      const result = buildAncestorPathNodes('/A/B/C/D');
+      const result = build('/A/B/C/D');
 
       expect(result.nodes).toEqual([
         { type: 'link', href: '/A', text: 'A' },
@@ -45,7 +56,7 @@ describe('buildAncestorPathNodes', () => {
 
   describe('when a highlightedPath is provided and the chain lengths match', () => {
     it("sets highlightedHtml only on surviving link nodes, reflecting each node's own highlight markup", () => {
-      const result = buildAncestorPathNodes('/A/B/C/D', '/A/B/<em>C</em>/D');
+      const result = build('/A/B/C/D', '/A/B/<em>C</em>/D');
 
       expect(result.nodes).toEqual([
         { type: 'link', href: '/A', text: 'A' },
@@ -60,10 +71,7 @@ describe('buildAncestorPathNodes', () => {
     });
 
     it('sets highlightedHtml only on the segments that carry a highlight', () => {
-      const result = buildAncestorPathNodes(
-        '/foo/bar/baz',
-        '/<em>foo</em>/bar/baz',
-      );
+      const result = build('/foo/bar/baz', '/<em>foo</em>/bar/baz');
 
       expect(result.nodes).toEqual([
         {
@@ -79,7 +87,7 @@ describe('buildAncestorPathNodes', () => {
 
   describe('when the highlight markup contains a "/" of its own', () => {
     it('renders only the segments whose <em> is cut by a "/" as plain text', () => {
-      const result = buildAncestorPathNodes(
+      const result = build(
         '/A/B/C/D',
         "/A/<em class='highlighted-keyword'>B/C</em>/D",
       );
@@ -94,7 +102,7 @@ describe('buildAncestorPathNodes', () => {
     it('keeps an ancestor highlight on a date-suffixed path', () => {
       // The `/` of `</em>` used to be picked up by the date-bundling regex,
       // desyncing the highlighted chain and dropping every ancestor highlight.
-      const result = buildAncestorPathNodes(
+      const result = build(
         '/daily/2024/01/02',
         "/<em class='highlighted-keyword'>daily</em>/2024/01/02",
       );
@@ -112,11 +120,101 @@ describe('buildAncestorPathNodes', () => {
     });
   });
 
+  describe('when a collapse level is given', () => {
+    it.each([
+      {
+        path: '/A/B/C/D',
+        level: 1,
+        expected: [
+          { type: 'ellipsis' },
+          { type: 'link', href: '/A/B/C', text: 'C' },
+        ],
+      },
+      { path: '/A/B/C/D', level: 2, expected: [{ type: 'ellipsis' }] },
+      {
+        path: '/A/B/C',
+        level: 1,
+        expected: [
+          { type: 'ellipsis' },
+          { type: 'link', href: '/A/B', text: 'B' },
+        ],
+      },
+      { path: '/A/B/C', level: 2, expected: [{ type: 'ellipsis' }] },
+      { path: '/A/B', level: 1, expected: [{ type: 'ellipsis' }] },
+      {
+        path: '/daily/2024/01/02',
+        level: 1,
+        expected: [
+          { type: 'ellipsis' },
+          { type: 'link', href: '/daily/2024/01', text: '01' },
+        ],
+      },
+    ])('folds $path at level $level, keeping each survivor linked to its own ancestor', ({
+      path,
+      level,
+      expected,
+    }) => {
+      const result = build(path, null, level);
+
+      expect(result.nodes).toEqual(expected);
+      expect(result.fullPath).toBe(path);
+    });
+
+    it('keeps the highlight on the surviving parent and drops it with the folded ancestors', () => {
+      const result = build('/foo/bar/baz', '/<em>foo</em>/<em>bar</em>/baz', 1);
+
+      expect(result.nodes).toEqual([
+        { type: 'ellipsis' },
+        {
+          type: 'link',
+          href: '/foo/bar',
+          text: 'bar',
+          highlightedHtml: '<em>bar</em>',
+        },
+      ]);
+    });
+
+    it('treats a level beyond the maximum as the maximum', () => {
+      const result = build('/A/B/C/D', null, 5);
+
+      expect(result.nodes).toEqual([{ type: 'ellipsis' }]);
+    });
+
+    it.each(['/', '/A'])('still returns no nodes for %j', (path) => {
+      const result = build(path, null, 1);
+
+      expect(result.nodes).toEqual([]);
+    });
+  });
+
   describe('fullPath', () => {
     it('always includes the page name, delegating to formatTruncatedPagePath', () => {
-      const result = buildAncestorPathNodes('/A/B/C/D');
+      const result = build('/A/B/C/D');
 
       expect(result.fullPath).toBe('/A/B/C/D');
+    });
+  });
+
+  // `</` in a plain path is a literal (only `</em>` in highlight markup is not a
+  // separator), so every "/" still splits an ancestor segment.
+  describe('when an ancestor segment ends with "<"', () => {
+    it('links every ancestor to its own prefix without throwing', () => {
+      const result = build('/a</b/c');
+
+      expect(result.nodes).toEqual([
+        { type: 'link', href: encodeURI('/a<'), text: 'a<' },
+        { type: 'link', href: encodeURI('/a</b'), text: 'b' },
+      ]);
+    });
+
+    it('keeps the parent linked to its own prefix when truncated', () => {
+      const result = build('/x</y/z/w/leaf');
+
+      expect(result.nodes).toEqual([
+        { type: 'link', href: encodeURI('/x<'), text: 'x<' },
+        { type: 'ellipsis' },
+        { type: 'link', href: encodeURI('/x</y/z/w'), text: 'w' },
+      ]);
     });
   });
 });

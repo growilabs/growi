@@ -67,7 +67,7 @@ type Props = {
   isReadOnlyUser: boolean;
   forceHideMenuItems?: ForceHideMenuItems;
   showPageUpdatedTime?: boolean; // whether to show page's updated time at the top-right corner of item
-  renderTruncatedAncestorPath?: TruncatedAncestorPathRenderer; // opt-in: render the ancestor path with this and bundle trailing dates into the page name (see design.md Requirement 7-9)
+  renderTruncatedAncestorPath?: TruncatedAncestorPathRenderer; // opt-in (only /_search passes it): render the ancestor path with this and bundle trailing dates into the page name; other lists keep the full legacy path
   onCheckboxChanged?: (isChecked: boolean, pageId: string) => void;
   onClickItem?: (pageId: string) => void;
   onPageDuplicated?: OnDuplicatedFunction;
@@ -299,20 +299,16 @@ const PageListItemLSubstance: ForwardRefRenderFunction<ISelectable, Props> = (
 
             <div
               className="flex-grow-1 px-2 px-md-4"
-              // Every flex ancestor of the truncated path needs min-width:0 to shrink
-              // (see page-path-truncation tasks.md, Task 5).
+              // Every flex ancestor of the truncated path needs min-width:0 to shrink.
               style={isPathTruncationEnabled ? { minWidth: 0 } : undefined}
             >
               <div className="d-flex justify-content-between">
                 {/* page path */}
                 {legacyAncestorPath == null ? (
-                  // min-width:0 enables the 1-line ellipsis (no Bootstrap utility for it).
-                  <span className="flex-grow-1" style={{ minWidth: 0 }}>
-                    {renderTruncatedAncestorPath?.(
-                      pageData.path,
-                      highlightedPath,
-                    )}
-                  </span>
+                  // Rendered directly in this flex row: the truncated path sizes
+                  // itself to the free width, and a wrapper here would size it
+                  // by its content instead.
+                  renderTruncatedAncestorPath?.(pageData.path, highlightedPath)
                 ) : (
                   <PagePathHierarchicalLink
                     linkedPagePath={legacyAncestorPath.linkedPagePath}
