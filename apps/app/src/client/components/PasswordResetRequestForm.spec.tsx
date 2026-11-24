@@ -1,14 +1,18 @@
 import type { ReactNode } from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { createStore, Provider } from 'jotai';
 import { mock } from 'vitest-mock-extended';
 
 import { apiv3Post } from '~/client/util/apiv3-client';
 import { toastError, toastSuccess } from '~/client/util/toastr';
 import { forgotPasswordErrorCode } from '~/interfaces/errors/forgot-password';
+import { rateLimitErrorCode } from '~/interfaces/errors/rate-limit';
+import { apiV3ErrorCode } from '~/interfaces/errors/v3-error';
 import { isMailerSetupAtom } from '~/states/server-configurations';
 
-import PasswordResetRequestForm from './PasswordResetRequestForm';
+import PasswordResetRequestForm, {
+  IMMEDIATE_REJECTION_WAIT_MS,
+} from './PasswordResetRequestForm';
 
 vi.mock('next-i18next', () => ({
   useTranslation: () => ({
@@ -46,63 +50,146 @@ const submitEmail = (email: string) => {
   fireEvent.click(sendButton());
 };
 
+const NEUTRAL_TOAST = 'forgot_password.email_sent_if_account_exists';
+
+const advance = (ms: number) => act(() => vi.advanceTimersByTimeAsync(ms));
+
+/** A request whose outcome the test decides later. */
+const deferredRequest = () => {
+  let reject: (reason: unknown) => void = () => {};
+  let resolve: (value: unknown) => void = () => {};
+  mockApiv3Post.mockReturnValue(
+    new Promise((res, rej) => {
+      resolve = res;
+      reject = rej;
+    }),
+  );
+  return { resolve: () => resolve(mock()), reject: (e: unknown) => reject(e) };
+};
+
+const immediateRejections = [
+  {
+    status: 405,
+    code: forgotPasswordErrorCode.PASSWORD_RESET_IS_UNAVAILABLE,
+    messageKey: 'forgot_password.password_reset_disabled',
+  },
+  {
+    status: 429,
+    code: rateLimitErrorCode.TOO_MANY_REQUESTS,
+    messageKey: 'forgot_password.too_many_requests',
+  },
+  {
+    status: 400,
+    code: apiV3ErrorCode.VALIDATION_FAILED,
+    messageKey: 'forgot_password.invalid_input_format',
+  },
+];
+
 describe('PasswordResetRequestForm', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useFakeTimers();
   });
 
-  it('shows the neutral toast immediately and keeps the form usable while waiting for the response', () => {
-    mockApiv3Post.mockReturnValue(new Promise(() => {}));
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it.each(
+    immediateRejections,
+  )('shows only the $status error toast when the server rejects the request at once', async ({
+    code,
+    messageKey,
+  }) => {
+    mockApiv3Post.mockRejectedValue([{ message: 'rejected', code }]);
     renderForm();
 
     submitEmail('user@example.com');
+    await advance(IMMEDIATE_REJECTION_WAIT_MS);
 
-    expect(mockToastSuccess).toHaveBeenCalledWith(
-      'forgot_password.email_sent_if_account_exists',
-    );
+    expect(mockToastError).toHaveBeenCalledWith(messageKey);
+    expect(mockToastError).toHaveBeenCalledTimes(1);
+    expect(mockToastSuccess).not.toHaveBeenCalled();
+  });
+
+  it('shows the neutral toast once the immediate rejection window has passed, keeping the form usable', async () => {
+    deferredRequest();
+    renderForm();
+
+    submitEmail('user@example.com');
+    await advance(IMMEDIATE_REJECTION_WAIT_MS - 1);
+    expect(mockToastSuccess).not.toHaveBeenCalled();
+
+    await advance(1);
+    expect(mockToastSuccess).toHaveBeenCalledWith(NEUTRAL_TOAST);
     expect(screen.getByRole('textbox')).toBeEnabled();
     expect(sendButton()).toBeEnabled();
   });
 
   it('shows no error toast when the request is accepted', async () => {
-    mockApiv3Post.mockResolvedValue(mock());
+    const request = deferredRequest();
     renderForm();
 
     submitEmail('user@example.com');
+    await advance(IMMEDIATE_REJECTION_WAIT_MS);
+    request.resolve();
+    await advance(0);
 
-    await waitFor(() => expect(mockApiv3Post).toHaveBeenCalled());
+    expect(mockToastSuccess).toHaveBeenCalledWith(NEUTRAL_TOAST);
     expect(mockToastError).not.toHaveBeenCalled();
   });
 
-  it('shows the retry guidance when the server reports a failed request', async () => {
-    mockApiv3Post.mockRejectedValue([
+  it('shows the retry guidance after the neutral toast when the server reports a failed request', async () => {
+    const request = deferredRequest();
+    renderForm();
+
+    submitEmail('user@example.com');
+    await advance(IMMEDIATE_REJECTION_WAIT_MS);
+    request.reject([
       {
         message: 'Failed to process the password reset request.',
         code: forgotPasswordErrorCode.PASSWORD_RESET_REQUEST_FAILED,
       },
     ]);
-    renderForm();
+    await advance(0);
 
-    submitEmail('user@example.com');
-
-    await waitFor(() =>
-      expect(mockToastError).toHaveBeenCalledWith(
-        'forgot_password.request_failed',
-      ),
+    expect(mockToastSuccess).toHaveBeenCalledWith(NEUTRAL_TOAST);
+    expect(mockToastError).toHaveBeenCalledWith(
+      'forgot_password.request_failed',
     );
     expect(mockToastError).toHaveBeenCalledTimes(1);
   });
 
-  it('shows other API errors as they are', async () => {
-    const rateLimitError = [{ message: 'Too many requests', code: '429' }];
-    mockApiv3Post.mockRejectedValue(rateLimitError);
+  it('still shows the specific message when a rate limit arrives after the window', async () => {
+    const request = deferredRequest();
     renderForm();
 
     submitEmail('user@example.com');
+    await advance(IMMEDIATE_REJECTION_WAIT_MS);
+    request.reject([
+      {
+        message: 'Too many requests',
+        code: rateLimitErrorCode.TOO_MANY_REQUESTS,
+      },
+    ]);
+    await advance(0);
 
-    await waitFor(() =>
-      expect(mockToastError).toHaveBeenCalledWith(rateLimitError),
+    expect(mockToastSuccess).toHaveBeenCalledWith(NEUTRAL_TOAST);
+    expect(mockToastError).toHaveBeenCalledWith(
+      'forgot_password.too_many_requests',
     );
+  });
+
+  it('shows other API errors as they are after the neutral toast', async () => {
+    const otherError = [{ message: 'Something else', code: 'unknown-code' }];
+    mockApiv3Post.mockRejectedValue(otherError);
+    renderForm();
+
+    submitEmail('user@example.com');
+    await advance(IMMEDIATE_REJECTION_WAIT_MS);
+
+    expect(mockToastSuccess).toHaveBeenCalledWith(NEUTRAL_TOAST);
+    expect(mockToastError).toHaveBeenCalledWith(otherError);
   });
 
   it('asks for an email address without sending a request when the input is empty', () => {

@@ -6,9 +6,11 @@ import { join } from 'pathe';
 
 import { SupportedAction } from '~/interfaces/activity';
 import { forgotPasswordErrorCode } from '~/interfaces/errors/forgot-password';
+import { PASSWORD_RESET_RESPONSE_DELAY_MS } from '~/interfaces/password-reset';
 import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
 import injectResetOrderByTokenMiddleware from '~/server/middlewares/inject-reset-order-by-token-middleware';
 import PasswordResetOrder from '~/server/models/password-reset-order';
+import { UserStatus } from '~/server/models/user/conts';
 import { configManager } from '~/server/service/config-manager';
 import { growiInfoService } from '~/server/service/growi-info';
 import { processPasswordResetRequest } from '~/server/service/password-reset';
@@ -48,11 +50,14 @@ import { body } from 'express-validator';
 const router = express.Router();
 
 /**
- * Every password reset request is answered exactly this long after it was
- * received, whatever the outcome, so the response time does not reveal
- * whether the email is registered. Delivery not finished by then is a failure.
+ * Records when the request arrived, before any other middleware runs, so the
+ * fixed response time is measured from receipt rather than from after the
+ * activity recording and input validation.
  */
-const PASSWORD_RESET_RESPONSE_DELAY_MS = 18_000;
+const recordReceivedAt = (_req, res, next) => {
+  res.locals.receivedAt = Date.now();
+  next();
+};
 
 /**
  * @param {import('~/server/crowi').default} crowi Crowi instance
@@ -154,8 +159,9 @@ export const setup = (crowi) => {
    *        '200':
    *          description: >-
    *            Password reset request accepted. Also returned when the email
-   *            does not belong to an active account. Always returned 18
-   *            seconds after the request was received.
+   *            does not belong to an active account. Always returned a fixed
+   *            time (`PASSWORD_RESET_RESPONSE_DELAY_MS` in
+   *            `~/interfaces/password-reset`) after the request was received.
    *          content:
    *            application/json:
    *              schema:
@@ -164,10 +170,12 @@ export const setup = (crowi) => {
    *          description: >-
    *            Sending the password reset email failed or did not finish in
    *            time (error code `password-reset-request-failed`). Always
-   *            returned 18 seconds after the request was received.
+   *            returned a fixed time (`PASSWORD_RESET_RESPONSE_DELAY_MS` in
+   *            `~/interfaces/password-reset`) after the request was received.
    */
   router.post(
     '/',
+    recordReceivedAt,
     checkPassportStrategyMiddleware,
     // addActivity before the validators so anonymous abuse / DoS / enumeration
     // attempts against this public endpoint are recorded as ACTION_UNSETTLED
@@ -177,7 +185,7 @@ export const setup = (crowi) => {
     validator.email,
     apiV3FormValidator,
     async (req, res) => {
-      const receivedAt = Date.now();
+      const { receivedAt } = res.locals;
       const respondAt = receivedAt + PASSWORD_RESET_RESPONSE_DELAY_MS;
       const respondWithFailure = () =>
         res.apiv3Err(
@@ -227,7 +235,7 @@ export const setup = (crowi) => {
             isResettableAccount: async (targetEmail) => {
               const user = await User.findOne({ email: { $eq: targetEmail } });
               // Do not send emails to non GROWI user or inactive user
-              return user != null && user.status === 2;
+              return user != null && user.status === UserStatus.STATUS_ACTIVE;
             },
             sendPasswordResetMail,
             // This route logs nothing on success or for unknown/inactive
@@ -325,7 +333,7 @@ export const setup = (crowi) => {
       const user = await User.findOne({ email });
 
       // when the user is not found or active
-      if (user == null || user.status !== 2) {
+      if (user == null || user.status !== UserStatus.STATUS_ACTIVE) {
         return res.apiv3Err('update-password-failed');
       }
 

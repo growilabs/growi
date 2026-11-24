@@ -6,21 +6,39 @@ import { useTranslation } from 'next-i18next';
 
 import { apiv3Post } from '~/client/util/apiv3-client';
 import { toastError, toastSuccess } from '~/client/util/toastr';
-import { forgotPasswordErrorCode } from '~/interfaces/errors/forgot-password';
+import { PASSWORD_RESET_RESPONSE_DELAY_MS } from '~/interfaces/password-reset';
 import { isMailerSetupAtom } from '~/states/server-configurations';
-import { toArrayIfNot } from '~/utils/array-utils';
+
+import {
+  isPasswordResetRequestFailure,
+  resolveImmediateRejectionMessageKey,
+} from './password-reset-request-error';
 
 import styles from './PasswordResetRequestForm.module.scss';
 
 const moduleClass = styles['password-reset-request-form'] ?? '';
 
-const hasErrorCode = (e: unknown, code: string): boolean =>
-  typeof e === 'object' && e != null && 'code' in e && e.code === code;
+// Immediate rejections take a few ms on the server, so this mostly budgets
+// network round-trip; one arriving later still shows, just after the neutral toast.
+export const IMMEDIATE_REJECTION_WAIT_MS = 500;
 
-const isPasswordResetRequestFailure = (err: unknown): boolean =>
-  toArrayIfNot(err).some((e) =>
-    hasErrorCode(e, forgotPasswordErrorCode.PASSWORD_RESET_REQUEST_FAILED),
-  );
+type RequestResult = { ok: true } | { ok: false; error: Error[] };
+
+/** Resolves with the promise's value, or with null if it is still pending after `ms`. */
+const settleWithin = async <T,>(
+  promise: Promise<T>,
+  ms: number,
+): Promise<T | null> => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), ms);
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
+};
 
 const PasswordResetRequestForm: FC = () => {
   const { t } = useTranslation();
@@ -39,18 +57,44 @@ const PasswordResetRequestForm: FC = () => {
         return;
       }
 
-      // Acknowledge immediately and keep the form usable. The server answers
-      // every request 18 seconds later, and only a failure needs a toast.
-      toastSuccess(t('forgot_password.email_sent_if_account_exists'));
-      try {
-        await apiv3Post('/forgot-password', { email });
-      } catch (err) {
-        if (isPasswordResetRequestFailure(err)) {
-          toastError(t('forgot_password.request_failed'));
+      const request: Promise<RequestResult> = apiv3Post('/forgot-password', {
+        email,
+      }).then(
+        () => ({ ok: true }),
+        // apiv3Request rejects with the response's error list.
+        (error: Error[]) => ({ ok: false, error }),
+      );
+
+      // The server answers every processed request after a fixed delay
+      // (PASSWORD_RESET_RESPONSE_DELAY_MS), but
+      // rejects an unavailable feature, a rate limit or invalid input at
+      // once. Wait briefly for such a rejection so it replaces the neutral
+      // acknowledgement instead of following it.
+      const early = await settleWithin(request, IMMEDIATE_REJECTION_WAIT_MS);
+      if (early != null && !early.ok) {
+        const key = resolveImmediateRejectionMessageKey(early.error);
+        if (key != null) {
+          toastError(t(key));
           return;
         }
-        toastError(err);
       }
+
+      // Acknowledge and keep the form usable; only a failure needs a toast.
+      toastSuccess(t('forgot_password.email_sent_if_account_exists'));
+      const result = early ?? (await request);
+      if (result.ok) {
+        return;
+      }
+      const key =
+        resolveImmediateRejectionMessageKey(result.error) ??
+        (isPasswordResetRequestFailure(result.error)
+          ? 'forgot_password.request_failed'
+          : null);
+      if (key != null) {
+        toastError(t(key));
+        return;
+      }
+      toastError(result.error);
     },
     [t, email],
   );
@@ -92,7 +136,9 @@ const PasswordResetRequestForm: FC = () => {
             {t('forgot_password.send')}
           </button>
           <p className="form-notice-sm text-center text-body-secondary mt-3 mb-1">
-            {t('forgot_password.error_notice_after_send')}
+            {t('forgot_password.error_notice_after_send', {
+              seconds: Math.ceil(PASSWORD_RESET_RESPONSE_DELAY_MS / 1000),
+            })}
           </p>
           <p className="form-notice text-center text-body-secondary mb-0">
             {t('forgot_password.check_spam_folder_notice')}

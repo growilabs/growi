@@ -5,13 +5,12 @@ import request from 'supertest';
 import { mock } from 'vitest-mock-extended';
 
 import { forgotPasswordErrorCode } from '~/interfaces/errors/forgot-password';
+import { PASSWORD_RESET_RESPONSE_DELAY_MS } from '~/interfaces/password-reset';
 import type Crowi from '~/server/crowi';
-import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
+import addCustomFunctionToResponse from '~/server/routes/apiv3/response';
 import { configManager } from '~/server/service/config-manager';
 import { growiInfoService } from '~/server/service/growi-info';
 import type { S2sMessagingService } from '~/server/service/s2s-messaging/base';
-
-const RESPONSE_DELAY_MS = 18_000;
 
 const passthroughMiddleware = (
   _req: Request,
@@ -50,15 +49,9 @@ describe('POST /forgot-password when the activity could not be created', () => {
       events: { activity: { emit: vi.fn() } },
     });
 
+    addCustomFunctionToResponse(express);
     app = express();
     app.use(express.json());
-    app.use((_req, res, next) => {
-      const apiRes = res as ApiV3Response;
-      apiRes.apiv3 = (data) => res.json(data ?? {});
-      apiRes.apiv3Err = (error, statusCode = 500) =>
-        res.status(statusCode).json({ error });
-      next();
-    });
 
     const { setup } = await import('./forgot-password');
     app.use('/', setup(crowiMock));
@@ -98,7 +91,7 @@ describe('POST /forgot-password when the activity could not be created', () => {
     findOne.mockResolvedValue(null);
     const { state, promise } = await send('nobody@example.com');
 
-    await vi.advanceTimersByTimeAsync(RESPONSE_DELAY_MS - 1000);
+    await vi.advanceTimersByTimeAsync(PASSWORD_RESET_RESPONSE_DELAY_MS - 1000);
     expect(state.response).toBeUndefined();
 
     await vi.advanceTimersByTimeAsync(2000);
@@ -110,15 +103,17 @@ describe('POST /forgot-password when the activity could not be created', () => {
     findOne.mockRejectedValue(new Error('db down'));
     const { state, promise } = await send('user@example.com');
 
-    await vi.advanceTimersByTimeAsync(RESPONSE_DELAY_MS - 1000);
+    await vi.advanceTimersByTimeAsync(PASSWORD_RESET_RESPONSE_DELAY_MS - 1000);
     expect(state.response).toBeUndefined();
 
     await vi.advanceTimersByTimeAsync(2000);
     const response = await promise;
     expect(response.status).toBe(500);
-    expect(response.body.error.code).toBe(
-      forgotPasswordErrorCode.PASSWORD_RESET_REQUEST_FAILED,
-    );
+    expect(response.body.errors).toEqual([
+      expect.objectContaining({
+        code: forgotPasswordErrorCode.PASSWORD_RESET_REQUEST_FAILED,
+      }),
+    ]);
   });
 
   it('answers an unexpected error in the handler with the failure code at the fixed response time', async () => {
@@ -127,14 +122,16 @@ describe('POST /forgot-password when the activity could not be created', () => {
     });
     const { state, promise } = await send('user@example.com');
 
-    await vi.advanceTimersByTimeAsync(RESPONSE_DELAY_MS - 1000);
+    await vi.advanceTimersByTimeAsync(PASSWORD_RESET_RESPONSE_DELAY_MS - 1000);
     expect(state.response).toBeUndefined();
 
     await vi.advanceTimersByTimeAsync(2000);
     const response = await promise;
     expect(response.status).toBe(500);
-    expect(response.body.error.code).toBe(
-      forgotPasswordErrorCode.PASSWORD_RESET_REQUEST_FAILED,
-    );
+    expect(response.body.errors).toEqual([
+      expect.objectContaining({
+        code: forgotPasswordErrorCode.PASSWORD_RESET_REQUEST_FAILED,
+      }),
+    ]);
   });
 });

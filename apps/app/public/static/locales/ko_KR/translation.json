@@ -854,9 +854,12 @@
     "password_and_confirm_password_does_not_match": "비밀번호와 비밀번호 확인이 일치하지 않습니다.",
     "please_enable_mailer_alert": "이메일 설정이 완료되지 않아 비밀번호 재설정 기능이 비활성화되었습니다. 관리자에게 이메일 설정을 완료하도록 요청하십시오.",
     "email_address": "이메일 주소",
-    "error_notice_after_send": "전송 후 시스템에 문제가 발생하면 18초 이내에 이 화면에서 알려 드립니다.",
+    "error_notice_after_send": "전송 후 시스템에 문제가 발생하면 {{seconds}}초 이내에 이 화면에서 알려 드립니다.",
     "check_spam_folder_notice": "몇 분이 지나도 메일이 도착하지 않으면 스팸 메일함을 확인한 후 다시 전송해 주세요.",
-    "request_failed": "오류가 발생했습니다. 잠시 후 다시 시도해 주세요. 문제가 계속되면 관리자에게 문의해 주세요."
+    "request_failed": "오류가 발생했습니다. 잠시 후 다시 시도해 주세요. 문제가 계속되면 관리자에게 문의해 주세요.",
+    "password_reset_disabled": "비밀번호 재설정 기능이 비활성화되어 있습니다. 관리자에게 알려 주세요.",
+    "too_many_requests": "요청 횟수 제한에 도달했습니다. 잠시 후 다시 시도해 주세요.",
+    "invalid_input_format": "입력 형식이 올바르지 않습니다."
   },
   "maintenance_mode": {
     "maintenance_mode": "유지 보수 모드",
