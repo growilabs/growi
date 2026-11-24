@@ -393,14 +393,16 @@ sequenceDiagram
     Svc->>Svc: 見えるページの添付ヒットだけを点数順に並べ、pageId ごとにまとめて from〜from+size 番目のページを返す
     Note over Svc: 検索か権限確認が失敗・800ms 超過なら空 items + primaryResultIncomplete: true
     Svc-->>Api: IPrimarySearchResult
+    Api->>Api: findPageListByIds でページ文書を読み、data に入れる (MongoDB に無いページの項目は落とす)
     Api-->>UI: JSON (IFacetedSearchResult)
 ```
 
 **Key decisions**:
 - ページングは `offset` / `limit` (`from` / `size`) だけで行う。カーソル (`nextCursor`、`search_after`) は無い。`limit` は 1〜200 (既定 50)、`offset` は 0 以上の整数で、それ以外は 400
 - 権限判定は、1 回の往復で窓の中の unique pageId (最大 200 件) を `searchAccessiblePages` に渡す。結果は「見えるヒットだけを並べた列」の上で決めるので、窓が 200 件に達するまでは、見えないヒットがあっても無くても同じ結果になる。200 件より下位にある見えるヒットには届かない
-- `meta.total` は常に null、`primaryResultIncomplete` は検索か権限確認が失敗 (800ms 超過を含む) したときだけ true。権限で落ちた件数に応じて変わる値は返さない。「続きを読み込む」ための次ページの有無の伝え方は、下流の UI 設計を見直すときに決める (Open Questions)
-- 各項目は `{ data: { _id: pageId }, meta: { attachmentHits } }` で、ページの path などは含まない。添付ヒット側の `pageId` と同じ値である (Open Questions)
+- `meta.total` は常に null、`primaryResultIncomplete` は検索か権限確認が失敗 (800ms 超過を含む) したときだけ true。権限で落ちた件数に応じて変わる値は返さない
+- 「続きを読み込む」の終わりは、`meta.hitsCount` が `limit` に満たないことで判定できる。窓はどの `offset` でも上位 200 件で頭打ちになり、各要求が同じ範囲を見るので、短い応答の後に続きは出ない (下流 `attachment-search-ui` の research.md 4.3)
+- 各項目の `data` は、ページ検索と同じ形のページ文書である。route が `findPageListByIds` で読み、`lastUpdateUser` を `serializeUserSecurely` で直し、`seenUserCount` を入れる (ページ検索の `formatSearchResult` と同じ処理)。MongoDB に無いページの項目は落とす。`meta.hitsCount` は落とす前の項目数にする (ページ検索の `hitsCount` と同じ数え方。落としたことで続きの読み込みが止まらないように)。下流の画面は、ページ検索と同じ一覧とプレビューの部品でこの結果を描く (Req 9.7)
 - `sort` / `order` / `type` は適用しない (点数順だけ)
 
 #### 2.3 API 呼び出しパターン (アプリ実装)
@@ -549,6 +551,7 @@ Key decisions:
 | 5.4 | URI 未設定時は検索に含めない | isFeatureEnabled gate (query side 算出値) + SearchConfigurationProps 拡張 (UI ゲート用 SSR 公開) | `searchConfig.isAttachmentFullTextSearchEnabled` | Flow 2 |
 | 5.5 | URI 未設定時も添付保存継続 | AttachmentService 本体は無変更 | — | — |
 | 5.6 | 設定の更新を監査ログに記録 | apiv3 admin config (`addActivity` + `ADMIN_ATTACHMENT_SEARCH_SETTINGS_UPDATE`) | — | — |
+| 5.7 | 環境変数で固定されているかを返す | apiv3 admin config (GET) | `AttachmentSearchConfig.useOnlyEnvVars` | — |
 | 6.1 | 添付再インデックス実施 | AttachmentReindexBatch | — | Flow 5 |
 | 6.2 | 個別失敗時スキップ + 障害を疑う結果が続くときは中止 | AttachmentReindexBatch + `rebuild-failure-budget.ts` | `AttachmentRebuildingFailed` `{ error }` | Flow 5 |
 | 6.3 | 進捗 Socket.io | Socket.io `AddAttachmentProgress` / `FinishAddAttachment` | — | Flow 5 |
@@ -572,6 +575,7 @@ Key decisions:
 | 9.4 | optional フィールド | `interfaces/search.ts` 差分 (`IPageSearchMeta.attachmentHits`) | — | — |
 | 9.5 | 有効時もページ検索は不変、添付ヒットは別の要求 | `GET /_api/search` は `facet=attachments` のときだけ aggregator を呼ぶ。検索結果のページへの添付ヒットは `GET /_api/v3/search/attachments` | AttachmentSearchResultAggregator.resolveSecondary | Flow 2 |
 | 9.6 | 添付ヒットの取得の失敗はエラーで返す | `resolveSecondary` は失敗と 500ms 超過で例外を投げ、ルートは 500 を返す | AttachmentSearchResultAggregator.resolveSecondary | Flow 2.1 |
+| 9.7 | 添付だけの検索の項目にページ文書を入れる | `GET /_api/search` の `facet=attachments` の処理 (`findPageListByIds`) | `IFacetedSearchResult` | Flow 2.2 |
 
 ## Components and Interfaces
 
@@ -959,7 +963,7 @@ resolveAttachmentSecondary(
 
 | Method | Endpoint | Request | Response | Errors |
 |--------|----------|---------|----------|--------|
-| GET | /_api/search (既存 apiv1 の拡張) | `?q=&facet=pages\|attachments&offset=&limit=` (`facet` 省略時は `pages` = 従来どおり。`facet=attachments` を処理するのは機能が有効で `nq` が無いときだけ) | `facet` 省略時・`facet=pages`・機能無効・`nq` 付きは既存の `IFormattedSearchResult`。`facet=attachments` は `IFacetedSearchResult` (下記) | 既存どおり。`facet` が決まった値でなければ `{ ok: false, code: 400 }` (apiv1 の慣習どおり HTTP 200。機能が有効なときだけ検査する)。`facet=attachments` を処理するときは、`limit` が 1〜200 の整数 (既定 50)、`offset` が 0 以上の整数でなければ同じく 400。`limit + offset` が 10,000 を超えると、facet の検査より前に、既存のページ検索と同じ `{ ok: false, error: '(limit + offset) must be less than or equal to 10000' }` を返す (`code` は付かず、HTTP 200) |
+| GET | /_api/search (既存 apiv1 の拡張) | `?q=&facet=pages\|attachments&offset=&limit=` (`facet` 省略時は `pages` = 従来どおり。`facet=attachments` を処理するのは機能が有効で `nq` が無いときだけ) | `facet` 省略時・`facet=pages`・機能無効・`nq` 付きは既存の `IFormattedSearchResult`。`facet=attachments` は `IFacetedSearchResult` (下記。各項目の `data` はページ検索と同じページ文書) | 既存どおり。`facet` が決まった値でなければ `{ ok: false, code: 400 }` (apiv1 の慣習どおり HTTP 200。機能が有効なときだけ検査する)。`facet=attachments` を処理するときは、`limit` が 1〜200 の整数 (既定 50)、`offset` が 0 以上の整数でなければ同じく 400。`limit + offset` が 10,000 を超えると、facet の検査より前に、既存のページ検索と同じ `{ ok: false, error: '(limit + offset) must be less than or equal to 10000' }` を返す (`code` は付かず、HTTP 200) |
 | GET | /_api/v3/search/attachments | `?q=&pageIds=id1,id2,...` (`pageIds` はコンマ区切りか繰り返し。重複を除いて 1〜20 件の ObjectId) | `IResolvedSecondaryResult` (`{ enrichments }`) | 400 `invalid_query` / `invalid_page_ids`, 403 (未ログインでゲストの閲覧が許可されていない), 500 (権限確認か添付の検索の失敗、500ms 超過を含む), 503 `feature_disabled` |
 | POST | /_api/v3/attachments/:id/reextract | — | `{ outcome: { kind } }` (`ReextractResponse`。抽出テキストは返さない) | 400 (id が ObjectId でない), 404 `notfound_or_forbidden` (添付なし・ページに属さない・親ページなし・admin でもページを閲覧できる利用者でもない、を区別しない同一応答), 429 (回数制限: 添付ごとに 1 分あたり 5 回。rate-limiter が `res.sendStatus(429)` で返すので、本文は `Too Many Requests` の文字だけで、エラーコードは無い), 500 `reextract_failed` (最後まで進められなかった) / `internal_server_error`, 503 `feature_disabled` / `reextract_timeout` (`timeoutMs × 2 + 30 秒` を超えた。抽出の順番待ちを含む) |
 | GET | /_api/v3/admin/attachment-search/failures | `?limit=N&since=iso` (`limit` は 1〜200、既定 50) | `{ items: ExtractionFailureEntry[], total: number }` (新しい順。`total` は `since` 以降の全件数) | 400 validation, 403 forbidden |
@@ -980,10 +984,11 @@ export type IFacetedSearchResultMeta = {
 };
 
 // { data: IPageWithSearchMeta[]; meta: IFacetedSearchResultMeta }
+// data[i].data is the same page document as the page search returns
 export type IFacetedSearchResult = IDataWithRequiredMeta<IPageWithSearchMeta[], IFacetedSearchResultMeta>;
 ```
 
-次ページを示すカーソル (`nextCursor`) は無い。`facet=attachments` で「続きを読み込む」ための伝え方 (たとえば `hitsCount` が `limit` に満たないことを終わりの合図にするか、専用の項目を足すか) は、下流の UI 設計を見直すときに決める (Open Questions)。
+次ページを示すカーソル (`nextCursor`) は無い。`hitsCount` が `limit` に満たなければ、続きは無い (Flow 2.2)。
 
 **`GET /_api/search` の互換性** (Req 9.1 / 9.3):
 - `facet` を付けない既存の利用者 (UI 以外の API 利用者、MCP など) には、機能の有効・無効にかかわらず従来と同じ処理・同じ応答を返す。検索画面も、既定のページ検索では `facet` を付けない
@@ -1004,6 +1009,7 @@ interface AttachmentSearchConfig {
   extractorUri: string | null;         // 未設定は null
   // extractorToken は返さない (write-only)。hasExtractorToken で設定済みかだけ示す
   hasExtractorToken: boolean;          // computed (extractorToken が空白以外で設定済みか)
+  useOnlyEnvVars: boolean;             // env:useOnlyEnvVars:app:attachmentFullTextSearch (4 つのキーが環境変数で固定されているか。Req 5.7)
   timeoutMs: number;                   // default 90000
   maxFileSizeBytes: number;            // default 52428800 (50MiB)
   // server が算出して返す参照情報 (computed、Config collection には persist しない)
@@ -1099,7 +1105,7 @@ GROWI.cloud のようなマルチテナント環境では、プラットフォ�
 - デフォルト (`false`) では通常の DB 優先動作（self-hosted 環境と完全互換）
 
 **admin UI への影響（下流 `attachment-search-ui` spec に委譲）**:
-- `env:useOnlyEnvVars:app:attachmentFullTextSearch` が `true` の場合、admin UI の設定フォームは読み取り専用表示にし、env var で管理されている旨を示すメッセージを表示する（既存の他 ENV_ONLY 設定項目と同等のパターン）
+- 設定 API の GET 応答は、固定されているかを `useOnlyEnvVars` で返す (Req 5.7)。`true` の場合、admin UI の設定フォームは読み取り専用表示にし、env var で管理されている旨を示すメッセージを表示する（既存の他 ENV_ONLY 設定項目と同等のパターン）
 
 #### `requiresReindex` の算出ルール (computed、state persist なし)
 
@@ -1524,12 +1530,9 @@ flowchart LR
 
 ## Open Questions / Risks
 
-1. **「続きを読み込む」ためのページングの伝え方**: 応答に次ページを示す項目 (`nextCursor` など) は無く、`facet=attachments` は `total` も返さない。UI が次ページの有無をどう知るか (`hitsCount` が `limit` に満たないことを終わりの合図にするか、専用の項目を足すか) を、下流の UI 設計を見直すときに決める
-2. **`facet=attachments` の各項目のページ情報**: いまは `data` に `_id` しか入らない。UI がページの path などを出すには、サーバが埋めるか UI が別に取るかを決める必要がある (`searchAccessiblePages` は `path` と `updatedAt` を返しているが、応答には使っていない)
-3. **添付だけが一致するページ**: 本文が一致しないページは、既定のページ検索の結果に出ないので、その添付ヒットも出ない。`facet=attachments` へ切り替える導線を `attachment-search-ui` spec 側で具体化する
-4. **`AttachmentRebuildingFailed.error` を理由コードにするか**: いまは英語の文。UI で翻訳して出すなら理由コードが要る。下流の UI 設計を見直すときに決める
-5. **時間の上限 (`facet=attachments` 800ms / `GET /_api/v3/search/attachments` 500ms) の妥当な値**: 実際の使い方での分布を見て決める。kuromoji + ngram analyzer を添付 index に当てたときの p95 も同じ機会に測る
-6. **`packages/attachment-text-extractor-client` の公開境界**: server 専用依存として apps/app から import し、UI 側に混入させないレイヤリング制約を lint ルール化するか検討
-7. **`requiresReindex` cardinality agg の共有 ES コスト**: 30 秒のキャッシュはインスタンスごとに独立しているので、複数インスタンスでは admin GET のたびに各インスタンスが集計を投げうる。`precision_threshold` の指定、共有のキャッシュ、MongoDB 上の件数の記録への置き換えのどれかを、リリース後に検討する
-8. **複数インスタンスでの作り直し**: 実行中の判定と、作り直し中の削除の記録はインスタンスごとのメモリにある (research.md 8.6 の「残っている制約」)
-9. **残っている作業**: tasks.md の未完了のタスク (3.4 監視メトリクス)
+1. **時間の上限 (`facet=attachments` 800ms / `GET /_api/v3/search/attachments` 500ms) の妥当な値**: 実際の使い方での分布を見て決める。kuromoji + ngram analyzer を添付 index に当てたときの p95 も同じ機会に測る
+2. **`packages/attachment-text-extractor-client` の公開境界**: server 専用依存として apps/app から import し、UI 側に混入させないレイヤリング制約を lint ルール化するか検討
+3. **`requiresReindex` cardinality agg の共有 ES コスト**: 30 秒のキャッシュはインスタンスごとに独立しているので、複数インスタンスでは admin GET のたびに各インスタンスが集計を投げうる。`precision_threshold` の指定、共有のキャッシュ、MongoDB 上の件数の記録への置き換えのどれかを、リリース後に検討する
+4. **複数インスタンスでの作り直し**: 実行中の判定と、作り直し中の削除の記録はインスタンスごとのメモリにある (research.md 8.6 の「残っている制約」)
+5. **残っている作業**: tasks.md の未完了のタスク (3.4 監視メトリクス、13 下流の画面のための追加)
+6. **環境変数の固定と `PUT /config`**: 4 つのキーが環境変数で固定されていても、`PUT /config` は保存を受け付ける (値は使われない)。下流の画面は保存の操作を出さない。API を直接使う場合に断るかどうかは未定

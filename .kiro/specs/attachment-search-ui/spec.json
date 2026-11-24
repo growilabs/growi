@@ -1,9 +1,9 @@
 {
   "feature_name": "attachment-search-ui",
   "created_at": "2026-04-17T16:30:00.000Z",
-  "updated_at": "2026-11-24T07:39:47.043Z",
+  "updated_at": "2026-11-24T07:55:43.048Z",
   "language": "ja",
-  "phase": "requirements-generated",
+  "phase": "design-generated",
   "derived_from": "attachment-search",
   "dependencies": ["attachment-search-indexing"],
   "approvals": {

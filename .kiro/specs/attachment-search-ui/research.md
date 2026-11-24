@@ -1,198 +1,124 @@
 # Research: attachment-search-ui
 
-_Generated: 2026-04-17 (3-way split から派生)_
+_Generated: 2026-04-17 (3-way split から派生)。2026-11-24 に、今の API と master の画面に合わせて設計を作り直したときの調査と判断で書き直した_
 
-umbrella spec `attachment-search` の research.md / design.md から、本 spec (UI 層) の設計判断に直接関わる調査のみを抽出・再整理する。サーバ側や抽出サービス側の調査は対象外とする。
+本 spec (画面) の設計判断に関わる調査と判断を記録する。サーバ側や抽出サービス側の調査は、それぞれの spec の research.md にある。
 
-## 1. 既存 UI 拡張ポイントの特定経緯
+## Summary
 
-### 1.1 検索結果 UI (Requirement 1, 2, 3)
+- **Discovery の種類**: 既存の画面の拡張 (light discovery)。新しいライブラリは入れない
+- **重要な発見**:
+  1. 検索結果の一覧は `@tanstack/react-virtual` で見えている行だけを描画する。行ごとに添付ヒットを SWR で引けば、要求は見えている行の組だけに出る
+  2. 行の部品 (`PageListItemL`) もプレビュー (`SearchResultContent`) も、ページ文書の `path`・`revision`・`lastUpdateUser` などを使う。添付だけの検索の項目がページ ID しか持たないと描けない
+  3. 既存の作り直しの hook (`useIndexManagement`) は `FinishAddPage` で完了とするので、添付の段階が続く間に作り直しを押せてしまう
 
-調査対象コンポーネント:
+## 1. 検索結果画面の今の作り (master、2026-11-24 に確認)
 
-- [apps/app/src/features/search/client/components/SearchPage/SearchPage.tsx](apps/app/src/features/search/client/components/SearchPage/SearchPage.tsx) — 検索ページ全体
-- [apps/app/src/features/search/client/components/SearchPage/SearchResultList.tsx](apps/app/src/features/search/client/components/SearchPage/SearchResultList.tsx) — 左ペイン (ページリスト)
-- [apps/app/src/features/search/client/components/SearchPage/SearchResultContent.tsx](apps/app/src/features/search/client/components/SearchPage/SearchResultContent.tsx) — 右ペイン (選択ページプレビュー)
-- [apps/app/src/interfaces/search.ts](apps/app/src/interfaces/search.ts) — 応答型 `ISearchResult<T>` / `IFormattedSearchResult` / `IPageWithSearchMeta`
+- `SearchPage.tsx` は `useSWRINFxSearch` (`stores/search.tsx`、`useSWRInfinite`) で、1 回に `customize:showPageLimitationL` 件 (既定 50) ずつ読む。読んだまとまりは `mergeInfiniteSearchResult` (`features/search/client/util/infinite-search-result.ts`) で 1 つの一覧にする
+- 次を読むのをやめるのは、前のまとまりの `meta.hitsCount` が 1 回に読む件数に満たないとき (`getSearchInfiniteKey`)。`mergeInfiniteSearchResult` は `fetchedCount >= total` でも終わりと判定する
+- 失敗したまとまりは `setSize(size)` で読み直す (保存されていないまとまりだけが取り直される)。改名・削除は `mutateSearchInfiniteChunks` で、`'/search/infinite'` で始まるキーのまとまりを書き換える
+- サーバに送る検索語は、`?q=` (演算子を含む) に `createSearchQuery` が `-prefix:/trash` / `-prefix:/user` を足したもの。`SearchPage` は名前付きの検索 (`nq`) を使わない (常に null)
+- `SearchResultList` は `@tanstack/react-virtual` で、見えている行と前後 5 行だけを描画する。行の高さは描画後に測り直す
+- 行は `PageListItemL` (`client/components/PageList/`)。行全体が `role="button"` でクリックでき、押すとそのページが選ばれる。外から中身を渡す口は無い
+- 選ばれたページは `SearchPageBase` が `IPageWithSearchMeta` のまま持ち、`SearchResultContent` に渡す。プレビューは `data.revision` で本文を読み、`PagePathNav` でパスを出す
+- 本文の抜粋 (`elasticSearchResult.snippet`) が無い行は、`useSWRxPageInfoForList` (`GET /_api/v3/page-listing/info`) で本文の冒頭を取る
 
-### 既存構造
+## 2. 上流の API の今の契約 (2026-11-24 にコードで確認)
 
-- `SearchResultList` は `IPageWithSearchMeta[]` を受け取り、各 Page をカードとして render する。ヒット情報は `elasticSearchResult.snippet` などに格納される
-- `SearchResultContent` は「選択中の Page」を表示。選択状態は親 `SearchPage` が state で保持
-- `IPageWithSearchMeta` は既に extensible な形で、新規フィールドを optional として追加しやすい
+- `GET /_api/v3/search/attachments?q=&pageIds=`: `pageIds` は重複を除いて 1〜20 件。`q` は decode しない。応答 `{ enrichments }`。失敗と 500ms 超過は 500、機能が無効なら 503 `feature_disabled`
+- `GET /_api/search?facet=attachments`: `q` を 1 回 decode する (ページ検索と同じ)。`limit` は 1〜200 (既定 50)。応答の `meta` は `{ facet: 'attachments', total: null, hitsCount, primaryResultIncomplete }`。各項目は `{ data: { _id }, meta: { attachmentHits } }`
+- 添付だけの検索の窓 (`collect-visible-attachment-hits.ts`): `from + size` 件のページに届くまで、添付ヒットを点数順に倍々で取り、権限で選り分ける。窓は最大 200 件で、どの `offset` でも同じ範囲で頭打ちになる
+- `POST /_api/v3/attachments/:id/reextract`: ゲストと読み取り専用の利用者は断る。ファイルの抽出が失敗しても 200 で、`outcome.kind` で種類を返す (文は返さない)。429 は本文にコードが無い
+- `GET|PUT /_api/v3/admin/attachment-search/config`: トークンは返さず `hasExtractorToken` だけ。PUT はトークンの項目を省くと保存済みのトークンを変えない。URI は http/https だけを通し、クラウドのメタデータの宛先を断る (400 `invalid_extractor_uri`)。`env:useOnlyEnvVars:app:attachmentFullTextSearch` で 4 つの設定が環境変数に固定されていても、GET はそれを返さない
+- `GET /_api/v3/admin/attachment-search/failures`: `{ items, total }`。理由コードは 8 種類。同じ添付・同じ理由は 1 時間に 1 行にまとまり、90 日で消える
+- `PUT /_api/v3/search/indices` の `includeAttachments: true`: 完了を待たずに応答し、実行中なら 409 `rebuild_in_progress`。ページの作り直しの後に添付を作り直す。ページの段階が失敗すると `RebuildingFailed` と、同じ文の `AttachmentRebuildingFailed` の両方が届く。進行中かどうかを問い合わせる API は無い
+- SSR prop `searchConfig.isAttachmentFullTextSearchEnabled` は、基本レイアウトのページと管理画面の検索ページに届く。クライアントの atom はまだ無い
 
-### 本 spec の拡張方針
+## 3. 既存の部品の拡張点
 
-- `IPageWithSearchMeta.attachmentHits?: IAttachmentHit[]` を上流 spec が追加する前提で、UI 側は **optional フィールド処理**を追加するだけで破壊なし
-- `SearchResultList` の Page カード render 箇所に `AttachmentSubEntry` を conditional render
-- `SearchResultContent` のプレビュー最上部に `AttachmentHitCard` を conditional render
-- `SearchPage` のヘッダ近傍に `SearchResultFacetTabs` を新設し、`activeFacet` を検索 API のクエリパラメータに注入
+- **添付ファイル一覧**: `@growi/ui` の `Attachment` (`packages/ui/src/components/Attachment.tsx`) の行の操作はダウンロードと削除で固定されている。操作を足すには `packages/ui` の変更が要る。`@growi/ui` は公開パッケージではない
+- **添付の「In Use」**: データベースの状態ではなく、モーダルが本文に添付の ID が含まれるかをその場で調べた目印である。検索では区別しない (上流 research.md 13)
+- **管理画面**: `IndexManagementSection` は作り直しの操作の下に `extraContent` を出せる。`ElasticsearchManagementPage` は、ページの索引の管理と監査ログの索引の管理を並べている
+- **添付を開く先**: 添付の `filePathProxied` は `/attachment/<id>`。これを新しいタブで開くのが、既存の添付の表示である
 
-ファセットタブは**既存 facet 機構が存在しない**ため新規実装する。
+## 4. 設計の判断 (2026-11-24)
 
-## 2. 添付ファイル一覧モーダルの拡張ポイント (Requirement 4)
+### 4.1 添付ヒットは 20 ページの組ごとに、行から SWR で引く
 
-umbrella research.md の Design Phase Discovery セクション A より抽出:
+- 判断: 読み込んだまとまりごとに先頭から 20 件ずつ組にし、`['/search/attachments', 送る検索語, 組のページ ID]` をキーに SWR で取る。各行とプレビューは、自分のページの組のキーで同じ値を引く
+- 理由:
+  - 一覧は見えている行だけを描画するので、要求は見えている行の組だけに出る。「表示中のページの添付ヒットを取る」(要件 1.6) がそのまま成り立つ
+  - 同じ組を見る行が何行あっても、SWR が同じキーの要求を 1 回にまとめる
+  - ページ検索のまとまりに書き込まないので、改名・削除の書き換えや読み直しと干渉しない
+  - まとまりごとに区切るので、続きを読み込んでも前の組のキーが変わらない
+- 採らなかった案:
+  - まとまりを受け取るたびに、そのまとまりの全部の組を `SearchPage` でまとめて取る: 見えていない行の分まで取る。まとまりの一部が失敗したときの持ち方も別に作る必要がある
+  - 添付ヒットを `useSWRInfinite` のまとまりに書き込む: `mutateSearchInfiniteChunks` の書き換えと、保存の有無で取り直しを決める読み直しの仕組みに混ざる
+  - 一覧全体の先頭から 20 件ずつ区切る: 1 回に読む件数 (50) が 20 で割り切れないと、続きを読み込んだときに最後の組のキーが変わり、取り直しになる
+- 受け入れた費用: 行を削除すると、そのまとまりの中で後ろの組の区切りがずれて取り直しになる
 
-- 親: [apps/app/src/client/components/PageAccessoriesModal/PageAttachment.tsx](apps/app/src/client/components/PageAccessoriesModal/PageAttachment.tsx) — SWR + Jotai のパターン
-- リスト: [apps/app/src/client/components/PageAttachment/PageAttachmentList.tsx](apps/app/src/client/components/PageAttachment/PageAttachmentList.tsx) — `@growi/ui` の `Attachment` コンポーネントに行 prop (`onAttachmentDeleteClicked` など) を渡す
-- 削除モーダル: [apps/app/src/client/components/PageAttachment/DeleteAttachmentModal.tsx](apps/app/src/client/components/PageAttachment/DeleteAttachmentModal.tsx) — Jotai atom (`useDeleteAttachmentModalStatus` / `useDeleteAttachmentModalActions`)
-- データフェッチ: `useSWRxAttachments()` → `/attachment/list`
+### 4.2 失敗は組ごとに、行とプレビューで示す
 
-### 本 spec の拡張方針
+- 判断: 組の要求が失敗したら、その組の行とプレビューに「確認できませんでした」と再試行の操作を出す。SWR の自動の再試行は止める。503 `feature_disabled` は失敗として見せず、添付の表示を出さない
+- 理由: 失敗の単位は要求の単位 (組) と同じにするのがいちばん単純で、再試行もその組のキーの取り直しだけで済む。失敗はまれ (ES の障害か時間切れ) なので、行ごとの表示が並ぶ場面は少ない
+- 取得中: 行には何も出さない (多くの行は添付ヒットが無いので、読み込み中の表示がちらつく)。プレビューには小さな読み込み中の表示を出す
 
-- `PageAttachmentList` 経由で `Attachment` に **新規 prop (例: `reextractButtonSlot` または `onReextractClicked`)** を渡し、個別行で「再抽出」ボタンをレンダリング
-- 操作状態は SWR の `mutate` で楽観更新 (成功時に対応する attachment list key を invalidate)
-- 既存の `onAttachmentDeleteClicked` と**同パターン**で実装し、行アクション全体の見た目・挙動を揃える
-- 機能無効時は `ReextractButton` 自体が `null` を返すため、`PageAttachmentList` 側の差分は prop 追加のみ
+### 4.3 「添付ファイル」を対象にした検索は、続きの読み込みを `hitsCount < limit` で終える (上流の未決事項 1)
 
-### 制約
+- 判断: 前のまとまりの `hitsCount` が `limit` に満たなければ終わり。`primaryResultIncomplete` は fetcher で例外にする
+- 理由: 窓はどの `offset` でも上位 200 件で頭打ちになり、各要求が同じ範囲を見るので、短い応答の後に続きは出ない (2 を参照)。失敗をデータとして返すと SWR がまとまりを保存し、読み直しで取り直されない
+- `mergeInfiniteSearchResult` は使わない: `total` が null だと `fetchedCount >= total` が成り立ち、最初のまとまりで終わりと判定される
 
-- `@growi/ui` の `Attachment` コンポーネントの行アクション props がどこまで拡張可能かは実装時に確認する (本 spec は prop 追加で成立すると想定)
-- 行アクション追加以外のモーダル全体の構造変更は **Out of scope** (brief.md の Out of Boundary)
+### 4.4 添付だけの検索の項目には、サーバがページ文書を入れる (上流の未決事項 2、上流への依頼 U1)
 
-## 3. 管理画面の拡張方針 (Requirement 5, 6, 7)
+- 判断: 上流の `GET /_api/search?facet=attachments` が、ページ検索と同じ `findPageListByIds` でページ文書を `data` に入れる。MongoDB に無いページは落とし、`hitsCount` は落とす前の数にする
+- 理由:
+  - 行の中心は親ページ (どのページの添付か) なので、ページの情報を後から取ると、届くまで行に何も書けない。ページ検索で添付ヒットを後から付け足すのは、添付ヒットが補足の情報だからである
+  - 複数のページ ID からページ文書 (`path`・`revision`・`lastUpdateUser`・`updatedAt`) をまとめて返す API は無い。`/page-listing/info` は付随情報だけ、`/page-listing/item` と `/page` は 1 回に 1 ページ
+  - サーバはページ検索で同じ関数を使っており、1 回呼ぶだけで済む。新しい API も、画面からの追加の要求も要らない
+  - 項目の形がページ検索と同じになるので、一覧とプレビューの部品をそのまま使える
+- 採らなかった案: 画面がページ ID の一覧から別の要求でページ文書を取る。新しい API が要り、要求も増える (2026-11-24 に利用者と検討)
 
-umbrella research.md の 1.4 より抽出:
+### 4.5 検索対象の切り替えは `SearchPage` の state にする
 
-- [apps/app/src/client/components/Admin/ElasticsearchManagement/ElasticsearchManagement.tsx](apps/app/src/client/components/Admin/ElasticsearchManagement/ElasticsearchManagement.tsx) — ES 管理画面
-- 機能: Reconnect / Normalize / Rebuild ボタン、Socket.io で進捗表示 (`AddPageProgress` / `FinishAddPage` / `RebuildingFailed`)
-- ConfigManager で設定永続化 (DB `Config` model)
+- 判断: `useState<SearchTarget>('pages')`。URL には載せない
+- 理由: 切り替えを読むのは `SearchPage` と、そこから渡す中身だけなので、atom にする必要が無い。URL に載せると、戻る・進むの動きと、ほかの検索の入口からの扱いを決める必要が出る。要件はそれを求めていない
+- 前の設計の Jotai atom (`activeFacetAtom`) はやめる。3 つのタブを複数の部品から読んでいた前提が無くなった
 
-### 専用 admin ページを作らない判断の根拠
+### 4.6 添付を含む作り直しは別の hook で持ち、既存の hook は変えない
 
-3 つの代替案を検討した:
+- 判断: `useAttachmentRebuild` が PUT と socket のイベントから添付の段階の状態を持つ。作り直しの操作は `isRebuildEnabled && !isRunning` のときだけ押せる
+- 理由: 既存の `useIndexManagement` は監査ログの索引の管理でも使われている。添付の段階を入れると、両方の画面の動きに影響する。ページの段階の進み具合と完了はこれまでどおり既存の hook が出せばよい
+- ページの段階の失敗では、既存の hook が `RebuildingFailed` を通知するので、続いて届く `AttachmentRebuildingFailed` は通知しない (同じ文の通知が 2 回出るのを防ぐ)
+- 失敗の理由は、`AttachmentRebuildingFailed.error` (英語の文) をそのまま出す (上流の未決事項 4)。管理者向けで、文のままでも原因を追える
 
-1. **新規 admin ページを作る**: 情報の独立性は高いが、管理者動線が増え「ES 再インデックス画面と別に添付設定画面を開く」二重操作が発生。rebuildIndex と「添付も対象にする」の相関が見えづらい
-2. **既存 `ElasticsearchManagement` にセクション追加**: 関連機能が一画面に集約され、rebuild チェックボックスとの相関が自然。既存 Socket.io 進捗 UI にもそのまま相乗り可能
-3. **Config 画面 (General Settings 等) に統合**: 設定トグルは馴染むが、rebuildIndex と失敗ログは検索インフラ関連なのでミスマッチ
+### 4.7 設定の区画は、環境変数で固定されているときは読み取り専用にする (上流への依頼 U2)
 
-**採用: 案 2**。`ElasticsearchManagement` への拡張であれば、rebuild チェックボックス、設定セクション、失敗ログパネルが一画面で揃い、Socket.io 進捗受信の listener も同一コンポーネント内で完結する。
+- 判断: 上流の GET `/config` に `useOnlyEnvVars` を足してもらい、true なら 4 つの設定を読み取り専用で出し、保存の操作を出さない。トークンの入力欄を足す (要件 5.1 / 5.5)
+- 理由: GROWI.cloud では運用側が 4 つの設定を環境変数で固定し、利用組織の管理者に上書きさせない。いまの GET はそれを返さないので、画面が保存できたように見えてしまう。トークンは機能が有効になる条件の 1 つなので、入力欄が無いと自前の運用では画面から機能を有効にできない (2026-11-20 に利用者と決定)
 
-### 拡張ポイント
+### 4.8 管理画面の外の機能の判定は SSR の値、管理画面の中は設定の API の値を使う
 
-- Rebuild ボタン近傍に `RebuildWithAttachmentsCheckbox` (デフォルト ON、機能無効時は非表示)
-- 新規セクション `AttachmentSearchSettings` (有効化トグル / URL / サイズ / タイムアウト / 同時実行) + 有効化ガイダンス
-- 新規セクション `AttachmentExtractionFailures` (失敗ログテーブル、機能無効時は非表示)
-- Socket.io listener に `AddAttachmentProgress` / `FinishAddAttachment` を追加
+- 判断: 検索結果画面と添付ファイル一覧は `isAttachmentFullTextSearchEnabledAtom` (SSR の値) を使う。管理画面の設定と失敗の区画は、設定の取得 API の `isAttachmentFullTextSearchEnabled` を使う
+- 理由: 管理者以外は設定の API を呼べない。管理画面では、保存の直後に画面を読み込み直さずに切り替える必要がある。設定の API の値なら、保存の後の `mutate` で切り替わる
 
-### Config キー (上流 spec 定義を消費)
+## 5. Design Synthesis
 
-umbrella research.md の Design Phase Discovery C より:
+- **一般化**: 「行の中」と「プレビューの中」の添付ヒットは、どちらも「1 ページの添付ヒットの状態」を表示する同じ問題である。`useAttachmentHits(source, page)` 1 つにまとめ、取り方の違い (後から取るか、項目に入っているか) は `AttachmentHitsSource` で表した。既存部品への拡張も「差し込み口 1 つ」の形にそろえた (`extraContent` / `headerContent` / `additionalActions`)
+- **作るか、使うか**: 新しいライブラリは使わない。無限読み込み・要求のまとめ・キャッシュは SWR、状態は Jotai、表示は Bootstrap と既存の部品で足りる
+- **単純化**:
+  - 前の設計の `activeFacetAtom`、`score` による並べ替え、再抽出の後の一覧の取り直し、`requiresReindex` の常時の通知、`AttachmentHitViewProps` への詰め替えをやめた。サーバの順と `IAttachmentHit` をそのまま使う
+  - 実行中に機能が無効になった場合 (503) のために共有の状態を持たず、組ごとに `unavailable` として扱う。どの組も同じ 503 を受けるので、結果は同じになる
+  - 既存の `useIndexManagement` を変えず、添付の段階だけを別の hook にした
 
-- `app:attachmentFullTextSearch:enabled` (bool)
-- `app:attachmentFullTextSearch:extractorUrl` (string)
-- `app:attachmentFullTextSearch:maxFileSizeBytes` (number)
-- `app:attachmentFullTextSearch:timeoutMs` (number)
-- `app:attachmentFullTextSearch:maxConcurrency` (number)
+## 6. 前の設計から変えたこと
 
-これらは上流 spec が定義・永続化し、本 spec は `use-attachment-search-config` hook 経由で**読み書きするだけ**。
+- 「全体 / ページ / 添付」の 3 つのタブ (`SearchResultFacetTabs`) は、「ページ / 添付ファイル」の切り替えにした (上流 research.md 12)
+- 呼び先を「apiv3 /search」としていたのは誤りで、ページ検索と添付だけの検索は apiv1 の `/_api/search` である
+- 右ペインのカードを「プレビューの最上部」に置くことは要件から外し、形と置き場所は見た目の案で決める (2026-11-20 に利用者と決定)
 
-## 4. ファセットタブの設計判断
+## 参照
 
-> 「全体 / ページ / 添付ファイル」の 3 択は 2026-11-20 にやめ、検索対象を「ページ」と「添付ファイル」で切り替える形にした (上流 `attachment-search-indexing` の research.md 12、本 spec の Requirement 3)。以下は当時の検討の記録として残す。下の state 管理の判断 (Jotai atom) は、切り替えの state にもそのまま当てはまる。
-
-### 既存 facet 機構の有無
-
-調査結果: GROWI 既存の検索 UI に **facet UI は存在しない**。新規タブコンポーネントとして追加する必要がある。
-
-### 3 択 vs より細かい分類
-
-umbrella 要件 R7 は「全体 / ページ / 添付ファイル」の 3 択を指定。より細かいファセット (PDF だけ / xlsx だけ / ページ番号範囲 等) は **Out of scope** (brief.md の Out)。
-
-### state 管理の選択肢
-
-1. **URL クエリパラメータ**: ブックマーク可能だが SSR との整合・遷移時の state 保持ロジックが増える
-2. **React local state**: シンプルだが `SearchPage` から子コンポーネントへの prop drilling が発生
-3. **Jotai atom**: 既存パターンに合致、`SearchResultFacetTabs` と `SearchPage` の両方から参照可能
-
-**採用: Jotai atom** (`activeFacetAtom`, default `'all'`)。将来 URL 同期が必要になったら atom のミドルウェアで対応可能。
-
-## 5. 添付ヒットカード UI パターン (他 wiki 検索との比較)
-
-GROWI 既存の検索結果には「Page カードの中にサブ情報を展開して表示」するパターンがある (本文 snippet の highlight 等)。添付ヒットの表示方針は以下の 2 案を検討した:
-
-1. **Page カードとは別の行として添付ヒットを表示**: Confluence の添付検索結果に近い。ただし Page 中心のナビゲーションが崩れ、「どのページに属するか」の視認性が落ちる
-2. **Page カード内にサブエントリ (折りたたみ) として表示 + 右ペイン最上部にヒットカード**: Notion の検索結果サブエントリに近い。Page 中心のナビゲーションを維持でき、マッチ箇所への遷移が 2 段 (ページ選択 → 添付本体) になるが各段階で情報が豊富
-
-**採用: 案 2** (umbrella 要件 R5, R6 の指定と一致)。Page 中心のナビゲーションを維持しつつ、右ペインに強調表示を配置することで「本文ヒットの補助情報」としての添付ヒットを自然に表現できる。
-
-### 複数ヒット時の UI
-
-- 左ペインサブエントリ: 最上位 (関連度トップ) 1 件を展開、残りは折りたたみアコーディオン
-- 右ペインヒットカード: 最上位 1 件をカードとして展開、残りは折りたたみでカード切替
-
-umbrella 要件 R5.4 / R6.4 に準拠。
-
-## 6. SSR 到達性と Turbopack 互換性
-
-umbrella design.md の UI Components 節より抽出:
-
-- 添付系 UI は全て既存 SearchPage と同経路 (SSR 経由) のため、Turbopack 外部化の対象になる可能性あり
-- `orval` 生成クライアント (`packages/attachment-text-extractor-client`) は **server 専用依存**。UI からは apiv3 経由でのみ触る
-- 重量級依存 (特に admin failures のテーブルライブラリ等) は `dynamic({ ssr: false })` で分離
-
-### 本 spec の適用方針
-
-- `packages/attachment-text-extractor-client` は UI から一切 import しない (静的解析で検知できるよう、feature module 内にガードを設置)
-- 新規コンポーネントは純粋な React + SWR + Jotai で構成し、Node 固有 API を避ける
-- 失敗ログテーブルが大きいライブラリを使う場合は動的 import を採用
-
-## 7. 上流契約への依存関係
-
-上流 `attachment-search-indexing` spec が確定すべき項目 (本 spec の Revalidation Trigger):
-
-| 上流契約 | 本 spec の消費箇所 |
-|----------|------------------|
-| `IPageWithSearchMeta.attachmentHits[]` の形状 | `AttachmentSubEntry`, `AttachmentHitCard` |
-| `POST /_api/v3/attachments/:id/reextract` の req/res | `use-attachment-reextract` |
-| `GET|PUT /_api/v3/admin/attachment-search/config` | `use-attachment-search-config` |
-| `GET /_api/v3/admin/attachment-search/failures` | `use-attachment-extraction-failures` |
-| `PUT /_api/v3/search/indices` の `includeAttachments` 受理 | `RebuildWithAttachmentsCheckbox` + `ElasticsearchManagement` |
-| Config キー `app:attachmentFullTextSearch:*` | admin 設定フォーム |
-| Socket.io `AddAttachmentProgress` / `FinishAddAttachment` payload | `ElasticsearchManagement` listener |
-| 機能有効フラグを非 admin から参照する経路 (Open Question 1) | `use-search-attachments-enabled` |
-
-これらのいずれかが上流で変更された場合、本 spec のコンポーネント・hook の回帰テストが必要になる。
-
-## 8. Open Questions (上流と調整が必要)
-
-1. 非 admin ユーザが機能有効/無効を参照する経路 (admin config API は 403 になるため、公開フラグまたは検索応答メタに `featureEnabled` を含める選択が必要)
-2. Socket.io `AddAttachmentProgress` の payload 形状 (既存 `AddPageProgress` と同形か否か)
-3. `@growi/ui` の `Attachment` コンポーネントの行アクション props 拡張可能性 (prop 追加で済むか、内部改修が必要か)
-4. ファイル形式アイコンの辞書 (MIME → アイコン) が既存 util で足りるか新規追加が必要か
-
-## 9. 設計で決めること: 無限スクロールと添付ヒットの取得 (2026-11-20)
-
-上流で `facet=all` をやめ、検索結果のページの添付ヒットを別の要求 (`GET /_api/v3/search/attachments`) で取る形に決めた (`attachment-search-indexing` の research.md 12)。master の検索画面は無限スクロールになっているので、その上で添付ヒットをどう取り、どう見せるかを、設計を作り直すときに決める。
-
-### いまの検索画面 (master、2026-11-20 に確認)
-
-- `SearchPage.tsx` は `useSWRINFxSearch` (`useSWRInfinite`) で、1 回に `customize:showPageLimitationL` 件 (既定 50) ずつ読む。読んだまとまりは `mergeInfiniteSearchResult` で 1 つの一覧にして描画する
-- 次を読むのをやめるのは、前のまとまりの `meta.hitsCount` が 1 回に読む件数に満たないとき (`getSearchInfiniteKey`)
-- 読み込みに失敗したまとまりは `setSize(size)` で読み直す。改名・削除した行は `mutateSearchInfiniteChunks` で、取得済みのまとまりを取り直さずに書き換える
-
-### 取得の流れの案 (検索の対象が「ページ」のとき)
-
-1. ページ検索は今のまま (`facet` を付けない)
-2. まとまりが届いたら、添付ヒットを待たずにページの一覧を描画する
-3. そのまとまりのページ ID を 20 件ずつに分け、`GET /_api/v3/search/attachments` を並行して送る。SWR のキーは「検索語・ページ ID の組」にし、検索語はページ検索に送ったのと同じ文字列 (演算子を含む) にする
-4. 届いた添付ヒットはページ ID ごとの表に貯め、一覧の描画と右ペインで、ページ ID で引いて付け足す。ページ検索のまとまりの中には書き込まない
-5. 次のまとまりを読んだら、そのまとまりのページについてだけ 3 を行う。読み込み済みのまとまりはキーが変わらないので、取り直さない
-
-添付ヒットをページ検索のまとまりに書き込まないのは、改名・削除の書き換え (`mutateSearchInfiniteChunks`) や再試行と干渉させないためである。
-
-### 決めること
-
-- 取得中の見せ方: Page カードの添付サブエントリと、右ペインの添付ヒットカードを、取得中にどう見せるか (何も出さないか、小さな読み込み中の表示を出すか)
-- 失敗の単位と再試行: 20 件の要求の 1 つだけが失敗したときに失敗を出す範囲 (その 20 件か、まとまり全体か) と、再試行の操作をどこに置くか (Requirement 1.8)
-- 検索語・並べ替え・絞り込みを変えたとき: キーが変わるので古い添付ヒットは使わない。遅れて届いた古い応答を表示しないことを確かめる
-- 改名・削除したとき: ページ ID は変わらないので添付ヒットは残る。削除した行は一覧から消えるので、表に残ったヒットは表示されないだけでよいか
-- 機能が途中で無効になったとき: 503 `feature_disabled` は失敗として出さず、添付の表示ごと隠す
-- 要求の数: まとまり 1 つにつき、ページ検索 1 回と添付の要求 3 回 (既定の 50 件の場合)。速くスクロールし続けたときに、回数制限 (既定で 1 分あたり 500 回) に当たらないか
-- 「添付ファイル」を対象にした検索の無限スクロール: `facet=attachments` は件数 (`total`) を返さず、権限確認の窓が 200 件までなので、続きがあっても返る件数が `limit` に満たないことがある。いまの「`hitsCount` が足りなければ終わり」の判定をそのまま使えるか (上流 design.md の Open Questions 1)
-- 「添付ファイル」を対象にした検索の各項目はページ ID しか持たない。親ページの path などをどう出すか (上流 design.md の Open Questions 2、Requirement 3.4)
-
-## Conclusion
-
-本 spec は**既存 UI の最小差分拡張 + 新規 feature module client 配下への集約**で成立する。サーバ側実装は一切持たず、上流 `attachment-search-indexing` spec が提供する API・応答型・Socket.io イベントを消費するだけ。拡張ポイントはすべて既存コンポーネントに存在し、optional prop / conditional render の追加で破壊的変更なし。ファセットタブのみ新規追加 (既存 facet 機構なし)。機能無効時は全追加 UI が `null` を返すことで、既存画面の挙動は導入前と完全一致する。
+- 上流の設計: [../attachment-search-indexing/design.md](../attachment-search-indexing/design.md)
+- 上流の判断の記録: [../attachment-search-indexing/research.md](../attachment-search-indexing/research.md) (8.7 速さ、10.1 見えない添付、12 `facet=all` をやめた理由、13 本文で使われていない添付)
+- 元の調査: [../attachment-search/research.md](../attachment-search/research.md)
