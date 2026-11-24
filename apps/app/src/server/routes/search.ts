@@ -85,14 +85,10 @@ export const setup = (crowi: Crowi, app) => {
     let result: IFacetedSearchResult;
     try {
       const viewer = await resolveAttachmentSearchViewer(req.user);
-      const keyword = decodeURIComponent(q);
       const { primary, items } = await crowi.searchService.searchByFacet(
-        keyword,
+        decodeURIComponent(q),
         viewer,
-        {
-          from: pagination.from,
-          size: pagination.size,
-        },
+        { from: pagination.from, size: pagination.size },
       );
       result = toFacetedSearchResult(primary, items);
     } catch (err) {

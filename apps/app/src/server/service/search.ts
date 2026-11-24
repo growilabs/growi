@@ -110,13 +110,9 @@ const findPageListByIds = async (pageIds: ObjectIdLike[], crowi: any) => {
     select: USER_FIELDS_EXCEPT_CONFIDENTIAL,
   });
 
-  const pages = await builder.query.clone().exec('find');
-  const totalCount = await builder.query.exec('count');
+  const pages = await builder.query.exec('find');
 
-  return {
-    pages,
-    totalCount,
-  };
+  return { pages };
 };
 
 class SearchService implements SearchQueryParser, SearchResolver {
@@ -656,10 +652,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
     viewer: AttachmentSearchViewer,
     { primaryIds }: { primaryIds: string[] },
   ): Promise<IResolvedSecondaryResult> {
-    const aggregator = this.attachmentSearchResultAggregator;
-    if (aggregator == null) {
-      throw new Error('Attachment search is not initialized');
-    }
+    const aggregator = this.requireAttachmentSearchResultAggregator();
     const input = await this.createAttachmentSearchInput(keyword, viewer);
     return aggregator.resolveSecondary(input, { primaryIds });
   }
@@ -670,7 +663,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
    * also matches the query gets page search's snippet; the snippet search
    * failing or timing out only leaves the snippets out (research.md 14.3).
    */
-  async formatFacetSearchItems(
+  private async formatFacetSearchItems(
     input: AttachmentSearchInput,
     items: readonly IPageWithSearchMeta[],
   ): Promise<IPageWithSearchMeta[]> {
@@ -681,11 +674,13 @@ class SearchService implements SearchQueryParser, SearchResolver {
 
     const [{ pages }, highlights] = await Promise.all([
       this.findPageListByIds(pageIds),
-      this.searchHighlightsOfPagesOrNone(input, pageIds),
+      this.searchHighlightsOfPages(input, pageIds),
     ]);
 
     const User = mongoose.model('User');
-    const pageById = new Map(pages.map((page) => [String(page._id), page]));
+    const pageById = new Map<string, IPageHasId>(
+      pages.map((page) => [String(page._id), page]),
+    );
     const { user, userGroups } = input.viewer;
 
     return items.flatMap((item) => {
@@ -694,7 +689,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
       if (page == null) {
         return [];
       }
-      const pageData = toSearchedPageDocument(page, User);
+      toSearchedPageDocument(page, User);
       const highlight = highlights.get(pageId);
       const meta =
         highlight == null
@@ -703,54 +698,36 @@ class SearchService implements SearchQueryParser, SearchResolver {
               ...item.meta,
               elasticSearchResult: toElasticSearchResult(
                 highlight,
-                this.canShowSnippet(pageData, user, userGroups),
+                this.canShowSnippet(page, user, userGroups),
               ),
             };
-      return [{ data: pageData, meta }];
+      return [{ data: page, meta }];
     });
   }
 
   /** The highlight of each page that matches the query; empty on failure. */
-  private async searchHighlightsOfPagesOrNone(
-    input: AttachmentSearchInput,
-    pageIds: readonly string[],
-  ): Promise<Map<string, unknown>> {
-    try {
-      return await withTimeout(
-        this.searchHighlightsOfPages(input, pageIds),
-        FACET_SNIPPET_TIMEOUT_MS,
-      );
-    } catch (err) {
-      logger.warn('Answering facet=attachments items without snippets', err);
-      return new Map();
-    }
-  }
-
-  /**
-   * One page_index search for `pageIds`, built as page search builds its
-   * query (the keyword, the operators and the viewer filter), so a page is
-   * returned only when page search would return it with a highlight.
-   */
   private async searchHighlightsOfPages(
     { terms, resolvedFilterData, viewer }: AttachmentSearchInput,
     pageIds: readonly string[],
   ): Promise<Map<string, unknown>> {
-    const delegator = this.fullTextSearchDelegator;
-
-    const query = delegator.createSearchQuery();
-    delegator.appendCriteriaForQueryString(query, terms);
-    delegator.appendCriteriaForGroupFilter(query, terms, resolvedFilterData);
-    delegator.filterPagesByViewer(query, viewer.user, viewer.userGroups);
-    const filter = query.body?.query?.bool?.filter;
-    if (!Array.isArray(filter)) {
-      throw new Error('The viewer filter did not initialize the bool query');
+    try {
+      const { data } = await withTimeout(
+        this.fullTextSearchDelegator.searchWithinPages(
+          { terms, resolvedFilterData },
+          viewer.user,
+          viewer.userGroups,
+          pageIds,
+        ),
+        FACET_SNIPPET_TIMEOUT_MS,
+      );
+      return new Map(data.map((hit) => [hit._id, hit._highlight]));
+    } catch (err) {
+      logger.warn(
+        { err },
+        'Answering facet=attachments items without snippets',
+      );
+      return new Map();
     }
-    filter.push({ ids: { values: [...pageIds] } });
-    delegator.appendResultSize(query, 0, pageIds.length);
-    delegator.appendHighlight(query);
-
-    const { data } = await delegator.searchKeyword(query);
-    return new Map(data.map((hit) => [hit._id, hit._highlight]));
   }
 
   protected findPageListByIds(

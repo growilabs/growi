@@ -6,7 +6,6 @@ import { type MockProxy, mock, mockDeep } from 'vitest-mock-extended';
 import type {
   AttachmentSearchInput,
   AttachmentSearchResultAggregator,
-  IPrimarySearchResult,
 } from '~/features/search-attachments/server/services/attachment-search-result-aggregator';
 import { SearchDelegatorName } from '~/interfaces/named-query';
 import type { IPageWithSearchMeta } from '~/interfaces/search';
@@ -346,45 +345,6 @@ describe('SearchService.canShowSnippet()', () => {
 
 describe('SearchService.searchByFacet()', () => {
   const viewer = { user: null, userGroups: null };
-  const input: AttachmentSearchInput = {
-    queryString: 'word',
-    terms: mock<QueryTerms>(),
-    resolvedFilterData: { groupIds: [], notGroupIds: [] },
-    viewer,
-  };
-  const primary: IPrimarySearchResult = {
-    items: [{ data: mock<IPageWithSearchMeta['data']>({ _id: 'p1' }) }],
-    meta: { primaryResultIncomplete: false },
-  };
-  const items: IPageWithSearchMeta[] = [
-    { data: mock<IPageWithSearchMeta['data']>({ _id: 'p1', path: '/p1' }) },
-  ];
-
-  it('answers the attachment search and its items formatted with the query parsed once', async () => {
-    const service = new TestSearchService();
-    const parse = vi
-      .spyOn(service, 'createAttachmentSearchInput')
-      .mockResolvedValue(input);
-    const format = vi
-      .spyOn(service, 'formatFacetSearchItems')
-      .mockResolvedValue(items);
-    const aggregator = mock<AttachmentSearchResultAggregator>();
-    aggregator.searchPrimary.mockResolvedValue(primary);
-    service.setAttachmentSearchResultAggregator(aggregator);
-
-    const result = await service.searchByFacet('word', viewer, {
-      from: 20,
-      size: 10,
-    });
-
-    expect(result).toEqual({ primary, items });
-    expect(parse).toHaveBeenCalledTimes(1);
-    expect(aggregator.searchPrimary).toHaveBeenCalledWith(input, {
-      from: 20,
-      size: 10,
-    });
-    expect(format).toHaveBeenCalledWith(input, primary.items);
-  });
 
   it('fails when the attachment search is not initialized', async () => {
     await expect(
@@ -498,7 +458,7 @@ describe('page documents and snippets', () => {
       const pages = this.pagesInMongo.filter((page) =>
         ids.includes(String(page._id)),
       );
-      return Promise.resolve({ pages, totalCount: pages.length });
+      return Promise.resolve({ pages });
     }
   }
 
@@ -574,30 +534,8 @@ describe('page documents and snippets', () => {
     });
   });
 
-  describe('SearchService.formatFacetSearchItems()', () => {
+  describe('SearchService.searchByFacet() items', () => {
     const viewer = { user: null, userGroups: null };
-    const terms: QueryTerms = {
-      match: ['word'],
-      not_match: [],
-      phrase: [],
-      not_phrase: [],
-      prefix: [],
-      not_prefix: [],
-      tag: [],
-      not_tag: [],
-      author: [],
-      not_author: [],
-      editor: [],
-      not_editor: [],
-      group: [],
-      not_group: [],
-    };
-    const input: AttachmentSearchInput = {
-      queryString: 'word',
-      terms,
-      resolvedFilterData: { groupIds: [], notGroupIds: [] },
-      viewer,
-    };
     const VIEWER_FILTER = { term: { 'viewer-filter': 'guest' } };
 
     const itemOf = (page: { _id: unknown }): IPageWithSearchMeta => ({
@@ -621,6 +559,56 @@ describe('page documents and snippets', () => {
         if (Array.isArray(filter)) filter.push(VIEWER_FILTER);
       });
       service.fullTextSearchDelegator = delegator;
+      service.nqDelegators = {
+        [SearchDelegatorName.DEFAULT]: delegator,
+        [SearchDelegatorName.PRIVATE_LEGACY_PAGES]: mock<SearchDelegator>(),
+      };
+      aggregator = mock<AttachmentSearchResultAggregator>();
+      service.setAttachmentSearchResultAggregator(aggregator);
+    });
+
+    let aggregator: MockProxy<AttachmentSearchResultAggregator>;
+
+    const searchItems = async (
+      primaryItems: IPageWithSearchMeta[],
+    ): Promise<IPageWithSearchMeta[]> => {
+      aggregator.searchPrimary.mockResolvedValue({
+        items: primaryItems,
+        meta: { primaryResultIncomplete: false },
+      });
+      return (await service.searchByFacet('word', viewer, {})).items;
+    };
+
+    it('answers the attachment search for the parsed query and the requested page', async () => {
+      const page = createPage('/page', PageGrant.GRANT_PUBLIC);
+      service.pagesInMongo = [page];
+      vi.spyOn(delegator, 'searchKeyword').mockResolvedValue({
+        data: [],
+        meta: { total: 0, hitsCount: 0 },
+      });
+      const primary = {
+        items: [itemOf(page)],
+        meta: { primaryResultIncomplete: true },
+      };
+      aggregator.searchPrimary.mockResolvedValue(primary);
+
+      const result = await service.searchByFacet('word', viewer, {
+        from: 20,
+        size: 10,
+      });
+
+      expect(result.primary).toBe(primary);
+      expect(toJson(result.items).map((item) => item.data.path)).toEqual([
+        '/page',
+      ]);
+      expect(aggregator.searchPrimary).toHaveBeenCalledWith(
+        expect.objectContaining({
+          queryString: 'word',
+          terms: expect.objectContaining({ match: ['word'] }),
+          viewer,
+        }),
+        { from: 20, size: 10 },
+      );
     });
 
     it('answers the page documents in the given order and drops the items whose page is gone', async () => {
@@ -633,7 +621,7 @@ describe('page documents and snippets', () => {
         meta: { total: 0, hitsCount: 0 },
       });
 
-      const result = await service.formatFacetSearchItems(input, [
+      const result = await searchItems([
         itemOf(second),
         itemOf(gone),
         itemOf(first),
@@ -669,10 +657,7 @@ describe('page documents and snippets', () => {
           meta: { total: 1, hitsCount: 1 },
         });
 
-      const result = await service.formatFacetSearchItems(input, [
-        itemOf(matched),
-        itemOf(unmatched),
-      ]);
+      const result = await searchItems([itemOf(matched), itemOf(unmatched)]);
 
       expect(toJson(result).map((item) => item.meta)).toEqual([
         {
@@ -715,9 +700,7 @@ describe('page documents and snippets', () => {
         meta: { total: 1, hitsCount: 1 },
       });
 
-      const [item] = await service.formatFacetSearchItems(input, [
-        itemOf(ownerOnly),
-      ]);
+      const [item] = await searchItems([itemOf(ownerOnly)]);
 
       expect(item.meta?.elasticSearchResult).toEqual({
         snippet: null,
@@ -732,9 +715,7 @@ describe('page documents and snippets', () => {
         new Error('es down'),
       );
 
-      const result = await service.formatFacetSearchItems(input, [
-        itemOf(page),
-      ]);
+      const result = await searchItems([itemOf(page)]);
 
       expect(toJson(result)).toEqual([
         expect.objectContaining({
@@ -753,7 +734,7 @@ describe('page documents and snippets', () => {
       );
 
       let result: IPageWithSearchMeta[] | undefined;
-      service.formatFacetSearchItems(input, [itemOf(page)]).then((items) => {
+      searchItems([itemOf(page)]).then((items) => {
         result = items;
       });
 
@@ -769,7 +750,7 @@ describe('page documents and snippets', () => {
     it('answers no items without searching when there are none', async () => {
       const searchKeyword = vi.spyOn(delegator, 'searchKeyword');
 
-      expect(await service.formatFacetSearchItems(input, [])).toEqual([]);
+      expect(await searchItems([])).toEqual([]);
       expect(searchKeyword).not.toHaveBeenCalled();
     });
   });

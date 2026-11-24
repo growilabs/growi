@@ -22,23 +22,15 @@ export const toSearchedPageDocument = (
   // biome-ignore lint/suspicious/noExplicitAny: a populated mongoose page document
   pageData: any,
   User: new (...args: never[]) => unknown,
-  // biome-ignore lint/suspicious/noExplicitAny: the same populated page document
-): any => {
-  const isUserDocument = (value: unknown): boolean => value instanceof User;
-
+): void => {
   pageData._doc.seenUserCount = pageData.seenUsers?.length || 0;
 
-  if (
-    pageData.lastUpdateUser != null &&
-    isUserDocument(pageData.lastUpdateUser)
-  ) {
+  if (pageData.lastUpdateUser instanceof User) {
     pageData.lastUpdateUser = serializeUserSecurely(pageData.lastUpdateUser);
   }
-  if (pageData.creator != null && isUserDocument(pageData.creator)) {
+  if (pageData.creator instanceof User) {
     pageData.creator = serializeUserSecurely(pageData.creator);
   }
-
-  return pageData;
 };
 
 /**
