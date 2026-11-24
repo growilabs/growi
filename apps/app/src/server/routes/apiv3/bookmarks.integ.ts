@@ -31,6 +31,7 @@ interface SeedPageOptions {
   grant?: PageGrant;
   grantedUsers?: HydratedDocument<IUser>[];
   grantedGroups?: { item: Types.ObjectId; type: 'UserGroup' }[];
+  isEmpty?: boolean;
 }
 
 const seedPage = async (
@@ -47,6 +48,7 @@ const seedPage = async (
       creator: creator._id,
       grantedUsers: options.grantedUsers?.map((u) => u._id),
       grantedGroups: options.grantedGroups,
+      isEmpty: options.isEmpty,
     },
   ]);
   return page;
@@ -482,6 +484,26 @@ describe('GET /bookmarks/info', () => {
     expect(res.status).toBe(200);
     expect(res.body.sumOfBookmarks).toBe(1);
     expect(res.body.isBookmarked).toBe(true);
+    expect(res.body.bookmarkedUsers.map((u: { _id: string }) => u._id)).toEqual(
+      [owner._id.toString()],
+    );
+  });
+
+  it('returns bookmark info for an empty page, which can be bookmarked', async () => {
+    const owner = await seedUser('owner');
+    const viewer = await seedUser('viewer');
+    const page = await seedPage({
+      path: '/empty-parent',
+      creator: owner,
+      isEmpty: true,
+    });
+    await seedBookmark(owner, page);
+    currentUser = viewer;
+
+    const res = await request(app).get(`/info?pageId=${page._id.toString()}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.sumOfBookmarks).toBe(1);
     expect(res.body.bookmarkedUsers.map((u: { _id: string }) => u._id)).toEqual(
       [owner._id.toString()],
     );
