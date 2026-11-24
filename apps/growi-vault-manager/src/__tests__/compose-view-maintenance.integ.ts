@@ -424,12 +424,6 @@ async function triggerGcAndWait(): Promise<{
         });
       expect(failedCount).toBe(0);
 
-      // At this point the version counter must be >= COMMIT_COUNT.
-      const stateBeforeSquash = await db
-        .collection('vault_namespace_state')
-        .findOne({ namespace: squashNs });
-      expect(stateBeforeSquash?.version).toBeGreaterThanOrEqual(COMMIT_COUNT);
-
       // Wait for the next scheduler tick to perform the squash within the
       // computed squash budget.
       const squashDeadline = Date.now() + squashWaitMs;
@@ -462,13 +456,27 @@ async function triggerGcAndWait(): Promise<{
       expect(stateAfterSquash?.version).toBe(1);
       expect(stateAfterSquash?.commitOid).toMatch(/^[0-9a-f]{40}$/);
 
-      // Verify the squash commit is a root commit (no parents) by calling the
-      // storage-stats or health endpoint — a direct git log check would require
-      // shell access to the repo, which we proxy via the manager's HTTP API.
-      // Here we simply assert that the namespace state is coherent after squash.
-      expect(stateAfterSquash?.commitOid).not.toBe(
-        stateBeforeSquash?.commitOid,
+      // The namespace HEAD is a single root commit that still holds every page.
+      const repoPath = process.env.VAULT_REPO_PATH;
+      if (repoPath == null) {
+        throw new Error('VAULT_REPO_PATH is not set by the integ setup');
+      }
+      const headRef = `refs/namespaces/${squashNs}/refs/heads/main`;
+      const { stdout: depth } = await execFileAsync('git', [
+        '-C',
+        repoPath,
+        'rev-list',
+        '--count',
+        headRef,
+      ]);
+      expect(Number(depth.trim())).toBe(1);
+
+      const { stdout: files } = await execFileAsync(
+        'git',
+        ['-C', repoPath, 'ls-tree', '-r', '--name-only', headRef],
+        { maxBuffer: 10 * 1024 * 1024 },
       );
+      expect(files.trim().split('\n')).toHaveLength(COMMIT_COUNT);
     });
 
     // -------------------------------------------------------------------------
