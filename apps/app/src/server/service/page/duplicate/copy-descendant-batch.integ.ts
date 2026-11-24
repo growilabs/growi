@@ -210,7 +210,7 @@ describe('copyDescendantBatch', () => {
     prefix: string,
     fn: () => Promise<void>,
   ): Promise<void> => {
-    const name = `unique_path_${WORKER_ID}`;
+    const name = `unique_path_batch_${WORKER_ID}`;
     await Page.collection.createIndex(
       { path: 1 },
       {

@@ -267,7 +267,7 @@ describe('runDescendantDuplicationV4', () => {
         relatedTagId: tagId,
       })),
     });
-    const uniqueIndex = `unique_path_${WORKER_ID}`;
+    const uniqueIndex = `unique_path_v4_${WORKER_ID}`;
     await Page.collection.createIndex(
       { path: 1 },
       {

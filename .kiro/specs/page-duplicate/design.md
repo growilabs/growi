@@ -18,7 +18,7 @@
 | 用語 | 意味 |
 |---|---|
 | PageOperation | `actionType: Duplicate` の PageOperation ドキュメント。配下を含む複製のたびに1件作られ、配下の複製とサブオペレーションが終わると削除される |
-| `lastProgressAt` を更新する | 配下の複製が1段進むたび（正確には、各書き込みの直前）に、PageOperation の `lastProgressAt` に今の時刻を書き込む |
+| `lastProgressAt` を更新する | 配下の複製が1段進むたび（正確には、各書き込みの直前と、配下の読み出しの1回分ごと）に、PageOperation の `lastProgressAt` に今の時刻を書き込む |
 | `lastProgressAt` により期限切れと判定された PageOperation | `lastProgressAt` が `STALL_THRESHOLD_MS`（2分）以上前の PageOperation。止まった複製を表す |
 | `ownerToken`（担当プロセスの ID） | その複製を担当しているプロセスを表す、実行ごとの乱数。`lastProgressAt` の更新と PageOperation の削除は、`ownerToken` が自分の値のときだけ成功する |
 | 回復を引き受ける | 期限切れと判定された PageOperation の `ownerToken` を、自分の値に条件付きで書き換える。成功した1プロセスだけが回復する |
@@ -128,7 +128,7 @@ graph TB
 
 `lastProgressAt` の更新が成功すると、その PageOperation は `STALL_THRESHOLD_MS`（2分）のあいだ、他のプロセスから期限切れと判定されない。この2分を、担当プロセスだけが安全に書き込める時間として使う。そのため、次の2つを常に守る。
 
-1. **各書き込みの直前に `lastProgressAt` を更新する。** revision の複製（`$merge` 1回）、ページの挿入、タグの複製、サブオペレーションの1回分の処理の、それぞれの直前で行う。配下の読み出しの1回分（100件）の開始時にも行う（利用者が閲覧できないページだけの回など、何も書かない回が続いても、止まったと判定されないため）。更新は「`ownerToken` が自分の値なら」という条件付きで行う。失敗したら `OwnershipLostError` を投げ、書かずにやめる。
+1. **各書き込みの直前に `lastProgressAt` を更新する。** revision の複製（`$merge` 1回）、ページの挿入、タグの複製、サブオペレーションの1回分の処理の、それぞれの直前で行う。配下の読み出しの1回分（100件）を読み終えて、写し始める前にも行う（利用者が閲覧できないページだけの回など、何も書かない回が続いても、止まったと判定されないため）。更新は「`ownerToken` が自分の値なら」という条件付きで行う。失敗したら `OwnershipLostError` を投げ、書かずにやめる。
 2. **1回の書き込みは、2分より十分短い量にする。** revision の複製は `REVISION_MERGE_CHUNK_SIZE`（10件）ずつの `$merge` に分け、最悪でも約160MB にする。各 `$merge` には `MERGE_MAX_TIME_MS`（60秒）の `maxTimeMS`（DB 側でその処理を打ち切る時間制限）を付け、2分を超えて書き込まないようにする。ページの挿入（本文を含まない最大100件）とタグの複製は小さいので、分けない。
 
 この2つにより、回復を引き受けたプロセスと元の担当プロセスが、同じ写しに同時に書き込むことはない。残る危険は、ページの挿入またはタグの複製の DB の呼び出しが固まり、2分以上たってから完了する場合だけになる。この場合は書き込みが重なりうる。この危険は受け入れる（`maxTimeMS` を付けられない書き込みで、量が小さく、固まる原因は DB 側の障害に限られるため）。
@@ -822,7 +822,8 @@ export const pageDuplicateInterruptedSnapshot: {
 
 ### Integration Tests
 
-- `copyCurrentRevisions`（結合テストで、保存された revision を調べる）: 照合が revision の ID で行われ、ページ ID では行われないこと。保存される項目と型が、Prisma で作った revision と同じであること（`createdAt` は元の revision の時刻でなく、複製した時刻）。同じ新しい ID の revision が既にあると、上書きせずに失敗すること。本文を DB の外へ読み出さないこと（DB 側のプロファイラで、revisions への読み出しが ID だけであることを確かめる）（1.2、2.1）。
+- 本文を DB の外へ読み出さないこと: `copyDescendantBatch` の結合テストで、DB 側のプロファイラを使い、revisions への読み出しが `$merge` か ID だけの読み出しであることを確かめる（2.1、2.2、2.4）。
+- `copyCurrentRevisions`（結合テストで、保存された revision を調べる）: 照合が revision の ID で行われ、ページ ID では行われないこと。保存される項目と型が、Prisma で作った revision と同じであること（`createdAt` は元の revision の時刻でなく、複製した時刻）。同じ新しい ID の revision が既にあると、上書きせずに失敗すること（1.2、2.1）。
 - 複製されたページの revision の項目と型: Prisma で作った revision と、`copyCurrentRevisions` で複製した revision で、項目の集合と `pageId`・`author`・`createdAt` の BSON の型が一致すること（1.1。Prisma の拡張 JSON の変換の確認を兼ねる。実装の最初に行う）。
 - 最新の revision だけ: revision を複数持つページを配下ごと複製し、写しの本文が最新の revision と一致し、複製されたページの revision が1件だけであること（1.1、1.2）。v4 のページでも同じ（1.3）。
 - 1回分の例外: `copyCurrentRevisions` を途中で失敗させ、作りかけの写しがページツリーからたどれ、配下ページ数が実際と一致し、PageOperation が削除され、本人にだけ通知が届くこと（4.1、4.5、5.1、5.5）。
