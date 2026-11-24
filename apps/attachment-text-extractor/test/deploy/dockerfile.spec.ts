@@ -13,7 +13,7 @@ import {
 // image needs docker, so these read the file; research.md 22.3 maps Python's
 // test_deploy_config.py (TestDockerfile) here, and 22.7 and 23.7 list what the
 // Node image adds (prlimit in the final stage, pnpm deploy, no WORKERS, no
-// /dev/shm). Requirements 8.1, 8.3, 8.6, 8.7.
+// /dev/shm).
 
 const SERVICE_PACKAGE = '@growi/attachment-text-extractor';
 const PINNED_NODE_SLIM =
@@ -145,7 +145,7 @@ describe('Dockerfile: no WORKERS, no shared memory', () => {
     expect(text).not.toMatch(/\bWORKERS\b/);
   });
 
-  it('does not use /dev/shm or a shared memory size (Req 8.6)', () => {
+  it('does not use /dev/shm or a shared memory size', () => {
     const text = loadDockerfile()
       .stages.flatMap((stage) => stage.instructions)
       .map((instruction) => instruction.args)
@@ -154,7 +154,7 @@ describe('Dockerfile: no WORKERS, no shared memory', () => {
   });
 });
 
-describe('Dockerfile: prlimit check in the final stage (Req 8.7)', () => {
+describe('Dockerfile: prlimit check in the final stage', () => {
   const prlimitRuns = (): readonly string[] =>
     instructionsOf(finalStage(loadDockerfile()), 'RUN')
       .map(runCommand)
@@ -190,7 +190,7 @@ describe('Dockerfile: prlimit check in the final stage (Req 8.7)', () => {
   });
 });
 
-describe('Dockerfile: production dependencies only (Req 8.3)', () => {
+describe('Dockerfile: production dependencies only', () => {
   it('takes the production dependencies of this package with `pnpm deploy --prod --filter`', () => {
     const model = loadDockerfile();
     const deployStage = sourceStageOf(model, 'node_modules');

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The image check of the attachment-text-extractor (Req 8.1-8.3, 9.1, 9.5).
+# The image check of the attachment-text-extractor.
 # The CI job runs the steps one by one (`memory` only when the workflow is
 # started by hand); with docker, `check-image.sh all` runs the same steps on
 # any machine.
@@ -28,7 +28,6 @@ PACKAGE=$(cd "$HERE/../.." && pwd)
 REPO=$(cd "$PACKAGE/../.." && pwd)
 
 IMAGE_TAG=${IMAGE_TAG:-attachment-text-extractor:ci}
-# Req 8.1.
 IMAGE_MAX_BYTES=${IMAGE_MAX_BYTES:-400000000}
 CONTAINER_NAME=${CONTAINER_NAME:-ate-smoke}
 WORK_DIR=${WORK_DIR:-${RUNNER_TEMP:-${TMPDIR:-/tmp}}/ate-image-check}
@@ -170,13 +169,13 @@ service() {
     client extract --filename "$file" --mime "$mime" --expect "$marker" <"$WORK_DIR/samples/$file"
     extracted=$((extracted + 1))
   done 3<"$WORK_DIR/samples.tsv"
-  # A PDF and a DOCX (Req 8.2): an empty or cut-short list must not pass.
+  # A PDF and a DOCX: an empty or cut-short list must not pass.
   if [[ $extracted -lt 2 ]]; then
     echo "only $extracted sample(s) went through POST /extract; a PDF and a DOCX are required" >&2
     return 1
   fi
 
-  # Req 9.5: under the container's own conditions.
+  # The client runs under the container's own conditions (resource limits, no network).
   client prlimit </dev/null
 
   # The document the image serves (production dependencies only) is the one

@@ -1,42 +1,43 @@
 /**
- * Latency of the faceted search against the plain page search, on a real
- * Elasticsearch and MongoDB. Run by hand, not in CI: a shared CI machine
- * cannot hold a latency ratio steady enough to gate on.
+ * Latency of the search requests as they go through the real GROWI app
+ * (`crowi.express`: global middlewares, the rate limiter, each route's auth
+ * chain and handler), on a real Elasticsearch and MongoDB. Run by hand, not in
+ * CI: a shared CI machine cannot hold a latency ratio steady enough to gate on.
  *
- *   ATTACHMENT_SEARCH_PERF=1 env -u MONGO_URI pnpm vitest run attachment-search-performance.integ
+ *   CI=true ATTACHMENT_SEARCH_PERF=1 env -u MONGO_URI pnpm vitest run attachment-search-performance.integ
  *
- * The behaviour past the time limits (facet=all falling back to the page
- * result, facet=attachments reporting an incomplete result, the secondary
- * search returning no enrichment) is pinned in
- * attachment-search-result-aggregator.spec.ts.
+ * The behaviour past the time limits (facet=attachments reporting an
+ * incomplete result, the secondary search throwing a timeout error) is pinned
+ * in attachment-search-result-aggregator.spec.ts.
  */
 
+import { createServer, type Server } from 'node:http';
 import { PageGrant } from '@growi/core';
 import mongoose from 'mongoose';
+import request from 'supertest';
 
-import { getInstance } from '^/test/setup/crowi';
+import { bootGrowiApp } from '^/test/setup/growi-routes';
 import {
   deleteIndices,
   elasticsearchOrigin,
+  indexExists,
   refreshIndex,
   uniqueRunToken,
 } from '^/test/setup/search-attachments/es-inspection';
 import {
   elasticsearchUriFor,
-  overrideConfig,
   wireAttachmentSearch,
 } from '^/test/setup/search-attachments/wire-attachment-search';
 
 import type Crowi from '~/server/crowi';
 import type { PageDocument, PageModel } from '~/server/models/page';
-import type SearchService from '~/server/service/search';
+import { configManager } from '~/server/service/config-manager';
 import type ElasticsearchDelegator from '~/server/service/search-delegator/elasticsearch';
 import { getClient } from '~/server/service/search-delegator/elasticsearch.testing';
 import { prisma } from '~/utils/prisma';
 
 import { attachmentIndexNames } from './attachment-search-delegator-extension';
 import { createAttachmentSearchResultAggregator } from './create-attachment-search-result-aggregator';
-import { resolveAttachmentSearchViewer } from './resolve-attachment-search-viewer';
 
 vi.mock('~/utils/logger', () => ({
   default: () => ({
@@ -54,6 +55,7 @@ const TOKEN = `zzperf${RUN}`;
 
 const PAGE_COUNT = 2000;
 const ATTACHMENTS_PER_PAGE = 3;
+const PAGE_SIZE = 20;
 const WARMUP = 20;
 const ITERATIONS = 200;
 
@@ -77,32 +79,76 @@ const percentile = (samples: number[], p: number): number => {
   return sorted[Math.min(sorted.length - 1, Math.ceil(p * sorted.length) - 1)];
 };
 
-const timeIt = async (fn: () => Promise<unknown>): Promise<number> => {
-  const start = performance.now();
-  await fn();
-  return performance.now() - start;
+const shuffled = <T>(items: readonly T[]): T[] => {
+  const result = [...items];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+};
+
+type PageSearchBody = {
+  ok: boolean;
+  data?: Array<{
+    data: { _id: string };
+    meta?: { attachmentHits?: unknown[] };
+  }>;
+  meta?: { facet?: string | null; primaryResultIncomplete?: boolean };
 };
 
 describe.skipIf(
   process.env.ELASTICSEARCH_URI == null ||
     process.env.ATTACHMENT_SEARCH_PERF !== '1',
-)('attachment search latency (manual)', () => {
+)('attachment search latency through the app (manual)', () => {
   let crowi: Crowi;
-  let searchService: SearchService;
+  let server: Server;
+  let featureEnabled = true;
   const pageIds: mongoose.Types.ObjectId[] = [];
-  let userId: mongoose.Types.ObjectId;
 
   beforeAll(async () => {
-    overrideConfig({
-      'app:elasticsearchUri': elasticsearchUriFor(PAGE_INDEX),
-      'app:attachmentFullTextSearch:extractorUri': 'http://127.0.0.1:1',
-      'app:attachmentFullTextSearch:extractorToken': 'perf',
+    crowi = await bootGrowiApp({
+      beforeServer: async (booted) => {
+        // read on every request by the global middlewares; the in-memory
+        // session store keeps requests from writing sessions to MongoDB
+        await booted.setupGrowiInfoService();
+        booted.sessionConfig = {
+          rolling: true,
+          secret: 'attachment-search-performance-integ',
+          resave: false,
+          saveUninitialized: false,
+          cookie: { maxAge: 60_000 },
+          genid: () => new mongoose.Types.ObjectId().toString(),
+        };
+      },
     });
-    crowi = await getInstance();
+
+    // After bootGrowiApp: it restores its own getConfig spy when it returns.
+    const originalGetConfig = configManager.getConfig.bind(configManager);
+    vi.spyOn(configManager, 'getConfig').mockImplementation((key, source) => {
+      if (key === 'app:elasticsearchUri') {
+        return elasticsearchUriFor(PAGE_INDEX);
+      }
+      if (
+        key === 'app:attachmentFullTextSearch:extractorUri' ||
+        key === 'app:attachmentFullTextSearch:extractorToken'
+      ) {
+        return featureEnabled ? 'http://127.0.0.1:1' : undefined;
+      }
+      return originalGetConfig(key, source);
+    });
+    // Measured as a guest: the rate limiter allows a user 500 requests a
+    // minute per endpoint, fewer than this test sends to /_api/search, and a
+    // guest 2,500 per IP.
+    vi.spyOn(crowi.aclService, 'isGuestAllowedToRead').mockReturnValue(true);
+
     await wireAttachmentSearch(crowi);
-    searchService = crowi.searchService;
+    const { searchService } = crowi;
     const delegator =
       searchService.fullTextSearchDelegator as ElasticsearchDelegator;
+    // The attachment index must carry its own mapping, not one that the bulk
+    // load below would create on the fly.
+    expect(await indexExists(NAMES.alias)).toBe(true);
     await delegator.createIndex(PAGE_INDEX);
     const esClient = getClient(delegator);
     await esClient.indices.putAlias({
@@ -120,7 +166,7 @@ describe.skipIf(
       }),
     );
 
-    userId = new mongoose.Types.ObjectId();
+    const userId = new mongoose.Types.ObjectId();
     const Page = mongoose.model<PageDocument, PageModel>('Page');
     for (let start = 0; start < PAGE_COUNT; start += 200) {
       const batch = Array.from(
@@ -196,9 +242,17 @@ describe.skipIf(
     }
     await refreshIndex(PAGE_INDEX);
     await refreshIndex(NAMES.alias);
+
+    // One listener for every request, rather than one per supertest call
+    server = createServer(crowi.express);
+    await new Promise<void>((resolve) => server.listen(0, resolve));
   }, 600_000);
 
   afterAll(async () => {
+    // unset when beforeAll failed earlier; the cleanup below must still run
+    if (server != null) {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
     vi.restoreAllMocks();
     await deleteIndices([PAGE_INDEX, ...NAMES.indices]);
     await mongoose.model('Page').deleteMany({ _id: { $in: pageIds } });
@@ -207,50 +261,77 @@ describe.skipIf(
     });
   });
 
-  it('keeps facet=all within +30% of the page search, and the secondary search within 500ms (p95)', async () => {
-    const viewer = await resolveAttachmentSearchViewer(null);
-    const query = `${TOKEN} report`;
+  it('keeps the page search unchanged and the secondary search within 500ms (p95)', async () => {
+    const q = `${TOKEN} report`;
 
-    const pageSearch = async () => {
-      const [result, name] = await searchService.searchKeyword(
-        query,
-        null,
-        viewer.user,
-        viewer.userGroups,
-        { offset: 0, limit: 20 },
-      );
-      return searchService.formatSearchResult(
-        result,
-        name,
-        viewer.user,
-        viewer.userGroups,
-      );
+    const pageSearch = (enabled: boolean) => (): request.Test => {
+      featureEnabled = enabled;
+      return request(server).get('/_api/search').query({ q, limit: PAGE_SIZE });
     };
-    const firstPage = await pageSearch();
-    const primaryIds = firstPage.data.map((item) => item.data._id.toString());
-    expect(primaryIds).toHaveLength(20);
+
+    const sample = await pageSearch(true)();
+    const sampleBody: PageSearchBody = sample.body;
+    const primaryIds = (sampleBody.data ?? []).map((item) => item.data._id);
+    expect(primaryIds).toHaveLength(PAGE_SIZE);
+    expect(JSON.stringify(sampleBody)).not.toContain('attachmentHits');
+    const baselineBody: PageSearchBody = (await pageSearch(false)()).body;
+    expect((baselineBody.data ?? []).map((item) => item.data._id)).toEqual(
+      primaryIds,
+    );
 
     const scenarios = {
-      pages: pageSearch,
-      allFirstPage: () =>
-        searchService.searchByFacet(query, viewer, { facet: 'all' }),
-      allSecondPage: () =>
-        searchService.searchByFacet(query, viewer, { facet: 'all', from: 20 }),
-      attachments: () =>
-        searchService.searchByFacet(query, viewer, { facet: 'attachments' }),
-      secondary: () =>
-        searchService.resolveAttachmentSecondary(query, viewer, {
-          primaryIds,
-        }),
+      pagesEnabled: pageSearch(true),
+      pagesDisabled: pageSearch(false),
+      secondary: (): request.Test => {
+        featureEnabled = true;
+        return request(server)
+          .get('/_api/v3/search/attachments')
+          .query({ q, pageIds: primaryIds.join(',') });
+      },
+      facetAttachments: (): request.Test => {
+        featureEnabled = true;
+        return request(server)
+          .get('/_api/search')
+          .query({ q, facet: 'attachments', limit: PAGE_SIZE });
+      },
     } as const;
     type Scenario = keyof typeof scenarios;
     const names = Object.keys(scenarios) as Scenario[];
 
-    // not vacuous: the facet=all first page carries attachment hits
-    const sample = await scenarios.allFirstPage();
+    // /_api/search answers its errors with HTTP 200 and ok: false
+    const succeeded = (name: Scenario, res: request.Response): boolean => {
+      if (name === 'secondary') return res.status === 200;
+      const body: PageSearchBody = res.body;
+      if (res.status !== 200 || body.ok !== true) return false;
+      // an incomplete facet=attachments answer skipped the work being timed
+      return (
+        name !== 'facetAttachments' ||
+        body.meta?.primaryResultIncomplete === false
+      );
+    };
+
+    // not vacuous: the disabled side really is disabled, and both attachment
+    // searches take the attachment path and find hits
+    featureEnabled = false;
+    const disabledSecondary = await request(server)
+      .get('/_api/v3/search/attachments')
+      .query({ q, pageIds: primaryIds.join(',') });
+    featureEnabled = true;
+    expect(disabledSecondary.status).toBe(503);
+    expect(disabledSecondary.body.errors[0].code).toBe('feature_disabled');
+    const secondarySample = await scenarios.secondary();
+    expect(secondarySample.status).toBe(200);
     expect(
-      sample.items.some((i) => (i.meta?.attachmentHits?.length ?? 0) > 0),
-    ).toBe(true);
+      Object.keys(secondarySample.body.enrichments).length,
+    ).toBeGreaterThan(0);
+    const facetSample: PageSearchBody = (await scenarios.facetAttachments())
+      .body;
+    expect(facetSample.ok).toBe(true);
+    expect(facetSample.meta).toMatchObject({
+      facet: 'attachments',
+      primaryResultIncomplete: false,
+    });
+    expect(facetSample.data?.length ?? 0).toBeGreaterThan(0);
 
     for (let i = 0; i < WARMUP; i++) {
       for (const name of names) {
@@ -261,11 +342,20 @@ describe.skipIf(
     const samples = Object.fromEntries(
       names.map((name) => [name, [] as number[]]),
     ) as Record<Scenario, number[]>;
-    // interleaved, so drift in the machine's load affects every scenario alike
+    const failures: string[] = [];
+    // Interleaved, so drift in the machine's load affects every scenario
+    // alike; in a new order each round, so no scenario always runs right
+    // after the same one (and on caches that one warmed).
     for (let i = 0; i < ITERATIONS; i++) {
-      for (const name of names) {
+      for (const name of shuffled(names)) {
+        const start = performance.now();
         // biome-ignore lint/performance/noAwaitInLoops: requests are timed one at a time
-        samples[name].push(await timeIt(scenarios[name]));
+        const res = await scenarios[name]();
+        samples[name].push(performance.now() - start);
+        // a fast error must not count as a fast search
+        if (!succeeded(name, res)) {
+          failures.push(`${name}: ${res.status}`);
+        }
       }
     }
 
@@ -277,15 +367,14 @@ describe.skipIf(
           p95: Number(percentile(samples[name], 0.95).toFixed(1)),
         },
       ]),
-    );
+    ) as Record<Scenario, { p50: number; p95: number }>;
     // biome-ignore lint/suspicious/noConsole: the numbers are this test's output
     console.table(summary);
 
-    expect(summary.allFirstPage.p95).toBeLessThanOrEqual(
-      summary.pages.p95 * 1.3,
-    );
-    expect(summary.allSecondPage.p95).toBeLessThanOrEqual(
-      summary.pages.p95 * 1.3,
+    expect(failures).toEqual([]);
+    // the same work either way, so equal within the machine's noise
+    expect(summary.pagesEnabled.p95).toBeLessThanOrEqual(
+      summary.pagesDisabled.p95 * 1.3,
     );
     expect(summary.secondary.p95).toBeLessThanOrEqual(500);
   }, 600_000);

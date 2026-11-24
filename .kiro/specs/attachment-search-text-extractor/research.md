@@ -1,6 +1,6 @@
 # Research: attachment-search-text-extractor
 
-_最終更新: 2026-11-16_
+_最終更新: 2026-11-19_
 
 この文書は、`apps/attachment-text-extractor` (添付ファイルからテキストを取り出す Node.js のサービス) の技術選定について、調べたことと決めたこと、その根拠の計測をまとめたものである。下流 spec (apps/app への組み込み、UI) に関わる調査は含めない。各項目の数字は、とくに書いていなければ実測である。推論や見込みには「推論」「未検証」と書く。
 
@@ -14,6 +14,7 @@ _最終更新: 2026-11-16_
 6. **実装で分かったこと** — 部品と実行環境の、調べて初めて分かった挙動
 7. **経緯**
 8. **コードのコメントが引く番号の対応表**
+9. **抽出サービス 1.1.0 で決めたことと実験** — ログの `app=`、`/metrics`、`/readyz` の結果を覚える期間、ZIP の上限の抜け道、ページごとの結果の大きさ、子と親の環境変数
 
 umbrella 側の資料: [../attachment-search/research.md](../attachment-search/research.md) (末尾の「抽出アーキテクチャ選択の根拠」)、[../attachment-search/research-docker-image.md](../attachment-search/research-docker-image.md) (既製の Docker image の調査)。
 
@@ -90,8 +91,8 @@ umbrella 側の資料: [../attachment-search/research.md](../attachment-search/r
 
 **ZIP を書き換える経路の前提**
 
-- PPTX と XLSX は、ZIP として一覧でき、必要な部品 (`ppt/presentation.xml` / `xl/workbook.xml`) があるときだけ書き換えの経路に入れる。暗号化された OOXML や旧形式は ZIP ではない (中身は CFB 形式) ので、書き換えずに形式を明示して anydoc にそのまま渡す。こうすると anydoc から型の付いたエラーが返る。
-- ZIP の終わりの記録は CPython の `zipfile` と同じ手順で探す (前後の余分なバイト、注釈の長さ、要素の数の食い違い、ディスク番号の扱い)。エントリ数と、申告された展開後のサイズの合計を確かめる。yauzl の大きさの検査は切り、部品を読むときに自分で確かめる (申告を超えるバイトが来たらその場で壊れたファイル、終わりに CRC-32 を確かめる。申告より短く終わっても CRC-32 が合えば通す)。
+- PPTX と XLSX は、ZIP として一覧でき、必要な部品 (`ppt/presentation.xml` / `xl/workbook.xml`) がちょうど 1 つあるときだけ書き換えの経路に入れる。ZIP の終わりの記録がファイルのどこにも見つからないもの (暗号化された OOXML や旧形式。中身は CFB 形式) だけを、書き換えずに形式を明示して anydoc にそのまま渡す。こうすると anydoc から型の付いたエラーが返る。終わりの記録があるのに一覧を読み切れない ZIP、必要な部品が無い・2 つ以上ある ZIP は `malformed` で断る (検査を通らずに anydoc に渡ると、上限を回避できるため。§9.3)。
+- ZIP の終わりの記録はファイル全体から探す。最後の 64KiB の中は CPython の `zipfile` と同じ手順で読み (前後の余分なバイト、注釈の長さ、要素の数の食い違い、ディスク番号の扱い)、それより前の候補は検証してから使う (§9.3.2)。エントリ数と、申告された展開後のサイズの合計を確かめる。yauzl の大きさの検査は切り、部品を読むときに自分で確かめる (申告を超えるバイトが来たらその場で壊れたファイル、終わりに CRC-32 を確かめる。申告より短く終わっても CRC-32 が合えば通す)。
 
 **テキスト系の部品**
 
@@ -130,7 +131,7 @@ umbrella 側の資料: [../attachment-search/research.md](../attachment-search/r
 - **install のときにファイルを取りに行く部品は使わない**。`pnpm-workspace.yaml` の `allowBuilds` は install のときの処理を許可制にしている。許可を足すと、開発者全員の `pnpm install` と CI が外部のサイトに依存する。
 - **ライセンスは MIT / Apache-2.0 / BSD / ISC などの許容的なライセンスのものだけ**を採用する。GPL / AGPL / LGPL は使わない。
 
-| 本番の依存 (11 個) | 版の書き方 | ライセンス |
+| 本番の依存 (12 個) | 版の書き方 | ライセンス |
 |---|---|---|
 | `hono` | `^4.13.16` | MIT |
 | `@hono/node-server` | `^2.1.6` | MIT |
@@ -143,8 +144,10 @@ umbrella 側の資料: [../attachment-search/research.md](../attachment-search/r
 | `yazl` | `^3.3.1` | MIT |
 | `hono-openapi` | `^1.5.0` | MIT |
 | `zod` | `^4.6.6` | MIT |
+| `@prometheus-io/client` | `^0.16.1` | Apache-2.0 |
 
-- 推移的に入る部品: `domhandler`・`domutils`・`domelementtype` (BSD-2-Clause)、`dom-serializer`・`pend`・`buffer-crc32` (MIT)、`@hono/standard-validator`・`@standard-community/standard-json`・`@standard-community/standard-openapi`・`@standard-schema/spec`・`openapi-types`・`quansync`・`@types/json-schema` (MIT)、`zod-to-json-schema` (ISC。任意の peer が自動で解決されたもので、zod 4 のスキーマでは読み込まれない)。どれも install のときの処理を持たない。
+- 推移的に入る部品: `domhandler`・`domutils`・`domelementtype` (BSD-2-Clause)、`dom-serializer`・`pend`・`buffer-crc32` (MIT)、`@hono/standard-validator`・`@standard-community/standard-json`・`@standard-community/standard-openapi`・`@standard-schema/spec`・`openapi-types`・`quansync`・`@types/json-schema` (MIT)、`zod-to-json-schema` (ISC。任意の peer が自動で解決されたもので、zod 4 のスキーマでは読み込まれない)、`@prometheus-io/client` の依存の `@opentelemetry/api` 1.9.0 (Apache-2.0)・`tdigest` 0.1.3 (MIT)・`tdigest` の依存の `bintrees` 1.0.2 (MIT)。どれも install のときの処理を持たない。
+- `@prometheus-io/client` は `/metrics` の応答を作るためだけに使い、HTTP の層の外 (変換の子を含む) では読み込まない。選んだ理由と、`pnpm-lock.yaml` で確かめたことは §9.1。
 - **anydoc のバイナリの中身**: anydoc 0.2.4 (上流の tag `v0.2.4`、commit `42bf1c5ecdde9eb0d96d6bd75a9e6698cf93b14c`) の Node 用のバイナリに組み込まれる Rust の部品は 130 個で、GPL・AGPL・LGPL などの許容的でないライセンスのものは 0 個だった (MIT、Apache-2.0、BSD、Zlib、Unicode-3.0、BSL-1.0、0BSD など)。npm の package には、部品の一覧もライセンスの文も入っていない。
 - **PDFium の WASM の中身**: npm の `@embedpdf/pdfium` 2.15.1 の `dist/pdfium.wasm` は、`embedpdf/embed-pdf-viewer` の `v2` ブランチの `packages/pdfium/src/vendor/pdfium.wasm` と同じ blob で、fork の `embedpdf/pdfium` (`73a041a5c1aaffa09ebb64f1981ff501cb91a41c`) から XFA・V8・Skia を切って `emscripten/emsdk:3.1.70` で作られている (emscripten の版は上流の Dockerfile からの推論)。入っている第三者の部品 (FreeType、OpenJPEG、libpng、zlib、libjpeg-turbo、Little CMS、ICU、Abseil、fast_float、AGG、emscripten の実行時の部品) は、どれも許容的なライセンスである (FreeType は FTL を選べる)。
 - **ライセンスの表示は、image にもリポジトリにも置かない** (ユーザーの決定、2026-11-12)。理由は、機能には要らないこと、`apps/` の下のほかの app の image がこの種の表示を持っていないこと、依存の版を上げるたびに取り直す手間が続くことである。上流の版を上げたときは、許容的でないライセンスの部品が入っていないことだけをもう一度確かめる。
@@ -169,6 +172,11 @@ CI の image の確認 (linux/amd64 と linux/arm64 のエミュレーション�
 - linux-arm64 の image の build と動作。
 - 展開した image の大きさ: linux/amd64 で 259,258,880 バイト、linux/arm64 で 277,116,416 バイト (上限 400,000,000)。
 - メモリの計測: どちらの環境でも上限の内側 (最も重い負荷で 1,013 〜 1,167 MiB、変換の子は最大 303 MB)。
+
+版 1.1.0 の image も、同じ確認 (2026-11-19 に人が起動した実行。メモリの計測を含む) で確かめた。
+
+- 展開した image の大きさ: linux/amd64 で 263,671,296 バイト、linux/arm64 で 281,528,832 バイト (上限 400,000,000。1.0.0 より約 4.4MB 増えた。`@prometheus-io/client` を加えた分を含む)。
+- メモリの計測: どちらの環境でも上限の内側。最も重い負荷 (S2) の最大は amd64 で 1,075 MiB、arm64 で 1,081 MiB (上限 2,048)。変換の子の最大 RSS は、XLSX (7 万セル) が 291 / 288 MB、DOCX (画像 12 枚) が 266 / 265 MB、PDF (200 万字) が 306 / 301 MB (amd64 / arm64)。ログの行の最後に `app=` が付いても、計測の道具は子の最大 RSS を読めた。
 
 次の確認は行っておらず、未確認のまま残っている。
 
@@ -824,14 +832,15 @@ Node と Hono の既定の振る舞いを採り、以前の実装に合わせる
 
 - 変わらないもの: `file` が必須で `mimeType` が任意であること、`/extract` のステータス (200・400・408・413・422・500・503)、`ErrorCode` の 8 つの値とその順。
 - 変わった形: `file` の型が `string` から `Blob` に (zod の `z.file()` は `format: binary` を出す。以前の文書は `contentMediaType` だけを書いていたので orval は `string` にしていた)、`mimeType` が null 可でなくなった (multipart では null を送れないので、送れる値は同じ)、`/healthz` の応答が `{status: 'ok'}` の型に、`/readyz` の応答に型が付いた。応答のオブジェクトに `additionalProperties: false`、整数に最小と最大が付く。操作の `summary` とスキーマの説明文は無い。
+- orval (7.2.0) は、文書のヘッダーの parameter から、関数の引数も型も作らない (実験。§9.2.2)。`POST /extract` の任意のヘッダー `X-Growi-App-Id` は文書には載るが、生成クライアントの関数と型は変わらず、apps/app は axios の `options.headers` で渡す。ヘッダーの引数を作らせる orval の設定 (`headers: true`) は、文書のための指定を書かない方針 (AC 7.6) に合わせて足さない。そのため AC 7.2 (生成クライアントは文書のとおりに項目を持つ) は、ヘッダーについては成り立たない。
 
 ### 5.7 ログ (ユーザー判断、2026-11-11)
 
 実装のレビューで、以前の実装にあって今の実装に無いログが記録されていないと分かり、ユーザーに 3 つの選択肢で諮った: (ア) このまま受け入れる、(イ) 親が書く診断の行を戻し、子の警告もサービスのログに通す、(ウ) (イ) に加えて `/extract` 以外の要求のログも戻す。**決定は (イ)**。
 
 - **戻したもの**: 子を起動できない、子が結果なしで終わった、シグナルで止まった、結果が決まった形でない、SIGKILL の後も終わらない、の診断の行。子の警告 (`oom_score_adj` を上げられない、入力が不正、結果を送れない、想定外の失敗) と、見覚えのない出力の 1 行。準備の確認の失敗 (理由が変わったときだけ) と回復の行。
-- **戻さなかったもの**: `/extract` 以外の要求ごとの行と、Web サーバー自身のアクセスログ。以前の実装は、認証を通った要求ごとに JSON の行を 1 行出し、Web サーバーのアクセスログも 401 を含むすべての要求に出していた。いまは 401 の要求、存在しないパス、probe の呼び出しが、ログに 1 行も残らない。
-- **行の先頭の書式**: 以前は「地方時の時刻、重要度、ロガーの名前」、いまは「ISO 8601 の UTC の時刻、重要度」。`extract format=… size=… duration_ms=… result=… child_peak_rss_mb=…` の部分は同じ。
+- **戻さなかったもの**: `/extract` 以外の要求ごとの行と、Web サーバー自身のアクセスログ。以前の実装は、認証を通った要求ごとに JSON の行を 1 行出し、Web サーバーのアクセスログも 401 を含むすべての要求に出していた。いまは 401 の要求、存在しないパス、probe の呼び出し、`/metrics` の呼び出しが、ログに 1 行も残らない。ただし応答の数は、経路とステータスごとに `/metrics` (`attachment_extractor_http_responses_total`) で数える (§9.8.1)。
+- **行の先頭の書式**: 以前は「地方時の時刻、重要度、ロガーの名前」、いまは「ISO 8601 の UTC の時刻、重要度」。`extract format=… size=… duration_ms=… result=… child_peak_rss_mb=…` の部分は同じで、その後ろ (行の最後) に呼び出し元の app を示す `app=…` が付く (§9.2)。
 - **想定外の失敗の例外の種類の名前は、ログに出さない** (以前の実装は出していた)。部品が自由に決める文字列で、親が決まった一覧と照らせないため。
 - **準備未完了の理由**: 「最初に失敗した確認と、その失敗のしかた」を言う。以前の実装のように、読み込めなかった部品の一覧は出さない。
 - **子の警告の伝え方** (子は信頼しない前提): 子は標準エラーに決まった 4 つの符号のどれかを 1 行で書き、親は行の全体が符号と完全に同じときだけ認め、親が持つ固定の文を出す。親が子 1 つから保持するのは 256 バイトまでで、それより後は読んで捨てる。乗っ取られた子をまねた偽の子 (約 45 通り。1GiB を標準エラーに書く子を含む) で、ログが決まった形から外れないこと、親の RSS が量に比例しないことを確かめた。終了の直前に書かれた警告は届かないことがありうる (実測では 300 件中 300 件、8 件同時で 320 件中 320 件が届いた)。
@@ -881,7 +890,7 @@ Node と Hono の既定の振る舞いを採り、以前の実装に合わせる
 **子と実行管理**
 
 - 親が消えたとき、以前の子は終了コード 3、いまの子は自分に SIGKILL。想定外の例外のとき、いまの子は `internal` の結果 (detail はクラス名だけ) を送ってから終了コード 1。どちらも応答は同じ。
-- 確認用の子は、運用者の変換の上限ではなく固定の上限で動く (以前の確認は部品を読み込めたかだけを見ていた)。`readiness()` は結果を覚えない (以前は準備完了を覚えていた。§5.3、design.md §HealthRoutes)。
+- 確認用の子は、運用者の変換の上限ではなく固定の上限で動く (以前の確認は部品を読み込めたかだけを見ていた)。`readiness()` は、確認を終えた時点から 10 秒間、準備完了と準備未完了のどちらの結果も覚える (以前の実装は準備完了だけを覚えていた。§5.3、§9.4、design.md §HealthRoutes)。
 - 中止の合図で止めた実行は `crashed` (detail `conversion was cancelled`) で返り、ログでは `client_disconnected` と書く (以前と同じ)。
 - 子の終わり方の detail は、シグナル番号ではなくシグナルの名前。detail は応答にもログにも出ない。
 
@@ -965,7 +974,12 @@ Node と Hono の既定の振る舞いを採り、以前の実装に合わせる
 
 ## 8. コードのコメントが引く番号の対応表
 
-抽出サービスのコードのコメント (`apps/attachment-text-extractor/` の約 170 か所と、`.github/workflows/ci-attachment-text-extractor.yml`) は、書き換えの作業で使った作業用の spec の研究記録の節の番号 (`research.md 15.4` など) と要件の番号 (`Req 3.11` など) を引いている。その記録はこの文書に移して消したので、番号を次の表で読み替える。この文書自身の節の番号と同じ番号でも、コードのコメントの番号は下の表で読む。
+抽出サービスのコードのコメント (`apps/attachment-text-extractor/` の約 190 か所) には、2 種類の番号の書き方がある。
+
+- **`§` の付いた番号** (`research.md §9.4` など): この文書の節を指す。そのまま読む。
+- **`§` の付かない番号** (`research.md 15.4`、`(16.3)`、`D1`〜`D5` など): 書き換えの作業で使った作業用の spec の研究記録と design.md の番号である。その記録はこの文書に移して消したので、下の表で読み替える。この文書自身の節の番号と同じ番号 (たとえば `9.x`) でも、`§` の付かない番号は下の表で読む。
+
+コメントは要件の番号 (`Req N.M`) を引かない。作業用の spec の要件の番号を引いていたコメントは、版 1.1.0 で番号を外した (§9.6)。
 
 ### 8.1 研究記録の節の番号
 
@@ -1012,43 +1026,274 @@ Node と Hono の既定の振る舞いを採り、以前の実装に合わせる
 
 この表に対応の無い細かい項目 (`16.5 option 0`、`16.3 (d)(m)(v)`、`15.4 (1)(1')(6)(7)`、`22.7 errors`、`9.7` など) は、commit `cc9fb5a372` の `.kiro/specs/attachment-search-text-extractor-node-rewrite/research.md` で読める (`git show cc9fb5a372:<パス>`)。
 
-### 8.2 要件の番号
+---
 
-コメントの `Req N.M` は、作業用の spec の要件の番号である (Req 1〜4 の範囲も、この spec の AC 1.1〜4.2 とは別のものを指す。たとえばコメントの `Req 1.6` は認証の要らないパスで、この spec の AC 1.6 (対応外の形式) ではない。`bearer-auth.ts`・`request-log.ts`・`child-env.ts`・`run-outcome.ts`・`parent-watch.ts`・`office.ts`・ベンチマークのコメントを読んで、作業用の spec の番号で書かれていることを確かめた)。この spec の AC を指すコメントは「target spec」や「AC」と書いている。この spec の要件の番号とは次のように対応する。コメントの Req 4・5・7 は、この spec の Req 5・6・7 に同じ枝番で当たる (下の表)。
+## 9. 抽出サービス 1.1.0 で決めたことと実験 (2026-11-19)
 
-| コメントの番号 | 中身 | この spec |
+版 1.1.0 で加えたこと (ログの行の `app=`、`GET /metrics`、`/readyz` の結果を覚えること) と直したこと (ZIP の上限の抜け道、PDF と PPTX のページごとの結果の大きさ、子と親の環境変数の記述) について、決めた理由、採らなかった案、手元の実験の記録を残す。現在の形は requirements.md (Req 8、Req 9、AC 2.10〜2.16、AC 3.5〜3.11) と design.md にある。apps/app がヘッダーを送る側の理由 (設定の値が文字列で入ること、ヘッダーに入れる前の検査) は、`attachment-search-indexing` の research.md §11 にある。
+
+実験はどれも 2026-11-19 に手元の dev container で行った。
+
+### 9.1 `/metrics` の部品: `@prometheus-io/client` を使う
+
+- **背景**: Req 9 は、gauge・ラベル付きのカウンタ・ヒストグラムと、プロセスの CPU・メモリ・イベントループの遅れを、Prometheus のテキスト形式で出すことを求める。
+- **比べた案**:
+  1. Prometheus の公式の JavaScript のクライアント `@prometheus-io/client` を使う (リポジトリは prometheus/client_js。旧名の `prom-client` の後継)
+  2. `prom-client` を使う (採らない。npm で「`@prometheus-io/client` に置き換えられた」と非推奨の表示が出ている。最新は 15.1.3 で 2024-06 のまま)
+  3. テキスト形式を自分で書く (`process.cpuUsage()`、`process.memoryUsage()`、`perf_hooks.monitorEventLoopDelay()` を読み、形式の決まり (エスケープ、`# HELP`・`# TYPE` の行、ヒストグラムの `_bucket`・`_sum`・`_count` と `le="+Inf"`) を自分で守る)
+  4. OpenTelemetry の SDK と Prometheus の exporter (apps/app は `@opentelemetry/exporter-prometheus` を使っている)
+- **決定**: 1。
+- **理由**:
+  - プロセスの既定の指標の名前 (`process_cpu_seconds_total`、`process_resident_memory_bytes`、`nodejs_eventloop_lag_seconds` など) は、Node のサービスで広く使われている名前で、運用者の既存のダッシュボードと警報の設定がそのまま使える。3 で同じ名前と意味を再現すると、保守するコードが増え、意味のずれを確かめる手段も無い
+  - 3 は依存を増やさないが、形式の決まりを守るコードとテストを自分で持つことになる。小さくはならない
+  - 4 は部品が多く、このサービスの小さな image と少ない依存の方針に合わない
+- **引き換えにしたこと**: 本番の依存が 1 つ増えた (12 個。§1.4)。`@prometheus-io/client` は HTTP の層だけで使い、変換の子は読み込まない (`test/layers/layer-rules.ts` の規則で守る)。
+- **npm で確かめたこと**: `@prometheus-io/client` 0.16.1 (最初の公開は 2026-08-21)。ライセンスは Apache-2.0。依存は `@opentelemetry/api` (Apache-2.0) と `tdigest` (MIT。さらに `bintrees` MIT)。Node は ^22 || ^24 || >=26 で、このサービスの >=24 に合う。`prom-client` 15.1.3 も Apache-2.0 で依存は同じ。版は 0.x なので、`^0.16.1` は 0.16.x の範囲に限られる。最初の公開から日が浅く、API が今後変わりうるので、依存の版を上げるときに確かめる。
+- **`pnpm-lock.yaml` に入った実際の内容で確かめたこと**:
+  - `@prometheus-io/client` 0.16.1 の依存は `@opentelemetry/api` 1.9.0 (Apache-2.0)、`tdigest` 0.1.3 (MIT)、`tdigest` の依存 `bintrees` 1.0.2 (MIT) の 3 つ。どれも install のときのスクリプト (preinstall / install / postinstall) を持たない (`bintrees` の scripts は test だけ)。`pnpm-workspace.yaml` の `allowBuilds` は広げていない
+  - 使う API (`Registry`、`Gauge`、`Counter`、`Histogram`、`collectDefaultMetrics`) は、そのままの名前で在る。`registry.contentType` は `text/plain; version=0.0.4; charset=utf-8` (Prometheus のテキスト形式)
+  - `pnpm-lock.yaml` の差分は `@prometheus-io/client`・`bintrees`・`tdigest` の追加だけにした。無関係な peer の再解決の差分は除いた
+- **image の大きさ**: docker の無い環境では測れないので、CI の image の確認で確かめる (§1.6)。1.0.0 の値は、展開して amd64 で 259,258,880 バイト、arm64 で 277,116,416 バイト (上限 400,000,000 バイト)。
+
+**本番の依存を増やすときに一緒に直す場所** (確かめた):
+
+- `test/deploy/production-dependencies.spec.ts`: 本番の依存の一覧を完全一致で固定している。一覧に足し、テスト名とコメントの個数を直す
+- `test/layers/layer-rules.ts` の `PACKAGE_RULES`: 部品ごとに、読み込んでよい層を決めている。HTTP の層だけで使う部品はここに足す
+- `docker/Dockerfile`: 変えなくてよい。build の段の `pnpm deploy out --prod --legacy` が本番の依存を取り出すので、`package.json` と `pnpm-lock.yaml` を直せば image に入る
+- `pnpm-lock.yaml`: `pnpm install` で更新する (ほかの pnpm の実行と同時に動かさない。`.claude/rules/devcontainer.md`)。`ci-attachment-text-extractor.yml` は `pnpm-lock.yaml` の変更でも動く
+
+### 9.2 呼び出し元の app の ID (`X-Growi-App-Id`)
+
+#### 9.2.1 ヘッダーの名前と形 (ユーザーと取りまとめ役の決定)
+
+- 名前は `X-Growi-App-Id`。値は apps/app の設定 `app:growiAppIdForCloud` (環境変数 `GROWI_APP_ID_FOR_GROWI_CLOUD`) の値。
+- 形は `^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`。ログの行は空白で区切った `key=value` の並びなので、空白・`=`・改行などを通さない。英数字で始めるので、`-` と `(invalid)` は本物の値と取り違えない。
+- 値は自己申告で認証されていない。負荷の内訳を見るためだけに使い、認可・上限・判断には使わない。悪い値で要求を失敗させない (負荷の内訳のためのラベルにすぎないため)。形に合わない値は、ログの行には出さず `(invalid)` と書く。
+- メトリクスのラベルには使わない。自己申告の値は種類が際限なく増えうる (ラベルの値の種類が増えると、監視システムの記憶と計算の量が増える)。
+
+#### 9.2.2 orval はヘッダーの parameter から何も作らない (実験)
+
+- **やったこと**: `packages/attachment-text-extractor-client` の `openapi.json` を作業用のディレクトリに写し、`POST /extract` に `{"in":"header","name":"X-Growi-App-Id","required":false,"schema":{"type":"string","pattern":"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"}}` を足した文書と、足さない文書から、それぞれ orval (`v7.2.0`、設定は `input` と `output.target` だけ) でクライアントを作り、`diff` で比べた。
+- **結果**: 2 つの出力は 1 バイトも違わなかった。`postExtract(postExtractBody, options?: AxiosRequestConfig)` のままで、ヘッダーの型も作られない。
+- **意味**: OpenAPI の文書にはヘッダーが載るが、生成クライアントは変わらない。apps/app は axios の `options.headers` で渡す。AC 7.2 (生成クライアントは文書のとおりに項目を持つ) は、ヘッダーについては成り立たない。これは orval の既定 (ヘッダーの引数は `headers: true` を指定したときだけ作る) によるもので、AC 7.6 (文書のための指定を書かない) を守るために、この設定は足さない。この事実は §5.6 にも書いた。
+- **`info.version` を 1.1.0 にしたとき**: 生成クライアントの先頭のコメントに `OpenAPI spec version: …` の行があり、この行だけが変わる。`ci-app.yml` は生成クライアントを作り直して commit 済みのものと比べるので、作り直したものを commit する。
+- **`describeRoute` が `parameters` を受け付けること**: `hono-openapi` の型 (`DescribeRouteOptions` は OpenAPI 3.1 の `OperationObject` から `requestBody`・`responses`・`operationId` を除いたもの) で確かめ、書き出しの手順の出力に `parameters` が載ることを確かめた。
+
+#### 9.2.3 ヘッダーを読む場所
+
+- 認証の後、route の最初 (宣言された `Content-Length` の確かめと、枠を取るより前) で読む。ヘッダーは本文より先に届いているので、本文を読む前に断る行 (`service_busy`、`file_too_large`、`upload_timeout`、`invalid_upload`、`client_disconnected`) にも値を出せる。
+- 認証より前には読まない。401 の要求は行を出さない (§5.7) ので、読んでも使い道が無い。
+- Node は、同じ名前の未知のヘッダーが 2 つ以上あると、`, ` でつないだ 1 つの値にする (`c.env.incoming.headers`)。その値は形に合わないので `(invalid)` になる。2 つのうちどちらかを選ぶ規則を足さない。
+
+### 9.3 ZIP の上限を回避する経路
+
+#### 9.3.1 実験
+
+- **やったこと**: 一時的なテストのファイル (実験の後に消した) で、変換の層の入口 `convert` に、既定の上限 (`MAX_XLSX_CELLS` 70,000、`MAX_ARCHIVE_ENTRIES` 10,000、`MAX_ARCHIVE_UNCOMPRESSED_MB` 512) で次のファイルを渡した。XLSX は `test/fixtures/xlsx.ts` の `xlsxParts` で、1 シートに 50,000 行 × 2 列 (10 万セル) を作った。ZIP は `test/fixtures/zip.ts` の `buildZip` で作り、中央の一覧の値を直接書き換えた。
+- **結果** (1.0.0 のコード):
+
+| 入力 (名前は `a.xlsx`) | `inspectArchive` の結果 | 変換の結果 |
 |---|---|---|
-| Req 1.1、1.2 | 契約の維持、エンドポイント | AC 1.1〜4.2、design.md §ExtractRoute・§HealthRoutes |
-| Req 1.3 | エラーの表と同じコードとステータス | design.md §Error Handling |
-| Req 1.4 | 環境変数の名前と既定値 | design.md §Configuration |
-| Req 1.5 | トークンが無ければ起動しない | design.md §Configuration、§Security Considerations |
-| Req 1.6 | 認証の要らないパスは 3 つだけ | design.md §Security Considerations (認証) |
-| Req 1.7、1.8 | ログに出す項目と出さない項目、エラーの文 | design.md §Monitoring、§Error Handling |
-| Req 1.9〜1.13 | 契約を崩す手続きと不変条件 | research.md §5 |
-| Req 2.x | ベンチマークと出力の比較 (2.5 は正規化の範囲、2.6 は既知の制約) | research.md §4.1、AC 1.9、Req 1 の残存ギャップ |
-| Req 3.1、3.3 | `Content-Length` の早期の検査、本文をメモリだけで受け取る | AC 2.1、design.md §抽出の流れ |
-| Req 3.2 | 枠が無ければ待たずに 503 | AC 2.3 |
-| Req 3.4 | 期限と RSS で子を止める | AC 2.2、2.5 |
-| Req 3.5 | 切断で子を止める | AC 2.9 |
-| Req 3.6 | CSV / HTML の事前のサイズ判定 | AC 2.8 |
-| Req 3.7 | XLSX のセル数と ZIP の上限 | AC 2.6 |
-| Req 3.8 | トークンを子に渡さない | design.md §Security Considerations |
-| Req 3.9 | 長さを先に付けた JSON を 1 回だけ受け取る | design.md §Data Models (親子間の受け渡し) |
-| Req 3.10 | 子の異常終了を 1 件に閉じ込める | AC 2.7 |
-| Req 3.11 | 親が先に終わったら子も終わる | design.md §Child 層 |
-| Req 3.12 | コアダンプを出さない | design.md §Configuration (`RLIMIT_CORE`) |
-| Req 3.13 | 最悪の合計時間 | design.md §Revalidation Triggers (タイムアウトの順序)、research.md §4.10 |
-| Req 3.14 | メモリの予算 2Gi | design.md §Configuration、research.md §4.9 |
-| Req 4.x | 実行基盤の制約 | Req 5.x (同じ枝番) |
-| Req 5.x | コードの構成 | Req 6.x (同じ枝番) |
-| Req 6.x | 進め方 (TDD とレビュー) | research.md §4.12、§7.1 |
-| Req 7.x | OpenAPI と生成クライアント | Req 7.x (同じ枝番) |
-| Req 8.1〜8.3、8.7 | image の元・大きさ・中身・`prlimit` の検査 | design.md §配布物と CI (Dockerfile) |
-| Req 8.4 | Docker image の配布 (compose は同梱しない) | design.md §配布物と CI (Dockerfile)、AC 3.1 |
-| Req 8.5 | 運用者向けの文書 | AC 3.3、design.md §配布物と CI |
-| Req 8.6 | `/dev/shm` を使わない | design.md §Security Considerations |
-| Req 8.8 | `prlimit` が使えなければ `/readyz` を 503 | design.md §HealthRoutes |
-| Req 9.x | CI | design.md §配布物と CI (CI)、Req 7.3 |
-| Req 10.x | 以前の実装の撤去 | research.md §7.1 |
-| Req 11.x | 未決事項の決め方 (11.2 は基準のファイルの RSS、11.11 は既定値を下げてよい条件) | research.md §4 (11.2 は §4.8) |
-| Req 12.x | 取り込みと作業用の spec の削除 | — |
+| 10 万セルの XLSX (対照) | 一覧を返す | `limit_exceeded` (セル数) |
+| 同じ XLSX に `xl/workbook.xml` をもう 1 つ足す | `null` (必要な部品が 2 つ) | **成功** (1 要素、1,077,794 字) |
+| 先頭に `versionNeeded` を 100 にしたエントリを 1 つ足す | `null` (一覧を読み切れない) | **成功** (1,077,794 字) |
+| 先頭に、UTF-8 の印があるのに名前が UTF-8 でないエントリを 1 つ足す | `null` (一覧を読み切れない) | **成功** (1,077,794 字) |
+| 上の XLSX に 12,000 個のエントリを足す (対照) | — | `limit_exceeded` (エントリ数) |
+| 12,000 個のエントリを足し、先頭に `versionNeeded` 100 のエントリ | `null` | **成功** (1,077,794 字) |
+| `xl/workbook.xml` を `xl/wbook.xml` に変え、参照も書き換える | `null` (必要な部品が無い) | 成功するが 0 字 |
+| 全部の名前の前に `/`、`./`、`\` の区切り、大文字、`xl/Workbook.xml` | `null` (必要な部品が無い) | `malformed` |
+| DOCX を `.pptx` / `.xlsx` として、XLSX を `.pptx` として、ただの ZIP を `.xlsx` として | `null` (必要な部品が無い) | `malformed` |
+| 中央の一覧の無い XLSX (ZIP の終わりの記録も無い) | `null` (ZIP でない) | `malformed` |
+| 終わりの記録の中央の一覧の位置を 3 バイトずらした XLSX | `null` (yauzl が開けない) | `malformed` |
+| 暗号化された XLSX (中身は CFB) | `null` (ZIP でない) | `encrypted` |
+| 旧形式の XLS を `.xlsx` として | `null` (ZIP でない) | 成功 (19 字) |
+
+実装の途中で、次も確かめた (変更前のソースを複製して比べた)。
+
+| 入力 (名前は `a.xlsx`) | 変更前 | 変更後 |
+|---|---|---|
+| 10 万セルの XLSX で、終わりの記録の「中央の一覧の大きさ」の値を 3 減らしたもの | 成功 (1,077,794 字。セル数の上限を通らない) | `limit_exceeded` |
+| 小さい正常な XLSX で、同じ値を 3 減らしたもの、46 減らしたもの | 成功 | 成功 (yauzl は大きさの値を見ないので断らない) |
+| 旧形式の XLS が DOCX を埋め込んでいて、その終わりの記録がファイル末尾の約 64KiB 以内にあるもの (名前は `.xlsx`) | 成功 (外側の XLS の文字) | `malformed` |
+| 暗号化された XLSX で、暗号化された部分の末尾の約 64KiB に偶然 ZIP の終わりの記録の印 (`PK\x05\x06`) があるもの | `encrypted` | `malformed` |
+
+最終レビューの指摘を受けて、終わりの記録を探す範囲をファイル全体に広げた。そのときに次を確かめた (変更前のコードで落ちるテストを先に書き、変更後に通ることを見た)。「後ろに足す」は、ZIP の後ろに 0x00 などのバイトを足すこと。70,000 バイトは、終わりの記録を探す範囲 (最後の 65,557 バイト) より長い。
+
+| 入力 (名前は `a.xlsx` / `a.pptx`) | 変更前 | 変更後 |
+|---|---|---|
+| 10 万セルの XLSX の後ろに 70,000 バイト (2MiB でも同じ) | 成功 (セル数の上限を通らない) | `limit_exceeded` |
+| 同じ XLSX の前に 100 バイト、後ろに 70,000 バイト | 成功 | `limit_exceeded` |
+| 12,000 個のエントリを足した XLSX の後ろに 70,000 バイト (前に 100 バイト足しても同じ) | 成功 (エントリ数の上限を通らない) | `limit_exceeded` |
+| 10 万セルの XLSX の後ろに、`PK\x05\x06` を含む 4〜21 バイト (印がファイルの最後の 21 バイトで途中で切れる) | 成功 (セル数の上限を通らない) | `limit_exceeded` |
+| 10 万セルの XLSX の後ろに 70,000 バイト。その中の最後の 64KiB より前の位置に、どこも指さない終わりの記録 (大きさとオフセットの値がでたらめ) を 3 つ置く | `malformed` | `limit_exceeded` |
+| 同じ形で、どこも指さない終わりの記録を最後の 64KiB の中に置く | `malformed` | `malformed` (この範囲の扱いは変えていないので、yauzl が開けない) |
+| 終わりの記録の「中央の一覧の大きさ」の値を 3 減らした 10 万セルの XLSX の後ろに 70,000 バイト | 成功 | `malformed` |
+| 同じものの前に 100 バイト足す | 成功 (1,077,794 字) | `malformed` |
+| 小さい正常な XLSX / PPTX の後ろに 70,000 バイト | 成功 (anydoc がファイル全体を読み、ページ番号の無い 1 要素) | 成功 (検査を通り、後ろに何も足さないときと同じ結果) |
+| 10 万セルの XLSX の中央の一覧を終わりの記録の後ろへ移し (オフセットの値は移した先に直す)、後ろに 70,000 バイト | `malformed` (anydoc も開けない) | 変わらない (`inspectArchive` は `null`。記録より前に中央の一覧の印が無いため) |
+| 暗号化された XLSX / PPTX / DOCX (乱数の部品で 64KiB より大きくしたもの) の暗号文の中、最後の 64KiB より前に、どこも指さない終わりの記録を書き込んだもの | `encrypted` (`inspectArchive` は `null`) | 変わらない |
+
+- 後ろに足した形で上限を通り抜けたのは、変更前の `zip-extent.ts` が終わりの記録を最後の 64KiB の中でしか探さず、見つからなければ「ZIP でない」としてファイル全体を anydoc に渡していたためである。anydoc は、それより前にある終わりの記録も見つけて開く。
+- anydoc は、終わりの記録の「中央の一覧の大きさ」の値を使わずに中央の一覧を見つける。前に 100 バイト足し、大きさの値を 3 減らす、3 増やす、100 減らすのどれでも、後ろに 70,000 バイト足した XLSX を開いた (変更前のコードで、この経路は検査を通らずに anydoc に渡っていた)。オフセットの値を 7 増やしたものは開けなかった (`malformed`)。
+- **読み取れること**: 1.0.0 の `inspectArchive` が `null` を返す 4 つの場合のうち、
+  - **ZIP でない**: 正しく通す必要がある (暗号化された OOXML が `encrypted` になり、旧形式の XLS が読める)。
+  - **一覧を読み切れない**: 3 つの上限 (エントリ数、展開後の大きさ、セル数) をすべて通らない。
+  - **必要な部品が 2 つ以上**: エントリ数と展開後の大きさは確かめた後なので、セル数の上限だけを通らない。
+  - **必要な部品が無い**: 試したどの形でも、anydoc は何も取り出さないか `malformed` を返した。上限を通らずに中身が変換される形は見つからなかった。
+  - なお、「ZIP でない」の `null` には、ZIP の終わりの記録が見つからない場合と、見つかったのに yauzl が開けない場合の 2 つが含まれていた。後者は「ZIP なのに読めない」側に入れた (§9.3.2)。
+- anydoc には組み込みの展開量の上限 (512MiB) があるが、エントリ数の上限は試した範囲では無かった (12,000 エントリが通った)。セル数の上限は anydoc に無い。
+
+#### 9.3.2 決定: ファイル全体を anydoc に渡すのは「ZIP でない」ときだけにする
+
+- **決定**: `inspectArchive` の `null` を「ZIP の終わりの記録がファイルのどこにも見つからない (検証に通る終わりの記録が無い)」だけの意味にする (探す範囲と検証は下の「終わりの記録を探す範囲」)。終わりの記録が見つかったのに yauzl が開けない、一覧を読み切れない、必要な部品が無い、2 つ以上ある、の 4 つはすべて `malformed` にする。
+- **理由**:
+  - 実際に上限を回避できたのは 2 つの場合だが、「ZIP なのに検査を通せない」形をまとめて断るほうが規則が単純で、`null` の意味が 1 つになり、分岐が減る。別の検査を並べて足す形より、穴をふさぐ場所が 1 か所で済む。
+  - 必要な部品が無い場合と yauzl が開けない場合は、実験では anydoc も `malformed` か 0 字だった。断っても、呼び出し側から見た結果はほぼ同じである (0 字の成功が `extraction_failed` に変わる形はある)。
+  - ZIP でない形 (暗号化された OOXML、旧形式) の扱いは変わらない。
+  - 終わりの記録が言う位置に中央の一覧が無い ZIP (記録の「中央の一覧の大きさ」の値が実際と合わないもの) も、「ZIP でない」とは扱わず、yauzl に判断させる。これを `null` にすると、10 万セルの XLSX で大きさの値を 3 減らすだけでセル数の上限を通る (§9.3.1 の 2 つ目の表)。yauzl は大きさの値を見ないので、正常なファイルは断らない。`null` の意味が「終わりの記録が無い」だけになり、分岐も 1 つ減る。
+- **終わりの記録を探す範囲: ファイル全体**。判定は 2 段になっている (最後の 64KiB の中と、それより前)。
+  - 最後の 64KiB (CPython の `zipfile` と yauzl が探す範囲) だけを探すと、ZIP の後ろに 64KiB より長いバイトを足すだけで「ZIP でない」になり、検査を通らずに anydoc に渡る。anydoc はそれより前の終わりの記録も開くので、エントリ数とセル数の上限を通り抜けられる (§9.3.1 の 3 つ目の表)。CPython に合わせて 64KiB に絞る理由は要件に無く、上限を守ることを優先する。
+  - **1 段目 (最後の 64KiB の中)**: いちばん後ろの完全な終わりの記録を、確かめずにそのまま使う (大きさを偽った ZIP は yauzl に判断させる、という上の扱いのまま)。ファイルの最後の 21 バイトで途中で切れた印は読み飛ばし、その手前の完全な記録を使う。以前はこの場合に「ZIP でない」になり、正しい XLSX の後ろに印を含む 4〜21 バイトを足すだけで上限を通り抜けられた。
+  - **2 段目 (それより前)**: ここで見つかった候補は、暗号化された OOXML や旧形式の中身に偶然 `PK\x05\x06` が入っているだけのこともあるので、検証してから使う。検証の条件は 2 つある。1 つ目の条件に通るのは、記録の「中央の一覧の大きさ」の値から計算した位置 (記録の位置から大きさを引いた位置) に、中央の一覧の印 `PK\x01\x02` がある候補と、すぐ前に zip64 の locator の印がある候補である。後ろから順に候補をたどり、1 つ目の条件に通らない候補は読み飛ばして手前を探す。そのため、後ろにダミーの終わりの記録を置いても、手前の本物が見つかる。
+  - 1 つ目の条件に通る候補が無くても、いちばん後ろの候補より前のどこかに `PK\x01\x02` があれば、その候補を終わりの記録として扱う。これが検証の 2 つ目の条件で、この節で「検証に通る」と言うときはこの条件も含む (結果は yauzl が開けず `malformed`)。anydoc は大きさの値を使わずに中央の一覧を見つけるので (§9.3.1 の 3 つ目の表の後の注)、記録の値だけで確かめると、前にバイトを足して大きさの値をずらした ZIP を「ZIP でない」として anydoc に渡してしまうためである。暗号化された OOXML がこれに当たるには、`PK\x01\x02` と、その後ろの `PK\x05\x06` の両方が偶然入っている必要があり、まず起きない。
+  - どちらの段でも、CFB の印 (`D0 CF 11 E0`) を見て旧形式や暗号化ファイルを通す検査はしない (下の「採らなかった案」と同じ理由)。
+  - 候補をたどるときは `lastIndexOf` の開始位置を前へずらしながら探すので、ファイル全体を一度読む程度の手間で済む。4 バイトおきに `PK\x05\x06` で埋まり、最後の 70,000 バイトだけが 0x00 という最悪の形で測ると、50MB (`MAX_FILE_SIZE_MB` の既定値) で約 0.9 秒、100MB で約 1.9 秒だった。
+  - 記録の「オフセット」の値 (ファイルの先頭から数えた中央の一覧の位置) が指す位置を見る検証は入れない。それだけで通る候補は、大きさの値が合わないので、結局 yauzl が開けず `malformed` になる。2 つ目の条件と結果が同じなので、分岐を増やさない。
+- **応答**: `malformed` は既存の `extraction_failed` (422)。`ErrorCode`、ステータス、OpenAPI の文書は変わらない。
+- **影響の範囲**: 名前か MIME が `.xlsx` / `.pptx` のファイルだけである。`.xls` / `.ppt` と `office` の経路 (DOCX など) は `inspectArchive` を使わない (§9.3.4)。動きが変わる形は §9.3.3。
+- **残る心配**: yauzl が開けない ZIP は、実験では 1 つの形 (一覧の位置のずれ) しか試していない。zip64 の形のうち yauzl が開けないものがあれば、それまで anydoc が読めていたものが断られる。「zip64 の大きさで書いた部品を受け付ける」テストは残してある。
+- **採らなかった案 (旧形式を CFB の印で通す)**: 旧形式 (PPT / XLS) や暗号化された OOXML は、ZIP の埋め込みや偶然の印のために、それまで読めたものが `malformed` になりうる (§9.3.1 の 2 つ目の表)。最後の 64KiB の中に終わりの記録の印があるとき、またはファイルのどこかに中央の一覧へつながる終わりの記録 (埋め込まれた ZIP のもの) があるときである。影響は、名前か MIME が `.xlsx` / `.pptx` になっている場合だけである。CFB の印 (`D0 CF 11 E0`) を見て旧形式を通す検査は入れない。入れると `null` に 2 つ目の意味ができ、AC 2.10 の書き方を変えることになる一方、取り戻せるのは「名前が違い、かつ ZIP を埋め込んだ旧形式」という狭い場合だけである。CFB の印の後ろに ZIP を付けたものを anydoc に渡しても、抜け道にはならないことを確かめた (`malformed`、または外側の文書だけが読まれる)。
+- **見直す条件**: 名前の違う旧形式や暗号化ファイルが、この変更のために `malformed` になった例がログ (`result=malformed`) から見つかったとき。
+
+#### 9.3.3 以前の動きとの違い (§5.4 と同じ形の記録)
+
+- **以前 (1.0.0 まで) の動き**: CPython の `zipfile` が開けない ZIP (扱えない版の印、UTF-8 の印と合わない名前) と、必要な部品が無いか 2 つある ZIP は、ファイル全体を anydoc に渡していた。以前の Python の実装と同じ扱いで、`archive-guard.spec.ts` の「passes … through」のテストがこれを固定していた。
+- **いまの動き**: 上のどれも `malformed` (422 `extraction_failed`) で断る。
+- **合わせない理由**: 以前の扱いでは、ZIP の上限とセル数の上限が回避できる (§9.3.1)。上限は細工したファイルから子を守るためのもので、以前の実装に合わせることより優先する。
+- **同じ変更で動きが変わるもの**: (a) 終わりの記録の大きさの値が実際と合わない ZIP は、以前は全体を anydoc に渡して変換していたが、いまは上限を確かめる (超えれば `limit_exceeded`、yauzl が開けなければ `malformed`)。(b) 名前か MIME が `.xlsx` / `.pptx` の旧形式や暗号化ファイルで、ZIP の終わりの記録を持つもの (最後の約 64KiB の中の印、またはファイルのどこかにある、埋め込まれた ZIP の終わりの記録) は、以前は読めたり `encrypted` になったりしたが、いまは `malformed`。理由は上と同じで、ZIP の終わりの記録を持つファイルを、検査を通さずに anydoc へ渡さないため。(b) を避ける CFB の印による検査を採らない理由と見直す条件は §9.3.2。
+- **下流**: apps/app、生成クライアント、下流 spec は変わらない。`malformed` は既存の 422 `extraction_failed` である。
+
+#### 9.3.4 扱わないもの
+
+- `office` の経路 (DOCX、ODT など) は、もともと `inspectArchive` を通らない。エントリ数の上限は anydoc 任せで、守りの境界は RSS の上限である。PPTX / XLSX の経路の外なので、変えなかった。
+
+### 9.4 `/readyz` の結果を覚える期間: 10 秒
+
+- **背景**: 1.0.0 では、`/readyz` を呼ぶたびに確認用の子を起動していた (1 回約 0.24〜0.4 秒の CPU)。同時の呼び出しは 1 回の確認を共有するが、終わった後は覚えないので、トークンなしで休みなく呼ばれると最大で約 1 コアを使った。覚えなかったのは、固まった部品を検知できなくならないため、準備未完了から戻れるようにするため、だった。
+- **前提**: `docker/README.md` が勧める確認の設定は、間隔 20 秒、期限 15 秒、3 回の失敗。確認用の子の期限は 10 秒。
+- **決定**: 確認を終えた時点から 10 秒間、結果を覚える。準備完了と未完了のどちらも覚える (確認が例外で終わった場合も同じ)。確認の実行中に届いた呼び出しは、その 1 回の確認を共有する。
+- **理由**:
+  - 10 秒は確認の間隔 (20 秒) より短い。kubelet の確認の前の確認は、普通は 20 秒前に終わっているので、kubelet は毎回新しい確認の結果を受け取る。kubelet から見た振る舞いは、普段は変わらない。
+  - トークンなしの呼び出しで起動される確認は、10 秒 (+ 確認そのものの時間) に 1 回までになる。CPU は最大で 0.4 秒 / 10 秒、1 コアの約 4% に下がる。
+  - 部品が固まってから気づくまでの時間: 確認の結果が最大 10 秒古いので、「3 回の失敗 × 20 秒」に最大 10 秒足した、約 70 秒以内になる。
+  - 準備未完了から戻るまでの時間: 覚えた未完了の結果は 10 秒で消えるので、部品が直ってから最大で「10 秒 + 次の確認の間隔」で戻る。
+  - 未完了も覚えるのは、未完了の結果だけを覚えないと、固まった部品のある Pod で、トークンなしの呼び出しが 10 秒の期限の確認を続けて起こせるからである。
+- **終えた時点から数える理由**: 確認は最大 10 秒かかる。始めた時点から数えると、遅い確認の結果は覚えた瞬間に古くなり、覚える意味が無くなる。
+- **環境変数にしない理由**: 運用者が変える値ではなく、確認の間隔との関係 (間隔より短いこと) をコードの側で守るため。`docker/README.md` には、値と、readiness の確認の間隔を 10 秒より十分長く (例の 20 秒のように) 取ることを書いた。
+- **採らなかった案**: 準備完了だけを長く覚える (固まった部品を見落とす時間が延びる)。トークンなしの `/readyz` を断る (k8s の確認はトークンを送れない)。
+- **下流**: 応答の形は変わらない。確認の結果が最大 10 秒古いことがある。運用者が決める確認の間隔と期限 (20 秒と 15 秒) は変えなくてよい。
+
+### 9.5 変換の子が親の環境変数を読めるか (実験)
+
+#### 9.5.1 やったこと
+
+リポジトリの外の作業用のディレクトリに、使い捨てのスクリプトを 2 つ書いた。
+
+- `parent.mjs`: 自分の環境変数に仮のトークン `ATTACHMENT_EXTRACTOR_SERVICE_TOKEN=fake-secret-for-experiment-0123` を持って起動し、抽出サービスの `src/runner/child-run.ts` と同じ形で子を起動する。すなわち `spawn('/usr/bin/prlimit', ['--as=2751463424', '--cpu=60:65', '--core=1', '--', process.execPath, '--wasm-max-mem-pages=8192', '--max-semi-space-size=4', 'child.mjs'], { stdio: ['pipe','pipe','pipe','pipe','pipe'], env: { RAYON_NUM_THREADS: '1', MALLOC_ARENA_MAX: '2' } })`。`--as` の値は `MAX_CHILD_RSS_MB` 320 + 2,304MiB、`--cpu` は `TIMEOUT_S` 55 からの値で、`prlimit-args.ts` と `conversion-runner.ts` の作り方に合わせた (親の hard の上限は無制限だったので切り詰めは起きない)。`env` は `child-env.ts` の 2 つだけ。
+- `child.mjs`: `process.ppid` を親とみなし、自分の環境変数、自分の上限 (`/proc/self/limits`)、親の `/proc/<ppid>/cmdline`、親の `/proc/<ppid>/environ` を読み、親の `/proc/<ppid>/mem` を開こうとする。
+- 実行したコマンド: `ATTACHMENT_EXTRACTOR_SERVICE_TOKEN=fake-secret-for-experiment-0123 node parent.mjs`
+
+さらに `sibling-parent.mjs` で、同じ形の子を 2 つ起動し、2 つ目の子から 1 つ目の子の `/proc/<pid>/fd` の一覧、`fd/0` の行き先、`fd/0` を開くこと、`mem` を開くことを試した。
+
+#### 9.5.2 結果 (出力そのまま)
+
+```
+parent pid=2435003 child pid=2435010 secret_in_parent_env=true
+child pid / ppid: 2435010 / 2435003
+own environ: RAYON_NUM_THREADS=1 MALLOC_ARENA_MAX=2
+parent cmdline: node parent.mjs
+own limits (as, cpu, core): Max cpu time 60 65 seconds  | Max core file size 1 1 bytes  | Max address space 2751463424 2751463424 bytes
+parent environ has token: YES (ATTACHMENT_EXTRACTOR_SERVICE_TOKEN=fake-secret-for-experiment-0123)
+open parent /proc/<ppid>/mem (ptrace attach mode): ERROR EACCES
+child exit=0
+```
+
+兄弟の子の試し:
+
+```
+sibling fd list: 0,1,10,11,12,13,14,15,16,2,3,4,5,6,7,8,9
+sibling fd/0 target: socket:[90237994]
+open sibling fd/0: ERROR ENXIO
+open sibling mem: ERROR EACCES
+```
+
+- 子自身の環境変数は 2 つだけで、トークンは渡っていない (設計どおり)。`prlimit` は上限を掛けてから node を exec するので、子の親は抽出サービスの親そのものである。
+- 子は、親の `/proc/<ppid>/environ` から仮のトークンを読めた。
+- 親と兄弟の `/proc/<pid>/mem` は開けなかった (`EACCES`)。兄弟の入力の管 (`fd/0`) は socket で、`/proc` から開き直せなかった (`ENXIO`)。
+
+#### 9.5.3 確かめた環境
+
+| 項目 | 値 |
+|---|---|
+| カーネル (`uname -r`) | `6.8.0-149-generic` |
+| `/proc/sys/kernel/yama/ptrace_scope` | `1` |
+| uid | 1000 (`vscode`)。親と子は同じ uid |
+| 有効な capabilities (`CapEff`) | `0000000000000000` |
+| `NoNewPrivs` | `0` |
+| seccomp | `Seccomp: 2` (filter が 1 つ) |
+| Node | v24.22.2 |
+| `core_pattern` | `|/usr/share/apport/apport …` |
+
+**本物の image と GROWI.cloud とは違う点**: これは開発用の dev container で、Docker は入っていないので、抽出サービスの image の中では試していない。image では uid が 10001、親が PID 1、root のファイルシステムが読み取り専用、`no-new-privileges` が付く。**GROWI.cloud の k8s のノードでは試していない** (そのノードのカーネルと `ptrace_scope` の値も分からない)。
+
+#### 9.5.4 ここから言えること (文書に書く強さ)
+
+- 言えること: 抽出サービスと同じ形で起動した子は、同じ uid の親の環境変数を `/proc` から読める。少なくとも Yama の `ptrace_scope` が 1 の Linux 6.8 では読めた。作業者の理解では、`/proc/<pid>/environ` を読む許可は「同じ uid で、相手が dump できるプロセスである」ことで決まり、Yama の制限 (ptrace で取り付くことへの制限) の対象ではない。この理解はカーネルの資料での知識で、この実験では確かめていない (確かめたのは `ptrace_scope` が 1 の 1 つの環境だけ)。そのため、ほかのノードでも読める見込みが高いと考えるが、試してはいない。
+- 言えないこと: GROWI.cloud のノードで読めること。親のメモリ (処理中のほかの要求のファイルを含む) が読めないこと。`ptrace_scope` が 0 のノードでは、同じ uid のプロセスのメモリを読める可能性があるが、試していない。
+- `docker/README.md` には、この範囲で書いた。「子は親と同じ uid で動き、トークンは子に渡さないが、乗っ取られた子は親の環境変数をトークンを含めて `/proc` から読める (Linux 6.8、`ptrace_scope` 1 の環境で確かめた。GROWI.cloud のノードと image の中では試していない)。親のメモリが読めるかはノードの ptrace の設定による (試していない)。対策は決めていない」。置き場所は「Conditions the service is designed for」の中の「Non-root, read-only, no privileges.」の段落の後の、独立した段落である (`docker/README.md` に「security」という名前の節は無い)。
+- 子自身の環境にトークンが無いことを確かめるテスト (`/proc/<pid>/environ` を読むもの) は正しいが、確かめているのは子の環境で、親の環境が子から読めることとは別の事実である。
+- この事実を文書に書くと攻撃の手がかりを示すことになるが、事実はコードと Linux の仕組みから分かることで、運用者が判断するために要る。そのため書くことにした。
+- 対策 (`MAX_CONCURRENCY=1`、顧客ごとのサービス、OS による隔離) は決めていない。umbrella の [roadmap.md](../attachment-search/roadmap.md) の (h) で扱う。
+
+### 9.6 古い要件番号を引くコメントを取り除いた理由
+
+- **片づける前に数えた結果**: `apps/attachment-text-extractor/` の `src`・`scripts`・`test`・`benchmark` に、`Req N.M` の形が 108 か所 (68 ファイル)。そのうち約 30 か所はコメントではなく、テストの名前 (`describe` に渡す `the deadline (Req 3.4)` など) の中にあった。ほかに `.github/workflows/ci-attachment-text-extractor.yml` のコメントに 1 か所。
+- **なぜ古かったか**: これらは、削除した作業用の spec (`attachment-search-text-extractor-node-rewrite`) の要件の番号である。以前は §8 に読み替えの表 (要件の番号の分) を置いていたが、表を引かないと読めず、この spec の requirements.md の同じ番号は別の要件を指していた (例: `request-log.ts` の「Req 1.7」はログの行のことだが、この spec の AC 1.7 は外部バイナリの要件。`Req 3.8`、`Req 3.11`、`Req 8.8` はこの spec の requirements.md に無い)。
+- **決定**: 番号を引く部分を、コメントからもテストの名前からも消した (テストの中身は変えていない)。コードから読み取れない理由を述べているコメントは、番号なしの文として残した。理由を述べていない (何をしているかを言い直しているだけの) コメントは、行ごと消した (`.claude/rules/coding-style.md` のコメントの規則)。§8 の前書きを直し、要件の番号の表を消した。
+- **検査のテストは足さない**: 足すなら、`test/layers/layer-dependencies.spec.ts` の `listSourceFiles` と同じファイルの一覧を作る処理を複製するか、共有の場所に移す必要がある (約 20 行)。取りまとめ役の目安 (既存の形で 10 行程度なら足す) を超える。コメントの規則は `.claude/rules/coding-style.md` にすでにあり、番号が古くなる原因 (作業用の spec を消して番号を付け直したこと) はこの片づけで無くなった。
+- **扱わなかったもの**: `research.md 15.4` のような節の番号 (約 174 か所)、`(16.3)` のような裸の番号 (約 12 か所)、`D1`〜`D5` (約 18 か所)。これらも作業用の spec の番号だが、§8.1 の表で読める。範囲を広げると、版 1.1.0 の差分が大きくなるため。
+
+### 9.7 結果の大きさの数え方
+
+- `assemblePages` は、改行を LF に揃えた `content` の UTF-8 のバイト数を足し、`MAX_RESULT_BYTES` を超えたら `result_too_large` を投げる。`label` は数えない。
+- PPTX の `content` は、anydoc の出力の掃除 (`cleanSlideText`) の後で、まだ CR を含みうる。揃える前のバイト数で数えると、最後の確かめでは通る結果を途中で止めてしまう。
+- **決定**: 数え方を `result-budget.ts` の 1 か所に置き、PDF の繰り返し、PPTX の繰り返し、`assemblePages` が同じものを使う。数える関数は改行を揃えず、揃えた後の文字列だけを型 (`LfText`。`normalize.ts` の関数だけが作る) で受け取る。各呼び出し元は自分で 1 回だけ揃える。PPTX は掃除の後に揃える (掃除の行末の判定は Python 版と同じく LF だけを見るので、先に揃えると消すものが変わる)。`PageInfo.content` は普通の文字列なので、`assemblePages` は経路を問わずもう 1 回揃える。揃える処理は文字列を写し直すので、上限に近い大きな PDF で同じ文字列に何度もかけると、CPU と一時的なメモリを無駄に使うためである。
+- 空の要素は 0 バイトなので、数えても数えなくても同じになる。
+- 親の受け取りの上限 (`2 × MAX_RESULT_BYTES + 約 1MiB`) は変えない。
+
+### 9.8 `/metrics` の数え方と、公開の手順
+
+#### 9.8.1 応答をどこで数えるか
+
+- **比べた案**:
+  1. Hono の middleware (`app.use('*', …)`) を `bearerAuth` より前に置き、`await next()` の後の `c.res.status` を数える
+  2. Node の `server.on('request')` と `response.once('close')` (`start-server.ts` の `trackRequests` と同じ場所) で数える
+- **決定**: 1。
+- **理由**: HTTP の層の中で完結し、`app.request()` でテストできる。`trackRequests` は停止のための仕組みで、指標を混ぜると責務が 2 つになる。2 にしても、Node が自分で返す答え (400、408、417、431) は `'request'` の前に返されるので数えられず、違いは「読み手のいない答え」の扱いくらいである。
+- **数えないもの**: Node の HTTP の層が自分で返す答え (壊れた要求と `Host` の無い要求の 400、431、`Expect` が `100-continue` 以外の 417、ヘッダーと要求の期限切れの 408)、答える前に閉じた接続、`100 Continue`。
+- **401 と 404 はログの行を出さない** (§5.7 の決定のまま)。数は `/metrics` で分かる。
+- **`/metrics` はトークンなしで開いている**: 中身に利用者のデータは無い (`X-Growi-App-Id` の値もラベルに使わない。§9.2.1)。内向きの通信の制限で守る。
+
+#### 9.8.2 registry を 2 つに分けた理由
+
+- サービスの 5 つの指標 (応答の数、枠の使用中の数と上限、`/extract` の結果ごとの件数と所要時間) はアプリごとの registry に置く。プロセスの既定の指標 (`collectDefaultMetrics`) は、モジュールで 1 回だけ作る registry に置く。`/metrics` は `Registry.merge` で 2 つを合わせたものを返す。
+- **理由**: `collectDefaultMetrics` は、止められない `setInterval`、GC の `PerformanceObserver`、イベントループの遅れの計測を起動する。テストでアプリを数百個作ると、これらが溜まる。また、既定の指標はアプリではなくプロセスの値である。本番ではアプリは 1 つなので、出力は並び順のほかは変わらない。
+- **注意**: `Registry.merge` は、呼んだ時点の指標を写し取る。後からどちらかの registry に指標を足しても、合わせた registry の出力には出ない。指標を足すときは、合わせる前に足す。
+
+#### 9.8.3 版と公開
+
+- `apps/attachment-text-extractor/package.json` は `"private": true`。1.0.0 までは、この package の changeset は 1 つも無かった (`git log` で確かめた)。
+- `.changeset/config.json` の `ignore` に `@growi/attachment-text-extractor` は無い。`private: true` の app が changesets で版を上げる前例は `apps/growi-vault-manager` (`CHANGELOG.md` があり、版は 1.1.7)。
+- ルートの `package.json` の `version-subpackages` は `changeset version && pnpm update "@growi/*" -r && pnpm dedupe`、`release-subpackages` は `@growi/core` と `@growi/pluginkit` を build して `changeset publish` (private の package は npm に出さない)。`release-subpackages.yml` の `changesets/action` が「Release Subpackages」の PR を作り、それを master にマージすると `apps/attachment-text-extractor/package.json` の版が変わり、`release-attachment-text-extractor.yml` が image を公開する。
+- 生成クライアントの package (`@growi/attachment-text-extractor-client`、`private: true`) は changeset を書かない。npm に出さず、apps/app は workspace の中で使うので、版を上げて伝える相手がいない。生成コードの変化は先頭のコメントの版の行だけである (§9.2.2)。
+- メモリの計測 (`ci-attachment-text-extractor.yml` の `Measure memory in the image`) は `workflow_dispatch` のときだけ動く。計測の道具は、ログの `/extract` の行を `\bextract format=(\S+) .*\bresult=(\S+) child_peak_rss_mb=(\S+)` で読む (`scripts/image-check/memory/report.ts`)。`app=` を行の最後に足しても、この正規表現は読める (`child_peak_rss_mb=` の値の後ろの空白で `\S+` が止まる)。ただし、計測は手で起動しないと動かないので、公開の前に手で起動する (§1.6)。

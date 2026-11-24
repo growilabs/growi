@@ -5,7 +5,7 @@ import {
 import { buildDocx, buildJapaneseLinesPdf } from '../fixtures';
 import { useBlackboxService } from './blackbox-service';
 
-// Black box (research.md 22.7 `line-breaks`): Req 2.5, only the PDF route closes
+// Black box (research.md 22.7 `line-breaks`): only the PDF route closes
 // a line break between Japanese characters; a break the author typed stays.
 // Python test_e2e_http.py TestLineBreaksOverHttp.
 

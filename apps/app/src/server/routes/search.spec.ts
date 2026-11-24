@@ -58,19 +58,17 @@ const formattedLegacyResult: IFormattedSearchResult = {
   meta: { took: 3, total: 1, hitsCount: 1 },
 };
 
+// Plain data, not a mock: the route serializes it into the response.
 const facetResult: IPrimarySearchResult = {
-  facet: 'all',
-  primarySlot: 'pages',
   items: [
     {
       data: {
         _id: 'page-2',
-        path: '/faceted',
       } as unknown as IPrimarySearchResult['items'][number]['data'],
       meta: { attachmentHits: [] },
     },
   ],
-  meta: { total: 7 },
+  meta: { primaryResultIncomplete: false },
 };
 
 describe('GET /_api/search', () => {
@@ -130,12 +128,12 @@ describe('GET /_api/search', () => {
         query: { q: 'word', resolve: 'full' },
       },
       {
-        name: 'facet is omitted, with an unknown resolve mode',
-        query: { q: 'word', resolve: 'bogus' },
+        name: 'facet=pages, with an unknown resolve mode',
+        query: { q: 'word', facet: 'pages', resolve: 'bogus' },
       },
       {
-        name: 'facet=all with a named query',
-        query: { q: 'word', facet: 'all', nq: 'my-query' },
+        name: 'facet=attachments with a named query',
+        query: { q: 'word', facet: 'attachments', nq: 'my-query' },
       },
     ])('$name', async ({ query }) => {
       const res = await request(app).get('/_api/search').query(query);
@@ -146,32 +144,18 @@ describe('GET /_api/search', () => {
     });
 
     it.each([
-      'all',
-      'attachments',
-    ])('facet=%s while attachment search is disabled', async (facet) => {
-      featureEnabled.value = false;
-
-      const res = await request(app)
-        .get('/_api/search')
-        .query({ q: 'word', facet });
-
-      expect(res.status).toBe(200);
-      expect(res.text).toBe(legacyResponseText);
-      expect(searchService.searchByFacet).not.toHaveBeenCalled();
-    });
-
-    it.each([
+      { name: 'facet=all', query: { q: 'word', facet: 'all' } },
+      {
+        name: 'facet=attachments',
+        query: { q: 'word', facet: 'attachments' },
+      },
       { name: 'an unknown facet', query: { q: 'word', facet: 'bogus' } },
       { name: 'an empty facet', query: { q: 'word', facet: '' } },
       { name: 'a repeated facet', query: 'q=word&facet=all&facet=pages' },
       { name: 'an object-shaped facet', query: 'q=word&facet[$ne]=pages' },
       {
-        name: 'facet=all with an unknown resolve mode',
-        query: { q: 'word', facet: 'all', resolve: 'bogus' },
-      },
-      {
-        name: 'facet=all with a page size above the facet search limit',
-        query: { q: 'word', facet: 'all', limit: '201' },
+        name: 'facet=attachments with a page size above the facet search limit',
+        query: { q: 'word', facet: 'attachments', limit: '201' },
       },
     ])('$name while attachment search is disabled', async ({ query }) => {
       featureEnabled.value = false;
@@ -183,7 +167,7 @@ describe('GET /_api/search', () => {
       expect(searchService.searchByFacet).not.toHaveBeenCalled();
     });
 
-    it('facet=all while Elasticsearch is not configured', async () => {
+    it('facet=attachments while Elasticsearch is not configured', async () => {
       searchService = mock<SearchService>({
         isConfigured: false,
         isReachable: true,
@@ -201,15 +185,15 @@ describe('GET /_api/search', () => {
 
       const res = await request(localApp)
         .get('/_api/search')
-        .query({ q: 'word', facet: 'all' });
+        .query({ q: 'word', facet: 'attachments' });
 
       expect(res.text).toBe(legacyResponseText);
       expect(searchService.searchByFacet).not.toHaveBeenCalled();
     });
   });
 
-  describe('facet search', () => {
-    it('answers the faceted result with a nullable total and the requested facet', async () => {
+  describe('facet=attachments', () => {
+    it('answers the attachment hits with a null total and primaryResultIncomplete=false', async () => {
       const res = await request(app)
         .get('/_api/search')
         .query({ q: 'word', facet: 'attachments' });
@@ -218,16 +202,19 @@ describe('GET /_api/search', () => {
       expect(res.body).toEqual({
         ok: true,
         data: JSON.parse(JSON.stringify(facetResult.items)),
-        meta: { facet: 'attachments', total: 7, hitsCount: 1 },
+        meta: {
+          facet: 'attachments',
+          total: null,
+          hitsCount: 1,
+          primaryResultIncomplete: false,
+        },
       });
     });
 
-    it('reports primaryResultIncomplete and a null total as given', async () => {
+    it('reports primaryResultIncomplete as given', async () => {
       searchService.searchByFacet.mockResolvedValue({
-        facet: 'attachments',
-        primarySlot: 'attachments',
         items: [],
-        meta: { total: null, primaryResultIncomplete: true },
+        meta: { primaryResultIncomplete: true },
       });
 
       const res = await request(app)
@@ -242,12 +229,12 @@ describe('GET /_api/search', () => {
       });
     });
 
-    it('searches as the logged-in user, with the decoded keyword, paging and resolve mode', async () => {
+    it('searches as the logged-in user, with the decoded keyword and paging, ignoring resolve', async () => {
       currentUser = loggedInUser;
 
       await request(app).get('/_api/search').query({
         q: 'caf%C3%A9',
-        facet: 'all',
+        facet: 'attachments',
         offset: '20',
         limit: '10',
         resolve: 'full',
@@ -256,26 +243,31 @@ describe('GET /_api/search', () => {
       expect(searchService.searchByFacet).toHaveBeenCalledWith(
         'café',
         { user: loggedInUser, userGroups: ['group-1'] },
-        { facet: 'all', from: 20, size: 10, resolve: 'full' },
+        { from: 20, size: 10 },
       );
     });
 
     it('searches as a guest when nobody is logged in, whatever the query says', async () => {
-      await request(app)
-        .get('/_api/search')
-        .query({ q: 'word', facet: 'all', user: 'someone', userGroups: 'x' });
+      await request(app).get('/_api/search').query({
+        q: 'word',
+        facet: 'attachments',
+        user: 'someone',
+        userGroups: 'x',
+      });
 
       expect(searchService.searchByFacet).toHaveBeenCalledWith(
         'word',
         { user: null, userGroups: null },
-        { facet: 'all', from: 0, size: 50, resolve: 'primary' },
+        { from: 0, size: 50 },
       );
     });
 
     it('records the search activity as the page search does', async () => {
       currentUser = loggedInUser;
 
-      await request(app).get('/_api/search').query({ q: 'word', facet: 'all' });
+      await request(app)
+        .get('/_api/search')
+        .query({ q: 'word', facet: 'attachments' });
 
       expect(activityService.createActivity).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -294,7 +286,7 @@ describe('GET /_api/search', () => {
 
       const res = await request(app)
         .get('/_api/search')
-        .query({ q: 'tag:x', facet: 'all' });
+        .query({ q: 'tag:x', facet: 'attachments' });
 
       expect(res.body).toMatchObject({
         ok: false,
@@ -306,17 +298,21 @@ describe('GET /_api/search', () => {
 
   describe('rejects malformed facet parameters with a fixed message', () => {
     it.each([
+      { name: 'facet=all', query: { q: 'word', facet: 'all' } },
+      {
+        name: 'facet=all with a named query',
+        query: { q: 'word', facet: 'all', nq: 'my-query' },
+      },
       { name: 'an unknown facet', query: { q: 'word', facet: 'secret<b>' } },
       { name: 'an empty facet', query: { q: 'word', facet: '' } },
-      { name: 'a repeated facet', query: 'q=word&facet=all&facet=pages' },
+      {
+        name: 'a repeated facet',
+        query: 'q=word&facet=attachments&facet=pages',
+      },
       { name: 'an object-shaped facet', query: 'q=word&facet[$ne]=pages' },
       {
-        name: 'an unknown resolve mode',
-        query: { q: 'word', facet: 'all', resolve: 'secret<b>' },
-      },
-      {
         name: 'a page size above the facet search limit',
-        query: { q: 'word', facet: 'all', limit: '201' },
+        query: { q: 'word', facet: 'attachments', limit: '201' },
       },
     ])('$name', async ({ query }) => {
       const res = await request(app).get('/_api/search').query(query);

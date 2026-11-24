@@ -5,7 +5,7 @@ import { createRandomBytes } from './seeded-random';
 
 // Documents of incompressible images (tests/fixture_files.py's
 // `_random_images`): 11 x 4 MiB is over 40 MiB and under the 50 MiB upload
-// limit; 12 images make the 48 MiB DOCX of Req 11.2's RSS baseline.
+// limit; 12 images make the 48 MiB DOCX of the RSS baseline.
 
 const IMAGE_SIDE = 2048;
 const LARGE_IMAGE_COUNT = 11;

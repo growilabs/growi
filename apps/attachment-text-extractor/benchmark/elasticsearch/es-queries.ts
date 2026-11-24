@@ -1,7 +1,7 @@
 import { BENCHMARK_FORMATS, type BenchmarkFormat } from '../answers';
 import type { ExtractedPage } from '../extraction';
 
-// Request bodies for the Elasticsearch stage (Req 2.10) and the recall it
+// Request bodies for the Elasticsearch stage and the recall it
 // yields. Why these analyzers and queries: research.md 12.
 
 /**
