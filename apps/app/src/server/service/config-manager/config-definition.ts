@@ -92,6 +92,7 @@ export const CONFIG_KEYS = [
   'app:ssrMaxRevisionBodyLength',
   'app:wipPageExpirationSeconds',
   'app:wipPageCleanupCronSchedule',
+  'app:interruptedDuplicateRecoveryCronSchedule',
   'app:isReadOnlyForNewUser',
   'app:vaultEnabled',
   'app:vaultManagerEndpoint',
@@ -629,6 +630,14 @@ export const CONFIG_DEFINITIONS = {
   'app:wipPageCleanupCronSchedule': defineConfig<string>({
     envVarName: 'WIP_PAGE_CLEANUP_CRON_SCHEDULE',
     defaultValue: '0 3 * * *',
+  }),
+  // Recovers duplicates whose PageOperation stopped reporting progress: once
+  // after start-up, then on this schedule. An empty value disables both; a
+  // stalled duplicate then keeps its PageOperation, which blocks overlapping
+  // operations on its paths.
+  'app:interruptedDuplicateRecoveryCronSchedule': defineConfig<string>({
+    envVarName: 'INTERRUPTED_DUPLICATE_RECOVERY_CRON_SCHEDULE',
+    defaultValue: '*/10 * * * *',
   }),
   'app:isReadOnlyForNewUser': defineConfig<boolean>({
     envVarName: 'DEFAULT_USER_READONLY',
