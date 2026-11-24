@@ -240,7 +240,11 @@ apps/app/src/features/search-attachments/
     └── attachment-search.ts                       # IAttachmentHit, IAttachmentEsDoc, ExtractionOutcome DTOs
 
 apps/app/src/server/service/search/
-└── can-show-snippet.ts                            # 本文の抜粋の表示規則 (ページ検索と添付検索が共有)
+├── can-show-snippet.ts                            # 本文の抜粋の表示規則 (ページ検索と添付検索が共有)
+└── page-search-item.ts                            # ページ検索の項目の組み立て (ページ文書・抜粋。ページ検索と facet=attachments が共有)
+
+apps/app/src/server/util/
+└── with-timeout.ts                                # 時間の上限 (添付検索と facet=attachments の抜粋の検索が共有)
 
 packages/attachment-text-extractor-client/
 ├── orval.config.js
@@ -264,10 +268,13 @@ packages/attachment-text-extractor-client/
 - [apps/app/src/server/crowi/index.ts](apps/app/src/server/crowi/index.ts) — `initAttachmentFullTextSearch(this)` を searchService / attachmentService 初期化後に追加
 - [apps/app/src/server/routes/search.ts](apps/app/src/server/routes/search.ts) — 既存のキーワード検索 API (`GET /_api/search`、apiv1) に optional な `facet` クエリを追加。`facet` 省略時と `facet=pages` は従来の `searchKeyword()` → `formatSearchResult()` をそのまま通す。`facet=attachments` で機能有効時は `searchService.searchByFacet()` を呼び、結果を既存の `IFormattedSearchResult` の形 (各 item の `meta` に optional の `attachmentHits`、応答の meta に `facet` / `primaryResultIncomplete`) に詰めて返す (`IFacetedSearchResult`)
 - [apps/app/src/server/service/search.ts](apps/app/src/server/service/search.ts) — `facet=attachments` の検索と、検索結果のページへの添付ヒットの取得を `AttachmentSearchResultAggregator` として追加し、入口として `searchByFacet()` と `resolveAttachmentSecondary()` を置く (クエリ解析・delegator 解決・`resolveFilterData()` を 1 回だけ行って `AttachmentSearchInput` を組み立てる)。`canShowSnippet()` は `can-show-snippet.ts` の規則を呼ぶだけにする (ページ検索の抜粋と添付ヒットで同じ規則)。`registerUpdateEvent()` への権限変更リスナ追加は **不要** (Option D は query-time 方式のため)
-- `apps/app/src/server/service/search-delegator/elasticsearch-client-delegator/es8-client-delegator.ts` / `es9-client-delegator.ts` — 添付 index の操作に要る ES client の呼び出しを追加。`elasticsearch.ts` 本体 (Page 系のメソッド) は変えず、添付の拡張は同じ ES client を受け取って使う
+- `apps/app/src/server/service/search-delegator/elasticsearch-client-delegator/es8-client-delegator.ts` / `es9-client-delegator.ts` — 添付 index の操作に要る ES client の呼び出しを追加。添付の拡張は同じ ES client を受け取って使う
+- `apps/app/src/server/service/search-delegator/elasticsearch.ts` — ページ検索のクエリを 1 か所で組み立て、`search()` と、ページ id に絞った `searchWithinPages()` (facet=attachments の抜粋) が共有する
 - [apps/app/src/server/service/config-manager/config-definition.ts](apps/app/src/server/service/config-manager/config-definition.ts) — `app:attachmentFullTextSearch:*` 4 キー追加 (`extractorUri` / **`extractorToken` (`isSecret: true`。API からは write-only)** / `timeoutMs` / `maxFileSizeBytes`)。各キーの env var 名: `GROWI_ATTACHMENT_EXTRACTOR_URI` / `GROWI_ATTACHMENT_EXTRACTOR_SERVICE_TOKEN` / `GROWI_ATTACHMENT_EXTRACTOR_TIMEOUT_MS` / `GROWI_ATTACHMENT_EXTRACTOR_MAX_FILE_SIZE_BYTES`。`enabled` / `maxConcurrency` の Config キーは無い (前者は算出値、後者は抽出サービス側の env var 専用)。加えて `ENV_ONLY_GROUPS` に `env:useOnlyEnvVars:app:attachmentFullTextSearch` エントリを追加し、control env var `ATTACHMENT_EXTRACTOR_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS=true` で 4 キー全てを env-only 強制できるようにする (マルチテナント向け詳細は下記「ENV_ONLY_GROUPS エントリ」参照)
 - [apps/app/src/interfaces/search.ts](apps/app/src/interfaces/search.ts) — `IPageSearchMeta.attachmentHits?: IAttachmentHit[]` (optional) と、facet 付き検索の応答型 `IFacetedSearchResult` / `SearchFacet` を追加
 - `apps/app/src/server/service/search/can-show-snippet.ts` (新規) — 本文の抜粋の表示規則 (`canShowSnippetForGrant` / `canShowSnippetOfPage`)
+- `apps/app/src/server/service/search/page-search-item.ts` (新規) — ページ検索の項目のページ文書と抜粋の組み立て (`toSearchedPageDocument` / `toElasticSearchResult`)。`formatSearchResult` と facet=attachments が共有する
+- `apps/app/src/server/util/with-timeout.ts` (新規) — 時間の上限 (`withTimeout`)
 - [apps/app/src/interfaces/activity.ts](apps/app/src/interfaces/activity.ts) — `ACTION_ADMIN_ATTACHMENT_SEARCH_SETTINGS_UPDATE` (Large のグループ) と `ACTION_ATTACHMENT_REEXTRACT` (Medium のグループ) を追加
 - `apps/app/src/features/rate-limiter/config/index.ts` — 再抽出の回数制限 (添付ごとに 1 分あたり 5 回) を追加
 - [apps/app/src/server/routes/apiv3/search.js](apps/app/src/server/routes/apiv3/search.js) — `PUT /search/indices` に `includeAttachments` フラグを受理。true のときは `AttachmentReindexBatch.startRebuild()` を呼んで即応答し、実行中なら 409 `rebuild_in_progress`

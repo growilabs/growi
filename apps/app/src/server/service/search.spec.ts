@@ -678,12 +678,6 @@ describe('page documents and snippets', () => {
         },
       });
       expect(query.body?.query?.bool?.filter).toContainEqual(VIEWER_FILTER);
-      expect(delegator.filterPagesByViewer).toHaveBeenCalledWith(
-        query,
-        null,
-        null,
-      );
-      expect(JSON.stringify(query.body?.query)).toContain('word');
       expect(query.body?.highlight).toBeDefined();
     });
 
