@@ -393,3 +393,21 @@
   - _Requirements: 4.1, 9.5, 9.6_
   - _Boundary: AttachmentSearchResultAggregator, SearchService, features/search-attachments/server/routes/apiv3 (`search-attachments.ts` と `.spec.ts`)_
   - _Depends: 12.1_
+
+## 13. 下流の画面 (`attachment-search-ui`) のための追加
+
+- [ ] 13.1 添付だけを対象にした検索の項目に、ページ検索と同じページ文書を入れる
+  - `GET /_api/search` の `facet=attachments` の処理で、aggregator が返したページ ID を `findPageListByIds` で読み、各項目の `data` に入れる。`lastUpdateUser` の `serializeUserSecurely` と `seenUserCount` は、ページ検索の `formatSearchResult` と同じにする (同じ処理を共有する)
+  - MongoDB に無いページの項目は落とす。`meta.hitsCount` は落とす前の項目数のままにする
+  - ページが MongoDB から消えていても `hitsCount` が減らないこと、`data` に `path`・`revision`・`lastUpdateUser` が入ることを、route のテストで固定する。権限で見えないページが入らないことは、既存の権限の結合テストで確かめる
+  - ページのパス・本文・コメントも検索語に一致する項目には、ページ検索と同じ抜粋 (`meta.elasticSearchResult`) を入れる。返すページの id に絞り、ページ検索と同じ組み立てで page_index を 1 回検索する。抜粋の作り方 (`canShowSnippet`、`filterXss`) は `formatSearchResult` と共有する。失敗と 500ms 超過では抜粋を付けずに返し、ログに残す
+  - 本文も一致したページにだけ抜粋が付くこと、一致しないページと抜粋の検索が失敗したときは抜粋なしで項目が返ることを、テストで固定する
+  - OpenAPI の `facet=attachments` の応答の説明を直す
+  - _Requirements: 9.7_
+  - _Boundary: apps/app/src/server/routes/search.ts (と `search.spec.ts`), SearchService (`formatSearchResult` の共有部分と、id に絞ったページ検索), `features/search-attachments/server/routes/apiv1/facet-search-contract.ts`_
+
+- [ ] 13.2 設定の取得 API で、環境変数で固定されているかを返す
+  - `GET /_api/v3/admin/attachment-search/config` の `config` に `useOnlyEnvVars` (`env:useOnlyEnvVars:app:attachmentFullTextSearch` の値) を足す。`AttachmentSearchConfig` の型と OpenAPI を直す
+  - 固定されているときと、されていないときの両方で値が返ることを、route のテストで固定する
+  - _Requirements: 5.7_
+  - _Boundary: features/search-attachments/server/routes/apiv3/attachment-search-admin.ts (と `.spec.ts`), features/search-attachments/interfaces/attachment-search.ts_
