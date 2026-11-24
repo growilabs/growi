@@ -406,7 +406,7 @@
   - _Requirements: 9.7_
   - _Boundary: apps/app/src/server/routes/search.ts (と `search.spec.ts`), SearchService (`formatSearchResult` の共有部分と、id に絞ったページ検索), `features/search-attachments/server/routes/apiv1/facet-search-contract.ts`_
 
-- [ ] 13.2 設定の取得 API で、環境変数で固定されているかを返す
+- [x] 13.2 設定の取得 API で、環境変数で固定されているかを返す
   - `GET /_api/v3/admin/attachment-search/config` の `config` に `useOnlyEnvVars` (`env:useOnlyEnvVars:app:attachmentFullTextSearch` の値) を足す。`AttachmentSearchConfig` の型と OpenAPI を直す
   - 固定されているときと、されていないときの両方で値が返ることを、route のテストで固定する
   - _Requirements: 5.7_
