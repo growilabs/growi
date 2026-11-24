@@ -160,9 +160,14 @@ export const setup = (crowi: Crowi): Router => {
       >('Page');
 
       try {
-        const page = await Page.findByIdAndViewer(pageId, user, null, true);
+        const viewablePageCount = await Page.countByIdAndViewer(
+          pageId,
+          user,
+          null,
+          true,
+        );
         // Uniform 404 for forbidden and nonexistent pages — see rules/page-write-action-403-404.md
-        if (page == null) {
+        if (viewablePageCount === 0) {
           return res.apiv3Err(
             new ErrorV3(
               `Page '${pageId}' is not found or forbidden`,
