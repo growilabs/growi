@@ -3,6 +3,7 @@ import {
   CONFIG_KEYS,
   ENV_ONLY_GROUPS,
 } from './config-definition';
+import { resolveEnvVarType } from './resolve-env-var-type';
 
 describe('config-definition resilience keys', () => {
   describe('CONFIG_KEYS array', () => {
@@ -491,5 +492,38 @@ describe('config-definition change-proposal keys', () => {
         'changeProposal:perPageNotificationsEnabled',
       ]);
     });
+  });
+});
+
+describe('env var type declarations', () => {
+  it('resolves an env var type for every env-backed config', () => {
+    const envBacked = Object.entries(CONFIG_DEFINITIONS).filter(
+      ([, definition]) => definition.envVarName != null,
+    );
+    const unresolvable = envBacked
+      .filter(([key, definition]) => {
+        try {
+          resolveEnvVarType(key, definition);
+          return false;
+        } catch {
+          return true;
+        }
+      })
+      .map(([key]) => key);
+
+    // Guard the guard: an empty set would make this pass vacuously
+    expect(envBacked).toContainEqual([
+      'security:sessionMaxAge',
+      expect.anything(),
+    ]);
+    expect(unresolvable).toEqual([]);
+  });
+
+  it('declares app:checkConfigurationValueStrictly as a strict-by-default env var', () => {
+    expect(CONFIG_KEYS).toContain('app:checkConfigurationValueStrictly');
+    const definition =
+      CONFIG_DEFINITIONS['app:checkConfigurationValueStrictly'];
+    expect(definition.envVarName).toBe('CHECK_CONFIGURATION_VALUE_STRICTLY');
+    expect(definition.defaultValue).toBe(true);
   });
 });

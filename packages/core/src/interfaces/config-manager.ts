@@ -8,11 +8,32 @@ export const ConfigSource = {
 export type ConfigSource = (typeof ConfigSource)[keyof typeof ConfigSource];
 
 /**
+ * How an environment variable string is converted into a config value
+ */
+export type EnvVarType = 'string' | 'number' | 'boolean' | 'object';
+
+/**
+ * The EnvVarType that matches a config value type T
+ */
+export type EnvVarTypeOf<T> = [NonNullable<T>] extends [string]
+  ? 'string'
+  : [NonNullable<T>] extends [number]
+    ? 'number'
+    : [NonNullable<T>] extends [boolean]
+      ? 'boolean'
+      : 'object';
+
+/**
  * Metadata for a configuration value
  */
 export interface ConfigDefinition<T> {
   defaultValue: T;
   envVarName?: string;
+  /**
+   * Required when envVarName is set and defaultValue is null/undefined,
+   * because the type cannot be inferred from the default at runtime.
+   */
+  envVarType?: EnvVarTypeOf<T>;
   isSecret?: boolean;
 }
 
