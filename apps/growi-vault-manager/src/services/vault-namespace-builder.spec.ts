@@ -82,6 +82,7 @@ import { VaultNamespaceStateModel } from '../models/vault-namespace-state.js';
 import { VaultUserViewModel } from '../models/vault-user-view.js';
 import * as VaultBlobHasher from './vault-blob-hasher.js';
 import { applyInstruction } from './vault-namespace-builder.js';
+import { withNamespaceLock } from './vault-namespace-lock.js';
 import * as VaultPathMapper from './vault-path-mapper.js';
 import * as VaultRepoStorage from './vault-repo-storage.js';
 
@@ -783,5 +784,118 @@ describe('isExcludedFromVault filtering', () => {
     expect(VaultRepoStorage.writeCommit).not.toHaveBeenCalled();
     expect(VaultRepoStorage.updateRef).not.toHaveBeenCalled();
     expect(VaultNamespaceStateModel.upsertNamespace).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Per-namespace lock shared with the squash
+// ---------------------------------------------------------------------------
+
+describe('namespace lock', () => {
+  /** Holds the lock on the given namespaces until the returned release runs. */
+  function holdNamespaces(namespaces: string[]): {
+    release: () => void;
+    held: Promise<void>;
+  } {
+    let release: () => void = () => {};
+    const held = withNamespaceLock(
+      namespaces,
+      () =>
+        new Promise<void>((r) => {
+          release = r;
+        }),
+    );
+    return { release: () => release(), held };
+  }
+
+  /** Lets every already-settled promise continuation run. */
+  async function flush(): Promise<void> {
+    await new Promise((r) => setImmediate(r));
+  }
+
+  beforeEach(() => {
+    asMock(RevisionModel.findBodyById).mockResolvedValue({
+      _id: 'rev-001',
+      body: '# Page body',
+    });
+  });
+
+  const upsertOn = (namespace: string): VaultInstructionDoc =>
+    makeInstruction({
+      op: 'upsert',
+      payload: {
+        namespace,
+        pageId: 'page-001',
+        pagePath: '/docs/page',
+        revisionId: 'rev-001',
+      },
+    });
+
+  it('does not write the namespace ref while another writer holds that namespace', async () => {
+    const holder = holdNamespaces(['public']);
+
+    const applying = applyInstruction(upsertOn('public'));
+    await flush();
+    expect(VaultRepoStorage.updateRef).not.toHaveBeenCalled();
+
+    holder.release();
+    await Promise.all([holder.held, applying]);
+    expect(VaultRepoStorage.updateRef).toHaveBeenCalledWith(
+      'refs/namespaces/public/refs/heads/main',
+      'commit-oid',
+    );
+  });
+
+  it('does not wait for a writer that holds a different namespace', async () => {
+    const holder = holdNamespaces(['group-g1']);
+
+    await applyInstruction(upsertOn('public'));
+
+    expect(VaultRepoStorage.updateRef).toHaveBeenCalledWith(
+      'refs/namespaces/public/refs/heads/main',
+      'commit-oid',
+    );
+    holder.release();
+    await holder.held;
+  });
+
+  it('grant-change-prefix waits while its source namespace is held', async () => {
+    const holder = holdNamespaces(['group-g1']);
+
+    const applying = applyInstruction(
+      makeInstruction({
+        op: 'grant-change-prefix',
+        payload: {
+          namespace: 'public',
+          fromNamespace: 'group-g1',
+          oldPrefix: '/docs',
+        },
+      }),
+    );
+    await flush();
+    expect(VaultRepoStorage.updateRef).not.toHaveBeenCalled();
+
+    holder.release();
+    await Promise.all([holder.held, applying]);
+    expect(VaultRepoStorage.updateRef).toHaveBeenCalledTimes(2);
+  });
+
+  it('reset-all waits while any known namespace is held', async () => {
+    asMock(VaultNamespaceStateModel.find).mockReturnValue({
+      lean: () =>
+        Promise.resolve([{ namespace: 'public' }, { namespace: 'group-g1' }]),
+    });
+    asMock(VaultNamespaceStateModel.deleteAll).mockResolvedValue(undefined);
+    const holder = holdNamespaces(['group-g1']);
+
+    const applying = applyInstruction(
+      makeInstruction({ op: 'reset-all', payload: {} }),
+    );
+    await flush();
+    expect(VaultRepoStorage.deleteRef).not.toHaveBeenCalled();
+
+    holder.release();
+    await Promise.all([holder.held, applying]);
+    expect(VaultRepoStorage.deleteRef).toHaveBeenCalledTimes(2);
   });
 });
