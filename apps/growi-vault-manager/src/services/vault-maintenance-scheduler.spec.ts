@@ -32,6 +32,7 @@ vi.mock('./vault-repo-storage.js', async (importOriginal) => {
   return {
     ...actual,
     getRepoPath: vi.fn(() => '/data/vault-repo.git'),
+    readRef: vi.fn(),
     readTree: vi.fn(),
     writeTree: vi.fn(),
     writeCommit: vi.fn(),
@@ -60,6 +61,7 @@ import {
   createVaultMaintenanceScheduler,
   type VaultMaintenanceScheduler,
 } from './vault-maintenance-scheduler.js';
+import { withNamespaceLock } from './vault-namespace-lock.js';
 import * as VaultRepoStorage from './vault-repo-storage.js';
 
 // ---------------------------------------------------------------------------
@@ -174,10 +176,26 @@ function mockSquashStorage(
   treeOid = 'tree0000000000000000000000000000000000000',
   squashedOid = 'squashed00000000000000000000000000000000',
 ): void {
+  vi.mocked(VaultRepoStorage.readRef).mockResolvedValue('abc123');
   vi.mocked(VaultRepoStorage.readTree).mockResolvedValue([]);
   vi.mocked(VaultRepoStorage.writeTree).mockResolvedValue(treeOid);
   vi.mocked(VaultRepoStorage.writeCommit).mockResolvedValue(squashedOid);
   vi.mocked(VaultRepoStorage.updateRef).mockResolvedValue(undefined);
+}
+
+/**
+ * Resolves once the tick reaches its gc check, which runs only after every
+ * squash dispatched by that tick has settled.
+ */
+function whenGcCheckRuns(): Promise<void> {
+  return new Promise((resolve) => {
+    // biome-ignore lint/suspicious/noExplicitAny: overloaded Node.js API
+    mockedExecFile.mockImplementation((...args: any[]) => {
+      resolve();
+      const callback = args[args.length - 1];
+      callback(null, '0 objects, 0 kilobytes\n', '');
+    });
+  });
 }
 
 /**
@@ -610,6 +628,7 @@ describe('VaultMaintenanceScheduler', () => {
         resolveSquash = r;
       });
 
+      vi.mocked(VaultRepoStorage.readRef).mockResolvedValue('abc123');
       vi.mocked(VaultRepoStorage.readTree).mockResolvedValue([]);
       vi.mocked(VaultRepoStorage.writeTree).mockResolvedValue('tree-oid');
       vi.mocked(VaultRepoStorage.writeCommit).mockImplementation(async () => {
@@ -629,6 +648,95 @@ describe('VaultMaintenanceScheduler', () => {
 
       // writeCommit must have been called exactly once for 'public'.
       expect(vi.mocked(VaultRepoStorage.writeCommit)).toHaveBeenCalledTimes(1);
+    });
+  });
+  // ---------------------------------------------------------------------------
+  // Squash vs. instruction application on the same namespace
+  // ---------------------------------------------------------------------------
+
+  describe('squash vs. instruction application on the same namespace', () => {
+    const REF = 'refs/namespaces/public/refs/heads/main';
+    const TREES: Record<string, VaultRepoStorage.TreeEntry[]> = {
+      c1: [{ mode: '100644', path: 'a.md', oid: 'blob-a', type: 'blob' }],
+      c2: [
+        { mode: '100644', path: 'a.md', oid: 'blob-a', type: 'blob' },
+        { mode: '100644', path: 'b.md', oid: 'blob-b', type: 'blob' },
+      ],
+    };
+    let heads: Map<string, string>;
+
+    beforeEach(() => {
+      heads = new Map([[REF, 'c1']]);
+      vi.mocked(VaultRepoStorage.readRef).mockImplementation((ref) =>
+        Promise.resolve(heads.get(ref) ?? null),
+      );
+      vi.mocked(VaultRepoStorage.readTree).mockImplementation((oid) =>
+        Promise.resolve(TREES[oid] ?? []),
+      );
+      vi.mocked(VaultRepoStorage.writeTree).mockImplementation((entries) =>
+        Promise.resolve(`tree:${entries.map((e) => e.path).join(',')}`),
+      );
+      vi.mocked(VaultRepoStorage.writeCommit).mockResolvedValue('squashed');
+      vi.mocked(VaultRepoStorage.updateRef).mockImplementation((ref, oid) => {
+        heads.set(ref, oid);
+        return Promise.resolve();
+      });
+      mockFindOneAndUpdate();
+      // The state row still points at c1: it was read before the instruction
+      // below advanced the ref.
+      mockFind([
+        {
+          namespace: 'public',
+          commitOid: 'c1',
+          version: 1001,
+          updatedAt: new Date(),
+        },
+      ]);
+    });
+
+    it('waits for an instruction holding the namespace, then squashes the HEAD that instruction left', async () => {
+      let releaseInstruction: () => void = () => {};
+      const instruction = withNamespaceLock(['public'], async () => {
+        await new Promise<void>((r) => {
+          releaseInstruction = r;
+        });
+        heads.set(REF, 'c2');
+      });
+      const gcCheck = whenGcCheckRuns();
+
+      scheduler.start();
+      await runOneTick();
+      releaseInstruction();
+      await instruction;
+      await gcCheck;
+
+      expect(VaultRepoStorage.writeCommit).toHaveBeenCalledTimes(1);
+      expect(VaultRepoStorage.writeCommit).toHaveBeenCalledWith(
+        expect.objectContaining({ tree: 'tree:a.md,b.md', parents: [] }),
+      );
+      expect(heads.get(REF)).toBe('squashed');
+    });
+
+    it('leaves the namespace alone when its ref is gone by the time its turn comes', async () => {
+      let releaseInstruction: () => void = () => {};
+      const resetAll = withNamespaceLock(['public'], async () => {
+        await new Promise<void>((r) => {
+          releaseInstruction = r;
+        });
+        heads.delete(REF);
+      });
+      const gcCheck = whenGcCheckRuns();
+
+      scheduler.start();
+      await runOneTick();
+      releaseInstruction();
+      await resetAll;
+      await gcCheck;
+
+      expect(heads.has(REF)).toBe(false);
+      expect(VaultRepoStorage.updateRef).not.toHaveBeenCalled();
+      expect(VaultNamespaceStateModel.findOneAndUpdate).not.toHaveBeenCalled();
+      expect(scheduler.getLastSquashAt()).toBeNull();
     });
   });
 });
