@@ -596,7 +596,7 @@ Independent of B4/B5.
   - _Boundary: PageService (page events), PageLinkService_
   - _Depends: B1.12_
 
-- [ ] B3.6 Add the admin start, state, stop and resume endpoints
+- [x] B3.6 Add the admin start, state, stop and resume endpoints
   - Add apiv3 admin routes behind `loginRequired` and `adminRequired`: GET the job state (status,
     processed and `runTotal` while a run is active, `coverage`, `coveredSince`, `completedAt`,
     `lastError`, and, computed on read, the number of pages not yet included and the total page count
