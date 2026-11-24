@@ -404,7 +404,7 @@
   - 本文も一致したページにだけ抜粋が付くこと、一致しないページと抜粋の検索が失敗したときは抜粋なしで項目が返ることを、テストで固定する
   - OpenAPI の `facet=attachments` の応答の説明を直す
   - _Requirements: 9.7_
-  - _Boundary: apps/app/src/server/routes/search.ts (と `search.spec.ts`), SearchService (`formatSearchResult` の共有部分と、id に絞ったページ検索), `features/search-attachments/server/routes/apiv1/facet-search-contract.ts`_
+  - _Boundary: apps/app/src/server/routes/search.ts (と `search.spec.ts`), SearchService (`formatSearchResult` の共有部分と、項目の組み立て), ElasticsearchDelegator (ページ検索のクエリの組み立てを `search()` と共有する、id に絞ったページ検索 `searchWithinPages`), `features/search-attachments/server/routes/apiv1/facet-search-contract.ts`_
 
 - [x] 13.2 設定の取得 API で、環境変数で固定されているかを返す
   - `GET /_api/v3/admin/attachment-search/config` の `config` に `useOnlyEnvVars` (`env:useOnlyEnvVars:app:attachmentFullTextSearch` の値) を足す。`AttachmentSearchConfig` の型と、route のファイル先頭の一覧の説明を直す (この feature の route には OpenAPI の記述が無い)

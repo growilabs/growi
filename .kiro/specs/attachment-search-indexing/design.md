@@ -62,7 +62,7 @@
 
 - **上流**: `attachment-search-text-extractor` spec が提供する OpenAPI spec (`POST /extract`、`ExtractResponse` / `ErrorResponse`)、Docker image、運用者向け手順書 `docker/README.md`
 - 既存 `AttachmentService.addAttachHandler` / `addDetachHandler` (ハンドラ登録のみ)
-- 既存 `ElasticsearchDelegator` (composition で添付向けメソッド合成、既存 Page 系メソッドは不変)。`searchAccessiblePages` からは既存の `createSearchQuery()` / `appendCriteriaForQueryString()` / `appendCriteriaForGroupFilter()` / `filterPagesByViewer()` を呼び出しのみで使う
+- 既存 `ElasticsearchDelegator` (composition で添付向けメソッド合成。既存 Page 系メソッドの振る舞いは変えない。ページ検索のクエリ (検索語・演算子・viewer filter・強調表示) は 1 か所で組み立て、`search()` と id に絞ったページ検索 `searchWithinPages()` が共有する)。`searchAccessiblePages` からは既存の `createSearchQuery()` / `appendCriteriaForQueryString()` / `appendCriteriaForGroupFilter()` / `filterPagesByViewer()` を呼び出しのみで使う
 - 既存 `SearchService` の `parseSearchQuery()` / `resolve()` / `resolveFilterData()` (呼び出しのみ。演算子の解析ロジックは複製しない)
 - 既存 `prisma.attachments` (読み取りのみ。Attachment の作成・削除は `AttachmentService` が行う)
 - 既存 `GET /_api/search` ハンドラ (`routes/search.ts`、optional なクエリの追加のみ。`facet` 省略時の処理は変えない)
@@ -395,7 +395,7 @@ sequenceDiagram
     Svc-->>Api: IPrimarySearchResult
     Note over Api: 以下は SearchService.searchByFacet の中 (route は searchByFacet を 1 回呼ぶ)
     Api->>Api: findPageListByIds でページ文書を読み、data に入れる (MongoDB に無いページの項目は落とす)
-    Api->>Del: 返すページの id に絞ったページ検索 (検索語 + 演算子 + viewer filter + ids + 強調表示)
+    Api->>Del: searchWithinPages (ページ検索と同じクエリ + ids)
     Del->>ES: page_index search
     ES-->>Del: 一致したページの highlight
     Api->>Api: ページ検索と同じ規則で meta.elasticSearchResult を作る (失敗・時間切れなら抜粋なし)
@@ -408,7 +408,7 @@ sequenceDiagram
 - `meta.total` は常に null、`primaryResultIncomplete` は検索か権限確認が失敗 (800ms 超過を含む) したときだけ true。権限で落ちた件数に応じて変わる値は返さない
 - 「続きを読み込む」の終わりは、`meta.hitsCount` が `limit` に満たないことで判定できる。窓はどの `offset` でも上位 200 件で頭打ちになり、各要求が同じ範囲を見るので、短い応答の後に続きは出ない (research.md 14.1)
 - 各項目の `data` は、ページ検索と同じ形のページ文書である。`SearchService` が `findPageListByIds` で読み、`lastUpdateUser` を `serializeUserSecurely` で直し、`seenUserCount` を入れる (ページ検索の `formatSearchResult` と同じ処理)。MongoDB に無いページの項目は落とす。`meta.hitsCount` は落とす前の項目数にする (ページ検索の `hitsCount` と同じ数え方。落としたことで続きの読み込みが止まらないように)。下流の画面は、ページ検索と同じ一覧とプレビューの部品でこの結果を描く (Req 9.7、research.md 14.1)
-- ページのパス・本文・コメントも検索語に一致する項目には、ページ検索と同じ抜粋 (`meta.elasticSearchResult` の `snippet` / `highlightedPath`) を入れる。返すページの id (最大 `limit` 件) に絞って、ページ検索と同じ組み立て (`appendCriteriaForQueryString`・`appendCriteriaForGroupFilter`・`filterPagesByViewer`・`appendHighlight`) で page_index を 1 回検索する。抜粋の作り方 (`canShowSnippet`、`filterXss`) は `formatSearchResult` と共有する。権限確認の `searchAccessiblePages` には相乗りさせない (役割を混ぜない)。検索語に一致しないページは返ってこないので、抜粋は付かない。この検索が失敗するか時間の上限 (500ms) を超えたときは、抜粋を付けずに項目を返し、ログに残す。抜粋は項目の補足であり、無くても項目は正しいため (research.md 14.3)
+- ページのパス・本文・コメントも検索語に一致する項目には、ページ検索と同じ抜粋 (`meta.elasticSearchResult` の `snippet` / `highlightedPath`) を入れる。返すページの id (最大 `limit` 件) に絞って、`ElasticsearchDelegator.searchWithinPages` で page_index を 1 回検索する。クエリは、ページ検索の `search()` と同じ組み立て (検索語・演算子・viewer filter・強調表示) を delegator の中で共有し、id の絞り込みだけを足したものである。抜粋の作り方 (`canShowSnippet`、`filterXss`) は `formatSearchResult` と共有する。権限確認の `searchAccessiblePages` には相乗りさせない (役割を混ぜない)。検索語に一致しないページは返ってこないので、抜粋は付かない。この検索が失敗するか時間の上限 (500ms) を超えたときは、抜粋を付けずに項目を返し、ログに残す。抜粋は項目の補足であり、無くても項目は正しいため (research.md 14.3)
 - `sort` / `order` / `type` は適用しない (点数順だけ)
 
 #### 2.3 API 呼び出しパターン (アプリ実装)
@@ -581,7 +581,7 @@ Key decisions:
 | 9.4 | optional フィールド | `interfaces/search.ts` 差分 (`IPageSearchMeta.attachmentHits`) | — | — |
 | 9.5 | 有効時もページ検索は不変、添付ヒットは別の要求 | `GET /_api/search` は `facet=attachments` のときだけ aggregator を呼ぶ。検索結果のページへの添付ヒットは `GET /_api/v3/search/attachments` | AttachmentSearchResultAggregator.resolveSecondary | Flow 2 |
 | 9.6 | 添付ヒットの取得の失敗はエラーで返す | `resolveSecondary` は失敗と 500ms 超過で例外を投げ、ルートは 500 を返す | AttachmentSearchResultAggregator.resolveSecondary | Flow 2.1 |
-| 9.7 | 添付だけの検索の項目にページ文書と、ページも一致したときの抜粋を入れる | `GET /_api/search` の `facet=attachments` の処理 (`findPageListByIds`、id に絞ったページ検索) | `IFacetedSearchResult` | Flow 2.2 |
+| 9.7 | 添付だけの検索の項目にページ文書と、ページも一致したときの抜粋を入れる | `GET /_api/search` の `facet=attachments` の処理 (`findPageListByIds`、`ElasticsearchDelegator.searchWithinPages`) | `IFacetedSearchResult` | Flow 2.2 |
 
 ## Components and Interfaces
 
