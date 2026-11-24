@@ -95,6 +95,13 @@ const router = express.Router();
  *              $ref: '#/components/schemas/User'
  */
 export const setup = (crowi: Crowi): Router => {
+  // Bookmarks are Prisma-backed, but the viewer/grant filters still live on the
+  // (not yet migrated) mongoose Page model.
+  const Page: PageModel = mongoose.model<
+    HydratedDocument<PageDocument>,
+    PageModel
+  >('Page');
+
   const loginRequiredStrictly = loginRequiredFactory(crowi);
   const loginRequired = loginRequiredFactory(crowi, true);
   const addActivity = generateAddActivityMiddleware();
@@ -153,11 +160,6 @@ export const setup = (crowi: Crowi): Router => {
         bookmarkedUsers: [],
         pageId: '',
       };
-
-      const Page: PageModel = mongoose.model<
-        HydratedDocument<PageDocument>,
-        PageModel
-      >('Page');
 
       try {
         const viewablePageCount = await Page.countByIdAndViewer(
@@ -247,13 +249,6 @@ export const setup = (crowi: Crowi): Router => {
       if (userId == null) {
         return res.apiv3Err('User id is not found or forbidden', 400);
       }
-
-      // Bookmarks are Prisma-backed, but the viewer/grant filter below still
-      // lives on the (not yet migrated) mongoose Page model.
-      const Page: PageModel = mongoose.model<
-        HydratedDocument<PageDocument>,
-        PageModel
-      >('Page');
 
       try {
         const userFolders = await prisma.bookmarkfolders.findMany({
@@ -388,11 +383,6 @@ export const setup = (crowi: Crowi): Router => {
       if (userId == null) {
         return res.apiv3Err('A logged in user is required.');
       }
-
-      const Page: PageModel = mongoose.model<
-        HydratedDocument<PageDocument>,
-        PageModel
-      >('Page');
 
       let page: HydratedDocument<PageDocument> | null;
       let bookmark: bookmarks | null;
