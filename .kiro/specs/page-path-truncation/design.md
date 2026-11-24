@@ -51,8 +51,7 @@
 - `~/models/linked-page-path` の `LinkedPagePath`（各祖先の href 導出に利用のみ）。
 - 移設後の `~/client/util/format-truncated-page-path`（`parsePagePath` / `formatTruncatedPagePath`）。
 - 既存の検索結果データ `pageData.path` / `elasticSearchResult.highlightedPath`（追加取得なし）。
-- `usehooks-ts`（既存依存, 2.16）の `useIsomorphicLayoutEffect`。
-- ブラウザの `ResizeObserver`。全行で 1 つのインスタンスを共有する（`observeElementWidth`）。ResizeObserver の無い環境（jsdom・SSR）では何もしないため、テストや初回描画で例外にならない。
+- `usehooks-ts`（既存依存, 2.16）の `useResizeObserver` / `useIsomorphicLayoutEffect`。ResizeObserver の無い環境（jsdom・SSR）では何もしないため、テストや初回描画で例外にならない。
 
 ### Revalidation Triggers
 - `formatTruncatedPagePath` の戻り値（`TruncatedPagePath.parts` の形状・順序）が変わる場合。
@@ -95,7 +94,7 @@ graph TB
     SearchResultPagePath --> FormatTruncatedPagePath
     SearchResultPagePath --> UseFittingCollapseLevel
     SearchResultAncestorPath --> UseFittingCollapseLevel
-    UseFittingCollapseLevel --> SharedResizeObserver[observeElementWidth 共有 ResizeObserver]
+    UseFittingCollapseLevel --> UseResizeObserver[usehooks-ts useResizeObserver]
 ```
 
 **Architecture Integration**:
@@ -115,7 +114,7 @@ graph TB
 | Frontend | React 18 / Next.js（既存, `next/link`） | 祖先パスのリンク描画 | 新規ライブラリ追加なし |
 | Frontend | `url-join`（既存依存） | href の正規化結合 | `PagePathHierarchicalLink` と同じ利用パターン |
 | Styling | CSS Modules（既存, Biome/Stylelint 対象） | 1 行固定（祖先・区切り・省略記号は縮めず、ページ名だけを縮める） | 共通 mixin `_truncated-path-row.scss` を両コンポーネントの module から `@use` する |
-| Frontend | `usehooks-ts` 2.16（既存依存） | 描画後・表示前に溢れを確認する（`useIsomorphicLayoutEffect`） | 新規ライブラリ追加なし |
+| Frontend | `usehooks-ts` 2.16（既存依存） | パス表示の幅の変化を検知し（`useResizeObserver`）、描画後・表示前に溢れを確認する（`useIsomorphicLayoutEffect`） | 新規ライブラリ追加なし |
 
 ## File Structure Plan
 
@@ -175,8 +174,6 @@ apps/app/src/
     │   ├── use-fitting-collapse-level.ts       # 新規: 描画結果の溢れを見て段階を選ぶフック（段階の意味は持たない）
     │   ├── use-path-collapse-level.ts          # 新規: パスから最大段階を求めて上記を呼ぶ。両描画コンポーネントで共有
     │   ├── use-fitting-collapse-level.spec.tsx # 新規
-    │   ├── shared-resize-observer.ts           # 新規: 全行で 1 つの ResizeObserver を共有して要素ごとの幅を知らせる
-    │   ├── shared-resize-observer.spec.ts      # 新規
     │   ├── web-fonts-loaded.ts                 # 新規: Web フォント読み込み完了を全行へ知らせる（リスナーは 1 つだけ登録）
     │   └── web-fonts-loaded.spec.ts            # 新規
     └── components/
@@ -249,7 +246,7 @@ flowchart TD
 | 3.2–3.3 | 先頭側から段階的に畳む・省略記号は 1 つ | `formatTruncatedPagePath`（`collapseLevel`）, `useFittingCollapseLevel` | `collapseLevel` / `maxCollapseLevel` | 畳み込み段階の選択 |
 | 3.4–3.5 | 祖先を文字単位で切らない・`//` を出さない | 共通 1 行 CSS レシピ（祖先は縮めない） | — | — |
 | 3.6 | ページ名のみ文字単位で切り詰め（モーダル） | `SearchResultPagePath`, `SearchResultPagePath.module.scss` | — | 畳み込み段階の選択: Last |
-| 3.7 | 幅の変化で判定し直す | `useFittingCollapseLevel`（`observeElementWidth`） | — | 畳み込み段階の選択: Resize |
+| 3.7 | 幅の変化で判定し直す | `useFittingCollapseLevel`（`useResizeObserver`） | — | 畳み込み段階の選択: Resize |
 | 3.8 | 横幅を超えない | `useFittingCollapseLevel`, 共通 1 行 CSS レシピ（行の `overflow: hidden`） | — | — |
 | 3.9 | 両画面で同一の規則 | `formatTruncatedPagePath`, `useFittingCollapseLevel`（両コンポーネントで共有） | — | — |
 | 4.1 | 省略時のフルパスホバー | `SearchResultPagePath`, `SearchResultAncestorPath` | `fullPath` → `title` 属性 | System Flows: Render |
@@ -266,7 +263,7 @@ flowchart TD
 | `formatTruncatedPagePath` | Shared util | プレーンパス文字列から、指定された畳み込み段階の表示パーツ列と祖先部分を決定する | 1, 2, 3, 7 | `DevidedPagePath`（P0） | Service |
 | `alignHighlightedPathSegments` | Shared util（`client/util/`） | ハイライト markup をプレーンパスのセグメントに対応付ける（祖先行・ページ名行で共用） | 6, 7 | `normalizePath`（P0） | Service |
 | `buildAncestorPathNodes` | Shared util（`client/util/`） | 中間省略判定と `LinkedPagePath`・ハイライトを橋渡しし、React 非依存のレンダリング計画を返す | 2, 5, 6 | `formatTruncatedPagePath`（P0）, `LinkedPagePath`（P0）, `alignHighlightedPathSegments`（P0） | Service |
-| `useFittingCollapseLevel` | `features/search` hook | 描画結果の溢れと幅の変化から、収まる最小の畳み込み段階を選ぶ | 3 | `observeElementWidth`（P0） | State |
+| `useFittingCollapseLevel` | `features/search` hook | 描画結果の溢れと幅の変化から、収まる最小の畳み込み段階を選ぶ | 3 | `useResizeObserver`（P0） | State |
 | `SearchResultAncestorPath` | `features/search` component | 検索結果一覧の祖先パス部分を 1 行・リンク付き・ハイライト付きで描画する | 1, 2, 3, 4, 5, 6 | `buildAncestorPathNodes`（P0）, `usePathCollapseLevel`（P0） | State |
 | `SearchResultPagePath` | `features/search` component | 検索モーダルのパスを、選ばれた段階で 1 行描画する | 1, 2, 3, 4 | `formatTruncatedPagePath`（P0）, `usePathCollapseLevel`（P0） | State |
 | `PageListItemL` | `client/components/PageList` | オプトイン prop に応じて祖先パス描画先を切り替え、`evalDatePath` を統一する | 7, 8, 9 | `alignHighlightedPathSegments`（P0）, `PagePathHierarchicalLink`（P0, 既存） | State |
@@ -384,7 +381,7 @@ export const buildAncestorPathNodes: (
 
 **Responsibilities & Constraints**
 - 描画後・表示前に溢れを確認し、溢れていれば段階を 1 つ上げて描画し直す（System Flows「畳み込み段階の選択」）。
-- コンテナの幅の変化を `observeElementWidth` で検知する（`/_search` の最大 200 行で ResizeObserver のインスタンスを 1 つにするため、全行で共有する。測る要素と幅は行ごと）。広がったら段階 0 から、狭まったら現在の段階から判定し直す。`resetKey` が変わったら段階 0 に戻す。
+- コンテナの幅の変化を `useResizeObserver` で検知する。広がったら段階 0 から、狭まったら現在の段階から判定し直す。`resetKey` が変わったら段階 0 に戻す。
 - 段階の意味（何をどう畳むか）は持たない。両画面は `usePathCollapseLevel(parsed, highlightedPath?)` 経由で使い、これが `parsePagePath` の結果から最大段階を取り出し、パスとハイライトを `resetKey` にする（ハイライトは太字で幅が変わるため、同じページでもハイライトが変われば基本形から判定し直す）。
 - ResizeObserver の無い環境では幅の変化を検知しないだけで、初回の判定は行う。
 - 幅の変化は「段階を決めたときのコンテナ幅」と比べて判断する。同じ幅の通知（監視開始直後の通知を含む）は無視し、全行が判定をやり直さないようにする。段階を決めてから監視が始まるまでの間に幅が変わっていても取りこぼさない。描画のたびに溢れを確認する処理は「今の段階で溢れるか」しか見ないので、そのときの幅が段階を決めたときより広ければ、その幅を記録するだけで済ませず段階 0 から判定し直す（狭まった通知の反映前に幅が広がった場合に、畳んだまま戻らなくなるのを防ぐ）。

@@ -5,9 +5,8 @@ import {
   useRef,
   useState,
 } from 'react';
-import { useIsomorphicLayoutEffect } from 'usehooks-ts';
+import { useIsomorphicLayoutEffect, useResizeObserver } from 'usehooks-ts';
 
-import { observeElementWidth } from './shared-resize-observer';
 import { subscribeWebFontsLoaded } from './web-fonts-loaded';
 
 export interface FittingCollapseLevel {
@@ -116,7 +115,8 @@ export const useFittingCollapseLevel = (
     }
   });
 
-  const onResize = useCallback((width: number) => {
+  const onResize = useCallback(({ width }: { width?: number }) => {
+    if (width == null) return;
     const action = resolveResizeAction(fittedWidthRef.current, width);
     if (action === 'ignore') return;
     fittedWidthRef.current = width;
@@ -127,11 +127,7 @@ export const useFittingCollapseLevel = (
     }));
   }, []);
 
-  useEffect(() => {
-    const container = containerRef.current;
-    if (container == null) return;
-    return observeElementWidth(container, onResize);
-  }, [onResize]);
+  useResizeObserver({ ref: containerRef, onResize });
 
   // A web font that finishes loading after fitting changes the text width but
   // not the container width, so no resize notification arrives. Re-fit from the
