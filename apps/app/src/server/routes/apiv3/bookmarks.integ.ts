@@ -420,3 +420,87 @@ describe('GET /bookmarks/:userId', () => {
     });
   });
 });
+
+describe('GET /bookmarks/info', () => {
+  const seedOwnerOnlyPage = (
+    owner: HydratedDocument<IUser>,
+  ): Promise<HydratedDocument<PageDocument>> => {
+    return seedPage({
+      path: '/owner-only-page',
+      creator: owner,
+      grant: PageGrant.GRANT_OWNER,
+      grantedUsers: [owner],
+    });
+  };
+
+  it('returns 404 without bookmark info for a page the viewer cannot see', async () => {
+    const owner = await seedUser('owner');
+    const outsider = await seedUser('outsider');
+    const page = await seedOwnerOnlyPage(owner);
+    await seedBookmark(owner, page);
+    currentUser = outsider;
+
+    const res = await request(app).get(`/info?pageId=${page._id.toString()}`);
+
+    expect(res.status).toBe(404);
+    expect(res.body.bookmarkedUsers).toBeUndefined();
+    expect(res.body.sumOfBookmarks).toBeUndefined();
+  });
+
+  it('returns 404 without bookmark info for a guest on a non-public page', async () => {
+    const owner = await seedUser('owner');
+    const page = await seedOwnerOnlyPage(owner);
+    await seedBookmark(owner, page);
+    currentUser = undefined;
+
+    const res = await request(app).get(`/info?pageId=${page._id.toString()}`);
+
+    expect(res.status).toBe(404);
+    expect(res.body.bookmarkedUsers).toBeUndefined();
+    expect(res.body.sumOfBookmarks).toBeUndefined();
+  });
+
+  it('responds to a nonexistent page the same way as to a forbidden one', async () => {
+    const outsider = await seedUser('outsider');
+    currentUser = outsider;
+
+    const res = await request(app).get(
+      `/info?pageId=${new mongoose.Types.ObjectId().toString()}`,
+    );
+
+    expect(res.status).toBe(404);
+  });
+
+  it('returns bookmark info for a non-public page the viewer can see', async () => {
+    const owner = await seedUser('owner');
+    const page = await seedOwnerOnlyPage(owner);
+    await seedBookmark(owner, page);
+    currentUser = owner;
+
+    const res = await request(app).get(`/info?pageId=${page._id.toString()}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.sumOfBookmarks).toBe(1);
+    expect(res.body.isBookmarked).toBe(true);
+    expect(res.body.bookmarkedUsers.map((u: { _id: string }) => u._id)).toEqual(
+      [owner._id.toString()],
+    );
+  });
+
+  it('returns bookmark info for a public page to another user', async () => {
+    const owner = await seedUser('owner');
+    const viewer = await seedUser('viewer');
+    const page = await seedPage({ path: '/public-page', creator: owner });
+    await seedBookmark(owner, page);
+    currentUser = viewer;
+
+    const res = await request(app).get(`/info?pageId=${page._id.toString()}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.sumOfBookmarks).toBe(1);
+    expect(res.body.isBookmarked).toBe(false);
+    expect(res.body.bookmarkedUsers.map((u: { _id: string }) => u._id)).toEqual(
+      [owner._id.toString()],
+    );
+  });
+});

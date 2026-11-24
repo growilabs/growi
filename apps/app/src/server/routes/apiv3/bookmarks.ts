@@ -1,4 +1,5 @@
 import { SCOPE } from '@growi/core/dist/interfaces';
+import { ErrorV3 } from '@growi/core/dist/models';
 import {
   isUserPage,
   isUsersTopPage,
@@ -153,7 +154,24 @@ export const setup = (crowi: Crowi): Router => {
         pageId: '',
       };
 
+      const Page: PageModel = mongoose.model<
+        HydratedDocument<PageDocument>,
+        PageModel
+      >('Page');
+
       try {
+        const page = await Page.findByIdAndViewer(pageId, user);
+        // Uniform 404 for forbidden and nonexistent pages — see rules/page-write-action-403-404.md
+        if (page == null) {
+          return res.apiv3Err(
+            new ErrorV3(
+              `Page '${pageId}' is not found or forbidden`,
+              'notfound_or_forbidden',
+            ),
+            404,
+          );
+        }
+
         const bookmarks = await prisma.bookmarks.findMany({
           where: { pageId: pageId },
           include: { user: true },
@@ -170,7 +188,6 @@ export const setup = (crowi: Crowi): Router => {
         return res.apiv3Err(err, 500);
       }
 
-      // guest user only get bookmark count
       if (user == null) {
         return res.apiv3(responsesParams);
       }
