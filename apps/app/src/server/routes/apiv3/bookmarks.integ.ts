@@ -89,6 +89,9 @@ const addUserToGroup = async (
 const bookmarkedPageIds = (res: SupertestResponse): string[] =>
   res.body.userRootBookmarks.map((b: { page: { _id: string } }) => b.page._id);
 
+const bookmarkedUserIds = (res: SupertestResponse): string[] =>
+  res.body.bookmarkedUsers.map((u: { _id: string }) => u._id);
+
 interface TestRequest extends Request {
   user?: HydratedDocument<IUser>;
   crowi?: Crowi;
@@ -480,9 +483,7 @@ describe('GET /bookmarks/info', () => {
     expect(res.status).toBe(200);
     expect(res.body.sumOfBookmarks).toBe(1);
     expect(res.body.isBookmarked).toBe(true);
-    expect(res.body.bookmarkedUsers.map((u: { _id: string }) => u._id)).toEqual(
-      [owner._id.toString()],
-    );
+    expect(bookmarkedUserIds(res)).toEqual([owner._id.toString()]);
   });
 
   it('returns bookmark info for an empty page, which can be bookmarked', async () => {
@@ -500,9 +501,7 @@ describe('GET /bookmarks/info', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.sumOfBookmarks).toBe(1);
-    expect(res.body.bookmarkedUsers.map((u: { _id: string }) => u._id)).toEqual(
-      [owner._id.toString()],
-    );
+    expect(bookmarkedUserIds(res)).toEqual([owner._id.toString()]);
   });
 
   it('returns bookmark info for a public page to another user', async () => {
@@ -517,9 +516,7 @@ describe('GET /bookmarks/info', () => {
     expect(res.status).toBe(200);
     expect(res.body.sumOfBookmarks).toBe(1);
     expect(res.body.isBookmarked).toBe(false);
-    expect(res.body.bookmarkedUsers.map((u: { _id: string }) => u._id)).toEqual(
-      [owner._id.toString()],
-    );
+    expect(bookmarkedUserIds(res)).toEqual([owner._id.toString()]);
   });
 
   it('returns bookmark info for a group-restricted page to a fellow member', async () => {
@@ -540,9 +537,7 @@ describe('GET /bookmarks/info', () => {
     const res = await request(app).get(`/info?pageId=${page._id.toString()}`);
 
     expect(res.status).toBe(200);
-    expect(res.body.bookmarkedUsers.map((u: { _id: string }) => u._id)).toEqual(
-      [owner._id.toString()],
-    );
+    expect(bookmarkedUserIds(res)).toEqual([owner._id.toString()]);
   });
 
   it('returns bookmark info for an "anyone with the link" page to another user', async () => {
@@ -559,8 +554,6 @@ describe('GET /bookmarks/info', () => {
     const res = await request(app).get(`/info?pageId=${page._id.toString()}`);
 
     expect(res.status).toBe(200);
-    expect(res.body.bookmarkedUsers.map((u: { _id: string }) => u._id)).toEqual(
-      [owner._id.toString()],
-    );
+    expect(bookmarkedUserIds(res)).toEqual([owner._id.toString()]);
   });
 });
