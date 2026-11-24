@@ -294,8 +294,7 @@ export function createVaultMaintenanceScheduler(): VaultMaintenanceScheduler {
 
   /**
    * Iterates all namespace state documents and squashes any namespace that
-   * exceeds the commit-count or age threshold.  Skips namespaces that are
-   * currently in-flight (being processed by VaultNamespaceBuilder).
+   * exceeds the commit-count or age threshold.
    *
    * Eligible namespaces are squashed concurrently (Promise.all) because each
    * namespace holds its own independent git ref and DB document.  The

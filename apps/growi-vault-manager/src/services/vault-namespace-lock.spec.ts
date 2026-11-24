@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import { withNamespaceLock } from './vault-namespace-lock.js';
 
@@ -7,13 +7,25 @@ interface Deferred {
   readonly resolve: () => void;
 }
 
+// The lock is module-wide state; a gate left open by a failed assertion
+// would stall every later test on the same namespace.
+const openGates: Deferred[] = [];
+
 function createDeferred(): Deferred {
   let resolve: () => void = () => {};
   const promise = new Promise<void>((r) => {
     resolve = r;
   });
-  return { promise, resolve };
+  const deferred = { promise, resolve: () => resolve() };
+  openGates.push(deferred);
+  return deferred;
 }
+
+afterEach(() => {
+  for (const gate of openGates.splice(0)) {
+    gate.resolve();
+  }
+});
 
 /** Lets every already-settled promise continuation run. */
 async function flush(): Promise<void> {

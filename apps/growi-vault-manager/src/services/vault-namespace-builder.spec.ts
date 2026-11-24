@@ -8,7 +8,7 @@
  */
 
 import type { VaultInstructionDoc } from '@growi/core/dist/interfaces/vault';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ---------------------------------------------------------------------------
 // Mocks — must be declared before importing the module under test
@@ -792,6 +792,16 @@ describe('isExcludedFromVault filtering', () => {
 // ---------------------------------------------------------------------------
 
 describe('namespace lock', () => {
+  // The lock is module-wide state; a holder left open by a failed assertion
+  // would stall every later test on the same namespace.
+  const openHolders: Array<() => void> = [];
+
+  afterEach(() => {
+    for (const release of openHolders.splice(0)) {
+      release();
+    }
+  });
+
   /** Holds the lock on the given namespaces until the returned release runs. */
   function holdNamespaces(namespaces: string[]): {
     release: () => void;
@@ -805,6 +815,7 @@ describe('namespace lock', () => {
           release = r;
         }),
     );
+    openHolders.push(() => release());
     return { release: () => release(), held };
   }
 
