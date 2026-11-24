@@ -16,7 +16,7 @@
 
 ### Non-Goals
 
-- リクエストボディ・ヘッダ・ログ、GROWI から外へ出るリクエスト、HTTP 以外の instrumentation の属性。
+- リクエストボディ・ヘッダ・ログ、GROWI から外へ出るリクエスト、HTTP 以外の instrumentation の属性（Next.js のサーバー側の span の `http.target` を除く）。
 - ページパスのハッシュの強化（辞書攻撃への耐性）。既存の 16 桁ハッシュの形式を維持する。
 - 受信側（監視基盤）のダッシュボードの変更。
 
@@ -27,19 +27,20 @@
 - `startIncomingSpanHook` の実装（`httpInstrumentationConfig`）と、そこから先の匿名化処理すべて。
 - 匿名化の規則の宣言（パスの規則、全 URL 共通で匿名化するクエリパラメータ名）と、その実行関数。
 - 匿名化した値を URL 属性（`http.target`、`http.url`、`url.path`、`url.query`）へ反映する処理（PR #12151 で導入済みのもの）。
+- HTTP の計測部品以外（Next.js）が作るサーバー側の span の `http.target` を匿名化する SpanProcessor（`serverSpanAnonymizer`）。
 - 匿名化対象の一覧表（`requirements.md`「匿名化対象一覧」）と、一覧表・宣言・テスト・実在するルートの突き合わせ。
 - `semconv.ts` への匿名化用の属性名の定数の追加。
 
 ### Out of Boundary
 
-- NodeSDK の初期化、`otel:anonymizeInBestEffort` を読んで HTTP instrumentation に `httpInstrumentationConfig` を渡すかどうかの判断（`opentelemetry` spec。要件 1.2 はこの既存の振る舞いに依存する）。
+- NodeSDK の初期化、`otel:anonymizeInBestEffort` を読んで HTTP instrumentation に `httpInstrumentationConfig` を、span processor の列に `serverSpanAnonymizer` を渡すかどうかの判断（`opentelemetry` spec。要件 1.2 はこの既存の振る舞いに依存する）。
 - `@growi/core` のページパス関連の関数（`isCreatablePage`、`isPermalink`、`isUserPage`、`getUsernameByPath`）と `AllLang` の仕様。
 - GROWI サーバーのルート定義そのもの。本 spec は照合するだけで、ルートを変えない。
 - `tools/snapshot-route-middleware.ts` の出力形式（ルート列挙の処理を共有するだけ）。
 
 ### Allowed Dependencies
 
-- `@opentelemetry/api`（`diag`）、`@opentelemetry/instrumentation-http`（型と hook の呼び出し規約）、`@opentelemetry/semantic-conventions`（stable な属性名のみ）。
+- `@opentelemetry/api`（`diag`、`SpanKind`）、`@opentelemetry/instrumentation-http`（型と hook の呼び出し規約）、`@opentelemetry/sdk-trace-node`（`SpanProcessor` の型。テストでは tracer provider と in-memory exporter）、`@opentelemetry/semantic-conventions`（stable な属性名のみ）。
 - `@growi/core/dist/utils/page-path-utils`、`@growi/core` の `AllLang`。
 - Node.js 標準モジュール `node:crypto`、`node:http`、`node:tls`。
 - テストのみ: `vitest`、`vitest-mock-extended`、`test/setup/crowi.ts`、`src/test-utils/express-route-walker.ts`。
@@ -53,6 +54,7 @@
 - Next.js のメジャー更新、または i18n・basePath・trailingSlash の設定変更 → データ URL の形が変わる。
 - `@growi/core` の `isCreatablePage` の禁止パターン、`isPermalink`、`AllLang` の変更。
 - `@opentelemetry/instrumentation-http` が URL を記録する属性の変更（semconv の更新）。
+- Next.js の更新で、サーバー側の span に記録する URL 属性が変わる（`http.target` 以外の URL 属性の追加、または `http.target` を span の開始後に設定するようになる）→ `serverSpanAnonymizer` が書き換えられず平文で残る。単体テストでは検出できないため、ローカルの Collector で Next.js の span（`next.span_type` が `BaseServer.handleRequest`）の属性を確かめる。
 - Express 5 への移行 → ルート列挙の処理（`app._router`）が動かなくなる。
 - Mongoose instrumentation に `dbStatementSerializer` を設定する、または MongoDB instrumentation の `enhancedDatabaseReporting` を有効にする → DB の span に値が記録されるため、本 spec の範囲外で別途の対策が要る。
 
@@ -78,6 +80,8 @@ graph LR
     Rules --> Pattern
     Rules --> Hash
     Coverage[coverage examples] --> Rules
+    Proc[anonymize-server-spans] --> Exec
+    Proc --> Rules
 ```
 
 - **パターン**: 規則の宣言（何を匿名化するか）と実行関数（どう適用するか）を分ける。実行関数は規則を引数で受け取り、規則のモジュールを import しない（`.claude/rules/coding-style.md`「Executors Take Their Work-Set as Input」）。
@@ -98,8 +102,10 @@ graph LR
 
 ```
 apps/app/src/features/opentelemetry/server/anonymization/
-├── index.ts                         # Barrel: httpInstrumentationConfig のみ公開（変更なし）
+├── index.ts                         # Barrel: httpInstrumentationConfig と serverSpanAnonymizer を公開
 ├── anonymize-http-requests.ts       # Hook 本体: URL を実行関数に渡し、結果を URL 属性に反映する（変更）
+├── anonymize-server-spans.ts        # SpanProcessor: Next.js などのサーバー側の span の http.target を実行関数に通す
+├── anonymize-server-spans.spec.ts   # 実際の tracer provider で、HTTP の span と同じ値になること・二重に匿名化しないことのテスト
 ├── anonymize-url.ts                 # 実行関数: 規則を受け取り、URL を匿名化した文字列（または null）を返す（新規）
 ├── anonymize-url.spec.ts            # 実行関数の単体テスト（小さな規則の fixture で）（新規）
 ├── coverage.spec.ts                 # 一覧表の網羅テスト: 全 coverage example を hook に通す／requirements.md と ID を突き合わせる（新規）
@@ -181,6 +187,7 @@ sequenceDiagram
 | 1.2 | 無効時は書き換えない | （`opentelemetry` spec の NodeSdkConfiguration が hook を渡さない） | — | — |
 | 1.3, 1.4 | `http.url`・`url.path`・`url.query` への反映 | UrlAttributeBuilder（#12151） | `buildUrlAttributes` | System Flows |
 | 1.5 | 当てはまらない URL は書き換えない | AnonymizeUrl | `anonymizeUrl` が null を返す | System Flows |
+| 1.6 | Next.js のサーバー側の span | ServerSpanAnonymizer, AnonymizeUrl | `serverSpanAnonymizer` | — |
 | 2.1–2.3 | 一覧表の記載 | AnonymizationCoverageTable（requirements.md）, CoverageExamples | `CoverageExample` | — |
 | 2.4, 2.5 | 一覧表どおりに匿名化する／残す | AnonymizationRules, AnonymizeUrl, RecordedTarget | `PathRule`, `anonymizeUrl`, `toRecordedTarget` | — |
 | 3.1, 3.2 | 一覧表の各行のテスト、ずれで失敗 | CoverageSpec | `CoverageExample` | — |
@@ -201,6 +208,7 @@ sequenceDiagram
 | Component | Domain/Layer | Intent | Req Coverage | Key Dependencies (P0/P1) | Contracts |
 |-----------|--------------|--------|--------------|--------------------------|-----------|
 | HttpAnonymizationHook | Adapter | instrumentation-http から呼ばれ、実行関数と URL 属性の組み立てをつなぐ | 1.1, 1.3–1.5 | AnonymizeUrl (P0), UrlAttributeBuilder (P0) | Service |
+| ServerSpanAnonymizer | Adapter | HTTP の計測部品以外が作るサーバー側の span の `http.target` を、開始時に実行関数に通す | 1.6 | AnonymizeUrl (P0) | Service |
 | AnonymizeUrl | Executor | 規則を受け取り、URL を匿名化する | 1.1, 1.5, 2.4, 2.5, 8.1, 8.2, 9.2 | RecordedTarget, HashPagePath, PathPattern, AnonymizeQueryParams (P0) | Service |
 | AnonymizationRules | Declaration | パスの規則と共通パラメータ名を宣言する | 2.4, 2.5, 4–7 | PathPattern, HashPagePath (P0) | State |
 | CoverageExamples | Declaration | 一覧表の各行を、テストできる例として宣言する | 2.1–2.3, 3.1, 9.2 | — | State |
@@ -248,7 +256,14 @@ export const anonymizeUrl = (
 #### HttpAnonymizationHook（`anonymize-http-requests.ts`）
 
 - `startIncomingSpanHook(request)` は `anonymizeUrl(request.url ?? '', ANONYMIZATION_RULES)` を呼び、`null` なら `{}` を返す。そうでなければ `{ 'http.target': target, ...buildUrlAttributes(request, target, isStableHttpSemconvEnabled(process.env.OTEL_SEMCONV_STABILITY_OPT_IN)) }` を返す。
-- 公開面は `httpInstrumentationConfig` のみ（`index.ts` は変えない）。
+
+#### ServerSpanAnonymizer（`anonymize-server-spans.ts`）
+
+- Next.js は受け取ったリクエストについて自分の tracer（instrumentation scope `next.js`）でもサーバー側の span を作り、`http.target` に生の `req.url` を記録する。`startIncomingSpanHook` は HTTP の計測部品の span にしか効かないため、この span は SpanProcessor で扱う。
+- `onStart(span)`: span の種類が `SERVER` で、instrumentation scope が HTTP の計測部品のもの（`HttpInstrumentation` の `instrumentationName` から取り、パッケージ側の名前の変更に追従する）でなく、`http.target` が文字列なら、`anonymizeUrl(target, ANONYMIZATION_RULES)` の結果で `http.target` を上書きする（`null` なら書き換えない）。HTTP の計測部品の span は開始時点で hook が匿名化した値を持っているため除外する。
+- Next.js は `http.target` を span の作成時の属性として渡すので、`onStart` の時点で値が入っている。ほかの URL 属性（`http.url`、`url.path`、`url.query`）は記録しないため扱わない（Revalidation Triggers）。
+- 同じ規則・同じ実行関数を使うので、同じリクエストの 2 つの span は同じハッシュ値になる。
+- 公開面は `httpInstrumentationConfig` と `serverSpanAnonymizer`。
 
 ### Declaration
 
@@ -398,6 +413,7 @@ export const listRegisteredRoutes: (app: { _router: unknown }) => readonly Regis
   - `requirements.md` の「匿名化対象一覧」の行 ID の集合と、`CoverageExample` の ID の集合が一致すること（3.2）。ファイルの場所は 1 つの定数にまとめる。
   - すべてのパスの規則と `sensitive-query-params` が、少なくとも 1 つの例から参照されていること（3.2）。
 - **ルート照合テスト（`coverage-routes.integ.ts`）**: `route` を持つすべての例について、その `(method, route)` が登録済みのルートに等しさで含まれること（3.3）。実装前に、架空のルートを例に加えて失敗することを確かめ、元に戻す。
+- **SpanProcessor のテスト（`anonymize-server-spans.spec.ts`）**: 実際の tracer provider と in-memory exporter で、Next.js の scope のサーバー側の span の `http.target` が hook と同じ値になること（1.6）、利用者データを含まない URL は変わらないこと、HTTP の計測部品の span の匿名化済みの値をもう一度匿名化しないこと、サーバー側でない span を変えないこと。
 - **実行関数の単体テスト（`anonymize-url.spec.ts`）**: 小さな規則の fixture で、規則の順序（最初に当てはまったものだけ）、パスとクエリの独立（8.1、8.2）、変化なしで `null`（1.5）、データ URL の中のパスへの再適用、例外時の固定値。
 - **ユーティリティの単体テスト**: `hash-page-path`（変更前のハッシュ値の固定、ユーザーページ、壊れたエンコード）、`path-pattern`、`anonymize-query-params`（同じ名前の繰り返し、`name[]`・`name[0]`（エンコードされた `name%5B0%5D` を含む）、JSON 配列、ほかの区切りが変わらないこと）。
 - **変更前との比較（実装のタスク内、コミットしない）**: 変更前の handler と新しい規則に 70 件以上の URL を流し、「変更前に匿名化されていて変更後に平文」が 0 件、ASCII のページパスのハッシュ値が同じであることを確かめ、結果を PR に記載する。

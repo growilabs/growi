@@ -8,6 +8,7 @@ import type { Resource } from '@opentelemetry/resources';
 import { resourceFromAttributes } from '@opentelemetry/resources';
 import { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
 import type { NodeSDKConfiguration } from '@opentelemetry/sdk-node';
+import { BatchSpanProcessor } from '@opentelemetry/sdk-trace-node';
 import {
   ATTR_SERVICE_NAME,
   ATTR_SERVICE_VERSION,
@@ -16,7 +17,10 @@ import {
 import { configManager } from '~/server/service/config-manager';
 import { getGrowiVersion } from '~/utils/growi-version';
 
-import { httpInstrumentationConfig as httpInstrumentationConfigForAnonymize } from './anonymization';
+import {
+  httpInstrumentationConfig as httpInstrumentationConfigForAnonymize,
+  serverSpanAnonymizer,
+} from './anonymization';
 import { ATTR_SERVICE_INSTANCE_ID } from './semconv';
 
 type Option = {
@@ -45,7 +49,10 @@ export const generateNodeSDKConfiguration = (opts?: Option): Configuration => {
 
     configuration = {
       resource,
-      traceExporter: new OTLPTraceExporter(),
+      spanProcessors: [
+        ...(opts?.enableAnonymization ? [serverSpanAnonymizer] : []),
+        new BatchSpanProcessor(new OTLPTraceExporter()),
+      ],
       metricReader: new PeriodicExportingMetricReader({
         exporter: new OTLPMetricExporter(),
         exportIntervalMillis: 300000, // 5 minute
