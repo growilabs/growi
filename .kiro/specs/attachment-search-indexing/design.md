@@ -393,6 +393,7 @@ sequenceDiagram
     Svc->>Svc: 見えるページの添付ヒットだけを点数順に並べ、pageId ごとにまとめて from〜from+size 番目のページを返す
     Note over Svc: 検索か権限確認が失敗・800ms 超過なら空 items + primaryResultIncomplete: true
     Svc-->>Api: IPrimarySearchResult
+    Note over Api: 以下は SearchService.searchByFacet の中 (route は searchByFacet を 1 回呼ぶ)
     Api->>Api: findPageListByIds でページ文書を読み、data に入れる (MongoDB に無いページの項目は落とす)
     Api->>Del: 返すページの id に絞ったページ検索 (検索語 + 演算子 + viewer filter + ids + 強調表示)
     Del->>ES: page_index search
@@ -406,7 +407,7 @@ sequenceDiagram
 - 権限判定は、1 回の往復で窓の中の unique pageId (最大 200 件) を `searchAccessiblePages` に渡す。結果は「見えるヒットだけを並べた列」の上で決めるので、窓が 200 件に達するまでは、見えないヒットがあっても無くても同じ結果になる。200 件より下位にある見えるヒットには届かない
 - `meta.total` は常に null、`primaryResultIncomplete` は検索か権限確認が失敗 (800ms 超過を含む) したときだけ true。権限で落ちた件数に応じて変わる値は返さない
 - 「続きを読み込む」の終わりは、`meta.hitsCount` が `limit` に満たないことで判定できる。窓はどの `offset` でも上位 200 件で頭打ちになり、各要求が同じ範囲を見るので、短い応答の後に続きは出ない (research.md 14.1)
-- 各項目の `data` は、ページ検索と同じ形のページ文書である。route が `findPageListByIds` で読み、`lastUpdateUser` を `serializeUserSecurely` で直し、`seenUserCount` を入れる (ページ検索の `formatSearchResult` と同じ処理)。MongoDB に無いページの項目は落とす。`meta.hitsCount` は落とす前の項目数にする (ページ検索の `hitsCount` と同じ数え方。落としたことで続きの読み込みが止まらないように)。下流の画面は、ページ検索と同じ一覧とプレビューの部品でこの結果を描く (Req 9.7、research.md 14.1)
+- 各項目の `data` は、ページ検索と同じ形のページ文書である。`SearchService` が `findPageListByIds` で読み、`lastUpdateUser` を `serializeUserSecurely` で直し、`seenUserCount` を入れる (ページ検索の `formatSearchResult` と同じ処理)。MongoDB に無いページの項目は落とす。`meta.hitsCount` は落とす前の項目数にする (ページ検索の `hitsCount` と同じ数え方。落としたことで続きの読み込みが止まらないように)。下流の画面は、ページ検索と同じ一覧とプレビューの部品でこの結果を描く (Req 9.7、research.md 14.1)
 - ページのパス・本文・コメントも検索語に一致する項目には、ページ検索と同じ抜粋 (`meta.elasticSearchResult` の `snippet` / `highlightedPath`) を入れる。返すページの id (最大 `limit` 件) に絞って、ページ検索と同じ組み立て (`appendCriteriaForQueryString`・`appendCriteriaForGroupFilter`・`filterPagesByViewer`・`appendHighlight`) で page_index を 1 回検索する。抜粋の作り方 (`canShowSnippet`、`filterXss`) は `formatSearchResult` と共有する。権限確認の `searchAccessiblePages` には相乗りさせない (役割を混ぜない)。検索語に一致しないページは返ってこないので、抜粋は付かない。この検索が失敗するか時間の上限 (500ms) を超えたときは、抜粋を付けずに項目を返し、ログに残す。抜粋は項目の補足であり、無くても項目は正しいため (research.md 14.3)
 - `sort` / `order` / `type` は適用しない (点数順だけ)
 
@@ -1540,5 +1541,5 @@ flowchart LR
 2. **`packages/attachment-text-extractor-client` の公開境界**: server 専用依存として apps/app から import し、UI 側に混入させないレイヤリング制約を lint ルール化するか検討
 3. **`requiresReindex` cardinality agg の共有 ES コスト**: 30 秒のキャッシュはインスタンスごとに独立しているので、複数インスタンスでは admin GET のたびに各インスタンスが集計を投げうる。`precision_threshold` の指定、共有のキャッシュ、MongoDB 上の件数の記録への置き換えのどれかを、リリース後に検討する
 4. **複数インスタンスでの作り直し**: 実行中の判定と、作り直し中の削除の記録はインスタンスごとのメモリにある (research.md 8.6 の「残っている制約」)
-5. **残っている作業**: tasks.md の未完了のタスク (3.4 監視メトリクス、13 下流の画面のための追加)
+5. **残っている作業**: tasks.md の未完了のタスク (3.4 監視メトリクス)
 6. **環境変数の固定と `PUT /config`**: 4 つのキーが環境変数で固定されていても、`PUT /config` は保存を受け付ける (値は使われない)。下流の画面は保存の操作を出さない。API を直接使う場合に断るかどうかは未定
