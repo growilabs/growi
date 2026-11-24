@@ -17,6 +17,9 @@ const RECOUNT_WRAPPER_BATCH_SIZE = 200;
 // and splits the work into several recursive passes above PAGES_LIMIT = 1000.
 const NORMALIZE_BATCH_SIZE = 100;
 const NORMALIZE_PAGES_LIMIT = 1000;
+// The recursive passes only start above PAGES_LIMIT orphans, so the tests that
+// reach them seed over 2000 pages; that exceeds the default 5 s on CI runners.
+const RECURSIVE_PASS_TEST_TIMEOUT_MS = 20_000;
 
 const countingOnBatchStart = () => {
   let calls = 0;
@@ -194,54 +197,64 @@ describe('PageService descendant batch processing: onBatchStart and error propag
       expect(await countOrphans(orphanPaths)).toBe(orphanPaths.length);
     });
 
-    it('keeps calling onBatchStart in the passes after the first one', async () => {
-      const nOrphans = NORMALIZE_PAGES_LIMIT + 1;
-      const { orphanPaths } = await seedOrphans(
-        `${PATH_ROOT}/bp-normalize-multi-pass`,
-        nOrphans,
-      );
-      const { onBatchStart, getCalls } = countingOnBatchStart();
+    it(
+      'keeps calling onBatchStart in the passes after the first one',
+      async () => {
+        const nOrphans = NORMALIZE_PAGES_LIMIT + 1;
+        const { orphanPaths } = await seedOrphans(
+          `${PATH_ROOT}/bp-normalize-multi-pass`,
+          nOrphans,
+        );
+        const { onBatchStart, getCalls } = countingOnBatchStart();
 
-      await crowi.pageService.normalizeParentRecursively(
-        [`${PATH_ROOT}/bp-normalize-multi-pass`],
-        user,
-        true,
-        false,
-        onBatchStart,
-      );
-
-      expect(await countOrphans(orphanPaths)).toBe(0);
-      expect(getCalls()).toBeGreaterThanOrEqual(
-        Math.ceil(nOrphans / NORMALIZE_BATCH_SIZE),
-      );
-    });
-
-    it('rejects with the error thrown by onBatchStart in a later pass', async () => {
-      await seedOrphans(
-        `${PATH_ROOT}/bp-normalize-multi-pass-err`,
-        NORMALIZE_PAGES_LIMIT + 1,
-      );
-      const error = new Error('onBatchStart failed in a later pass');
-      // Above PAGES_LIMIT the first pass takes well under half of the orphans,
-      // so this call lands in a recursive pass.
-      const failingCall =
-        Math.ceil(NORMALIZE_PAGES_LIMIT / 2 / NORMALIZE_BATCH_SIZE) + 1;
-      let calls = 0;
-      const onBatchStart = (): Promise<void> => {
-        calls++;
-        return calls >= failingCall ? Promise.reject(error) : Promise.resolve();
-      };
-
-      await expect(
-        crowi.pageService.normalizeParentRecursively(
-          [`${PATH_ROOT}/bp-normalize-multi-pass-err`],
+        await crowi.pageService.normalizeParentRecursively(
+          [`${PATH_ROOT}/bp-normalize-multi-pass`],
           user,
           true,
           false,
           onBatchStart,
-        ),
-      ).rejects.toBe(error);
-    });
+        );
+
+        expect(await countOrphans(orphanPaths)).toBe(0);
+        expect(getCalls()).toBeGreaterThanOrEqual(
+          Math.ceil(nOrphans / NORMALIZE_BATCH_SIZE),
+        );
+      },
+      RECURSIVE_PASS_TEST_TIMEOUT_MS,
+    );
+
+    it(
+      'rejects with the error thrown by onBatchStart in a later pass',
+      async () => {
+        await seedOrphans(
+          `${PATH_ROOT}/bp-normalize-multi-pass-err`,
+          NORMALIZE_PAGES_LIMIT + 1,
+        );
+        const error = new Error('onBatchStart failed in a later pass');
+        // Above PAGES_LIMIT the first pass takes well under half of the orphans,
+        // so this call lands in a recursive pass.
+        const failingCall =
+          Math.ceil(NORMALIZE_PAGES_LIMIT / 2 / NORMALIZE_BATCH_SIZE) + 1;
+        let calls = 0;
+        const onBatchStart = (): Promise<void> => {
+          calls++;
+          return calls >= failingCall
+            ? Promise.reject(error)
+            : Promise.resolve();
+        };
+
+        await expect(
+          crowi.pageService.normalizeParentRecursively(
+            [`${PATH_ROOT}/bp-normalize-multi-pass-err`],
+            user,
+            true,
+            false,
+            onBatchStart,
+          ),
+        ).rejects.toBe(error);
+      },
+      RECURSIVE_PASS_TEST_TIMEOUT_MS,
+    );
 
     it('rejects with a DB error raised inside a batch', async () => {
       await seedOrphans(`${PATH_ROOT}/bp-normalize-db-err`, 3);
