@@ -1,4 +1,3 @@
-import type { EventEmitter } from 'node:events';
 import type { IUserHasId } from '@growi/core';
 import { PageGrant } from '@growi/core';
 import type { HydratedDocument } from 'mongoose';
@@ -87,7 +86,7 @@ describe('notifyDuplicateInterrupted', () => {
     await notifyDuplicateInterrupted(
       {
         activityService: crowi.activityService,
-        activityEvent: crowi.events.activity as EventEmitter,
+        activityEvent: crowi.events.activity,
       },
       {
         userId: String(actor._id),

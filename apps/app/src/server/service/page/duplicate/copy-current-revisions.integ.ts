@@ -27,11 +27,13 @@ const countWithExpectedTypes = (id: string): Promise<number> =>
   });
 
 const seedRevision = async (input: {
+  readonly id?: string;
   readonly pageId: string;
   readonly body: string;
   readonly authorId: string;
+  readonly createdAt?: Date;
 }): Promise<string> => {
-  const id = newId();
+  const id = input.id ?? newId();
   // Same shape as the revisions the descendant duplication has written so far.
   await prisma.revisions.createMany({
     data: [
@@ -41,6 +43,7 @@ const seedRevision = async (input: {
         body: input.body,
         authorId: input.authorId,
         format: 'markdown',
+        createdAt: input.createdAt,
       },
     ],
   });
@@ -98,6 +101,7 @@ describe('copyCurrentRevisions', () => {
       pageId: newId(),
       body: 'values body',
       authorId: sourceAuthorId,
+      createdAt: new Date('2020-01-01T00:00:00Z'),
     });
     const entry: RevisionCopyEntry = {
       sourceRevisionId,
@@ -152,6 +156,62 @@ describe('copyCurrentRevisions', () => {
     expect(copies[0]).toMatchObject({
       id: entry.newRevisionId,
       body: 'latest body',
+    });
+  });
+
+  it('gives the copy the markdown format when the source revision has no format', async () => {
+    // Revisions stored before the format field existed lack it.
+    const sourceRevisionId = newId();
+    await revisionsCollection().insertOne({
+      _id: new Types.ObjectId(sourceRevisionId),
+      pageId: new Types.ObjectId(),
+      body: 'legacy body',
+      author: new Types.ObjectId(sourceAuthorId),
+      createdAt: new Date(),
+    });
+    const entry: RevisionCopyEntry = {
+      sourceRevisionId,
+      newRevisionId: newId(),
+      newPageId: newId(),
+    };
+    track(sourceRevisionId, entry.newRevisionId);
+
+    await copyCurrentRevisions([entry], duplicatingUserId, async () => {});
+
+    const copied = await revisionsCollection().findOne({
+      _id: new Types.ObjectId(entry.newRevisionId),
+    });
+    expect(copied?.format).toBe('markdown');
+  });
+
+  it('rejects, leaving the stored revision as it is, when a revision with the new id already exists', async () => {
+    const sourceRevisionId = await seedRevision({
+      pageId: newId(),
+      body: 'source body',
+      authorId: sourceAuthorId,
+    });
+    const occupiedPageId = newId();
+    const newRevisionId = await seedRevision({
+      pageId: occupiedPageId,
+      body: 'existing body',
+      authorId: sourceAuthorId,
+    });
+    track(sourceRevisionId, newRevisionId);
+
+    await expect(
+      copyCurrentRevisions(
+        [{ sourceRevisionId, newRevisionId, newPageId: newId() }],
+        duplicatingUserId,
+        async () => {},
+      ),
+    ).rejects.toThrow();
+
+    expect(
+      await prisma.revisions.findUnique({ where: { id: newRevisionId } }),
+    ).toMatchObject({
+      pageId: occupiedPageId,
+      body: 'existing body',
+      authorId: sourceAuthorId,
     });
   });
 

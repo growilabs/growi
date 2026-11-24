@@ -11,6 +11,7 @@ import UserGroup from '~/server/models/user-group';
 import UserGroupRelation from '~/server/models/user-group-relation';
 import { prisma } from '~/utils/prisma';
 
+import { BULK_REINDEX_SIZE } from '../consts';
 import { runDescendantDuplicationV4 } from './run-descendant-duplication-v4';
 
 const WORKER_ID = process.env.VITEST_WORKER_ID ?? '1';
@@ -80,6 +81,7 @@ describe('runDescendantDuplicationV4', () => {
 
   let pageEvent: EventEmitter;
   const createdGroupIds: string[] = [];
+  const createdTagIds: string[] = [];
 
   const run = (sourcePath: string, newPagePath: string) =>
     runDescendantDuplicationV4(
@@ -107,6 +109,10 @@ describe('runDescendantDuplicationV4', () => {
     await prisma.revisions.deleteMany({
       where: { authorId: { in: [sourceAuthorId, ...createdUserIds] } },
     });
+    await prisma.pagetagrelations.deleteMany({
+      where: { relatedTagId: { in: createdTagIds } },
+    });
+    await prisma.tags.deleteMany({ where: { id: { in: createdTagIds } } });
     await UserGroupRelation.deleteMany({
       relatedGroup: { $in: createdGroupIds },
     });
@@ -215,6 +221,91 @@ describe('runDescendantDuplicationV4', () => {
     expect((await findCopies(`${src}-copy`)).map((p) => p.path)).toEqual([
       `${src}-copy/v4`,
     ]);
+  });
+
+  it('keeps copying the rest of the batch and the later batches when new paths are already taken under a unique path index', async () => {
+    const src = `${PATH_ROOT}/taken`;
+    const dest = `${src}-copy`;
+    const tagId = newId();
+    await prisma.tags.createMany({
+      data: [{ id: tagId, name: `tag-${tagId}` }],
+    });
+    createdTagIds.push(tagId);
+    await createV4Page(src, ['root']);
+    // Two read batches; more than half of the targets are taken, so the first
+    // batch has a collision whatever order the cursor reads in.
+    const children = Array.from(
+      { length: BULK_REINDEX_SIZE * 1.5 },
+      (_, i) => ({
+        pageId: newId(),
+        revisionId: newId(),
+        name: `p${String(i).padStart(3, '0')}`,
+        taken: i % 2 === 0,
+      }),
+    );
+    await prisma.revisions.createMany({
+      data: children.map((c) => ({
+        id: c.revisionId,
+        pageId: c.pageId,
+        body: c.name,
+        authorId: sourceAuthorId,
+        format: 'markdown',
+      })),
+    });
+    await Page.insertMany(
+      children.map((c) => ({
+        _id: c.pageId,
+        path: `${src}/${c.name}`,
+        parent: null,
+        grant: PageGrant.GRANT_PUBLIC,
+        revision: c.revisionId,
+      })),
+    );
+    await prisma.pagetagrelations.createMany({
+      data: children.map((c) => ({
+        relatedPageId: c.pageId,
+        relatedTagId: tagId,
+      })),
+    });
+    const uniqueIndex = `unique_path_${WORKER_ID}`;
+    await Page.collection.createIndex(
+      { path: 1 },
+      {
+        name: uniqueIndex,
+        unique: true,
+        partialFilterExpression: {
+          path: { $gte: `${dest}/`, $lt: `${dest}0` },
+        },
+      },
+    );
+    try {
+      await Page.insertMany(
+        children
+          .filter((c) => c.taken)
+          .map((c) => ({ path: `${dest}/${c.name}`, parent: null })),
+      );
+
+      await run(src, dest);
+    } finally {
+      await Page.collection.dropIndex(uniqueIndex);
+    }
+
+    const copies = await Page.find({
+      creator: owner._id,
+      path: { $regex: `^${dest}/` },
+    }).lean();
+    expect(copies.map((p) => p.path).sort()).toEqual(
+      children.filter((c) => !c.taken).map((c) => `${dest}/${c.name}`),
+    );
+    const copiedTagRelations = await prisma.pagetagrelations.findMany({
+      where: {
+        relatedTagId: tagId,
+        relatedPageId: { notIn: children.map((c) => c.pageId) },
+      },
+    });
+    expect(copiedTagRelations.map((r) => r.relatedPageId).sort()).toEqual(
+      copies.map((p) => p._id.toString()).sort(),
+    );
   });
 
   it('resolves without rejecting when copying fails', async () => {

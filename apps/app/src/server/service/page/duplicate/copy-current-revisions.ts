@@ -13,7 +13,7 @@ export interface RevisionCopyEntry {
 }
 
 /** Pure: builds the aggregation pipeline that copies one chunk. */
-export function buildCopyCurrentRevisionsPipeline(
+function buildCopyCurrentRevisionsPipeline(
   entries: readonly RevisionCopyEntry[],
   authorId: string,
 ): readonly Prisma.InputJsonObject[] {

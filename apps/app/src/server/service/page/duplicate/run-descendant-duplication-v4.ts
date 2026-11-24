@@ -63,7 +63,7 @@ export async function runDescendantDuplicationV4(
         oldPathPrefix,
         newPathPrefix: newPagePath,
         user,
-        // Today's v4 ignores this option, so it is always off here.
+        // A v4 duplicate copies every editable descendant regardless of this option (Req 6.3).
         onlyDuplicateUserRelatedResources: false,
         recordProgress: noProgress,
       });
@@ -99,7 +99,7 @@ export async function runDescendantDuplicationV4(
     } catch (err) {
       logger.warn({ err }, 'Failed to close the descendant cursor');
     }
-    // Emitted even after a failure, as the old v4 did: copies written so far must be indexed.
+    // Emitted even after a failure: the copies written so far must be indexed too.
     try {
       deps.pageEvent.emit('syncDescendantsUpdate', { path: newPagePath }, user);
     } catch (err) {

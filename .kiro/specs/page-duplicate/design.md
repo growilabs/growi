@@ -128,7 +128,7 @@ graph TB
 
 `lastProgressAt` の更新が成功すると、その PageOperation は `STALL_THRESHOLD_MS`（2分）のあいだ、他のプロセスから期限切れと判定されない。この2分を、担当プロセスだけが安全に書き込める時間として使う。そのため、次の2つを常に守る。
 
-1. **各書き込みの直前に `lastProgressAt` を更新する。** revision の複製（`$merge` 1回）、ページの挿入、タグの複製、サブオペレーションの1回分の処理の、それぞれの直前で行う。更新は「`ownerToken` が自分の値なら」という条件付きで行う。失敗したら `OwnershipLostError` を投げ、書かずにやめる。
+1. **各書き込みの直前に `lastProgressAt` を更新する。** revision の複製（`$merge` 1回）、ページの挿入、タグの複製、サブオペレーションの1回分の処理の、それぞれの直前で行う。配下の読み出しの1回分（100件）の開始時にも行う（利用者が閲覧できないページだけの回など、何も書かない回が続いても、止まったと判定されないため）。更新は「`ownerToken` が自分の値なら」という条件付きで行う。失敗したら `OwnershipLostError` を投げ、書かずにやめる。
 2. **1回の書き込みは、2分より十分短い量にする。** revision の複製は `REVISION_MERGE_CHUNK_SIZE`（10件）ずつの `$merge` に分け、最悪でも約160MB にする。各 `$merge` には `MERGE_MAX_TIME_MS`（60秒）の `maxTimeMS`（DB 側でその処理を打ち切る時間制限）を付け、2分を超えて書き込まないようにする。ページの挿入（本文を含まない最大100件）とタグの複製は小さいので、分けない。
 
 この2つにより、回復を引き受けたプロセスと元の担当プロセスが、同じ写しに同時に書き込むことはない。残る危険は、ページの挿入またはタグの複製の DB の呼び出しが固まり、2分以上たってから完了する場合だけになる。この場合は書き込みが重なりうる。この危険は受け入れる（`maxTimeMS` を付けられない書き込みで、量が小さく、固まる原因は DB 側の障害に限られるため）。
@@ -150,20 +150,20 @@ graph TB
 ```
 apps/app/src/server/service/page/
 ├── duplicate/
-│   ├── index.ts                                   # 外部に公開する入口: duplicatePage, DuplicatedPage（型）, DuplicateDeps（型）, shouldNormalizeParent（PageService の元に戻す処理が使う）, startInterruptedDuplicateRecoveryCronIfEnabled
+│   ├── index.ts                                   # 外部に公開する入口: duplicatePage, DuplicatedPage（型）, DuplicateDeps（型）, startInterruptedDuplicateRecoveryCronIfEnabled
 │   ├── duplicate-page-port.ts                     # DuplicatePagePort と DuplicateDeps（複製の部品が受け取る協力者の型）
 │   ├── duplicate-page.ts                          # 要求時の処理（検証・先頭ページの作成・タグ・裏の処理の開始）
 │   ├── run-descendant-duplication.ts              # v5 の裏の処理（読み出し・1回分ずつの複製・サブオペレーション・失敗時の回復）
 │   ├── run-descendant-duplication-v4.ts           # v4 の裏の処理（読み出しと複製だけ。PageOperation とサブオペレーションはない）
 │   ├── copy-descendant-batch.ts                   # 1回分の複製（ID の決定 → revision の複製 → ページの挿入 → タグ）
 │   ├── copy-current-revisions.ts                  # 複製されたページの revision を DB の中で作る集計の組み立て（純粋な関数）と実行
-│   ├── should-normalize-parent.ts                 # 親を付け直すかどうかの規則（純粋な関数。run と回復の両方が使う）
 │   ├── run-duplicate-sub-operation.ts             # 複製処理に伴うサブオペレーション
 │   ├── duplicate-page-operation.ts                # 複製の PageOperation の作成・lastProgressAt の更新・回復の引き受け・削除、OwnershipLostError と関連の定数
 │   ├── recover-interrupted-duplicate.ts           # 止まった複製の回復（サブオペレーション → PageOperation の削除 → 通知）
 │   ├── interrupted-duplicate-recovery-cron.ts     # 回復の定期処理（CronService の派生）と起動関数、開始のずらしの定数
 │   ├── notify-duplicate-interrupted.ts            # 本人だけに届く通知の発行
 │   └── *.spec.ts / *.integ.ts                     # 各ファイルの隣に置く
+├── should-normalize-parent.ts                     # 親を付け直すかどうかの規則（純粋な関数。複製の run・回復と、PageService の元に戻す処理が使うので、複製のモジュールの外に置く）
 └── page-cursors-for-descendants.ts                # PageCursorsForDescendantsFactory を index.ts から移す（中身は変えない）
 
 apps/app/src/models/serializers/in-app-notification-snapshot/
@@ -179,7 +179,7 @@ apps/app/src/client/components/InAppNotification/ModelNotification/
 
 - `apps/app/src/server/service/page/index.ts`
   - 複製の処理（`duplicate` から `duplicateDescendantsV4`、`duplicateTags` まで）を削除し、`duplicate` を `duplicatePage` への委譲にする。
-  - `shouldNormalizeParent` を削除し、`duplicate/should-normalize-parent.ts` の関数を使う。
+  - `shouldNormalizeParent` を削除し、`service/page/should-normalize-parent.ts` の関数を使う。
   - `PageCursorsForDescendantsFactory` を新しいファイルから import する。
   - サブオペレーションで呼ぶ4つの処理（`normalizeParentRecursively`（中で再帰する `_normalizeParentRecursively` を含む）、`updateDescendantCountOfSelfAndDescendants`、`updateDescendantCountOfPagesWithPaths`、`recountAndUpdateDescendantCountOfPages`）に、任意の引数 `onBatchStart?: () => Promise<void>` を加える。1回分の処理を始める前に呼ぶ。
   - 同じ4つの処理の Writable の `write` の中身を try で包み、例外を `callback(err)` で返す。これで、例外が `pipeline` を通って呼び出し元へ返る。既存の呼び出し元にとっては、今は固まっていた例外が、例外として返るようになる（挙動の変更）。
@@ -254,7 +254,7 @@ stateDiagram-v2
 | Requirement | Summary | Components | Interfaces | Flows |
 |-------------|---------|------------|------------|-------|
 | 1.1 | 写しの本文は最新の revision | copyDescendantBatch, copyCurrentRevisions, duplicatePage | `RevisionCopyEntry` | 配下の複製 |
-| 1.2 | 過去の revision から取らない | copyCurrentRevisions | `buildCopyCurrentRevisionsPipeline` | 配下の複製 |
+| 1.2 | 過去の revision から取らない | copyCurrentRevisions | `copyCurrentRevisions` | 配下の複製 |
 | 1.3 | v4 でも同じ | runDescendantDuplicationV4, copyDescendantBatch | `copyDescendantBatch` | — |
 | 2.1 | メモリが本文・revision・件数によらない | copyCurrentRevisions, copyDescendantBatch | `copyCurrentRevisions` | 配下の複製 |
 | 2.2 | 約16MB の本文でも成り立つ | copyCurrentRevisions | `copyCurrentRevisions` | — |
@@ -524,7 +524,7 @@ export function copyDescendantBatch(
 
 **Responsibilities & Constraints**
 
-- 集計の組み立て（`buildCopyCurrentRevisionsPipeline`）は純粋な関数にする。実行（`copyCurrentRevisions`）は `prisma.revisions.aggregateRaw` で行い、トランザクションの外で呼ぶ（`$merge` はトランザクションの中で使えない）。
+- 集計の組み立ては、ファイル内の純粋な関数（公開しない）にする。実行（`copyCurrentRevisions`）は `prisma.revisions.aggregateRaw` で行い、トランザクションの外で呼ぶ（`$merge` はトランザクションの中で使えない）。
 - 対応表を `REVISION_MERGE_CHUNK_SIZE`（10件）ずつに分け、1つずつ `$merge` を実行する。各実行の直前に `recordProgress` を呼ぶ。各実行には `maxTimeMS: MERGE_MAX_TIME_MS`（60秒）を付ける。
 - 集計の内容:
   - `$match`: `_id` が対応表の「元の revision の ID」の一覧に含まれるもの。ページ ID では照合しない（1.2）。
@@ -545,12 +545,6 @@ export interface RevisionCopyEntry {
   readonly newRevisionId: string;
   readonly newPageId: string;
 }
-
-/** Pure: builds the aggregation pipeline for one chunk. Exported for unit tests. */
-export function buildCopyCurrentRevisionsPipeline(
-  entries: readonly RevisionCopyEntry[],
-  authorId: string,
-): readonly Prisma.InputJsonObject[];
 
 export function copyCurrentRevisions(
   entries: readonly RevisionCopyEntry[],
@@ -808,6 +802,7 @@ export const pageDuplicateInterruptedSnapshot: {
 | `$merge` が `maxTimeMS` で打ち切られた | 1回分の複製の例外として扱う |
 | 回復処理の中の例外 | ログに出す。PageOperation は残るので、`lastProgressAt` が古くなった後に再び回復される。同じ理由で毎回失敗する場合は、2〜3分ごとにやり直し続け、その範囲の操作を拒否し続ける。これは受け入れる危険である。運用者は、ログに出る PageOperation の ID の記録を手で削除する |
 | 引き受けた PageOperation の保存値が欠けている | 引き受けのときに新しい `ownerToken` を条件にその記録を削除し、ログに出して、次の記録へ進む |
+| v4 の一意索引（`pages.path_1`）で、写し先のパスがすでに使われている | そのページは挿入せず、ほかのページの複製を続ける。そのページ用に先に写した revision は、参照されないまま残る |
 | 回復時に写しの先頭ページがない | サブオペレーションと通知をせず、PageOperation だけ削除する |
 | 回復時に複製した本人がいない | サブオペレーションと削除は行い、通知はしない |
 | 定期処理の式が不正 | ログに出し、起動を続ける |
@@ -821,13 +816,13 @@ export const pageDuplicateInterruptedSnapshot: {
 
 ### Unit Tests
 
-- `buildCopyCurrentRevisionsPipeline`: `$match` が revision の ID で照合し、ページ ID で照合しないこと。出力項目が7項目に固定されていること。ObjectId が拡張 JSON になっていること（1.2、2.1）。
 - `shouldNormalizeParent`: grant ごとの真偽が今の規則と同じであること。
 - `pageDuplicateInterruptedSnapshot`: 組み立てと読み取りが往復すること。形の合わない文字列で `undefined` を返すこと（5.2）。
 - `PageDuplicateInterruptedSubMsg`: 件数・パス・対処の文言が出ること（5.4）。
 
 ### Integration Tests
 
+- `copyCurrentRevisions`（結合テストで、保存された revision を調べる）: 照合が revision の ID で行われ、ページ ID では行われないこと。保存される項目と型が、Prisma で作った revision と同じであること（`createdAt` は元の revision の時刻でなく、複製した時刻）。同じ新しい ID の revision が既にあると、上書きせずに失敗すること。本文を DB の外へ読み出さないこと（DB 側のプロファイラで、revisions への読み出しが ID だけであることを確かめる）（1.2、2.1）。
 - 複製されたページの revision の項目と型: Prisma で作った revision と、`copyCurrentRevisions` で複製した revision で、項目の集合と `pageId`・`author`・`createdAt` の BSON の型が一致すること（1.1。Prisma の拡張 JSON の変換の確認を兼ねる。実装の最初に行う）。
 - 最新の revision だけ: revision を複数持つページを配下ごと複製し、写しの本文が最新の revision と一致し、複製されたページの revision が1件だけであること（1.1、1.2）。v4 のページでも同じ（1.3）。
 - 1回分の例外: `copyCurrentRevisions` を途中で失敗させ、作りかけの写しがページツリーからたどれ、配下ページ数が実際と一致し、PageOperation が削除され、本人にだけ通知が届くこと（4.1、4.5、5.1、5.5）。

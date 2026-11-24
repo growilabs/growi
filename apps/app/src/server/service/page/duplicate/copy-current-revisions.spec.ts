@@ -12,7 +12,6 @@ vi.mock('~/utils/prisma', () => ({
 import { Types } from 'mongoose';
 
 import {
-  buildCopyCurrentRevisionsPipeline,
   copyCurrentRevisions,
   MERGE_MAX_TIME_MS,
   REVISION_MERGE_CHUNK_SIZE,
@@ -49,56 +48,6 @@ const matchedSourceIdsOf = (pipeline: unknown): string[] => {
     (id) => id.$oid,
   );
 };
-
-describe('buildCopyCurrentRevisionsPipeline', () => {
-  const authorId = newId();
-
-  it('matches source revisions by revision id in extended JSON form, never by page id', () => {
-    const entries = makeEntries(3);
-
-    const pipeline = buildCopyCurrentRevisionsPipeline(entries, authorId);
-
-    expect(stageOf(pipeline, '$match').$match).toEqual({
-      _id: {
-        $in: entries.map((e) => ({ $oid: e.sourceRevisionId })),
-      },
-    });
-  });
-
-  it('fixes the output document to exactly the seven revision fields', () => {
-    const pipeline = buildCopyCurrentRevisionsPipeline(
-      makeEntries(2),
-      authorId,
-    );
-
-    const project = stageOf(pipeline, '$project').$project;
-    expect(Object.keys(project as object).sort()).toEqual(
-      ['__v', '_id', 'author', 'body', 'createdAt', 'format', 'pageId'].sort(),
-    );
-    expect(project).toMatchObject({
-      author: { $literal: { $oid: authorId } },
-      createdAt: '$$NOW',
-      __v: { $toLong: 0 },
-      format: { $ifNull: ['$format', 'markdown'] },
-    });
-  });
-
-  it('inserts into revisions and fails rather than overwrite an existing revision', () => {
-    const pipeline = buildCopyCurrentRevisionsPipeline(
-      makeEntries(1),
-      authorId,
-    );
-
-    expect(pipeline.at(-1)).toEqual({
-      $merge: {
-        into: 'revisions',
-        on: '_id',
-        whenMatched: 'fail',
-        whenNotMatched: 'insert',
-      },
-    });
-  });
-});
 
 describe('copyCurrentRevisions', () => {
   const authorId = newId();

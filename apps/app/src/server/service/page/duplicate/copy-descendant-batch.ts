@@ -127,19 +127,61 @@ const copyTags = async (copies: readonly PlannedCopy[]): Promise<void> => {
   }
 };
 
-/** Returns only the copies actually stored: with ordered: false, Mongoose drops documents failing validation without throwing. */
+const DUPLICATE_KEY_ERROR_CODE = 11000;
+
+/**
+ * The documents an unordered insertMany stored when every rejected one hit a
+ * unique index (a v4 wiki still has the unique pages.path index); null otherwise.
+ */
+const storedDespiteDuplicateKeys = (
+  err: unknown,
+): readonly { readonly _id: Types.ObjectId }[] | null => {
+  if (!(err instanceof mongoose.mongo.MongoBulkWriteError)) return null;
+  // A write concern failure is also a MongoBulkWriteError, with no write errors.
+  if (err.result.getWriteConcernError() != null) return null;
+  const writeErrors = err.result.getWriteErrors();
+  // Mongoose replaces each WriteError with a plain copy, which loses the `code`
+  // getter but keeps `err`.
+  const allDuplicateKeys =
+    writeErrors.length > 0 &&
+    writeErrors.every(
+      (writeError) => writeError.err.code === DUPLICATE_KEY_ERROR_CODE,
+    );
+  // insertedDocs is added by Mongoose: the valid documents minus the rejected ones.
+  return allDuplicateKeys &&
+    'insertedDocs' in err &&
+    Array.isArray(err.insertedDocs)
+    ? err.insertedDocs
+    : null;
+};
+
+/**
+ * Resolves to the stored documents: with ordered: false, Mongoose drops
+ * documents failing validation without throwing, and the documents that do not
+ * collide on a unique key are stored even though insertMany throws.
+ */
+const insertUnordered = async (
+  pages: readonly CopiedPage[],
+): Promise<readonly { readonly _id: Types.ObjectId }[]> => {
+  const Page = mongoose.model<PageDocument, PageModel>('Page');
+  try {
+    return await Page.insertMany(pages, { ordered: false });
+  } catch (err) {
+    const stored = storedDespiteDuplicateKeys(err);
+    if (stored == null) throw err;
+    return stored;
+  }
+};
+
+/** Returns only the copies actually stored. */
 const insertPages = async (
   copies: readonly PlannedCopy[],
   recordProgress: () => Promise<void>,
 ): Promise<PlannedCopy[]> => {
   if (copies.length === 0) return [];
 
-  const Page = mongoose.model<PageDocument, PageModel>('Page');
   await recordProgress();
-  const inserted = await Page.insertMany(
-    copies.map((c) => c.newPage),
-    { ordered: false },
-  );
+  const inserted = await insertUnordered(copies.map((c) => c.newPage));
   const insertedIds = new Set(inserted.map((p) => p._id.toHexString()));
   return copies.filter((c) => insertedIds.has(c.newPage._id));
 };

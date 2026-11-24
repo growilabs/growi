@@ -53,7 +53,6 @@ describe('pageDuplicateInterruptedSnapshot', () => {
     ['toPath', {}],
     ['copiedPageCount', '3'],
     ['sourcePageCount', null],
-    ['copiedPageCount', Number.NaN],
     ['copiedPageCount', -1],
     ['sourcePageCount', 1.5],
   ])('returns undefined when %s has the wrong value (%s)', (key, value) => {

@@ -5,6 +5,7 @@ import loggerFactory from '~/utils/logger';
 
 import { BULK_REINDEX_SIZE } from '../consts';
 import { PageCursorsForDescendantsFactory } from '../page-cursors-for-descendants';
+import { shouldNormalizeParent } from '../should-normalize-parent';
 import { copyDescendantBatch } from './copy-descendant-batch';
 import {
   deleteDuplicatePageOperation,
@@ -18,7 +19,6 @@ import {
   recoverInterruptedDuplicate,
 } from './recover-interrupted-duplicate';
 import { runDuplicateSubOperation } from './run-duplicate-sub-operation';
-import { shouldNormalizeParent } from './should-normalize-parent';
 
 const logger = loggerFactory(
   'growi:services:page:duplicate:run-descendant-duplication',
@@ -58,12 +58,11 @@ async function duplicateDescendants(
   const progress = recordProgress(operation);
 
   // Empty pages are read too, so that descendants under them are reached.
-  // WHY cast: the factory is untyped; its cursors yield lean Page documents.
-  const descendants = (await new PageCursorsForDescendantsFactory(
+  const descendants = await new PageCursorsForDescendantsFactory(
     user,
     sourcePage,
     true,
-  ).generateIterable()) as AsyncIterable<PageDocument> | PageDocument[];
+  ).generateIterable();
   // in-process only (never sent to MongoDB), so RegExp.escape is safe here
   const oldPathPrefix = new RegExp(`^${RegExp.escape(sourcePage.path)}`, 'i');
 
@@ -72,6 +71,8 @@ async function duplicateDescendants(
     descendants,
     BULK_REINDEX_SIZE,
   )) {
+    // A batch may write nothing, and so record no progress on its own.
+    await progress();
     const result = await copyDescendantBatch(deps, {
       pages,
       oldPathPrefix,

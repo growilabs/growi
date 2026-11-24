@@ -93,6 +93,7 @@ describe('runDescendantDuplication', () => {
   const seedFlatChildren = async (
     srcPath: string,
     srcId: Types.ObjectId,
+    groupId?: string,
   ): Promise<void> => {
     const children = Array.from({ length: FLAT_CHILD_COUNT }, (_, i) => ({
       pageId: newId(),
@@ -112,7 +113,12 @@ describe('runDescendantDuplication', () => {
         _id: c.pageId,
         path: c.path,
         parent: srcId,
-        grant: PageGrant.GRANT_PUBLIC,
+        ...(groupId == null
+          ? { grant: PageGrant.GRANT_PUBLIC }
+          : {
+              grant: PageGrant.GRANT_USER_GROUP,
+              grantedGroups: [{ item: groupId, type: GroupType.userGroup }],
+            }),
         revision: c.revisionId,
       })),
     );
@@ -144,11 +150,14 @@ describe('runDescendantDuplication', () => {
     {
       nested,
       foreignGroupId,
+      flatChildrenGroupId,
       emptySource = false,
     }: {
       nested: boolean;
       /** Adds src/foreign, granted only to this group (which the owner is not in). */
       foreignGroupId?: string;
+      /** Grants the flat children only to this group instead of the public. */
+      flatChildrenGroupId?: string;
       /** Makes the source top page, and so the copy top page, empty. */
       emptySource?: boolean;
     },
@@ -178,7 +187,7 @@ describe('runDescendantDuplication', () => {
       descendantCount: sourceDescendantCount,
       isEmpty: emptySource,
     });
-    await seedFlatChildren(srcPath, src._id);
+    await seedFlatChildren(srcPath, src._id, flatChildrenGroupId);
     if (nested) {
       await seedNestedChildren(srcPath, src._id);
     }
@@ -461,6 +470,39 @@ describe('runDescendantDuplication', () => {
       expect((await findByPath(seeded.aPath))?.descendantCount).toBe(
         (storedACount ?? Number.NaN) + viewableCount,
       );
+    });
+
+    it('keeps the duplicate from being taken over while it reads batches that copy nothing (Req 4.4)', async () => {
+      const foreignGroup = await UserGroup.create({
+        name: `${USERNAME_PREFIX}-nothing-viewable-${newId()}`,
+      });
+      createdGroupIds.push(String(foreignGroup._id));
+      const seeded = await seedCase('progress-nothing-copied', {
+        nested: false,
+        flatChildrenGroupId: String(foreignGroup._id),
+      });
+      let takenOverInSecondBatch: unknown;
+      const pageGrantService = pageGrantServiceWith(async (batchNumber) => {
+        if (batchNumber === 1) {
+          // as if the first batch had run longer than the stall threshold
+          await PageOperation.updateOne(
+            { _id: seeded.operation.operationId },
+            { $set: { lastProgressAt: new Date(0) } },
+          );
+        }
+        if (batchNumber === 2) {
+          takenOverInSecondBatch = await takeOverStalledDuplicate(new Date());
+        }
+      });
+
+      await runDescendantDuplication(
+        { ...deps, pageGrantService },
+        inputFor(seeded, { onlyDuplicateUserRelatedResources: true }),
+      );
+
+      expect(takenOverInSecondBatch).toBeNull();
+      expect(await countNonEmptyCopyDescendants(seeded.toPath)).toBe(0);
+      expect(await operationExists(seeded.operation)).toBe(false);
     });
 
     it('removes the PageOperation and notifies nobody (Req 3.2)', async () => {

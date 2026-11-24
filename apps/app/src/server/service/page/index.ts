@@ -91,7 +91,6 @@ import {
   type DuplicateDeps,
   type DuplicatedPage,
   duplicatePage,
-  shouldNormalizeParent,
 } from './duplicate';
 import { onSeen } from './events/seen';
 import { isGrantImmutablePath } from './grant-immutable-path';
@@ -106,6 +105,7 @@ import type {
   EmptyTrashResult,
   IPageService,
 } from './page-service';
+import { shouldNormalizeParent } from './should-normalize-parent';
 import { shouldUseV4Process } from './should-use-v4-process';
 
 export * from './page-service';
@@ -3562,9 +3562,8 @@ class PageService implements IPageService {
   private async normalizeParentAndDescendantCountOfDescendants(
     path: string,
     user,
-    isDuplicateOperation = false,
   ): Promise<void> {
-    await this.normalizeParentRecursively([path], user, isDuplicateOperation);
+    await this.normalizeParentRecursively([path], user);
 
     // update descendantCount of descendant pages
     await this.updateDescendantCountOfSelfAndDescendants(path);

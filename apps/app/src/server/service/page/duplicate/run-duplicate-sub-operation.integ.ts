@@ -276,6 +276,35 @@ describe('runDuplicateSubOperation', () => {
       expect(listener).not.toHaveBeenCalled();
     });
 
+    it('aborts the own-subtree recount before the copy reports its count', async () => {
+      const { toPath, aPath, bPath } = await seedCase('abort-own-recount');
+      const pageEvent = new EventEmitter();
+      const listener = vi.fn();
+      pageEvent.on('syncDescendantsUpdate', listener);
+      // The copy is attached once the normalize is done, so the next call is
+      // the one right before the own-subtree recount.
+      const onBatchStart = async () => {
+        const top = await findByPath(toPath);
+        if (top?.parent != null) {
+          throw new OwnershipLost();
+        }
+      };
+
+      await expect(
+        run(
+          toPath,
+          { kind: 'increment', insertedPageCount: 3 },
+          { onBatchStart },
+          pageEvent,
+        ),
+      ).rejects.toBeInstanceOf(OwnershipLost);
+
+      expect((await findByPath(toPath))?.descendantCount).toBe(0);
+      expect((await findByPath(bPath))?.descendantCount).toBe(0);
+      expect((await findByPath(aPath))?.descendantCount).toBe(1);
+      expect(listener).not.toHaveBeenCalled();
+    });
+
     it('aborts the increment before the ancestors are modified and before the event', async () => {
       const { toPath, aPath, bPath } = await seedCase('abort-increment');
       const pageEvent = new EventEmitter();
@@ -313,25 +342,19 @@ describe('runDuplicateSubOperation', () => {
       const pageEvent = new EventEmitter();
       const listener = vi.fn();
       pageEvent.on('syncDescendantsUpdate', listener);
-      let calls = 0;
-      const calledBeforeEachBatch = vi.fn(() => {
-        calls += 1;
-        // Let the normalize and own-subtree recount pass, fail on the ancestor recount
-        return calls > 2
-          ? Promise.reject(new OwnershipLost())
-          : Promise.resolve();
-      });
+      // The own-subtree recount is done once the copy top reports its count, so
+      // the next call is the one right before the ancestor recount.
+      const onBatchStart = async () => {
+        const top = await findByPath(toPath);
+        if (top?.descendantCount === 2) {
+          throw new OwnershipLost();
+        }
+      };
 
       await expect(
-        run(
-          toPath,
-          { kind: 'recount' },
-          { onBatchStart: calledBeforeEachBatch },
-          pageEvent,
-        ),
+        run(toPath, { kind: 'recount' }, { onBatchStart }, pageEvent),
       ).rejects.toBeInstanceOf(OwnershipLost);
 
-      expect(calls).toBe(3);
       expect((await findByPath(bPath))?.descendantCount).toBe(99);
       expect((await findByPath(aPath))?.descendantCount).toBe(99);
       expect(listener).not.toHaveBeenCalled();

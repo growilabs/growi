@@ -34,7 +34,7 @@ export class PageCursorsForDescendantsFactory {
    * Returns Iterable that yields only descendant pages unorderedly
    * @returns Promise<AsyncGenerator>
    */
-  async generateIterable(): Promise<AsyncGenerator | never[]> {
+  async generateIterable(): Promise<AsyncGenerator<PageDocument> | never[]> {
     // initialize cursor
     await this.init();
 
@@ -52,16 +52,24 @@ export class PageCursorsForDescendantsFactory {
   }
 
   /**
-   * Generator that unorderedly yields descendant pages
+   * Generator that unorderedly yields descendant pages (lean documents)
    */
-  private async *generateOnlyDescendants(cursor: Cursor<any>) {
-    for await (const page of cursor) {
-      const nextCursor = await this.generateCursorToFindChildren(page);
-      if (!this.isNeverArray(nextCursor)) {
-        yield* this.generateOnlyDescendants(nextCursor); // recursively yield
-      }
+  private async *generateOnlyDescendants(
+    cursor: Cursor<PageDocument>,
+  ): AsyncGenerator<PageDocument> {
+    // Leaving the for-await early (the consumer breaking or throwing reaches
+    // here as return()) does not close a QueryCursor, so close it explicitly.
+    try {
+      for await (const page of cursor) {
+        const nextCursor = await this.generateCursorToFindChildren(page);
+        if (!this.isNeverArray(nextCursor)) {
+          yield* this.generateOnlyDescendants(nextCursor); // recursively yield
+        }
 
-      yield page;
+        yield page;
+      }
+    } finally {
+      await cursor.close();
     }
   }
 

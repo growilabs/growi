@@ -5,6 +5,7 @@ import type { PageDocument, PageModel } from '~/server/models/page';
 import { UserStatus } from '~/server/models/user/conts';
 import loggerFactory from '~/utils/logger';
 
+import { shouldNormalizeParent } from '../should-normalize-parent';
 import {
   deleteDuplicatePageOperation,
   type OwnedDuplicatePageOperation,
@@ -15,7 +16,6 @@ import {
 import type { DuplicateDeps } from './duplicate-page-port';
 import { notifyDuplicateInterrupted } from './notify-duplicate-interrupted';
 import { runDuplicateSubOperation } from './run-duplicate-sub-operation';
-import { shouldNormalizeParent } from './should-normalize-parent';
 
 const logger = loggerFactory(
   'growi:services:page:duplicate:recover-interrupted-duplicate',

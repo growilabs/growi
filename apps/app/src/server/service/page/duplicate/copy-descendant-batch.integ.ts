@@ -1,4 +1,5 @@
 import { GroupType, type IUserHasId, PageGrant } from '@growi/core';
+import type { Document } from 'mongodb';
 import type { HydratedDocument } from 'mongoose';
 import mongoose, { Types } from 'mongoose';
 
@@ -163,6 +164,70 @@ describe('copyDescendantBatch', () => {
   const countRelationsOfTag = (tagId: string) =>
     prisma.pagetagrelations.count({ where: { relatedTagId: tagId } });
 
+  // Prisma reaches MongoDB through its own engine, so its reads are observed on
+  // the server with the profiler instead of by spying on a client.
+  const profileRevisionCommands = async (
+    fn: () => Promise<void>,
+  ): Promise<Document[]> => {
+    const { db } = mongoose.connection;
+    // the profiler stamps entries with the server clock, which may differ from this process's
+    const { localTime: startedAt } = await db.command({ hello: 1 });
+    await db.command({ profile: 2 });
+    try {
+      await fn();
+    } finally {
+      await db.command({ profile: 0 });
+    }
+    const entries = await db
+      .collection('system.profile')
+      .find({ ns: `${db.databaseName}.revisions`, ts: { $gte: startedAt } })
+      .toArray();
+    // a getMore entry carries the command that opened its cursor
+    return entries.map((e) => e.originatingCommand ?? e.command);
+  };
+
+  const keysOf = (value: unknown): string[] =>
+    value != null && typeof value === 'object' ? Object.keys(value) : [];
+
+  const lastStageOf = (command: Document): unknown =>
+    Array.isArray(command.pipeline) ? command.pipeline.at(-1) : undefined;
+
+  /** A $merge stays inside MongoDB; any other read may return only ids. */
+  const bringsNoBodyIntoTheProcess = (command: Document): boolean => {
+    const lastStage = lastStageOf(command);
+    if (keysOf(lastStage).includes('$merge')) return true;
+    const projection =
+      command.find != null
+        ? command.projection
+        : (lastStage as Document | undefined)?.$project;
+    const projected = keysOf(projection);
+    return projected.length > 0 && projected.every((key) => key === '_id');
+  };
+
+  // A v4 wiki keeps a unique index on pages.path. Limited to paths under the
+  // prefix so that it coexists with path_1 and the other files' pages.
+  const withUniquePathIndex = async (
+    prefix: string,
+    fn: () => Promise<void>,
+  ): Promise<void> => {
+    const name = `unique_path_${WORKER_ID}`;
+    await Page.collection.createIndex(
+      { path: 1 },
+      {
+        name,
+        unique: true,
+        partialFilterExpression: {
+          path: { $gte: `${prefix}/`, $lt: `${prefix}0` },
+        },
+      },
+    );
+    try {
+      await fn();
+    } finally {
+      await Page.collection.dropIndex(name);
+    }
+  };
+
   beforeAll(async () => {
     crowi = await getInstance();
     Page = mongoose.model<PageDocument, PageModel>('Page');
@@ -211,6 +276,22 @@ describe('copyDescendantBatch', () => {
       expect(revisions[0].id).toBe(copy.revision?.toString());
       expect(revisions[0].body).toBe(expectedBody);
     }
+  });
+
+  it('never reads a revision body into the process (Req 2.1, 2.2, 2.4)', async () => {
+    const user = await createUser();
+    const pages = await seedSourcePages([
+      { path: `${PATH_ROOT}/no-body/a`, bodies: ['a current', 'a older'] },
+      { path: `${PATH_ROOT}/no-body/b`, bodies: ['b current'] },
+    ]);
+
+    const commands = await profileRevisionCommands(async () => {
+      await run(batchInput({ pages, user }, 'no-body'));
+    });
+
+    // the profiler did capture this run
+    expect(commands.length).toBeGreaterThan(0);
+    expect(commands.filter((c) => !bringsNoBodyIntoTheProcess(c))).toEqual([]);
   });
 
   it('makes the duplicating user the creator and last updater, and replaces only the leading path prefix', async () => {
@@ -322,6 +403,48 @@ describe('copyDescendantBatch', () => {
       `${PATH_ROOT}/invalid-copy/fine`,
     ]);
     expect(await countRelationsOfTag(tag)).toBe(1);
+  });
+
+  it('skips a page whose new path is already taken under a unique path index, and copies and tags the others', async () => {
+    const user = await createUser();
+    const tag = await createTag();
+    const group = await createUserGroup();
+    const pages = await seedSourcePages([
+      { path: `${PATH_ROOT}/taken/a`, bodies: ['a'], tagIds: [tag] },
+      { path: `${PATH_ROOT}/taken/b`, bodies: ['b'], tagIds: [tag] },
+      {
+        path: `${PATH_ROOT}/taken/invalid`,
+        grant: PageGrant.GRANT_USER_GROUP,
+        grantedGroupIds: [group],
+        storedGrantedGroupType: 'UnknownGroupType',
+        bodies: ['invalid'],
+        tagIds: [tag],
+      },
+      { path: `${PATH_ROOT}/taken/c`, bodies: ['c'], tagIds: [tag] },
+    ]);
+
+    await withUniquePathIndex(`${PATH_ROOT}/taken-copy`, async () => {
+      await Page.create({ path: `${PATH_ROOT}/taken-copy/b` });
+
+      const result = await run(batchInput({ pages, user }, 'taken'));
+
+      expect(result.insertedPageCount).toBe(2);
+    });
+
+    const copies = await findCopiedPages(user);
+    expect(copies.map((p) => p.path).sort()).toEqual([
+      `${PATH_ROOT}/taken-copy/a`,
+      `${PATH_ROOT}/taken-copy/c`,
+    ]);
+    const copiedTagRelations = await prisma.pagetagrelations.findMany({
+      where: {
+        relatedTagId: tag,
+        relatedPageId: { notIn: pages.map((p) => String(p._id)) },
+      },
+    });
+    expect(copiedTagRelations.map((r) => r.relatedPageId).sort()).toEqual(
+      copies.map((p) => p._id.toString()).sort(),
+    );
   });
 
   it('fails when the tags cannot be written', async () => {
