@@ -1,7 +1,5 @@
 import type { IPage, IPageHasId, IUser } from '@growi/core';
-import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import mongoose from 'mongoose';
-import { FilterXSS } from 'xss';
 
 import { CommentEvent, commentEvent } from '~/features/comment/server';
 import ExternalUserGroup from '~/features/external-user-group/server/models/external-user-group';
@@ -10,11 +8,12 @@ import {
   FILTER_FIELDS,
   SEARCH_FILTER_PREFIXES,
 } from '~/features/search/utils/filter-fields';
-import type {
-  AttachmentSearchInput,
-  AttachmentSearchResultAggregator,
-  IPrimarySearchResult,
-  IResolvedSecondaryResult,
+import {
+  type AttachmentSearchInput,
+  type AttachmentSearchResultAggregator,
+  type IPrimarySearchResult,
+  type IResolvedSecondaryResult,
+  withTimeout,
 } from '~/features/search-attachments/server/services/attachment-search-result-aggregator';
 import type { AttachmentSearchViewer } from '~/features/search-attachments/server/services/search-accessible-pages';
 import type {
@@ -51,6 +50,10 @@ import type { PageModel } from '../models/page';
 import { SearchError } from '../models/vo/search-error';
 import { configManager } from './config-manager';
 import { canShowSnippetOfPage } from './search/can-show-snippet';
+import {
+  toElasticSearchResult,
+  toSearchedPageDocument,
+} from './search/page-search-item';
 import ElasticsearchDelegator from './search-delegator/elasticsearch';
 import PrivateLegacyPagesDelegator from './search-delegator/private-legacy-pages';
 
@@ -58,15 +61,8 @@ const logger = loggerFactory('growi:service:search');
 
 const nonNullable = <T>(value: T): value is NonNullable<T> => value != null;
 
-// options for filtering xss
-// Do not change the property key name to 'whitelist" because it depends on the 'xss' library
-const filterXssOptions = {
-  whiteList: {
-    em: ['class'],
-  },
-};
-
-const filterXss = new FilterXSS(filterXssOptions);
+/** The time limit of the snippet search for facet=attachments items. */
+const FACET_SNIPPET_TIMEOUT_MS = 500;
 
 // The shared UI operators plus the server-only `prefix:` path filter.
 const FILTER_PREFIXES = ['prefix:', ...SEARCH_FILTER_PREFIXES] as const;
@@ -622,23 +618,31 @@ class SearchService implements SearchQueryParser, SearchResolver {
    * isAttachmentFullTextSearchEnabled first.
    *
    * `viewer` is resolved the same way the page search route resolves it; a
-   * null user means guest.
+   * null user means guest. `primary` is the aggregator's result and `items`
+   * its items as facet=attachments answers them (formatFacetSearchItems),
+   * with the query parsed once for both.
    */
   async searchByFacet(
     keyword: string,
     viewer: AttachmentSearchViewer,
     options: { from?: number; size?: number },
-  ): Promise<IPrimarySearchResult> {
-    const from = options.from ?? 0;
-    const size = options.size ?? 20;
+  ): Promise<{ primary: IPrimarySearchResult; items: IPageWithSearchMeta[] }> {
+    const aggregator = this.requireAttachmentSearchResultAggregator();
+    const input = await this.createAttachmentSearchInput(keyword, viewer);
+    const primary = await aggregator.searchPrimary(input, {
+      from: options.from ?? 0,
+      size: options.size ?? 20,
+    });
+    const items = await this.formatFacetSearchItems(input, primary.items);
+    return { primary, items };
+  }
 
+  private requireAttachmentSearchResultAggregator(): AttachmentSearchResultAggregator {
     const aggregator = this.attachmentSearchResultAggregator;
     if (aggregator == null) {
       throw new Error('Attachment search is not initialized');
     }
-
-    const input = await this.createAttachmentSearchInput(keyword, viewer);
-    return aggregator.searchPrimary(input, { from, size });
+    return aggregator;
   }
 
   /**
@@ -658,6 +662,101 @@ class SearchService implements SearchQueryParser, SearchResolver {
     }
     const input = await this.createAttachmentSearchInput(keyword, viewer);
     return aggregator.resolveSecondary(input, { primaryIds });
+  }
+
+  /**
+   * The facet=attachments items with the page document page search returns;
+   * items whose page is gone from MongoDB are dropped. A page that itself
+   * also matches the query gets page search's snippet; the snippet search
+   * failing or timing out only leaves the snippets out (research.md 14.3).
+   */
+  async formatFacetSearchItems(
+    input: AttachmentSearchInput,
+    items: readonly IPageWithSearchMeta[],
+  ): Promise<IPageWithSearchMeta[]> {
+    if (items.length === 0) {
+      return [];
+    }
+    const pageIds = items.map((item) => String(item.data._id));
+
+    const [{ pages }, highlights] = await Promise.all([
+      this.findPageListByIds(pageIds),
+      this.searchHighlightsOfPagesOrNone(input, pageIds),
+    ]);
+
+    const User = mongoose.model('User');
+    const pageById = new Map(pages.map((page) => [String(page._id), page]));
+    const { user, userGroups } = input.viewer;
+
+    return items.flatMap((item) => {
+      const pageId = String(item.data._id);
+      const page = pageById.get(pageId);
+      if (page == null) {
+        return [];
+      }
+      const pageData = toSearchedPageDocument(page, User);
+      const highlight = highlights.get(pageId);
+      const meta =
+        highlight == null
+          ? item.meta
+          : {
+              ...item.meta,
+              elasticSearchResult: toElasticSearchResult(
+                highlight,
+                this.canShowSnippet(pageData, user, userGroups),
+              ),
+            };
+      return [{ data: pageData, meta }];
+    });
+  }
+
+  /** The highlight of each page that matches the query; empty on failure. */
+  private async searchHighlightsOfPagesOrNone(
+    input: AttachmentSearchInput,
+    pageIds: readonly string[],
+  ): Promise<Map<string, unknown>> {
+    try {
+      return await withTimeout(
+        this.searchHighlightsOfPages(input, pageIds),
+        FACET_SNIPPET_TIMEOUT_MS,
+      );
+    } catch (err) {
+      logger.warn('Answering facet=attachments items without snippets', err);
+      return new Map();
+    }
+  }
+
+  /**
+   * One page_index search for `pageIds`, built as page search builds its
+   * query (the keyword, the operators and the viewer filter), so a page is
+   * returned only when page search would return it with a highlight.
+   */
+  private async searchHighlightsOfPages(
+    { terms, resolvedFilterData, viewer }: AttachmentSearchInput,
+    pageIds: readonly string[],
+  ): Promise<Map<string, unknown>> {
+    const delegator = this.fullTextSearchDelegator;
+
+    const query = delegator.createSearchQuery();
+    delegator.appendCriteriaForQueryString(query, terms);
+    delegator.appendCriteriaForGroupFilter(query, terms, resolvedFilterData);
+    delegator.filterPagesByViewer(query, viewer.user, viewer.userGroups);
+    const filter = query.body?.query?.bool?.filter;
+    if (!Array.isArray(filter)) {
+      throw new Error('The viewer filter did not initialize the bool query');
+    }
+    filter.push({ ids: { values: [...pageIds] } });
+    delegator.appendResultSize(query, 0, pageIds.length);
+    delegator.appendHighlight(query);
+
+    const { data } = await delegator.searchKeyword(query);
+    return new Map(data.map((hit) => [hit._id, hit._highlight]));
+  }
+
+  protected findPageListByIds(
+    pageIds: ObjectIdLike[],
+  ): ReturnType<typeof findPageListByIds> {
+    return findPageListByIds(pageIds, this.crowi);
   }
 
   async resolveFilterData(
@@ -887,7 +986,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
       return page._id;
     });
 
-    const findPageResult = await findPageListByIds(pageIds, this.crowi);
+    const findPageResult = await this.findPageListByIds(pageIds);
 
     // set meta data
     result.meta = searchResult.meta;
@@ -903,56 +1002,17 @@ class SearchService implements SearchQueryParser, SearchResolver {
           return null;
         }
 
-        // add tags and seenUserCount to pageData
         pageData._doc.tags = data._source.tag_names;
-        pageData._doc.seenUserCount =
-          (pageData.seenUsers && pageData.seenUsers.length) || 0;
+        toSearchedPageDocument(pageData, User);
 
-        // serialize lastUpdateUser
-        if (
-          pageData.lastUpdateUser != null &&
-          pageData.lastUpdateUser instanceof User
-        ) {
-          pageData.lastUpdateUser = serializeUserSecurely(
-            pageData.lastUpdateUser,
-          );
-        }
+        const elasticSearchResult =
+          data._highlight != null
+            ? toElasticSearchResult(
+                data._highlight,
+                this.canShowSnippet(pageData, user, userGroups),
+              )
+            : undefined;
 
-        // increment elasticSearchResult
-        let elasticSearchResult:
-          | { snippet: string | null; highlightedPath: string | null }
-          | undefined;
-        const highlightData = data._highlight;
-        if (highlightData != null) {
-          const snippet = this.canShowSnippet(pageData, user, userGroups)
-            ? highlightData.body ||
-              highlightData['body.en'] ||
-              highlightData['body.ja'] ||
-              highlightData.comments ||
-              highlightData['comments.en'] ||
-              highlightData['comments.ja']
-            : null;
-          const pathMatch =
-            highlightData['path.en'] || highlightData['path.ja'];
-
-          elasticSearchResult = {
-            snippet:
-              snippet != null && typeof snippet[0] === 'string'
-                ? filterXss.process(snippet)
-                : null,
-            highlightedPath:
-              pathMatch != null && typeof pathMatch[0] === 'string'
-                ? filterXss.process(pathMatch)
-                : null,
-          };
-        }
-
-        // serialize creator
-        if (pageData.creator != null && pageData.creator instanceof User) {
-          pageData.creator = serializeUserSecurely(pageData.creator);
-        }
-
-        // generate pageMeta data
         const pageMeta = {
           bookmarkCount: data._source.bookmark_count || 0,
           elasticSearchResult,

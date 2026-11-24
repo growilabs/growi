@@ -396,7 +396,7 @@
 
 ## 13. 下流の画面 (`attachment-search-ui`) のための追加
 
-- [ ] 13.1 添付だけを対象にした検索の項目に、ページ検索と同じページ文書を入れる
+- [x] 13.1 添付だけを対象にした検索の項目に、ページ検索と同じページ文書を入れる
   - `GET /_api/search` の `facet=attachments` の処理で、aggregator が返したページ ID を `findPageListByIds` で読み、各項目の `data` に入れる。`lastUpdateUser` の `serializeUserSecurely` と `seenUserCount` は、ページ検索の `formatSearchResult` と同じにする (同じ処理を共有する)
   - MongoDB に無いページの項目は落とす。`meta.hitsCount` は落とす前の項目数のままにする
   - ページが MongoDB から消えていても `hitsCount` が減らないこと、`data` に `path`・`revision`・`lastUpdateUser` が入ることを、route のテストで固定する。権限で見えないページが入らないことは、既存の権限の結合テストで確かめる

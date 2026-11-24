@@ -168,7 +168,10 @@ export class AttachmentSearchTimeoutError extends Error {
   }
 }
 
-const withTimeout = async <T>(promise: Promise<T>, ms: number): Promise<T> => {
+export const withTimeout = async <T>(
+  promise: Promise<T>,
+  ms: number,
+): Promise<T> => {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     return await Promise.race([

@@ -6,7 +6,10 @@ import { type MockProxy, mock } from 'vitest-mock-extended';
 import type { IPrimarySearchResult } from '~/features/search-attachments/server/services/attachment-search-result-aggregator';
 import type { AttachmentSearchViewer } from '~/features/search-attachments/server/services/search-accessible-pages';
 import { SearchDelegatorName } from '~/interfaces/named-query';
-import type { IFormattedSearchResult } from '~/interfaces/search';
+import type {
+  IFormattedSearchResult,
+  IPageWithSearchMeta,
+} from '~/interfaces/search';
 import type Crowi from '~/server/crowi';
 import { SearchError } from '~/server/models/vo/search-error';
 import type ActivityService from '~/server/service/activity';
@@ -71,6 +74,25 @@ const facetResult: IPrimarySearchResult = {
   meta: { primaryResultIncomplete: false },
 };
 
+// The items as SearchService answers them with their page documents. Plain
+// data, not mock<T>(): the route serializes it, and a vitest-mock-extended
+// proxy serializes to undefined and cannot be structuredClone-d.
+const formattedFacetItems: IPageWithSearchMeta[] = [
+  {
+    data: {
+      _id: 'page-2',
+      path: '/attached',
+    } as unknown as IPageWithSearchMeta['data'],
+    meta: {
+      attachmentHits: [],
+      elasticSearchResult: {
+        snippet: 'page <em>hit</em>',
+        highlightedPath: null,
+      },
+    },
+  },
+];
+
 describe('GET /_api/search', () => {
   let searchService: MockProxy<SearchService>;
   let activityService: MockProxy<ActivityService>;
@@ -99,7 +121,10 @@ describe('GET /_api/search', () => {
     searchService.formatSearchResult.mockImplementation(async () =>
       structuredClone(formattedLegacyResult),
     );
-    searchService.searchByFacet.mockResolvedValue(facetResult);
+    searchService.searchByFacet.mockResolvedValue({
+      primary: facetResult,
+      items: structuredClone(formattedFacetItems),
+    });
     activityService = mock<ActivityService>();
 
     const crowi = mock<Crowi>({ searchService, activityService });
@@ -193,7 +218,7 @@ describe('GET /_api/search', () => {
   });
 
   describe('facet=attachments', () => {
-    it('answers the attachment hits with a null total and primaryResultIncomplete=false', async () => {
+    it('answers the items with their page documents, a null total and primaryResultIncomplete=false', async () => {
       const res = await request(app)
         .get('/_api/search')
         .query({ q: 'word', facet: 'attachments' });
@@ -201,7 +226,7 @@ describe('GET /_api/search', () => {
       expect(res.status).toBe(200);
       expect(res.body).toEqual({
         ok: true,
-        data: JSON.parse(JSON.stringify(facetResult.items)),
+        data: JSON.parse(JSON.stringify(formattedFacetItems)),
         meta: {
           facet: 'attachments',
           total: null,
@@ -211,10 +236,31 @@ describe('GET /_api/search', () => {
       });
     });
 
+    it('keeps hitsCount at the number of items before those whose page is gone were dropped', async () => {
+      searchService.searchByFacet.mockResolvedValue({
+        primary: {
+          items: [
+            ...facetResult.items,
+            ...facetResult.items,
+            ...facetResult.items,
+          ],
+          meta: { primaryResultIncomplete: false },
+        },
+        items: structuredClone(formattedFacetItems),
+      });
+
+      const res = await request(app)
+        .get('/_api/search')
+        .query({ q: 'word', facet: 'attachments', limit: '3' });
+
+      expect(res.body.data).toHaveLength(1);
+      expect(res.body.meta.hitsCount).toBe(3);
+    });
+
     it('reports primaryResultIncomplete as given', async () => {
       searchService.searchByFacet.mockResolvedValue({
+        primary: { items: [], meta: { primaryResultIncomplete: true } },
         items: [],
-        meta: { primaryResultIncomplete: true },
       });
 
       const res = await request(app)
