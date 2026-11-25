@@ -787,6 +787,30 @@ async function triggerGcAndWait(): Promise<{
       expect(await listNamespaceFiles(ns)).toHaveLength(1);
     });
 
+    it('a rebuild also wipes a namespace ref the state has no record of, and the view refs', {
+      timeout: 120_000,
+    }, async () => {
+      const ns = 'integ-rebuild-orphan-ns';
+      await upsertNewPages(ns, 2);
+      const view = await callComposeView('cafebabedeadbeef00000007', [ns]);
+      // The state of a namespace whose instruction failed between the ref
+      // update and the state write.
+      const db = mongoose?.connection.db;
+      await db
+        ?.collection('vault_namespace_state')
+        .deleteOne({ namespace: ns });
+      expect(await resolveRef(namespaceRef(view.viewRef))).not.toBeNull();
+
+      await rebuildVault();
+
+      expect(await resolveRef(namespaceRef(ns))).toBeNull();
+      expect(await resolveRef(namespaceRef(view.viewRef))).toBeNull();
+      expect(await resolveRef(SPARSE_FILTER_REF)).not.toBeNull();
+
+      await upsertNewPages(ns, 1);
+      expect(await listNamespaceFiles(ns)).toHaveLength(1);
+    });
+
     describe('while refs are packed', () => {
       afterEach(async () => {
         if (packedRefsExist()) {

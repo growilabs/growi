@@ -21,7 +21,7 @@ vi.mock('./vault-repo-storage.js', async (importOriginal) => {
     ...actual,
     readRef: vi.fn(),
     updateRef: vi.fn(),
-    deleteRef: vi.fn(),
+    deleteAllNamespaceRefs: vi.fn(),
     dropPackedNamespaceRefs: vi.fn(),
     readTree: vi.fn(),
     writeTree: vi.fn(),
@@ -141,9 +141,10 @@ beforeEach(() => {
   asMock(VaultRepoStorage.writeCommit).mockResolvedValue('commit-oid');
   // Default: readTree returns empty entries.
   asMock(VaultRepoStorage.readTree).mockResolvedValue([]);
-  // Default: updateRef and deleteRef succeed silently.
+  // Default: updateRef succeeds silently.
   asMock(VaultRepoStorage.updateRef).mockResolvedValue(undefined);
-  asMock(VaultRepoStorage.deleteRef).mockResolvedValue(undefined);
+  // Default: the wipe succeeds.
+  asMock(VaultRepoStorage.deleteAllNamespaceRefs).mockResolvedValue(undefined);
   asMock(VaultRepoStorage.dropPackedNamespaceRefs).mockResolvedValue(undefined);
   asMock(VaultInstructionModel.supersedeUnprocessedBefore).mockResolvedValue(
     undefined,
@@ -651,17 +652,8 @@ describe('op: reset-all', () => {
 
     await applyInstruction(instruction);
 
-    // deleteRef must be called for every namespace.
-    expect(VaultRepoStorage.deleteRef).toHaveBeenCalledWith(
-      'refs/namespaces/public/refs/heads/main',
-    );
-    expect(VaultRepoStorage.deleteRef).toHaveBeenCalledWith(
-      'refs/namespaces/group-g1/refs/heads/main',
-    );
-    expect(VaultRepoStorage.deleteRef).toHaveBeenCalledWith(
-      'refs/namespaces/user-u1-only-me/refs/heads/main',
-    );
-    expect(VaultRepoStorage.deleteRef).toHaveBeenCalledTimes(3);
+    // Every namespace ref on disk goes, not only those the state knows.
+    expect(VaultRepoStorage.deleteAllNamespaceRefs).toHaveBeenCalled();
 
     // Packed namespace refs go with the wipe as well.
     expect(VaultRepoStorage.dropPackedNamespaceRefs).toHaveBeenCalled();
@@ -694,7 +686,7 @@ describe('op: reset-all', () => {
 
     await applyInstruction(instruction);
 
-    expect(VaultRepoStorage.deleteRef).not.toHaveBeenCalled();
+    expect(VaultRepoStorage.deleteAllNamespaceRefs).toHaveBeenCalled();
     expect(VaultNamespaceStateModel.deleteAll).toHaveBeenCalled();
     expect(VaultUserViewModel.deleteAll).toHaveBeenCalled();
   });
@@ -710,7 +702,10 @@ describe('op: reset-all', () => {
     });
 
     it.each([
-      ['deleting a namespace ref', () => asMock(VaultRepoStorage.deleteRef)],
+      [
+        'deleting the namespace refs',
+        () => asMock(VaultRepoStorage.deleteAllNamespaceRefs),
+      ],
       [
         'clearing the namespace state',
         () => asMock(VaultNamespaceStateModel.deleteAll),
@@ -978,10 +973,10 @@ describe('namespace lock', () => {
       makeInstruction({ op: 'reset-all', payload: {} }),
     );
     await flush();
-    expect(VaultRepoStorage.deleteRef).not.toHaveBeenCalled();
+    expect(VaultRepoStorage.deleteAllNamespaceRefs).not.toHaveBeenCalled();
 
     holder.release();
     await Promise.all([holder.held, applying]);
-    expect(VaultRepoStorage.deleteRef).toHaveBeenCalledTimes(2);
+    expect(VaultRepoStorage.deleteAllNamespaceRefs).toHaveBeenCalledTimes(1);
   });
 });

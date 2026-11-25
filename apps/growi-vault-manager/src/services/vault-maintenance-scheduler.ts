@@ -10,7 +10,8 @@
  * **Squash track** (checked every 5 minutes):
  *   For each namespace whose commit count (= vault_namespace_state.version)
  *   exceeds VAULT_SQUASH_COMMIT_THRESHOLD or whose last-squash age exceeds
- *   VAULT_SQUASH_AGE_HOURS, the scheduler:
+ *   VAULT_SQUASH_AGE_HOURS, unless nothing was written since its only commit,
+ *   the scheduler:
  *     1. Reads the current tree OID from the namespace HEAD commit.
  *     2. Creates a new squash commit with parents: [] (root commit).
  *     3. Atomically updates the namespace ref to the squash commit.
@@ -208,13 +209,12 @@ function runGitGc(repoPath: string): Promise<void> {
  * Reads the tree OID from a commit OID via isomorphic-git readCommit.
  * Uses the VaultRepoStorage.readTree peeling behaviour — readTree accepts
  * a commit OID and peels to the root tree.  We need the tree OID itself,
- * so we read the tree then write it back (no-op for existing objects) to
- * obtain a stable OID.
+ * so we read the tree then write it back to obtain its OID.
  */
 async function getTreeOidFromCommit(commitOid: string): Promise<string> {
   // readTree peels the commit and returns its tree entries.
   const entries = await VaultRepoStorage.readTree(commitOid);
-  // Write the tree back to obtain its OID (content-addressed no-op).
+  // Writing the same entries back yields the OID of the existing tree.
   return VaultRepoStorage.writeTree(entries);
 }
 
@@ -246,17 +246,28 @@ export function createVaultMaintenanceScheduler(): VaultMaintenanceScheduler {
    * Must run inside withNamespaceLock() for that namespace.
    *
    * Steps:
-   *  1. Read the current HEAD commit OID.
+   *  1. Read the current HEAD commit OID; stop when the state already
+   *     records it as the namespace's only commit.
    *  2. Peel the commit to obtain its root tree OID.
    *  3. Write a new root commit (parents: []) with the same tree.
    *  4. Atomically update the namespace ref.
    *  5. Reset vault_namespace_state.version to 1 (the squash commit).
    */
-  async function squashNamespace(namespace: string): Promise<void> {
+  async function squashNamespace(
+    namespace: string,
+    recorded: { readonly commitOid: string; readonly version: number },
+  ): Promise<void> {
     const currentCommitOid = await VaultRepoStorage.readRef(nsRef(namespace));
     if (currentCommitOid == null) {
       // The ref was deleted (reset-all) while this squash was queued;
       // writing it back would resurrect the namespace.
+      return;
+    }
+
+    // Squashing again would only change the commit OID and make every view
+    // that includes this namespace recompose (see design.md,
+    // VaultMaintenanceScheduler, for why the state is enough to tell).
+    if (recorded.version === 1 && recorded.commitOid === currentCommitOid) {
       return;
     }
 
@@ -312,30 +323,30 @@ export function createVaultMaintenanceScheduler(): VaultMaintenanceScheduler {
     // Load all namespace state documents in one query.
     const allStates = await VaultNamespaceStateModel.find(
       {},
-      { namespace: 1, version: 1, updatedAt: 1 },
+      { namespace: 1, commitOid: 1, version: 1, updatedAt: 1 },
     )
       .lean()
       .exec();
 
-    const namespaces = allStates
-      .filter((state) => {
-        const exceedsCommitThreshold = state.version > squashCommitThreshold;
-        const ageMs = now - state.updatedAt.getTime();
-        const exceedsAge = ageMs > squashAgeMs;
-        return exceedsCommitThreshold || exceedsAge;
-      })
-      .map((state) => state.namespace);
+    const candidates = allStates.filter((state) => {
+      const exceedsCommitThreshold = state.version > squashCommitThreshold;
+      const ageMs = now - state.updatedAt.getTime();
+      const exceedsAge = ageMs > squashAgeMs;
+      return exceedsCommitThreshold || exceedsAge;
+    });
 
     // Errors are non-fatal per namespace; wait for every squash to settle.
     const results = await Promise.allSettled(
-      namespaces.map((namespace) =>
-        withNamespaceLock([namespace], () => squashNamespace(namespace)),
+      candidates.map(({ namespace, commitOid, version }) =>
+        withNamespaceLock([namespace], () =>
+          squashNamespace(namespace, { commitOid, version }),
+        ),
       ),
     );
     results.forEach((result, index) => {
       if (result.status === 'rejected') {
         logger.error(
-          { err: result.reason, namespace: namespaces[index] },
+          { err: result.reason, namespace: candidates[index].namespace },
           'squash failed',
         );
       }

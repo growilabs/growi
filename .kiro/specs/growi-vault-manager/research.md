@@ -95,6 +95,25 @@
 
 ---
 
+### gc と object の再利用（2026-11-25 実測 / git 2.55.0 / isomorphic-git 1.38.6）
+
+**調べたこと**: 書き込みが既存の object を再利用した後、ref がそれを指す前に `git gc --prune=2.weeks.ago` が走ると、その object が消されるか。
+
+**方法**: bare repo に blob を書き、loose ファイルの更新時刻を 3 週間前にしてから、同じ内容をもう一度 `writeBlob` し、どの ref からも参照しないまま gc を実行した。
+
+| 場合 | gc の後 |
+|---|---|
+| loose ファイルがあり、書き込みが再利用した（修正前） | **消えた** |
+| pack の中にだけあり（`gc --prune=never` で cruft pack に入れた）、書き込みが再利用した | 残った |
+| loose ファイルがあり、どの書き込みも再利用しなかった（対照） | 消えた |
+
+**分かったこと**:
+- isomorphic-git の `writeObjectLoose` は、loose ファイルがあれば書き込みを省き、更新時刻も変えない。gc は更新時刻だけで古さを判定するので、再利用された object を「2 週間使われていない」と扱う
+- pack の中にしかない object は、isomorphic-git が pack を見ずに loose ファイルを新しく書く。git は loose ファイルと cruft pack の記録のうち新しい方の時刻を使うので、消されない
+- git は、新しい object からたどれる object も残す。そのため、tree と commit（毎回新しく作られる）を書いた後に gc が走る場合は、再利用した blob も残る。消えるのは、再利用の確認から commit の書き込みまでの間に gc の判定が入った場合に限られる
+
+---
+
 ## Design Decisions
 
 ### Decision A: ビュー外 object の要求は proxy 層で拒否する

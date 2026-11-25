@@ -157,23 +157,64 @@ export async function init(): Promise<void> {
 }
 
 /**
+ * Marks an object that a write is about to depend on as recently used.
+ *
+ * isomorphic-git skips the write when the loose object already exists and
+ * leaves its mtime alone, so an old unreferenced object would stay eligible
+ * for `git gc --prune` until a ref reaches it (see design.md,
+ * VaultMaintenanceScheduler).
+ *
+ * @returns false when the object is gone, i.e. a prune removed it meanwhile.
+ */
+async function freshenLooseObject(oid: string): Promise<boolean> {
+  const objectPath = path.join(
+    getRepoPath(),
+    'objects',
+    oid.slice(0, 2),
+    oid.slice(2),
+  );
+  const now = new Date();
+  try {
+    await fs.promises.utimes(objectPath, now, now);
+    return true;
+  } catch (err: unknown) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+      return false;
+    }
+    throw err;
+  }
+}
+
+/**
+ * Runs an object write and guarantees the object is fresh on return.
+ */
+async function writeFreshObject(write: () => Promise<string>): Promise<string> {
+  const oid = await write();
+  if (await freshenLooseObject(oid)) {
+    return oid;
+  }
+  // Pruned between the write's existence check and the freshen: this time
+  // the object is absent, so the write creates it.
+  return write();
+}
+
+/**
  * Writes blob content to the object pool and returns its OID.
  *
- * If a blob with the same OID already exists (content-addressed no-op),
- * isomorphic-git will simply overwrite the loose object with identical
- * bytes, which is functionally equivalent to a skip and does not produce
- * an error (requirement 9.3).
+ * Writing content that is already stored is not an error (requirement 9.3).
  *
  * @param content - Raw bytes to store as a git blob.
  * @returns 40-character SHA-1 OID.
  */
 export function writeBlob(content: Buffer): Promise<string> {
   const repoPath = getRepoPath();
-  return git.writeBlob({
-    fs,
-    gitdir: repoPath,
-    blob: content,
-  });
+  return writeFreshObject(() =>
+    git.writeBlob({
+      fs,
+      gitdir: repoPath,
+      blob: content,
+    }),
+  );
 }
 
 /**
@@ -184,11 +225,13 @@ export function writeBlob(content: Buffer): Promise<string> {
  */
 export function writeTree(entries: ReadonlyArray<TreeEntry>): Promise<string> {
   const repoPath = getRepoPath();
-  return git.writeTree({
-    fs,
-    gitdir: repoPath,
-    tree: entries.map(toGitTreeEntry),
-  });
+  return writeFreshObject(() =>
+    git.writeTree({
+      fs,
+      gitdir: repoPath,
+      tree: entries.map(toGitTreeEntry),
+    }),
+  );
 }
 
 /**
@@ -204,17 +247,19 @@ export function writeCommit(opts: CommitOptions): Promise<string> {
   // Using 0 (UTC) keeps commit timestamps portable across environments.
   const timezoneOffset = 0;
 
-  return git.writeCommit({
-    fs,
-    gitdir: repoPath,
-    commit: {
-      message: opts.message,
-      tree: opts.tree,
-      parent: [...opts.parents],
-      author: { ...opts.author, timezoneOffset },
-      committer: { ...opts.committer, timezoneOffset },
-    },
-  });
+  return writeFreshObject(() =>
+    git.writeCommit({
+      fs,
+      gitdir: repoPath,
+      commit: {
+        message: opts.message,
+        tree: opts.tree,
+        parent: [...opts.parents],
+        author: { ...opts.author, timezoneOffset },
+        committer: { ...opts.committer, timezoneOffset },
+      },
+    }),
+  );
 }
 
 /**
@@ -381,23 +426,23 @@ async function readLooseRef(refPath: string): Promise<string | null> {
   }
 }
 
+function namespacesDir(): string {
+  return path.join(getRepoPath(), 'refs', 'namespaces');
+}
+
 /**
- * Deletes a ref from the repository.
- * If the ref does not exist, this is a no-op (idempotent).
- *
- * @param refPath - Ref path relative to the git directory.
+ * Deletes every loose ref and HEAD under refs/namespaces/, including those
+ * of namespaces the database has no record of.  Only a full wipe (reset-all)
+ * may call this.
  */
-export async function deleteRef(refPath: string): Promise<void> {
-  const target = refFilePath(refPath);
-  try {
-    await fs.promises.unlink(target);
-  } catch (err: unknown) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
-      // Already gone — treat as success.
-      return;
-    }
-    throw err;
-  }
+export async function deleteAllNamespaceRefs(): Promise<void> {
+  await fs.promises.rm(namespacesDir(), {
+    recursive: true,
+    force: true,
+    // A view composed during the wipe can add a file to a directory that is
+    // being removed (ENOTEMPTY).
+    maxRetries: 3,
+  });
 }
 
 /**
