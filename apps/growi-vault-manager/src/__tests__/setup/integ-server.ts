@@ -34,6 +34,32 @@ function withDbName(uri: string, dbName: string): string {
   return url.toString();
 }
 
+let server: VaultManagerServer | undefined;
+
+async function bootServer(): Promise<VaultManagerServer> {
+  // Dynamic import so the env set below is applied before server.ts is evaluated.
+  const { startServer } = await import('../../server-runtime.js');
+  return startServer();
+}
+
+/**
+ * Stops this worker's server, runs `prepare` while nothing is running, then
+ * boots it again on the same port, database and bare repo. For tests that
+ * have to observe what startup itself does to data that already exists.
+ *
+ * `prepare` runs with the global mongoose connection closed; seed the
+ * database through a separate connection.
+ */
+export async function restartIntegServer(
+  prepare: () => Promise<void>,
+): Promise<void> {
+  const running = server;
+  server = undefined;
+  await running?.stop();
+  await prepare();
+  server = await bootServer();
+}
+
 if (process.env.RUN_VAULT_INTEG === 'true') {
   const workerId = process.env.VITEST_WORKER_ID ?? '1';
   const port = 3001 + Number(workerId);
@@ -58,12 +84,8 @@ if (process.env.RUN_VAULT_INTEG === 'true') {
   process.env.VAULT_MANAGER_BASE_URL = `http://localhost:${port}`;
   process.env.MONGO_URL = mongoUri;
 
-  let server: VaultManagerServer | undefined;
-
   beforeAll(async () => {
-    // Dynamic import so the env above is applied before server.ts is evaluated.
-    const { startServer } = await import('../../server-runtime.js');
-    server = await startServer();
+    server = await bootServer();
   });
 
   afterAll(async () => {
