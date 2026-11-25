@@ -603,55 +603,6 @@ describe('VaultMaintenanceScheduler', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // In-flight namespace serialization
-  // ---------------------------------------------------------------------------
-
-  describe('in-flight namespace serialization', () => {
-    it('does not squash a namespace that is already in-flight', async () => {
-      // The scheduler uses an internal Set to track in-flight namespaces.
-      // When a squash is ongoing, the next tick skips that namespace.
-      //
-      // We verify this indirectly: writeCommit is gated behind a Promise.
-      // While that Promise is pending the namespace is in inflightSquash.
-      // A concurrent tick would skip it.  Here we confirm writeCommit is
-      // called exactly once for 'public' across a single tick.
-      const now = new Date();
-      mockFind([
-        {
-          namespace: 'public',
-          version: 2000,
-          updatedAt: now,
-        },
-      ]);
-
-      let resolveSquash!: () => void;
-      const squashGate = new Promise<void>((r) => {
-        resolveSquash = r;
-      });
-
-      vi.mocked(VaultRepoStorage.readRef).mockResolvedValue('abc123');
-      vi.mocked(VaultRepoStorage.readTree).mockResolvedValue([]);
-      vi.mocked(VaultRepoStorage.writeTree).mockResolvedValue('tree-oid');
-      vi.mocked(VaultRepoStorage.writeCommit).mockImplementation(async () => {
-        // Hold the squash open until we release it, simulating slow I/O.
-        await squashGate;
-        return 'squashed-oid';
-      });
-      vi.mocked(VaultRepoStorage.updateRef).mockResolvedValue(undefined);
-      mockFindOneAndUpdate();
-      mockCountObjects(0);
-
-      scheduler.start();
-
-      // Release the squash gate so the tick can complete.
-      resolveSquash();
-      await runOneTick();
-
-      // writeCommit must have been called exactly once for 'public'.
-      expect(vi.mocked(VaultRepoStorage.writeCommit)).toHaveBeenCalledTimes(1);
-    });
-  });
-  // ---------------------------------------------------------------------------
   // Squash vs. instruction application on the same namespace
   // ---------------------------------------------------------------------------
 
@@ -804,6 +755,7 @@ describe('VaultMaintenanceScheduler', () => {
       await vi.advanceTimersByTimeAsync(0);
 
       expect(findExecFileCalls('count-objects')).toHaveLength(1);
+      expect(VaultRepoStorage.writeCommit).toHaveBeenCalledTimes(1);
     });
   });
 });

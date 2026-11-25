@@ -24,9 +24,8 @@
  * Serialization with instruction processing:
  *   Each squash runs inside withNamespaceLock(), the same per-namespace lock
  *   VaultNamespaceBuilder holds while applying an instruction, and reads the
- *   namespace HEAD only once its turn comes. A Set<string> additionally keeps
- *   a namespace that is still queued or being squashed from being queued
- *   again by the next tick.
+ *   namespace HEAD only once its turn comes. A tick waits for every squash
+ *   it queued, and ticks never overlap, so a namespace is never queued twice.
  */
 
 import * as childProcess from 'node:child_process';
@@ -236,10 +235,6 @@ export function createVaultMaintenanceScheduler(): VaultMaintenanceScheduler {
   let lastSquashAt: Date | null = null;
   let lastGcAt: Date | null = null;
 
-  // Namespaces queued for or undergoing a squash, so a later tick does not
-  // queue them again.
-  const inflightSquash = new Set<string>();
-
   let tickInProgress = false;
 
   // ---------------------------------------------------------------------------
@@ -292,26 +287,11 @@ export function createVaultMaintenanceScheduler(): VaultMaintenanceScheduler {
   }
 
   /**
-   * Marks a namespace in-flight and runs squashNamespace under its namespace
-   * lock.  Extracted so that runSquashCheck can dispatch all eligible
-   * namespaces with Promise.all() instead of a sequential await-in-loop.
-   */
-  async function squashNamespaceLocked(namespace: string): Promise<void> {
-    inflightSquash.add(namespace);
-    try {
-      await withNamespaceLock([namespace], () => squashNamespace(namespace));
-    } finally {
-      inflightSquash.delete(namespace);
-    }
-  }
-
-  /**
    * Iterates all namespace state documents and squashes any namespace that
    * exceeds the commit-count or age threshold.
    *
-   * Eligible namespaces are squashed concurrently (Promise.all) because each
-   * namespace holds its own independent git ref and DB document.  The
-   * inflightSquash Set prevents queueing the same namespace twice.
+   * Eligible namespaces are squashed concurrently because each namespace
+   * holds its own independent git ref and DB document.
    */
   async function runSquashCheck(): Promise<void> {
     const squashCommitThreshold = getEnvInt(
@@ -333,18 +313,16 @@ export function createVaultMaintenanceScheduler(): VaultMaintenanceScheduler {
       .lean()
       .exec();
 
-    // Filter to namespaces that need squashing and are not already in-flight.
     const tasks = allStates
       .filter((state) => {
-        if (inflightSquash.has(state.namespace)) {
-          return false;
-        }
         const exceedsCommitThreshold = state.version > squashCommitThreshold;
         const ageMs = now - state.updatedAt.getTime();
         const exceedsAge = ageMs > squashAgeMs;
         return exceedsCommitThreshold || exceedsAge;
       })
-      .map((state) => squashNamespaceLocked(state.namespace));
+      .map(({ namespace }) =>
+        withNamespaceLock([namespace], () => squashNamespace(namespace)),
+      );
 
     // Errors are non-fatal per namespace; wait for every squash to settle.
     const results = await Promise.allSettled(tasks);
