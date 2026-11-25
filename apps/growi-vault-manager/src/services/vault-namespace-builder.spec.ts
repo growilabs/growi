@@ -21,7 +21,8 @@ vi.mock('./vault-repo-storage.js', async (importOriginal) => {
     ...actual,
     readRef: vi.fn(),
     updateRef: vi.fn(),
-    deleteRef: vi.fn(),
+    listNamespaces: vi.fn(),
+    deleteAllNamespaceRefs: vi.fn(),
     dropPackedNamespaceRefs: vi.fn(),
     readTree: vi.fn(),
     writeTree: vi.fn(),
@@ -141,9 +142,11 @@ beforeEach(() => {
   asMock(VaultRepoStorage.writeCommit).mockResolvedValue('commit-oid');
   // Default: readTree returns empty entries.
   asMock(VaultRepoStorage.readTree).mockResolvedValue([]);
-  // Default: updateRef and deleteRef succeed silently.
+  // Default: updateRef succeeds silently.
   asMock(VaultRepoStorage.updateRef).mockResolvedValue(undefined);
-  asMock(VaultRepoStorage.deleteRef).mockResolvedValue(undefined);
+  // Default: no namespace on disk, and the wipe succeeds.
+  asMock(VaultRepoStorage.listNamespaces).mockResolvedValue([]);
+  asMock(VaultRepoStorage.deleteAllNamespaceRefs).mockResolvedValue(undefined);
   asMock(VaultRepoStorage.dropPackedNamespaceRefs).mockResolvedValue(undefined);
   asMock(VaultInstructionModel.supersedeUnprocessedBefore).mockResolvedValue(
     undefined,
@@ -651,17 +654,8 @@ describe('op: reset-all', () => {
 
     await applyInstruction(instruction);
 
-    // deleteRef must be called for every namespace.
-    expect(VaultRepoStorage.deleteRef).toHaveBeenCalledWith(
-      'refs/namespaces/public/refs/heads/main',
-    );
-    expect(VaultRepoStorage.deleteRef).toHaveBeenCalledWith(
-      'refs/namespaces/group-g1/refs/heads/main',
-    );
-    expect(VaultRepoStorage.deleteRef).toHaveBeenCalledWith(
-      'refs/namespaces/user-u1-only-me/refs/heads/main',
-    );
-    expect(VaultRepoStorage.deleteRef).toHaveBeenCalledTimes(3);
+    // Every namespace ref on disk goes, not only those the state knows.
+    expect(VaultRepoStorage.deleteAllNamespaceRefs).toHaveBeenCalled();
 
     // Packed namespace refs go with the wipe as well.
     expect(VaultRepoStorage.dropPackedNamespaceRefs).toHaveBeenCalled();
@@ -694,7 +688,7 @@ describe('op: reset-all', () => {
 
     await applyInstruction(instruction);
 
-    expect(VaultRepoStorage.deleteRef).not.toHaveBeenCalled();
+    expect(VaultRepoStorage.deleteAllNamespaceRefs).toHaveBeenCalled();
     expect(VaultNamespaceStateModel.deleteAll).toHaveBeenCalled();
     expect(VaultUserViewModel.deleteAll).toHaveBeenCalled();
   });
@@ -710,7 +704,10 @@ describe('op: reset-all', () => {
     });
 
     it.each([
-      ['deleting a namespace ref', () => asMock(VaultRepoStorage.deleteRef)],
+      [
+        'deleting the namespace refs',
+        () => asMock(VaultRepoStorage.deleteAllNamespaceRefs),
+      ],
       [
         'clearing the namespace state',
         () => asMock(VaultNamespaceStateModel.deleteAll),
@@ -978,10 +975,32 @@ describe('namespace lock', () => {
       makeInstruction({ op: 'reset-all', payload: {} }),
     );
     await flush();
-    expect(VaultRepoStorage.deleteRef).not.toHaveBeenCalled();
+    expect(VaultRepoStorage.deleteAllNamespaceRefs).not.toHaveBeenCalled();
 
     holder.release();
     await Promise.all([holder.held, applying]);
-    expect(VaultRepoStorage.deleteRef).toHaveBeenCalledTimes(2);
+    expect(VaultRepoStorage.deleteAllNamespaceRefs).toHaveBeenCalledTimes(1);
+  });
+
+  it('reset-all waits while a namespace that only exists on disk is held', async () => {
+    asMock(VaultNamespaceStateModel.find).mockReturnValue({
+      lean: () => Promise.resolve([{ namespace: 'public' }]),
+    });
+    asMock(VaultRepoStorage.listNamespaces).mockResolvedValue([
+      'public',
+      'group-orphan',
+    ]);
+    asMock(VaultNamespaceStateModel.deleteAll).mockResolvedValue(undefined);
+    const holder = holdNamespaces(['group-orphan']);
+
+    const applying = applyInstruction(
+      makeInstruction({ op: 'reset-all', payload: {} }),
+    );
+    await flush();
+    expect(VaultRepoStorage.deleteAllNamespaceRefs).not.toHaveBeenCalled();
+
+    holder.release();
+    await Promise.all([holder.held, applying]);
+    expect(VaultRepoStorage.deleteAllNamespaceRefs).toHaveBeenCalledTimes(1);
   });
 });

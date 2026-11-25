@@ -438,25 +438,6 @@ async function readLooseRef(refPath: string): Promise<string | null> {
   }
 }
 
-/**
- * Deletes a ref from the repository.
- * If the ref does not exist, this is a no-op (idempotent).
- *
- * @param refPath - Ref path relative to the git directory.
- */
-export async function deleteRef(refPath: string): Promise<void> {
-  const target = refFilePath(refPath);
-  try {
-    await fs.promises.unlink(target);
-  } catch (err: unknown) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
-      // Already gone — treat as success.
-      return;
-    }
-    throw err;
-  }
-}
-
 function namespacesDir(): string {
   return path.join(getRepoPath(), 'refs', 'namespaces');
 }

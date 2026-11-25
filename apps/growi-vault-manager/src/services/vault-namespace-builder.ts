@@ -642,19 +642,14 @@ async function applyGrantChangePrefix(
 }
 
 /**
- * Handles op === 'reset-all': delete every namespace ref and clear
+ * Handles op === 'reset-all': delete every namespace ref on disk, including
+ * view refs and refs vault_namespace_state has no record of, and clear
  * vault_namespace_state + vault_user_views.  The object pool is preserved.
  * Instructions still pending from before the wipe are superseded by it: the
  * rebuild that follows re-derives their effect from the database.
  */
-async function applyResetAll(
-  instruction: VaultInstructionDoc,
-  namespaces: readonly string[],
-): Promise<void> {
-  // Delete every namespace ref from the bare repository.
-  await Promise.all(
-    namespaces.map((namespace) => VaultRepoStorage.deleteRef(nsRef(namespace))),
-  );
+async function applyResetAll(instruction: VaultInstructionDoc): Promise<void> {
+  await VaultRepoStorage.deleteAllNamespaceRefs();
 
   // Clear MongoDB state collections.
   await VaultNamespaceStateModel.deleteAll();
@@ -687,32 +682,31 @@ export async function applyInstruction(
   instruction: VaultInstructionDoc,
 ): Promise<void> {
   const namespaces = await namespacesWrittenBy(instruction);
-  await withNamespaceLock(namespaces, () =>
-    dispatchOp(instruction, namespaces),
-  );
+  await withNamespaceLock(namespaces, () => dispatchOp(instruction));
 }
 
 /**
  * Returns the namespaces whose ref the instruction may write. reset-all
- * writes every namespace that has a vault_namespace_state document.
+ * writes every namespace that has a ref on disk; those that only have a
+ * vault_namespace_state document are included because a squash locks by it.
  */
 async function namespacesWrittenBy(
   instruction: VaultInstructionDoc,
 ): Promise<string[]> {
   if (instruction.op === 'reset-all') {
-    const docs = await VaultNamespaceStateModel.find({}, { namespace: 1 }).lean<
-      { namespace: string }[]
-    >();
-    return docs.map((doc) => doc.namespace);
+    const [docs, onDisk] = await Promise.all([
+      VaultNamespaceStateModel.find({}, { namespace: 1 }).lean<
+        { namespace: string }[]
+      >(),
+      VaultRepoStorage.listNamespaces(),
+    ]);
+    return [...new Set([...docs.map((doc) => doc.namespace), ...onDisk])];
   }
   const { namespace, fromNamespace } = instruction.payload;
   return [namespace, fromNamespace].filter((ns): ns is string => ns != null);
 }
 
-async function dispatchOp(
-  instruction: VaultInstructionDoc,
-  namespaces: readonly string[],
-): Promise<void> {
+async function dispatchOp(instruction: VaultInstructionDoc): Promise<void> {
   switch (instruction.op) {
     case 'upsert':
       await applyUpsert(instruction);
@@ -730,7 +724,7 @@ async function dispatchOp(
       await applyGrantChangePrefix(instruction);
       break;
     case 'reset-all':
-      await applyResetAll(instruction, namespaces);
+      await applyResetAll(instruction);
       break;
     default: {
       // TypeScript exhaustiveness check

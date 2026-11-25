@@ -169,17 +169,14 @@ describe('a repository with packed-refs', () => {
 });
 
 describe('a repository without packed-refs', () => {
-  it('reports a missing ref as null and deleting it as a no-op', async () => {
+  it('reports a missing ref as null', async () => {
     expect(await storage.readRef(REF_A)).toBeNull();
-    await expect(storage.deleteRef(REF_A)).resolves.toBeUndefined();
   });
 
-  it('reads and deletes a loose ref', async () => {
+  it('reads a loose ref', async () => {
     await storage.updateRef(REF_A, OID_A);
 
     expect(await storage.readRef(REF_A)).toBe(OID_A);
-    await storage.deleteRef(REF_A);
-    expect(looseRef(REF_A)).toBeNull();
   });
 
   it('dropPackedNamespaceRefs() is a no-op', async () => {
