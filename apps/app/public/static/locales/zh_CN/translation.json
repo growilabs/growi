@@ -877,7 +877,6 @@
     "check_spam_folder_notice": "如果几分钟后仍未收到邮件，请检查垃圾邮件文件夹，然后重新发送。",
     "request_failed": "发生错误。请稍后重试。如果问题仍然存在，请联系管理员。",
     "password_reset_disabled": "密码重置功能已禁用。请通知管理员。",
-    "too_many_requests": "已达到请求频率限制。请稍后重试。",
     "invalid_input_format": "输入格式无效"
   },
   "maintenance_mode": {

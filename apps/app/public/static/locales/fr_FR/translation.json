@@ -881,7 +881,6 @@
     "check_spam_folder_notice": "Si vous ne recevez pas d'e-mail d'ici quelques minutes, vérifiez votre dossier de courrier indésirable puis renvoyez la demande.",
     "request_failed": "Une erreur s'est produite. Veuillez réessayer plus tard. Si le problème persiste, contactez votre administrateur.",
     "password_reset_disabled": "La réinitialisation du mot de passe est désactivée. Veuillez contacter votre administrateur.",
-    "too_many_requests": "Limite de requêtes atteinte. Veuillez réessayer plus tard.",
     "invalid_input_format": "Format de saisie invalide"
   },
   "maintenance_mode": {

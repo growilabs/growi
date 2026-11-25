@@ -896,7 +896,6 @@
     "check_spam_folder_notice": "If you don't receive an email within a few minutes, please check your spam folder and try sending again.",
     "request_failed": "An error occurred. Please try again later. If the problem persists, please contact your administrator.",
     "password_reset_disabled": "Password reset is disabled. Please contact your administrator.",
-    "too_many_requests": "Rate limit exceeded. Please try again later.",
     "invalid_input_format": "Invalid input format"
   },
   "maintenance_mode": {

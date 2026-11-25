@@ -858,7 +858,6 @@
     "check_spam_folder_notice": "몇 분이 지나도 메일이 도착하지 않으면 스팸 메일함을 확인한 후 다시 전송해 주세요.",
     "request_failed": "오류가 발생했습니다. 잠시 후 다시 시도해 주세요. 문제가 계속되면 관리자에게 문의해 주세요.",
     "password_reset_disabled": "비밀번호 재설정 기능이 비활성화되어 있습니다. 관리자에게 알려 주세요.",
-    "too_many_requests": "요청 횟수 제한에 도달했습니다. 잠시 후 다시 시도해 주세요.",
     "invalid_input_format": "입력 형식이 올바르지 않습니다."
   },
   "maintenance_mode": {

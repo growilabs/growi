@@ -880,7 +880,6 @@
     "check_spam_folder_notice": "数分たってもメールが届かない場合は、迷惑メールフォルダをご確認のうえ、もう一度送信してください。",
     "request_failed": "エラーが発生しました。時間をおいて再度お試しください。それでも解決しない場合は管理者にお問い合わせください。",
     "password_reset_disabled": "パスワードリセット機能が無効です。管理者にお知らせください。",
-    "too_many_requests": "レート制限です。しばらくしてから再度お試しください。",
     "invalid_input_format": "入力形式が無効です"
   },
   "maintenance_mode": {
