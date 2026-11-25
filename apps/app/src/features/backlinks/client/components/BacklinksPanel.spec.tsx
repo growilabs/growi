@@ -9,13 +9,18 @@ import { useCurrentPageId } from '~/states/page';
 import type {
   IBacklink,
   IBacklinkResponse,
+  IBacklinksIndexState,
   ILinkTarget,
 } from '../../interfaces/backlink';
 import { useSWRxBacklinks } from '../stores/backlinks';
 import { BacklinksPanel } from './BacklinksPanel';
 
+// Echoes interpolation values so a test can see what the text was given.
 vi.mock('next-i18next', () => ({
-  useTranslation: () => ({ t: (key: string) => key }),
+  useTranslation: () => ({
+    t: (key: string, params?: Record<string, unknown>) =>
+      params == null ? key : `${key} ${JSON.stringify(params)}`,
+  }),
 }));
 vi.mock('~/states/page', () => ({
   useCurrentPageId: vi.fn(),
@@ -36,12 +41,19 @@ const mockBacklinks = (
   );
 };
 
+const FULL_INDEX: IBacklinksIndexState = {
+  coverage: 'all',
+  coveredSince: null,
+};
+
 const responseOf = (
   backlinks: IBacklink[],
   linkTargets: ILinkTarget[] = [],
+  indexState: IBacklinksIndexState | null = FULL_INDEX,
 ): IBacklinkResponse => ({
   backlinks,
   linkTargets,
+  indexState,
 });
 
 const TRASHED_AND_BROKEN: ILinkTarget[] = [
@@ -202,6 +214,7 @@ describe('BacklinksPanel', () => {
         data: {
           backlinks: [{ pageId: 'p-a', path: '/foo' }],
           linkTargets: null,
+          indexState: FULL_INDEX,
         },
         isLoading: false,
       });
@@ -230,6 +243,81 @@ describe('BacklinksPanel', () => {
       expect(
         screen.queryByTestId('backlinks-link-status-unavailable'),
       ).not.toBeInTheDocument();
+    });
+  });
+
+  // 4.4: a gated or in-progress backfill is a visible gap, not a silent one.
+  describe('index state', () => {
+    it('says which pages are not included when the index is partial', () => {
+      // Arrange: a midday-UTC boundary reads as the same day in any time zone
+      mockBacklinks({
+        data: responseOf([{ pageId: 'p-a', path: '/foo' }], [], {
+          coverage: 'partial',
+          coveredSince: '2026-03-01T12:00:00.000Z',
+        }),
+        isLoading: false,
+      });
+
+      // Act
+      render(<BacklinksPanel />);
+
+      // Assert: the notice names the boundary, and the list is still shown
+      const notice = screen.getByTestId('backlinks-index-notice');
+      expect(notice).toHaveTextContent('backlinks.index_partial');
+      expect(notice).toHaveTextContent('2026-03-01');
+      expect(screen.getByTestId('backlinks-list')).toBeInTheDocument();
+    });
+
+    it('says the index is still being built when no run has covered the older pages', () => {
+      // Arrange
+      mockBacklinks({
+        data: responseOf([], [], {
+          coverage: 'none',
+          coveredSince: null,
+        }),
+        isLoading: false,
+      });
+
+      // Act
+      render(<BacklinksPanel />);
+
+      // Assert
+      expect(screen.getByTestId('backlinks-index-notice')).toHaveTextContent(
+        'backlinks.index_building',
+      );
+    });
+
+    it('shows no notice when every page is indexed', () => {
+      // Arrange
+      mockBacklinks({
+        data: responseOf([{ pageId: 'p-a', path: '/foo' }], [], FULL_INDEX),
+        isLoading: false,
+      });
+
+      // Act
+      render(<BacklinksPanel />);
+
+      // Assert
+      expect(
+        screen.queryByTestId('backlinks-index-notice'),
+      ).not.toBeInTheDocument();
+    });
+
+    it('shows no notice when the index state could not be read', () => {
+      // Arrange
+      mockBacklinks({
+        data: responseOf([{ pageId: 'p-a', path: '/foo' }], [], null),
+        isLoading: false,
+      });
+
+      // Act
+      render(<BacklinksPanel />);
+
+      // Assert
+      expect(
+        screen.queryByTestId('backlinks-index-notice'),
+      ).not.toBeInTheDocument();
+      expect(screen.getByTestId('backlinks-list')).toBeInTheDocument();
     });
   });
 });

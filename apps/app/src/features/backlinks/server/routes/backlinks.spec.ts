@@ -7,7 +7,11 @@ import { mock } from 'vitest-mock-extended';
 import type { CrowiRequest } from '~/interfaces/crowi-request';
 import type Crowi from '~/server/crowi';
 
-import type { IBacklink, ILinkTarget } from '../../interfaces/backlink';
+import type {
+  IBacklink,
+  IBacklinksIndexState,
+  ILinkTarget,
+} from '../../interfaces/backlink';
 import type { PageLinkService } from '../services/page-link-service';
 
 type Viewer = NonNullable<CrowiRequest['user']>;
@@ -24,6 +28,7 @@ const mocks = vi.hoisted(() => {
     loginRequiredFactory: vi.fn(() => passthrough),
     isPageReadableByViewer: vi.fn(),
     findUserGroupIdsForViewer: vi.fn(),
+    readBacklinksIndexState: vi.fn(),
   };
 });
 
@@ -47,6 +52,13 @@ vi.mock('../services/find-user-group-ids-for-viewer', () => ({
   findUserGroupIdsForViewer: mocks.findUserGroupIdsForViewer,
 }));
 
+// The summary itself is its own module's contract (backlinks-index-state.spec.ts,
+// read-backlinks-index-state.integ.ts); what this endpoint owns is carrying it, and not
+// failing the backlinks when it cannot be read.
+vi.mock('../services/read-backlinks-index-state', () => ({
+  readBacklinksIndexState: mocks.readBacklinksIndexState,
+}));
+
 // Imported after the middleware mocks so the route picks up the passthroughs.
 import { getBacklinksHandlerFactory } from './backlinks';
 
@@ -62,6 +74,10 @@ import { getBacklinksHandlerFactory } from './backlinks';
  */
 describe('GET /page/backlinks', () => {
   const validPageId = '507f1f77bcf86cd799439011';
+  const indexState: IBacklinksIndexState = {
+    coverage: 'partial',
+    coveredSince: '2026-03-01T12:00:00.000Z',
+  };
 
   const findBacklinks = vi.fn<PageLinkService['findBacklinks']>();
   const findForwardLinkHealth =
@@ -109,6 +125,7 @@ describe('GET /page/backlinks', () => {
     mocks.isPageReadableByViewer.mockResolvedValue(true);
     mocks.findUserGroupIdsForViewer.mockResolvedValue(null);
     findForwardLinkHealth.mockResolvedValue([]);
+    mocks.readBacklinksIndexState.mockResolvedValue(indexState);
   });
 
   describe('success', () => {
@@ -131,7 +148,7 @@ describe('GET /page/backlinks', () => {
       const res = await get(buildApp(), { pageId: validPageId });
 
       expect(res.status).toBe(200);
-      expect(res.body).toEqual({ backlinks, linkTargets });
+      expect(res.body).toEqual({ backlinks, linkTargets, indexState });
     });
 
     it('answers 200 with empty lists when the page has no backlinks and no outbound links needing attention (1.7)', async () => {
@@ -141,7 +158,11 @@ describe('GET /page/backlinks', () => {
       const res = await get(buildApp(), { pageId: validPageId });
 
       expect(res.status).toBe(200);
-      expect(res.body).toEqual({ backlinks: [], linkTargets: [] });
+      expect(res.body).toEqual({
+        backlinks: [],
+        linkTargets: [],
+        indexState,
+      });
     });
 
     // One pageId serves both reads: it is the link target for backlinks and the link
@@ -180,6 +201,22 @@ describe('GET /page/backlinks', () => {
       const [, forwardLinkUser] = findForwardLinkHealth.mock.calls[0];
       expect(backlinksUser ?? null).toBeNull();
       expect(forwardLinkUser ?? null).toBeNull();
+    });
+  });
+
+  describe('index state', () => {
+    it('carries the backlinks index summary so the panel can flag a partial index', async () => {
+      findBacklinks.mockResolvedValue([]);
+      const building: IBacklinksIndexState = {
+        coverage: 'none',
+        coveredSince: null,
+      };
+      mocks.readBacklinksIndexState.mockResolvedValue(building);
+
+      const res = await get(buildApp(), { pageId: validPageId });
+
+      expect(res.status).toBe(200);
+      expect(res.body.indexState).toEqual(building);
     });
   });
 
@@ -356,8 +393,28 @@ describe('GET /page/backlinks', () => {
       const res = await get(buildApp(), { pageId: validPageId });
 
       expect(res.status).toBe(200);
-      expect(res.body).toEqual({ backlinks, linkTargets: null });
+      expect(res.body).toEqual({ backlinks, linkTargets: null, indexState });
       expect(JSON.stringify(res.body)).not.toContain('unexpected failure');
+    });
+
+    it('answers 200 with the backlinks and indexState: null when the index state read throws', async () => {
+      const backlinks: IBacklink[] = [
+        { pageId: '507f1f77bcf86cd799439021', path: '/source-a' },
+      ];
+      findBacklinks.mockResolvedValue(backlinks);
+      mocks.readBacklinksIndexState.mockRejectedValue(
+        new Error('job read failed'),
+      );
+
+      const res = await get(buildApp(), { pageId: validPageId });
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({
+        backlinks,
+        linkTargets: [],
+        indexState: null,
+      });
+      expect(JSON.stringify(res.body)).not.toContain('job read failed');
     });
 
     // apiv3Err turns a raw Error into ErrorV3(err.message), and `message` is an

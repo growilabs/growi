@@ -57,6 +57,7 @@ describe('useSWRxBacklinks', () => {
     const response: IBacklinkResponse = {
       backlinks: backlinksOf('/foo', '/bar'),
       linkTargets,
+      indexState: { coverage: 'all', coveredSince: null },
     };
     mockApiv3Get.mockResolvedValue({ data: response });
 
@@ -86,7 +87,7 @@ describe('useSWRxBacklinks', () => {
     // if the cache key actually changed with the page id.
     const sharedWrapper = createSharedCacheWrapper();
     mockApiv3Get.mockResolvedValue({
-      data: { backlinks: [], linkTargets: [] },
+      data: { backlinks: [], linkTargets: [], indexState: null },
     });
 
     // Act
@@ -109,7 +110,7 @@ describe('useSWRxBacklinks', () => {
     // Arrange: shared cache; only a changed key can cause a second fetch.
     const sharedWrapper = createSharedCacheWrapper();
     mockApiv3Get.mockResolvedValue({
-      data: { backlinks: [], linkTargets: [] },
+      data: { backlinks: [], linkTargets: [], indexState: null },
     });
 
     vi.mocked(useIsGuestUser).mockReturnValue(true);
@@ -130,7 +131,7 @@ describe('useSWRxBacklinks', () => {
     // Arrange: warm the shared cache with a first mount
     const sharedWrapper = createSharedCacheWrapper();
     mockApiv3Get.mockResolvedValue({
-      data: { backlinks: [], linkTargets: [] },
+      data: { backlinks: [], linkTargets: [], indexState: null },
     });
 
     const first = renderHook(() => useSWRxBacklinks('page-1'), {
