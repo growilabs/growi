@@ -566,6 +566,7 @@ Key decisions:
 | 5.5 | URI 未設定時も添付保存継続 | AttachmentService 本体は無変更 | — | — |
 | 5.6 | 設定の更新を監査ログに記録 | apiv3 admin config (`addActivity` + `ADMIN_ATTACHMENT_SEARCH_SETTINGS_UPDATE`) | — | — |
 | 5.7 | 環境変数で固定されているかを返す | apiv3 admin config (GET) | `AttachmentSearchConfig.useOnlyEnvVars` | — |
+| 5.8 | 環境変数で固定されているときは保存を断る | apiv3 admin config (PUT) | 409 `config_locked_by_env_vars` | — |
 | 6.1 | 添付再インデックス実施 | AttachmentReindexBatch | — | Flow 5 |
 | 6.2 | 個別失敗時スキップ + 障害を疑う結果が続くときは中止 | AttachmentReindexBatch + `rebuild-failure-budget.ts` | `AttachmentRebuildingFailed` `{ error }` | Flow 5 |
 | 6.3 | 進捗 Socket.io | Socket.io `AddAttachmentProgress` / `FinishAddAttachment` | — | Flow 5 |
@@ -609,7 +610,7 @@ Key decisions:
 | AttachmentSearchResultAggregator | Server | facet=attachments の検索と、検索結果のページへの添付ヒット。添付ヒットは見てよいページのものだけ、検索演算子の振り分け | 3.3, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 9.1, 9.3, 9.5, 9.6 | searchAccessiblePages (P0), query builder 2 つ (P0), 既存 Page 検索 (P0) | Service |
 | apiv3: attachment-reextract | Server | `POST /attachments/:id/reextract` | 7.1–7.7 | AttachmentSearchIndexer (P0), reextract-gate (P0) | API |
 | apiv3: search-attachments | Server | `GET /search/attachments` (検索結果のページへの添付ヒット) | 4.1, 9.1, 9.3, 9.5, 9.6 | AttachmentSearchResultAggregator (P0) | API |
-| apiv3: attachment-search-admin | Server | failures / config 取得更新 | 5.1, 5.2, 5.3, 5.6, 8.4 | ConfigManager (P0), FailureLogService (P0) | API |
+| apiv3: attachment-search-admin | Server | failures / config 取得更新 | 5.1, 5.2, 5.3, 5.6, 5.7, 5.8, 8.4 | ConfigManager (P0), FailureLogService (P0) | API |
 | apiv3: search indices extended | Server | `includeAttachments` フラグ受理、作り直しを裏で起動して即応答 | 6.1, 6.5, 6.6 | AttachmentReindexBatch (P0) | API |
 | Response type (`IPageSearchMeta` / `IFacetedSearchResult`) | Interface | optional `meta.attachmentHits[]` 追加、facet 付き検索の応答 | 9.3, 9.4 | 既存 interfaces/search.ts (P0) | Contract |
 | SearchConfigurationProps 拡張 | SSR props / Interface | 非 admin 一般ユーザ向けに機能有効フラグを SSR 経路で公開 | 5.1, 5.4 | ConfigManager (P0), 既存 basic-layout-page SSR (P0) | Contract, SSR |
@@ -983,7 +984,7 @@ resolveAttachmentSecondary(
 | POST | /_api/v3/attachments/:id/reextract | — | `{ outcome: { kind } }` (`ReextractResponse`。抽出テキストは返さない) | 400 (id が ObjectId でない), 404 `notfound_or_forbidden` (添付なし・ページに属さない・親ページなし・admin でもページを閲覧できる利用者でもない、を区別しない同一応答), 429 (回数制限: 添付ごとに 1 分あたり 5 回。rate-limiter が `res.sendStatus(429)` で返すので、本文は `Too Many Requests` の文字だけで、エラーコードは無い), 500 `reextract_failed` (最後まで進められなかった) / `internal_server_error`, 503 `feature_disabled` / `reextract_timeout` (`timeoutMs × 2 + 30 秒` を超えた。抽出の順番待ちを含む) |
 | GET | /_api/v3/admin/attachment-search/failures | `?limit=N&since=iso` (`limit` は 1〜200、既定 50) | `{ items: ExtractionFailureEntry[], total: number }` (新しい順。`total` は `since` 以降の全件数) | 400 validation, 403 forbidden |
 | GET | /_api/v3/admin/attachment-search/config | — | `{ config: AttachmentSearchConfig }` | 403 forbidden |
-| PUT | /_api/v3/admin/attachment-search/config | `AttachmentSearchConfigUpdate` | `{}` (更新後の値は GET で読む) | 400 validation / `invalid_extractor_uri`, 403 forbidden |
+| PUT | /_api/v3/admin/attachment-search/config | `AttachmentSearchConfigUpdate` | `{}` (更新後の値は GET で読む) | 400 validation / `invalid_extractor_uri`, 403 forbidden, 409 `config_locked_by_env_vars` (4 つのキーが環境変数で固定されている。入力の検査に通った要求でも、何も保存しない) |
 | PUT | /_api/v3/search/indices | `{ operation: 'rebuild', includeAttachments?: boolean }` | 既存 response (作り直しの完了を待たずに 200) | 既存 + 409 `rebuild_in_progress` + 503 `feature_disabled` |
 
 `IFacetedSearchResult` (`apps/app/src/interfaces/search.ts`):
@@ -1122,6 +1123,7 @@ GROWI.cloud のようなマルチテナント環境では、プラットフォ�
 
 **admin UI への影響（下流 `attachment-search-ui` spec に委譲）**:
 - 設定 API の GET 応答は、固定されているかを `useOnlyEnvVars` で返す (Req 5.7)。`true` の場合、admin UI の設定フォームは読み取り専用表示にし、env var で管理されている旨を示すメッセージを表示する（既存の他 ENV_ONLY 設定項目と同等のパターン）
+- 固定されているときの `PUT /config` は、何も保存せずに 409 `config_locked_by_env_vars` を返す (Req 5.8)。画面を通さずに API を呼ばれても、使われない値が DB に残ったり、何も変わらないのに監査ログに更新が記録されたりしない
 
 #### `requiresReindex` の算出ルール (computed、state persist なし)
 
@@ -1550,5 +1552,4 @@ flowchart LR
 2. **`packages/attachment-text-extractor-client` の公開境界**: server 専用依存として apps/app から import し、UI 側に混入させないレイヤリング制約を lint ルール化するか検討
 3. **`requiresReindex` cardinality agg の共有 ES コスト**: 30 秒のキャッシュはインスタンスごとに独立しているので、複数インスタンスでは admin GET のたびに各インスタンスが集計を投げうる。`precision_threshold` の指定、共有のキャッシュ、MongoDB 上の件数の記録への置き換えのどれかを、リリース後に検討する
 4. **複数インスタンスでの作り直し**: 実行中の判定と、作り直し中の削除の記録はインスタンスごとのメモリにある (research.md 8.6 の「残っている制約」)
-5. **残っている作業**: tasks.md の未完了のタスク (3.4 監視メトリクス)
-6. **環境変数の固定と `PUT /config`**: 4 つのキーが環境変数で固定されていても、`PUT /config` は保存を受け付ける (値は使われない)。下流の画面は保存の操作を出さない。API を直接使う場合に断るかどうかは未定
+5. **残っている作業**: tasks.md の未完了のタスク (3.4 監視メトリクス、13.4 環境変数で固定されているときの保存の拒否)

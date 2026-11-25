@@ -418,3 +418,10 @@
   - _Requirements: 9.8_
   - _Boundary: SearchService (`formatFacetSearchItems`)_
   - _Depends: 13.1_
+
+- [ ] 13.4 環境変数で固定されているときは、設定の保存を断る
+  - `PUT /_api/v3/admin/attachment-search/config` の処理の先頭 (URI の検査より前) で `env:useOnlyEnvVars:app:attachmentFullTextSearch` を見て、true なら 409 `config_locked_by_env_vars` を返す。何も保存せず、`requiresReindex` のキャッシュの破棄と添付 index の作成もしない。監査ログの更新の記録 (`ADMIN_ATTACHMENT_SEARCH_SETTINGS_UPDATE`) も出さない (記録は `UNSETTLED` のまま。Req 5.6)
+  - route のファイル先頭の一覧の説明に、この応答を足す
+  - route のテストで固定する: 固定中は、正しい本文でも URI が誤った本文でも 409 とそのコードが返り、設定が保存されないこと。固定されていないときは、これまでどおり保存できること。既存の PUT のテストは、固定の値を前の `describe` の設定から引き継がないよう、固定されていない状態を明示する
+  - _Requirements: 5.8_
+  - _Boundary: features/search-attachments/server/routes/apiv3/attachment-search-admin.ts (と `.spec.ts`)_
