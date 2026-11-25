@@ -451,8 +451,8 @@ vault-manager 側には **2 種類の resume** が同居しており、それぞ
 
 `VaultMaintenanceScheduler` の squash と `VaultNamespaceBuilder` の instruction 処理は **同一 namespace 上で並行してはならない**。どちらも「namespace の HEAD を読む → その上に commit を作る → ref を上書きする」を compare-and-swap なしで行うため、重なると後から ref を書いた側が先の commit を消す（エラーは残らない）。
 
-- 両者は namespace ごとのロック `withNamespaceLock()`（[vault-namespace-lock.ts](../../../apps/growi-vault-manager/src/services/vault-namespace-lock.ts)）を共有する。instruction は書き込む namespace（`namespace` と `fromNamespace`、`reset-all` はディスク上にある全 namespace と `vault_namespace_state` にある全 namespace）を、squash は対象の 1 namespace を押さえる。squash 自体が他の namespace を待たせることはない（要件 6.6）。ただし watcher は全 namespace の instruction を 1 本の列で順に処理するため、squash を待っている instruction の後ろにある別 namespace の instruction も、その squash の分（既存 tree の使い回しで数ミリ秒）だけ遅れる
-- squash は自分の番が来てから `readRef` で HEAD を読む。番が来た時点で ref が無い（`reset-all` の後）なら何もしない。HEAD がすでに親なし commit 1 つで、state もその commit を指している場合も何もしない
+- 両者は namespace ごとのロック `withNamespaceLock()`（[vault-namespace-lock.ts](../../../apps/growi-vault-manager/src/services/vault-namespace-lock.ts)）を共有する。instruction は書き込む namespace（`namespace` と `fromNamespace`、`reset-all` は `vault_namespace_state` にある全 namespace）を、squash は対象の 1 namespace を押さえる。squash 自体が他の namespace を待たせることはない（要件 6.6）。ただし watcher は全 namespace の instruction を 1 本の列で順に処理するため、squash を待っている instruction の後ろにある別 namespace の instruction も、その squash の分（既存 tree の使い回しで数ミリ秒）だけ遅れる
+- squash は自分の番が来てから `readRef` で HEAD を読む。番が来た時点で ref が無い（`reset-all` の後）なら何もしない。state の `version` が 1 で、`commitOid` が HEAD と同じ場合（前回の squash の後に書き込みがない場合）も何もしない
 - tick は自分が積んだ squash がすべて終わるまで待ち、前の tick が終わるまで次の tick は何もしない。そのため同じ namespace の squash が二重に積まれることはない
 - ロックは再入不可。ロック内の処理から同じ namespace のロックを取り直さない
 - レジリエント resume で ref を書く新しい処理を足すときは、同じロックを通すこと

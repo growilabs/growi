@@ -263,18 +263,6 @@ export function writeCommit(opts: CommitOptions): Promise<string> {
 }
 
 /**
- * Reads the parent commit OIDs of a commit.
- *
- * @returns An empty array for a root commit.
- */
-export async function readCommitParents(
-  oid: string,
-): Promise<ReadonlyArray<string>> {
-  const { commit } = await git.readCommit({ fs, gitdir: getRepoPath(), oid });
-  return commit.parent;
-}
-
-/**
  * Reads a tree object from the object pool.
  *
  * @param oid - OID of the tree (or a commit that will be peeled to its tree).
@@ -440,26 +428,6 @@ async function readLooseRef(refPath: string): Promise<string | null> {
 
 function namespacesDir(): string {
   return path.join(getRepoPath(), 'refs', 'namespaces');
-}
-
-/**
- * Lists every namespace that has a ref or a HEAD on disk, whether or not the
- * database knows it.
- */
-export async function listNamespaces(): Promise<ReadonlyArray<string>> {
-  try {
-    const entries = await fs.promises.readdir(namespacesDir(), {
-      withFileTypes: true,
-    });
-    return entries
-      .filter((entry) => entry.isDirectory())
-      .map((entry) => entry.name);
-  } catch (err: unknown) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
-      return [];
-    }
-    throw err;
-  }
 }
 
 /**

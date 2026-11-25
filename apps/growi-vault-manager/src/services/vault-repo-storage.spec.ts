@@ -260,46 +260,8 @@ describe('an old, unreferenced object that a write reuses', () => {
   });
 });
 
-describe('readCommitParents()', () => {
-  it('returns no parent for a root commit and the parent for its child', async () => {
-    const tree = await storage.writeTree([]);
-    const root = await storage.writeCommit({
-      tree,
-      parents: [],
-      message: 'root',
-      author: BOT,
-      committer: BOT,
-    });
-    const child = await storage.writeCommit({
-      tree,
-      parents: [root],
-      message: 'child',
-      author: BOT,
-      committer: BOT,
-    });
-
-    expect(await storage.readCommitParents(root)).toEqual([]);
-    expect(await storage.readCommitParents(child)).toEqual([root]);
-  });
-});
-
 describe('namespace refs as a whole', () => {
   const VIEW_REF = 'refs/namespaces/user-u1-view/refs/heads/main';
-
-  it('listNamespaces() names every namespace that has anything on disk', async () => {
-    await storage.updateRef(REF_A, OID_A);
-    await storage.ensureNamespaceHead('user-u1-view');
-    await storage.updateRef(REF_FILTER, OID_C);
-
-    expect([...(await storage.listNamespaces())].sort()).toEqual([
-      'public',
-      'user-u1-view',
-    ]);
-  });
-
-  it('listNamespaces() is empty before any namespace is written', async () => {
-    expect(await storage.listNamespaces()).toEqual([]);
-  });
 
   it('deleteAllNamespaceRefs() removes every namespace and keeps refs outside namespaces', async () => {
     await storage.updateRef(REF_A, OID_A);
@@ -309,7 +271,9 @@ describe('namespace refs as a whole', () => {
 
     await storage.deleteAllNamespaceRefs();
 
-    expect(await storage.listNamespaces()).toEqual([]);
+    expect(fs.existsSync(path.join(repoPath, 'refs', 'namespaces'))).toBe(
+      false,
+    );
     expect(await storage.readRef(REF_A)).toBeNull();
     expect(await storage.readRef(VIEW_REF)).toBeNull();
     expect(await storage.readRef(REF_FILTER)).toBe(OID_C);

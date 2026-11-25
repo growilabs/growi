@@ -21,7 +21,6 @@ vi.mock('./vault-repo-storage.js', async (importOriginal) => {
     ...actual,
     readRef: vi.fn(),
     updateRef: vi.fn(),
-    listNamespaces: vi.fn(),
     deleteAllNamespaceRefs: vi.fn(),
     dropPackedNamespaceRefs: vi.fn(),
     readTree: vi.fn(),
@@ -144,8 +143,7 @@ beforeEach(() => {
   asMock(VaultRepoStorage.readTree).mockResolvedValue([]);
   // Default: updateRef succeeds silently.
   asMock(VaultRepoStorage.updateRef).mockResolvedValue(undefined);
-  // Default: no namespace on disk, and the wipe succeeds.
-  asMock(VaultRepoStorage.listNamespaces).mockResolvedValue([]);
+  // Default: the wipe succeeds.
   asMock(VaultRepoStorage.deleteAllNamespaceRefs).mockResolvedValue(undefined);
   asMock(VaultRepoStorage.dropPackedNamespaceRefs).mockResolvedValue(undefined);
   asMock(VaultInstructionModel.supersedeUnprocessedBefore).mockResolvedValue(
@@ -970,28 +968,6 @@ describe('namespace lock', () => {
     });
     asMock(VaultNamespaceStateModel.deleteAll).mockResolvedValue(undefined);
     const holder = holdNamespaces(['group-g1']);
-
-    const applying = applyInstruction(
-      makeInstruction({ op: 'reset-all', payload: {} }),
-    );
-    await flush();
-    expect(VaultRepoStorage.deleteAllNamespaceRefs).not.toHaveBeenCalled();
-
-    holder.release();
-    await Promise.all([holder.held, applying]);
-    expect(VaultRepoStorage.deleteAllNamespaceRefs).toHaveBeenCalledTimes(1);
-  });
-
-  it('reset-all waits while a namespace that only exists on disk is held', async () => {
-    asMock(VaultNamespaceStateModel.find).mockReturnValue({
-      lean: () => Promise.resolve([{ namespace: 'public' }]),
-    });
-    asMock(VaultRepoStorage.listNamespaces).mockResolvedValue([
-      'public',
-      'group-orphan',
-    ]);
-    asMock(VaultNamespaceStateModel.deleteAll).mockResolvedValue(undefined);
-    const holder = holdNamespaces(['group-orphan']);
 
     const applying = applyInstruction(
       makeInstruction({ op: 'reset-all', payload: {} }),

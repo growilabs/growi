@@ -687,20 +687,17 @@ export async function applyInstruction(
 
 /**
  * Returns the namespaces whose ref the instruction may write. reset-all
- * writes every namespace that has a ref on disk; those that only have a
- * vault_namespace_state document are included because a squash locks by it.
+ * locks every namespace that has a vault_namespace_state document: the only
+ * other writer it can overlap with is a squash, which locks by that document.
  */
 async function namespacesWrittenBy(
   instruction: VaultInstructionDoc,
 ): Promise<string[]> {
   if (instruction.op === 'reset-all') {
-    const [docs, onDisk] = await Promise.all([
-      VaultNamespaceStateModel.find({}, { namespace: 1 }).lean<
-        { namespace: string }[]
-      >(),
-      VaultRepoStorage.listNamespaces(),
-    ]);
-    return [...new Set([...docs.map((doc) => doc.namespace), ...onDisk])];
+    const docs = await VaultNamespaceStateModel.find({}, { namespace: 1 }).lean<
+      { namespace: string }[]
+    >();
+    return docs.map((doc) => doc.namespace);
   }
   const { namespace, fromNamespace } = instruction.payload;
   return [namespace, fromNamespace].filter((ns): ns is string => ns != null);

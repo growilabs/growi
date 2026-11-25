@@ -47,7 +47,6 @@ vi.mock('./vault-repo-storage.js', async (importOriginal) => {
     getRepoPath: vi.fn(() => '/data/vault-repo.git'),
     assertRefsReadable: vi.fn(),
     readRef: vi.fn(),
-    readCommitParents: vi.fn(),
     readTree: vi.fn(),
     writeTree: vi.fn(),
     writeCommit: vi.fn(),
@@ -98,14 +97,22 @@ interface NamespaceStateRow {
   updatedAt: Date;
 }
 
+/** The HEAD mockSquashStorage() serves, which state rows record by default. */
+const RECORDED_HEAD_OID = 'abc123';
+
 /**
  * Configures VaultNamespaceStateModel.find() to return the given rows via
- * a lean().exec() call chain.
+ * a lean().exec() call chain.  A row records the current HEAD unless it
+ * names another commitOid.
  */
 function mockFind(rows: NamespaceStateRow[]): void {
   vi.mocked(VaultNamespaceStateModel.find).mockReturnValue({
     lean: vi.fn().mockReturnValue({
-      exec: vi.fn().mockResolvedValue(rows),
+      exec: vi
+        .fn()
+        .mockResolvedValue(
+          rows.map((row) => ({ commitOid: RECORDED_HEAD_OID, ...row })),
+        ),
     }),
   } as unknown as ReturnType<typeof VaultNamespaceStateModel.find>);
 }
@@ -191,10 +198,7 @@ function mockSquashStorage(
   treeOid = 'tree0000000000000000000000000000000000000',
   squashedOid = 'squashed00000000000000000000000000000000',
 ): void {
-  vi.mocked(VaultRepoStorage.readRef).mockResolvedValue('abc123');
-  vi.mocked(VaultRepoStorage.readCommitParents).mockResolvedValue([
-    'parent0000000000000000000000000000000000',
-  ]);
+  vi.mocked(VaultRepoStorage.readRef).mockResolvedValue(RECORDED_HEAD_OID);
   vi.mocked(VaultRepoStorage.readTree).mockResolvedValue([]);
   vi.mocked(VaultRepoStorage.writeTree).mockResolvedValue(treeOid);
   vi.mocked(VaultRepoStorage.writeCommit).mockResolvedValue(squashedOid);
@@ -401,27 +405,17 @@ describe('VaultMaintenanceScheduler', () => {
     });
   });
 
-  describe('squash: a namespace whose HEAD is already a single parentless commit', () => {
-    const HEAD_OID = 'root000000000000000000000000000000000000';
+  describe('squash: a namespace with nothing written since its only commit', () => {
     const twoHoursAgo = () => new Date(Date.now() - 2 * 60 * 60 * 1000);
 
     beforeEach(() => {
       mockSquashStorage();
-      vi.mocked(VaultRepoStorage.readRef).mockResolvedValue(HEAD_OID);
-      vi.mocked(VaultRepoStorage.readCommitParents).mockResolvedValue([]);
       mockFindOneAndUpdate();
       mockCountObjects(0);
     });
 
     it('is left untouched however long it has been idle', async () => {
-      mockFind([
-        {
-          namespace: 'public',
-          commitOid: HEAD_OID,
-          version: 1,
-          updatedAt: twoHoursAgo(),
-        },
-      ]);
+      mockFind([{ namespace: 'public', version: 1, updatedAt: twoHoursAgo() }]);
 
       scheduler.start();
       await runOneTick();
@@ -431,13 +425,13 @@ describe('VaultMaintenanceScheduler', () => {
       expect(scheduler.getLastSquashAt()).toBeNull();
     });
 
-    it('is squashed once more when the state does not record that commit', async () => {
+    it('is squashed when the state records a commit other than its HEAD', async () => {
       mockFind([
         {
           namespace: 'public',
           commitOid: 'stale00000000000000000000000000000000000',
-          version: 1001,
-          updatedAt: new Date(),
+          version: 1,
+          updatedAt: twoHoursAgo(),
         },
       ]);
 
@@ -446,9 +440,12 @@ describe('VaultMaintenanceScheduler', () => {
 
       expect(VaultNamespaceStateModel.findOneAndUpdate).toHaveBeenCalledWith(
         { namespace: 'public' },
-        expect.objectContaining({
-          $set: expect.objectContaining({ version: 1 }),
-        }),
+        {
+          $set: expect.objectContaining({
+            commitOid: 'squashed00000000000000000000000000000000',
+            version: 1,
+          }),
+        },
         expect.any(Object),
       );
     });
@@ -694,7 +691,6 @@ describe('VaultMaintenanceScheduler', () => {
       vi.mocked(VaultRepoStorage.readRef).mockImplementation((ref) =>
         Promise.resolve(heads.get(ref) ?? null),
       );
-      vi.mocked(VaultRepoStorage.readCommitParents).mockResolvedValue(['c0']);
       vi.mocked(VaultRepoStorage.readTree).mockImplementation((oid) =>
         Promise.resolve(TREES[oid] ?? []),
       );
@@ -775,9 +771,6 @@ describe('VaultMaintenanceScheduler', () => {
       const writesGate = new Promise<void>((r) => {
         releaseWrites = r;
       });
-      vi.mocked(VaultRepoStorage.readCommitParents).mockResolvedValue([
-        'parent-oid',
-      ]);
       vi.mocked(VaultRepoStorage.readTree).mockResolvedValue([]);
       vi.mocked(VaultRepoStorage.writeTree).mockResolvedValue('tree-oid');
       vi.mocked(VaultRepoStorage.writeCommit).mockImplementation(async () => {
@@ -850,7 +843,7 @@ describe('VaultMaintenanceScheduler', () => {
 
     it('skips a tick while the previous one is still running', async () => {
       mockFind([{ namespace: 'public', version: 2000, updatedAt: new Date() }]);
-      vi.mocked(VaultRepoStorage.readRef).mockResolvedValue('abc123');
+      vi.mocked(VaultRepoStorage.readRef).mockResolvedValue(RECORDED_HEAD_OID);
       mockCountObjects(0);
 
       scheduler.start();

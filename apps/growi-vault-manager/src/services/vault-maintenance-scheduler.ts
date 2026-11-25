@@ -10,8 +10,8 @@
  * **Squash track** (checked every 5 minutes):
  *   For each namespace whose commit count (= vault_namespace_state.version)
  *   exceeds VAULT_SQUASH_COMMIT_THRESHOLD or whose last-squash age exceeds
- *   VAULT_SQUASH_AGE_HOURS, unless its HEAD is already a single parentless
- *   commit, the scheduler:
+ *   VAULT_SQUASH_AGE_HOURS, unless nothing was written since its only commit,
+ *   the scheduler:
  *     1. Reads the current tree OID from the namespace HEAD commit.
  *     2. Creates a new squash commit with parents: [] (root commit).
  *     3. Atomically updates the namespace ref to the squash commit.
@@ -209,13 +209,12 @@ function runGitGc(repoPath: string): Promise<void> {
  * Reads the tree OID from a commit OID via isomorphic-git readCommit.
  * Uses the VaultRepoStorage.readTree peeling behaviour — readTree accepts
  * a commit OID and peels to the root tree.  We need the tree OID itself,
- * so we read the tree then write it back (no-op for existing objects) to
- * obtain a stable OID.
+ * so we read the tree then write it back to obtain its OID.
  */
 async function getTreeOidFromCommit(commitOid: string): Promise<string> {
   // readTree peels the commit and returns its tree entries.
   const entries = await VaultRepoStorage.readTree(commitOid);
-  // Write the tree back to obtain its OID (content-addressed no-op).
+  // Writing the same entries back yields the OID of the existing tree.
   return VaultRepoStorage.writeTree(entries);
 }
 
@@ -247,8 +246,8 @@ export function createVaultMaintenanceScheduler(): VaultMaintenanceScheduler {
    * Must run inside withNamespaceLock() for that namespace.
    *
    * Steps:
-   *  1. Read the current HEAD commit OID; stop when it is already a single
-   *     parentless commit that the state records.
+   *  1. Read the current HEAD commit OID; stop when the state already
+   *     records it as the namespace's only commit.
    *  2. Peel the commit to obtain its root tree OID.
    *  3. Write a new root commit (parents: []) with the same tree.
    *  4. Atomically update the namespace ref.
@@ -256,7 +255,7 @@ export function createVaultMaintenanceScheduler(): VaultMaintenanceScheduler {
    */
   async function squashNamespace(
     namespace: string,
-    recordedCommitOid: string,
+    recorded: { readonly commitOid: string; readonly version: number },
   ): Promise<void> {
     const currentCommitOid = await VaultRepoStorage.readRef(nsRef(namespace));
     if (currentCommitOid == null) {
@@ -266,10 +265,9 @@ export function createVaultMaintenanceScheduler(): VaultMaintenanceScheduler {
     }
 
     // Squashing again would only change the commit OID and make every view
-    // that includes this namespace recompose. A parentless HEAD the state
-    // does not record is still squashed, which brings the state back in line.
-    const parents = await VaultRepoStorage.readCommitParents(currentCommitOid);
-    if (parents.length === 0 && recordedCommitOid === currentCommitOid) {
+    // that includes this namespace recompose (see design.md,
+    // VaultMaintenanceScheduler, for why the state is enough to tell).
+    if (recorded.version === 1 && recorded.commitOid === currentCommitOid) {
       return;
     }
 
@@ -339,9 +337,9 @@ export function createVaultMaintenanceScheduler(): VaultMaintenanceScheduler {
 
     // Errors are non-fatal per namespace; wait for every squash to settle.
     const results = await Promise.allSettled(
-      candidates.map(({ namespace, commitOid }) =>
+      candidates.map(({ namespace, commitOid, version }) =>
         withNamespaceLock([namespace], () =>
-          squashNamespace(namespace, commitOid),
+          squashNamespace(namespace, { commitOid, version }),
         ),
       ),
     );
