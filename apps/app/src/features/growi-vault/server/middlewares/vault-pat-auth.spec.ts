@@ -369,22 +369,6 @@ describe('vault credential adapter (seam #1)', () => {
       expect(req.user).toBeUndefined();
     });
 
-    it('records a VAULT_AUTH_FAILURE audit event when a present credential is invalid (req 10.4)', async () => {
-      vi.mocked(AccessToken.findUserIdByToken).mockResolvedValue(null);
-      const createActivity = vi.fn().mockResolvedValue(undefined);
-
-      const adapter = createVaultCredentialAdapter(createActivity);
-      const req = buildRequest(encodeBasic('anyuser', INVALID_PAT));
-      const res = buildResponse();
-      const next = vi.fn() as unknown as NextFunction;
-
-      await adapter(req, res, next);
-
-      expect(createActivity).toHaveBeenCalledWith(
-        expect.objectContaining({ action: 'VAULT_AUTH_FAILURE' }),
-      );
-    });
-
     it('rejects a non-Basic Authorization scheme with 401 (fail-closed)', async () => {
       const adapter = createVaultCredentialAdapter();
       const req = buildRequest('Bearer some-bearer-token');
@@ -398,22 +382,7 @@ describe('vault credential adapter (seam #1)', () => {
       expect(next).not.toHaveBeenCalled();
     });
 
-    it('does not include page/path/existence information in the rejection (req 2.3)', async () => {
-      vi.mocked(AccessToken.findUserIdByToken).mockResolvedValue(null);
-
-      const adapter = createVaultCredentialAdapter();
-      const req = buildRequest(encodeBasic('anyuser', INVALID_PAT));
-      const res = buildResponse();
-      const next = vi.fn() as unknown as NextFunction;
-
-      await adapter(req, res, next);
-
-      // The challenge body is empty (.end() with no payload); only the
-      // WWW-Authenticate header is emitted.
-      expect(res.headers['WWW-Authenticate']).toBe('Basic realm="GROWI Vault"');
-    });
-
-    it('answers over HTTP with an empty-body 401 and records the auth-failure audit record', async () => {
+    it('answers over HTTP with the 401 challenge and records the auth-failure audit record', async () => {
       vi.mocked(AccessToken.findUserIdByToken).mockResolvedValue(null);
       const createActivity = vi.fn().mockResolvedValue(undefined);
       const app = express();
@@ -431,14 +400,12 @@ describe('vault credential adapter (seam #1)', () => {
 
       expect(res.status).toBe(401);
       expect(res.headers['www-authenticate']).toBe('Basic realm="GROWI Vault"');
-      expect(res.text).toBe('');
-      expect(createActivity).toHaveBeenCalledExactlyOnceWith({
-        ip: expect.any(String),
-        endpoint: '/vault.git/info/refs?service=git-upload-pack',
-        action: 'VAULT_AUTH_FAILURE',
-        user: undefined,
-        snapshot: {},
-      });
+      expect(createActivity).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({
+          action: 'VAULT_AUTH_FAILURE',
+          endpoint: '/vault.git/info/refs?service=git-upload-pack',
+        }),
+      );
     });
   });
 

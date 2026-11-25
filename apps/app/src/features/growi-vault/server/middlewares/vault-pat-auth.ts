@@ -9,10 +9,8 @@ import { extractAccessToken } from '~/server/middlewares/access-token-parser/ext
 import { AccessToken } from '~/server/models/access-token';
 import loggerFactory from '~/utils/logger';
 
-import {
-  createVaultAuthChallenge,
-  type VaultActivityRecorder,
-} from './vault-auth-challenge';
+import type { VaultActivityRecorder } from '../interfaces/vault-activity-recorder';
+import { createVaultAuthChallenge } from './vault-auth-challenge';
 
 const logger = loggerFactory(
   'growi:features:growi-vault:middleware:vault-pat-auth',

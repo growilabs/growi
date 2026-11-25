@@ -105,7 +105,7 @@ describe('VaultNamespaceMapper.computeAccessibleNamespaces', () => {
     vi.mocked(eugr.findAllUserGroupIdsRelatedToUser).mockResolvedValue([]);
   });
 
-  describe('authenticated user with no group memberships', () => {
+  describe('user with no group memberships', () => {
     it('returns public, restricted-link, and user-only-me namespace', async () => {
       const userId = 'user-abc-123';
 
@@ -121,7 +121,7 @@ describe('VaultNamespaceMapper.computeAccessibleNamespaces', () => {
     it('returns the same namespaces when scopes are provided (req 2.5 MVP)', async () => {
       const userId = 'user-abc-123';
 
-      // MVP: scopes are accepted but do not alter the namespace result for authenticated users
+      // MVP: scopes are accepted but do not alter the namespace result
       const namespacesWithScopes = await mapper.computeAccessibleNamespaces(
         userId,
         ['read:features:page'],
@@ -146,7 +146,7 @@ describe('VaultNamespaceMapper.computeAccessibleNamespaces', () => {
     });
   });
 
-  describe('authenticated user who belongs to one group', () => {
+  describe('user who belongs to one group', () => {
     it('includes the group namespace in the result', async () => {
       const userId = 'user-def-456';
       const groupId = 'group-id-001';
@@ -165,7 +165,7 @@ describe('VaultNamespaceMapper.computeAccessibleNamespaces', () => {
     });
   });
 
-  describe('authenticated user who belongs to multiple groups (internal + external)', () => {
+  describe('user who belongs to multiple groups (internal + external)', () => {
     it('includes all group namespaces without duplicates', async () => {
       const userId = 'user-ghi-789';
       const internalGroupId = 'internal-grp-1';

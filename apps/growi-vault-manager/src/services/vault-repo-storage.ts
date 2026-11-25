@@ -507,7 +507,7 @@ export async function deleteNamespace(namespace: string): Promise<void> {
     );
   });
 
-  await fs.promises.rm(path.join(repoPath, 'refs', 'namespaces', namespace), {
+  await fs.promises.rm(path.join(namespacesDir(), namespace), {
     recursive: true,
     force: true,
   });

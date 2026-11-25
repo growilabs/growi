@@ -7,10 +7,8 @@ import loginRequiredFactory from '~/server/middlewares/login-required';
 import { generateUnavailableWhenMaintenanceModeMiddlewareForApi } from '~/server/middlewares/unavailable-when-maintenance-mode';
 import loggerFactory from '~/utils/logger';
 
-import {
-  createVaultAuthChallenge,
-  type VaultActivityRecorder,
-} from '../middlewares/vault-auth-challenge';
+import type { VaultActivityRecorder } from '../interfaces/vault-activity-recorder';
+import { createVaultAuthChallenge } from '../middlewares/vault-auth-challenge';
 import {
   createVaultCredentialAdapter,
   type VaultAuthenticatedReq,

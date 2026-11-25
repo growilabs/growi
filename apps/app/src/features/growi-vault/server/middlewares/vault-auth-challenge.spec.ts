@@ -3,10 +3,8 @@ import express from 'express';
 import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  createVaultAuthChallenge,
-  type VaultActivityRecorder,
-} from './vault-auth-challenge';
+import type { VaultActivityRecorder } from '../interfaces/vault-activity-recorder';
+import { createVaultAuthChallenge } from './vault-auth-challenge';
 
 const { warnLog } = vi.hoisted(() => ({ warnLog: vi.fn() }));
 vi.mock('~/utils/logger', () => ({

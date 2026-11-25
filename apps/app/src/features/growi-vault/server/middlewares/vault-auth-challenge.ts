@@ -3,18 +3,11 @@ import type { Request, Response } from 'express';
 import { SupportedAction } from '~/interfaces/activity';
 import loggerFactory from '~/utils/logger';
 
+import type { VaultActivityRecorder } from '../interfaces/vault-activity-recorder';
+
 const logger = loggerFactory(
   'growi:features:growi-vault:middleware:vault-auth-challenge',
 );
-
-/** Audit-logger callback shape (subset of activityService.createActivity). */
-export type VaultActivityRecorder = (params: {
-  ip: string | undefined;
-  endpoint: string;
-  action: string;
-  user: string | undefined;
-  snapshot: { username?: string };
-}) => Promise<void>;
 
 /**
  * Build the single response for a `/vault.git` request whose user could not be
