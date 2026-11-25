@@ -250,6 +250,9 @@ apps/app/src/features/backlinks/
   `PageLinkService.startBackfillPoll()`, which schedules the backfill poll only while a run is
   outstanding.
 - `apps/app/src/server/routes/apiv3/index.js` — register the backlinks route.
+- `apps/app/src/interfaces/activity.ts` — **(B3)** the backfill's three admin audit actions
+  (`ADMIN_BACKLINKS_BACKFILL_START` / `_STOP` / `_RESUME`, large action group), with their labels
+  in every locale's `admin.json`.
 - `apps/app/src/server/models/page-redirect.ts` — add `retrieveFromPathsRedirectingTo` (the reverse
   walk: which paths reach a given one) and re-implement `removePageRedirectsByToPath` over it, so
   that pipeline exists once as well. Add the `retrievePageRedirectEndpointsBatch`
@@ -1174,6 +1177,13 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
     new start with a scope resets the marker and the retry fields instead. Neither a `stopped`
     document nor a `failed` one with no retry due is picked up by the poll.
   - Stopping never changes coverage: `coveredSince` moves only on completion.
+- **Audit log.** Start, Stop and Resume each record an admin audit `Activity` for the admin who
+  made the request: `ADMIN_BACKLINKS_BACKFILL_START`, `_STOP` and `_RESUME`, in the large action
+  group like `ADMIN_SEARCH_INDICES_REBUILD`. The routes follow
+  `apps/app/.claude/rules/activity-recording.md`: `addActivity` runs after the auth chain, and the
+  action is emitted after the write succeeds and before the response. A refused or invalid
+  request (a 409 or 400) is therefore recorded as an unsettled attempt. Reading the state records
+  nothing. The row does not carry the scope, as the search-index rebuild's carries no detail.
 - **GROWI.cloud: the same control as on-prem, bounded by the per-app limits only.** GROWI.cloud apps
   share a MongoDB, and a duty cycle bounds one app's busy share, not the total: many customer admins
   starting a full backfill at about the same time would load the shared cluster at (apps × duty).

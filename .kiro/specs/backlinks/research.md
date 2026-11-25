@@ -445,6 +445,12 @@
     reported it as missing and asked for a restart instead, because a recreated document's request
     was claimed only if a poll had been scheduled at boot; the endpoints now start the poll
     themselves, so that no longer applies.
+  - *Start, stop and resume are audited (decided 2026-11-25)*: a full backfill loads the database
+    for hours, on GROWI.cloud a shared one, so who started or stopped it and when is what an admin
+    or support looks up afterwards. The repo already audits the comparable admin-started jobs
+    (`ADMIN_SEARCH_INDICES_REBUILD`, `ADMIN_PAGE_TREE_REPAIR`), and its activity-recording rule
+    expects non-GET apiv3 routes to record. The scope is left out of the row, as the rebuild
+    records no detail either.
   - *Stop and resume are part of the design (decided 2026-10-28)*: now that admins start the job, a
     long run on a large wiki needs a way to be interrupted that is not a restart. It is cheap because
     resume is the crash-recovery path the design already has (marker saved only after a page's rows

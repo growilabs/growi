@@ -634,7 +634,7 @@ Independent of B4/B5.
     a run is active (`requested`, `running` with a live lease, or `failed` with a retry due) and
     when coverage is `all`. Run the boot upsert before reading or writing, so a missing job document
     is recreated (design.md, "If the document goes missing"). GET returns `failedAttempts` and
-    `retryAt`
+    `retryAt`. Start, stop and resume record an admin audit activity (design.md, "Audit log")
   - Done when a non-admin is refused on every route; a valid start writes the request, clears the
     previous run's fields, and returns the state; a new start after a completed or stopped run walks
     its own range rather than resuming the old one; a start while a run is active, with coverage `all`, or with an invalid scope is rejected
@@ -642,7 +642,10 @@ Independent of B4/B5.
     the number of seeded pages older than `coveredSince` and excludes pages the walk skips; stop cancels an
     unclaimed request, flags a running one, and ends an expired-lease run and a `failed` job with a
     retry due directly; resume is accepted in `stopped` and `failed` and rejected otherwise; a start or resume is claimed in the same process without waiting for a
-    tick; with the job document deleted, GET reports "not started" and a start succeeds
+    tick; with the job document deleted, GET reports "not started" and a start succeeds; a
+    successful start, stop or resume settles its audit action with the admin as the operator,
+    emitted before the response, a refused or invalid one leaves an unsettled attempt, and GET
+    records nothing
   - _Requirements: 4.5, 4.6, 4.8, 4.9, 4.10_
   - _Boundary: backlinks-backfill-admin routes_
   - _Depends: B3.1, B3.3_
