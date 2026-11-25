@@ -584,7 +584,9 @@ type PagelinkbackfilljobsRequestedScope {
 model pagelinkbackfilljobs {
   // The single control/status document of the backlinks backfill, read by the admin settings.
   // Prisma-only and `v`-less like pagelinks. The admin endpoints write the request fields
-  // (`requestedScope`, `requestedAt`, `stopRequested`); the job writes everything else.
+  // (`requestedScope`, `requestedAt`, `stopRequested`) and `status`, and otherwise only reset
+  // job-written fields (design.md, "The job document is both the control and the status
+  // surface"); the job writes everything else.
   id             String                              @id @default(auto()) @map("_id") @db.ObjectId
   // idle / requested / running / stopped / complete / failed
   status         String                              @default("idle")

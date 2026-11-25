@@ -623,12 +623,13 @@ Independent of B4/B5.
     status `requested` and clears the previous run's `runCutoff`, `runTotal`, `progressMarker`,
     `processed` and `skippedPages` in the same write (the loop treats a claimed job with
     `runTotal == null` as a new run, design.md; without the reset a new start resumes the old
-    range); POST stop, which cancels an unclaimed request, sets `stopRequested` on a running
+    range); POST stop, which cancels an unclaimed request (a new run's back to rest, a resumed
+    run's back to `stopped`), sets `stopRequested` on a running
     run, and sets `stopped` directly when the run's lease has expired or when the job is `failed`
     with a retry due (clearing `failedAttempts` and `retryAt`); and POST resume, valid in `stopped`
     and `failed`, which sets `requested`, keeps the scope, `runCutoff` and the
-    marker, and resets `failedAttempts` and `retryAt`. A start also resets `failedAttempts` and
-    `retryAt`. After start or resume writes `requested`, call the `PageLinkService` method from
+    marker, resets `failedAttempts` and `retryAt` and clears `lastError`. A start also resets
+    `failedAttempts` and `retryAt`, clears `lastError` and releases any claim. After start or resume writes `requested`, call the `PageLinkService` method from
     B3.3 that starts the poll in this process and claims at once; respond without waiting for the
     run. Validate the scope (N a positive integer, the date not in the future). Reject a start while
     a run is active (`requested`, `running` with a live lease, or `failed` with a retry due) and
