@@ -534,7 +534,7 @@ Independent of B4/B5.
   - _Boundary: PageLinkBackfillCron, backfill-range_
   - _Depends: B3.1, B1.3, B1.2_
 
-- [ ] B3.3 Register the backfill job and start it from a request
+- [x] B3.3 Register the backfill job and start it from a request
   - Start the backfill poll only while a run is outstanding: the job's `status` is `requested` or
     `running`, or `failed` with `retryAt` set (one predicate, read by the boot gate and the
     self-stop). At boot, after the boot upsert, schedule it only then; with `idle`, `stopped`,
