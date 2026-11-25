@@ -10,11 +10,13 @@ import type { PageModel } from '~/server/models/page';
 import PageModelFactory from '~/server/models/page';
 import { UserStatus } from '~/server/models/user/conts';
 import addCustomFunctionToResponse from '~/server/routes/apiv3/response';
+import type { SocketIoService } from '~/server/service/socket-io';
 import { prisma } from '~/utils/prisma';
 
 import { ensurePageLinkIndexes } from '../models/page-link-indexes';
 import { throwOnWriteErrors } from '../models/throw-on-write-errors';
 import { PageLinkBackfillCron } from '../services/page-link-backfill-cron';
+import { PageLinkService } from '../services/page-link-service';
 import { createBacklinksBackfillAdminRouter } from './backlinks-backfill-admin';
 
 // Exclusive project: the job document is a singleton and the page counts span the whole
@@ -98,6 +100,24 @@ const claimRunning = async (owner = 'owner-a'): Promise<void> => {
 const expireLease = () =>
   patchJob({ leaseExpiresAt: date('2000-01-01T00:00:00.000Z') });
 
+/** The previous run failed, and the poll will retry it on its own. */
+const FAILED_WITH_RETRY_DUE = {
+  ...PREVIOUS_RUN,
+  status: 'failed',
+  lastError: 'db down',
+  failedAttempts: 2,
+  retryAt: date('2999-01-01T00:00:00.000Z'),
+};
+
+/** The previous run failed and will not be retried: its retries are used up. */
+const FAILED_NOT_RETRIED = {
+  ...PREVIOUS_RUN,
+  status: 'failed',
+  lastError: 'db down',
+  failedAttempts: 4,
+  retryAt: null,
+};
+
 interface SeedPage {
   readonly path: string;
   readonly updatedAt: Date;
@@ -140,25 +160,32 @@ const post = (action: 'start' | 'stop' | 'resume', body?: object) =>
     .post(`${MOUNT_PATH}/${action}`)
     .send(body ?? {});
 
+/** The router mounted behind a stub of the session middleware, on its own app. */
+const buildApp = (crowi: Crowi): express.Application => {
+  const responseHelpers: { response: Record<string, unknown> } = {
+    response: {},
+  };
+  addCustomFunctionToResponse(responseHelpers);
+  const built = express();
+  built.use(express.json());
+  built.use((req: express.Request & { user?: FakeUser }, res, next) => {
+    Object.assign(res, responseHelpers.response);
+    if (currentUser != null) req.user = currentUser;
+    next();
+  });
+  built.use(MOUNT_PATH, createBacklinksBackfillAdminRouter(crowi));
+  return built;
+};
+
 beforeAll(async () => {
   const db = mongoose.connection.db;
   if (db == null) throw new Error('no mongoose connection');
   await ensurePageLinkIndexes(db);
   Page = PageModelFactory(null);
 
-  const responseHelpers: { response: Record<string, unknown> } = {
-    response: {},
-  };
-  addCustomFunctionToResponse(responseHelpers);
-  app = express();
-  app.use(express.json());
-  app.use((req: express.Request & { user?: FakeUser }, res, next) => {
-    Object.assign(res, responseHelpers.response);
-    if (currentUser != null) req.user = currentUser;
-    next();
-  });
-  // The auth middlewares read nothing from crowi for a logged-in or anonymous API caller.
-  app.use(MOUNT_PATH, createBacklinksBackfillAdminRouter(mock<Crowi>()));
+  // The auth middlewares read nothing from crowi for a logged-in or anonymous API caller. The
+  // stubbed service claims nothing, so these tests see the document as the routes wrote it.
+  app = buildApp(mock<Crowi>({ pageLinkService: mock<PageLinkService>() }));
 });
 
 beforeEach(async () => {
@@ -226,6 +253,8 @@ describe('backlinks backfill admin routes', () => {
         coveredSince: null,
         completedAt: null,
         lastError: null,
+        failedAttempts: 0,
+        retryAt: null,
         notIncludedCount: 1,
         totalPageCount: 1,
       });
@@ -313,6 +342,19 @@ describe('backlinks backfill admin routes', () => {
         coverage: 'none',
       });
     });
+
+    it('reports a failed run waiting to retry with its count and retry time', async () => {
+      await patchJob(FAILED_WITH_RETRY_DUE);
+
+      const res = await getState();
+
+      expect(res.body.state).toMatchObject({
+        status: 'failed',
+        lastError: 'db down',
+        failedAttempts: 2,
+        retryAt: '2999-01-01T00:00:00.000Z',
+      });
+    });
   });
 
   describe('POST /start', () => {
@@ -373,12 +415,12 @@ describe('backlinks backfill admin routes', () => {
     });
 
     it.each([
-      'idle',
-      'complete',
-      'stopped',
-      'failed',
-    ])('accepts a start from %s as a new run', async (status) => {
-      await patchJob({ ...PREVIOUS_RUN, status });
+      ['idle', { ...PREVIOUS_RUN, status: 'idle' }],
+      ['complete', { ...PREVIOUS_RUN, status: 'complete' }],
+      ['stopped', { ...PREVIOUS_RUN, status: 'stopped' }],
+      ['failed and not retried', FAILED_NOT_RETRIED],
+    ])('accepts a start from %s as a new run', async (_case, previous) => {
+      await patchJob(previous);
 
       const res = await post('start', { kind: 'all' });
 
@@ -391,6 +433,8 @@ describe('backlinks backfill admin routes', () => {
         progressMarker: null,
         processed: 0,
         skippedPages: 0,
+        failedAttempts: 0,
+        retryAt: null,
       });
     });
 
@@ -428,6 +472,11 @@ describe('backlinks backfill admin routes', () => {
       [
         'a run is running under a live lease',
         () => claimRunning(),
+        'backfill_run_active',
+      ],
+      [
+        'a failed run is waiting to retry',
+        () => patchJob(FAILED_WITH_RETRY_DUE),
         'backfill_run_active',
       ],
       [
@@ -614,13 +663,35 @@ describe('backlinks backfill admin routes', () => {
       expect(await readJob()).toMatchObject({ processed: 20 });
     });
 
+    it('ends a failed run waiting to retry as stopped, cancelling the retry and keeping its progress', async () => {
+      await patchJob(FAILED_WITH_RETRY_DUE);
+
+      const res = await post('stop');
+
+      expect(res.status).toBe(200);
+      expect(res.body.state).toMatchObject({
+        status: 'stopped',
+        failedAttempts: 0,
+        retryAt: null,
+        processed: 20,
+      });
+      expect(await readJob()).toMatchObject({
+        status: 'stopped',
+        stopRequested: false,
+        claimedBy: null,
+        progressMarker: '0000000000000000000000aa',
+        runTotal: 50,
+      });
+      expect(await jobs().tryClaim('poll', LEASE)).toBe(false);
+    });
+
     it.each([
-      'idle',
-      'complete',
-      'stopped',
-      'failed',
-    ])('is refused with 409 in %s, changing nothing', async (status) => {
-      await patchJob({ ...PREVIOUS_RUN, status });
+      ['idle', { ...PREVIOUS_RUN, status: 'idle' }],
+      ['complete', { ...PREVIOUS_RUN, status: 'complete' }],
+      ['stopped', { ...PREVIOUS_RUN, status: 'stopped' }],
+      ['failed and not retried', FAILED_NOT_RETRIED],
+    ])('is refused with 409 in %s, changing nothing', async (_case, previous) => {
+      await patchJob(previous);
       const before = await readStoredJob();
 
       const res = await post('stop');
@@ -659,11 +730,29 @@ describe('backlinks backfill admin routes', () => {
     });
 
     it.each([
+      ['not retried', FAILED_NOT_RETRIED],
+      ['waiting to retry', FAILED_WITH_RETRY_DUE],
+    ])('requests a failed run (%s) again from its marker, with its retries restored', async (_case, previous) => {
+      await patchJob(previous);
+
+      const res = await post('resume');
+
+      expect(res.status).toBe(200);
+      expect(await readJob()).toMatchObject({
+        status: 'requested',
+        failedAttempts: 0,
+        retryAt: null,
+        runTotal: 50,
+        progressMarker: '0000000000000000000000aa',
+        processed: 20,
+      });
+    });
+
+    it.each([
       ['idle', () => patchJob({ status: 'idle' })],
       ['requested', () => patchJob({ ...PREVIOUS_RUN, status: 'requested' })],
       ['running', () => claimRunning()],
       ['complete', () => patchJob({ status: 'complete' })],
-      ['failed', () => patchJob({ ...PREVIOUS_RUN, status: 'failed' })],
     ])('is refused with 409 in %s, changing nothing', async (_status, arrange) => {
       await arrange();
       const before = await readStoredJob();
@@ -671,9 +760,86 @@ describe('backlinks backfill admin routes', () => {
       const res = await post('resume');
 
       expect(res.status).toBe(409);
-      expect(res.body.errors[0].code).toBe('backfill_not_stopped');
+      expect(res.body.errors[0].code).toBe('backfill_not_resumable');
       expect(await readStoredJob()).toEqual(before);
     });
+  });
+});
+
+describe('backlinks backfill admin routes, with the real PageLinkService', () => {
+  // Paced to finish a handful of pages at once; the poll runs on its real schedule, so each
+  // test stops it as soon as it has looked.
+  const CONFIG: Record<string, string | number> = {
+    'app:siteUrl': 'https://wiki.example',
+    'backlinks:drainIntervalMs': 1000,
+    'backlinks:dutyCyclePercent': 25,
+    'backlinks:backfillDutyCyclePercent': 100,
+    'backlinks:backfillMaxPagesPerSecond': 1000,
+    'backlinks:backfillMaxBodyKiB': 256,
+  };
+  let service: PageLinkService;
+  let appWithService: express.Application;
+
+  beforeEach(() => {
+    service = new PageLinkService(
+      mock<Crowi>({
+        configManager: {
+          // mockImplementation rather than vi.fn(impl): getConfig is generic over the key.
+          getConfig: vi.fn().mockImplementation((key: string) => CONFIG[key]),
+        },
+        socketIoService: mock<SocketIoService>(),
+      }),
+    );
+    appWithService = buildApp(mock<Crowi>({ pageLinkService: service }));
+  });
+
+  afterEach(() => {
+    service.backfillPoll?.stopCron();
+  });
+
+  const postWithService = (action: 'start' | 'resume', body?: object) =>
+    request(appWithService)
+      .post(`${MOUNT_PATH}/${action}`)
+      .send(body ?? {});
+
+  const waitForStatus = (status: string) =>
+    vi.waitFor(async () => expect(await readJob()).toMatchObject({ status }), {
+      timeout: 5000,
+      interval: 50,
+    });
+
+  it.each([
+    ['a start', () => postWithService('start', { kind: 'all' })],
+    [
+      'a resume',
+      async () => {
+        await patchJob({ status: 'stopped', requestedScope: { kind: 'all' } });
+        return postWithService('resume');
+      },
+    ],
+  ])('runs %s in this process without waiting for a tick, and leaves the poll running', async (_case, send) => {
+    await seedPage({
+      path: '/now/a',
+      updatedAt: new Date('2026-01-01T00:00:00Z'),
+      body: '[b](/now/b)',
+    });
+    expect(service.backfillPoll).toBeUndefined();
+
+    const res = await send();
+
+    expect(res.status).toBe(200);
+    await waitForStatus('complete');
+    expect(await readJob()).toMatchObject({ coverage: 'all', processed: 1 });
+    expect(service.backfillPoll?.isJobRunning()).toBe(true);
+  });
+
+  it('starts a run after the job document was deleted at runtime', async () => {
+    await jobs().deleteMany({});
+
+    const res = await postWithService('start', { kind: 'all' });
+
+    expect(res.status).toBe(200);
+    await waitForStatus('complete');
   });
 });
 

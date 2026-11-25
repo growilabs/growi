@@ -15,6 +15,8 @@ const job = (overrides: Partial<BackfillJobRow> = {}): BackfillJobRow => ({
   coveredSince: null,
   completedAt: null,
   lastError: null,
+  failedAttempts: 0,
+  retryAt: null,
   ...overrides,
 });
 
@@ -48,8 +50,28 @@ describe('toBacklinksBackfillState', () => {
       coveredSince: '2026-03-01T00:00:00.000Z',
       completedAt: '2026-03-02T10:00:00.000Z',
       lastError: 'boom',
+      failedAttempts: 0,
+      retryAt: null,
       notIncludedCount: 7,
       totalPageCount: 10,
+    });
+  });
+
+  it('reports a failed run waiting to retry with its count and retry time', () => {
+    const state = toBacklinksBackfillState(
+      job({
+        status: 'failed',
+        lastError: 'db down',
+        failedAttempts: 2,
+        retryAt: new Date('2026-03-02T10:15:00.000Z'),
+      }),
+      COUNTS,
+    );
+
+    expect(state).toMatchObject({
+      status: 'failed',
+      failedAttempts: 2,
+      retryAt: '2026-03-02T10:15:00.000Z',
     });
   });
 
