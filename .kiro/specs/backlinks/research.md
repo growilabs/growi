@@ -384,20 +384,67 @@
     it directly, and a copy in config could disagree with it. If the document goes missing, the boot
     upsert recreates it as "not started", and a rerun is harmless because the upsert is idempotent;
     reconstructing "complete" from `pagelinks` is not possible (a page without links has no rows).
-  - *A job document missing at runtime is reported, not repaired (decided 2026-11-19)*: nothing in
-    GROWI deletes it and GROWI-to-GROWI transfers exclude it, so it disappears only by an operator's
-    hand (or a restore into a running server). The admin endpoints could recreate it, but whether a
-    request is then claimed depends on a poll existing in the process, and the poll is scheduled
-    only when coverage was not `all` at boot: otherwise a Start would sit in `requested` with nothing
-    to claim it. Recreating it as `all` would need the boot-time coverage kept in process, and would
-    override an operator who deleted it to force a rebuild, disagreeing with what a restart produces
-    (`none`). A tick-side recreation helps only while the poll runs, and may only write `idle`, since
-    the tick cannot know an admin asked. A restart is right in every case, so the endpoints report
-    that one is needed.
-  - *The poll does not stop itself when a run reaches `all` (decided 2026-11-19)*: stopping it would
-    make Start (and recovery from a missing document) responsible for restarting it, so `PageLinkService`
-    would have to keep the poll for the endpoints. The saving is one primary-key read a minute per
-    instance until the next restart, which an upgrade brings anyway.
+  - *The start poll runs only while a run is outstanding (decided 2026-11-24, PR #12278 review)*:
+    scheduling the poll whenever coverage is not `all` meant every app polled the job document once
+    a minute from the upgrade on, including apps whose admin never starts a backfill, and kept
+    polling after a run reached `all` until the next restart. On GROWI.cloud every app shares one
+    MongoDB, so that is a `findAndModify` a minute per app, indefinitely.
+    - *Removing the poll was considered*, with runs started only by the admin endpoints and at boot.
+      It was rejected because nothing then takes over a run whose owner dies after the other
+      instances have booted. During a rolling deploy the new pod boots while the old one still
+      renews its lease, so the new pod's boot claim fails; the old pod is then killed mid-run, and
+      no instance checks again once the lease lapses. A run on a large wiki is paced to take hours,
+      so overlapping a rollout is the expected case, and the admin would only see a progress bar
+      that stopped moving. A takeover needs something that checks again after the lease runs out.
+    - *Kept, gated on the job's status*: boot schedules the poll only while a run is outstanding
+      (`requested`, `running`, or `failed` with a retry due); Start and Resume start it in their own
+      process and claim at once; a tick that wins nothing stops the poll unless a run is still
+      outstanding. An app that never starts a backfill, or has finished it, sends nothing. The cost
+      is one primary-key `findAndModify` a minute per polling instance while a run is outstanding,
+      small next to the run's own per-page writes.
+    - *An earlier decision is reversed*: the poll was not to stop itself once a run reached `all`,
+      because Start would then have to restart it. Since the endpoints now start the poll anyway,
+      that reason no longer holds.
+    - *Accepted gap*: only an instance whose poll is running takes a run over. If the owner
+      disappears without a restart (scale-in) and no other instance has a poll, the job stays
+      `running` until some instance restarts, or until the admin uses Stop (which sets `stopped`
+      directly on an expired lease) and Resume. A `requested` job is left the same way if the
+      instance that received the Start disappears before its claim. The common cases, a rolling deploy or a restart,
+      are covered, because the new process boots with the run outstanding.
+  - *A failed run is retried three times with a growing delay, then left for the admin (decided
+    2026-11-25, PR #12278 review)*: a failed run used to be claimed again by the next tick, every
+    minute with no cap. A run that fails the same way each time would then retry forever, and each
+    retry rebuilds the in-memory path map for every page. Now the failure schedules a retry at
+    5, 15 then 30 minutes, and after the fourth failure in a row the job stays `failed` until the
+    admin resumes it. Three retries over about 50 minutes ride out a failover or a short outage; a
+    fault that outlasts that is one the admin should see.
+    - *The count and the retry time live on the job document, not in the process*
+      (`failedAttempts`, `retryAt` on the database clock). The review first asked for the retry
+      inside the failing process, but that was written for the design without a poll, where only
+      that process could retry. With the poll kept, storing the schedule on the document means the
+      poll does the retry, so any polling instance takes it over when the failing one dies while
+      waiting. With an in-process timer, that case would leave the job `failed` until the admin
+      resumed it; the review had accepted that, since the admin sees `failed` with Resume. Storing
+      it also keeps the cap across restarts (an in-process count would give each restart a fresh
+      round), lets the admin settings tell "retrying at T" from "retries used up", and needs no
+      timer to clear at shutdown. The cost is two fields and a poll that keeps ticking during the
+      wait.
+    - *The cap counts failures in a row with no progress between them*: the first checkpoint after
+      a claim resets the count. Counting per run would end a run that failed twice early, then
+      progressed for hours, at its first late failure, though the late fault is unrelated to the
+      early ones. A run fails only on a fault outside the per-page retry (the database unreachable
+      at a checkpoint or batch read, or a bug), so a deterministic fault never passes a new
+      checkpoint and still reaches the cap. A fault that strikes just after every checkpoint would
+      not, but every retry then saves progress, so the run still ends.
+    - *A run that fails while a Stop is pending is not retried*: the retry would only claim the job
+      to stop at its first checkpoint, after rebuilding the path map.
+  - *A job document missing at runtime is recreated by the admin endpoints (decided 2026-11-25)*:
+    nothing in GROWI deletes it and GROWI-to-GROWI transfers exclude it, so it disappears only by an
+    operator's hand (or a restore into a running server). The endpoints run the boot upsert before
+    reading or writing, so the state reads "not started", as after a restart. An earlier decision
+    reported it as missing and asked for a restart instead, because a recreated document's request
+    was claimed only if a poll had been scheduled at boot; the endpoints now start the poll
+    themselves, so that no longer applies.
   - *Stop and resume are part of the design (decided 2026-10-28)*: now that admins start the job, a
     long run on a large wiki needs a way to be interrupted that is not a restart. It is cheap because
     resume is the crash-recovery path the design already has (marker saved only after a page's rows
