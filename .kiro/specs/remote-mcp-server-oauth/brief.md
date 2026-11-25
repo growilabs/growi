@@ -105,6 +105,7 @@ GROWI 本体が OAuth 2.1 の認可サーバーを兼ねる。MCP 仕様は、�
 - **新しいモデル**: Prisma で作る。索引は migrate-mongo のマイグレーションで作り、`schema.prisma` に同じ名前で宣言する。期限つきの索引（TTL）は Prisma で表せないので、マイグレーションで作る。
 - **トークンの保存**: 認可コード、アクセストークン、リフレッシュトークンは、ハッシュで保存する。
 - **Activity**: 連携の許可・拒否・失効、トークンの発行と更新を記録する。`activity-recording` のルールに従う。未認証で呼べる `/oauth/token` は悪用の対象になりやすいので、失敗の記録と回数制限を要件で決める。
+- **置き場所**: 認可サーバーは MCP のために作るが、MCP 専用のものではない。そのため `features/mastra` の下に置くとは限らない。置き場所は設計で決める。`/_api/v3/mcp` の認証の差し替えだけは、`remote-mcp-server-route` が `features/mastra` に用意する差し込み口に入る。
 - **Basic 認証つきの環境**: Sign in 方式は `Authorization: Bearer` を使うので、プロキシの Basic 認証と衝突する。プロキシ側で `/_api/v3/mcp`、well-known、`/oauth/token` を Basic 認証の対象から外すことが必須で、代替手段は無い。ブラウザで開く `/oauth/authorize` は対象のままでよい。外したパスはインターネットから直接届くようになるので、回数制限で守る。
 - **AccessToken の 1 件削除の不具合**: `DELETE /_api/v3/personal-setting/access-token` は所有者を確かめていない（research.md の H）。発行トークンを AccessToken に載せる場合（未決 2 の案 A）は、この不具合を先に直す。
 

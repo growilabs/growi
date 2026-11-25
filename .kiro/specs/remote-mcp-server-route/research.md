@@ -210,7 +210,9 @@ umbrella 全体の調査（claude.ai の挙動、MCP の仕様、先行事例）
 
 #### 推奨する方針
 
-- **Option C**。閲覧権限の判定を 1 か所に保ったまま、MCP 向けの定義を分けられる。
+- **置き場所は `features/mastra`（2026-11-25、ユーザー確認済み）**。MCP サーバーは Mastra を使う前提なので、ルート、認証の差し込み口、`MCPServer` の組み立て、管理 API、管理画面を `features/mastra` の下に置く。新しい feature は作らない。
+- **ツールの構成は Option C のまま**。既存の 2 ツールから処理の中身を関数として取り出し、MCP 用のツール定義を `features/mastra` の中に、エージェント用の定義とは別に置く。閲覧権限の判定を 1 か所に保ったまま、MCP 向けの定義を分けられる。Option A の欠点（`mapAuthInfoToUser` の副作用、定義の混在）は、これで避けられる。
+- **URL は `/_api/v3/mcp` のまま**。`features/mastra` のルーター（`/_api/v3/mastra`）は、全体に `aiReadyGuard` をかけている（`features/mastra/server/routes/index.ts`）。その下に置くと要件 1.8（AI の設定に左右されない）に反するので、MCP のルートは別にマウントする。`features/mastra` の中のコードを別の URL にマウントする前例は、`routes/admin-ai-settings` にある。
 - 認証は、`/_api/v3/mcp` をセッションの対象から外したうえで（3.8）、「Bearer が無ければ 401」の判定と `accessTokenParser` を、差し込み口の暫定の中身にする（3.1 の (a)）。
 - Activity は、MCP 用のツールの `execute` の中で `createActivity` を直接呼ぶ（3.6 の (a)）。
 - `mongoSanitize` は、`/_api/v3/mcp` を除外する（3.2）。
@@ -235,4 +237,4 @@ umbrella 全体の調査（claude.ai の挙動、MCP の仕様、先行事例）
 10. claude.ai が配列のリクエストを送らないこと（1.3）。
 
 ---
-_Updated: 2026-11-25. パスを `/_api/v3/mcp` にする決定を反映した（1.1 を解決済みにし、`CertifyOrigin` の制約を 3.9 に足した）。Prior: 2026-11-24. ギャップ分析を記録。_
+_Updated: 2026-11-25. 置き場所を `features/mastra` にする決定を、設計への申し送りに足した。Prior: 2026-11-25. パスを `/_api/v3/mcp` にする決定を反映した（1.1 を解決済みにし、`CertifyOrigin` の制約を 3.9 に足した）。Prior: 2026-11-24. ギャップ分析を記録。_
