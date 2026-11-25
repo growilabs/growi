@@ -33,7 +33,7 @@
   - 完了の目安: 追加したテストが、実装前に落ち、実装後に通る。`anonymous-view` がない状態での起動が、今までどおり成功する
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6_
   - _Depends: 2.2_
-- [ ] 3. RPC の型から「利用者なし」を消す
+- [x] 3. RPC の型から「利用者なし」を消す
   - `packages/core/src/interfaces/vault/vault-compose-view.ts` の `ComposeViewRequest.userId` を `string` にし、changeset を足す
   - 完了の目安: `@growi/core` を再ビルドした後、`apps/app` と `apps/growi-vault-manager` の lint（型検査を含む）が通る。`userId` に `null` を渡すコードを書くと、型検査で落ちる
   - _Requirements: 1.5, 2.1_

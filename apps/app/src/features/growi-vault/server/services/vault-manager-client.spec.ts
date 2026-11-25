@@ -129,7 +129,7 @@ describe('VaultManagerClient', () => {
 
     it('calls POST /internal/compose-view with correct URL and body', async () => {
       const expectedResponse: ComposeViewResponse = {
-        viewRef: 'anonymous-view',
+        viewRef: 'user-abc-view',
         commitOid: 'cafebabecafebabecafebabe',
       };
 
@@ -138,7 +138,7 @@ describe('VaultManagerClient', () => {
       );
 
       await client.composeView({
-        userId: null,
+        userId: 'user-abc',
         namespaces: ['public'],
       });
 
@@ -158,7 +158,7 @@ describe('VaultManagerClient', () => {
 
       // Body must contain the serialized request.
       expect(JSON.parse(calledOpts.body as string)).toEqual({
-        userId: null,
+        userId: 'user-abc',
         namespaces: ['public'],
       });
     });
@@ -471,7 +471,7 @@ describe('VaultManagerClient', () => {
         makeFetchResponse({ json: { viewRef: 'v', commitOid: 'abc' } }),
       );
 
-      await client.composeView({ userId: null, namespaces: [] });
+      await client.composeView({ userId: 'user-abc', namespaces: [] });
 
       const [calledUrl] = mockFetch.mock.calls[0] as [string];
       expect(calledUrl).toContain(customEndpoint);
