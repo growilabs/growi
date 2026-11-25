@@ -11,6 +11,13 @@ import {
   SEARCH_FILTER_PREFIXES,
 } from '~/features/search/utils/filter-fields';
 import type {
+  AttachmentSearchInput,
+  AttachmentSearchResultAggregator,
+  IPrimarySearchResult,
+  IResolvedSecondaryResult,
+} from '~/features/search-attachments/server/services/attachment-search-result-aggregator';
+import type { AttachmentSearchViewer } from '~/features/search-attachments/server/services/search-accessible-pages';
+import type {
   AuditlogSuggestionField,
   AuditlogSuggestionsResponse,
 } from '~/interfaces/activity';
@@ -42,8 +49,8 @@ import type {
 import NamedQuery from '../models/named-query';
 import type { PageModel } from '../models/page';
 import { SearchError } from '../models/vo/search-error';
-import { hasIntersection } from '../util/compare-objectId';
 import { configManager } from './config-manager';
+import { canShowSnippetOfPage } from './search/can-show-snippet';
 import ElasticsearchDelegator from './search-delegator/elasticsearch';
 import PrivateLegacyPagesDelegator from './search-delegator/private-legacy-pages';
 
@@ -128,6 +135,9 @@ class SearchService implements SearchQueryParser, SearchResolver {
   fullTextSearchDelegator: ElasticsearchDelegator;
 
   nqDelegators: { [key in SearchDelegatorName]: SearchDelegator };
+
+  private attachmentSearchResultAggregator: AttachmentSearchResultAggregator | null =
+    null;
 
   static async create(crowi: Crowi) {
     const instance = new SearchService();
@@ -519,13 +529,15 @@ class SearchService implements SearchQueryParser, SearchResolver {
     );
   }
 
-  async searchKeyword(
+  /**
+   * Parses and resolves a query string once: the delegator to run it with and
+   * the searchable data (terms, resolved filter data) to run.
+   */
+  private async prepareSearch(
     keyword: string,
     nqName: string | null,
-    user,
     userGroups: ObjectIdLike[] | null,
-    searchOpts,
-  ): Promise<[ISearchResult<unknown>, SearchDelegatorName | null]> {
+  ): Promise<[SearchDelegator, SearchableData]> {
     let parsedQuery: ParsedQuery;
     // parse
     try {
@@ -552,10 +564,100 @@ class SearchService implements SearchQueryParser, SearchResolver {
       userGroups,
     );
 
+    return [delegator, data];
+  }
+
+  async searchKeyword(
+    keyword: string,
+    nqName: string | null,
+    user,
+    userGroups: ObjectIdLike[] | null,
+    searchOpts,
+  ): Promise<[ISearchResult<unknown>, SearchDelegatorName | null]> {
+    const [delegator, data] = await this.prepareSearch(
+      keyword,
+      nqName,
+      userGroups,
+    );
+
     return [
       await delegator.search(data, user, userGroups, searchOpts),
       delegator.name ?? null,
     ];
+  }
+
+  /**
+   * Parses a query for the full-text search delegator, once, into what both
+   * the page side and the attachment side of a faceted search run with.
+   */
+  async createAttachmentSearchInput(
+    keyword: string,
+    viewer: AttachmentSearchViewer,
+  ): Promise<AttachmentSearchInput> {
+    const [, data] = await this.prepareSearch(keyword, null, viewer.userGroups);
+    return {
+      queryString: data.queryString,
+      terms: data.terms as QueryTerms,
+      resolvedFilterData: data.resolvedFilterData ?? {
+        groupIds: [],
+        notGroupIds: [],
+      },
+      viewer,
+    };
+  }
+
+  /**
+   * Register an AttachmentSearchResultAggregator for faceted search routing.
+   * Called by initAttachmentFullTextSearch.
+   */
+  setAttachmentSearchResultAggregator(
+    agg: AttachmentSearchResultAggregator,
+  ): void {
+    this.attachmentSearchResultAggregator = agg;
+  }
+
+  /**
+   * The facet=attachments search, routed through the
+   * AttachmentSearchResultAggregator. Callers check
+   * isAttachmentFullTextSearchEnabled first.
+   *
+   * `viewer` is resolved the same way the page search route resolves it; a
+   * null user means guest.
+   */
+  async searchByFacet(
+    keyword: string,
+    viewer: AttachmentSearchViewer,
+    options: { from?: number; size?: number },
+  ): Promise<IPrimarySearchResult> {
+    const from = options.from ?? 0;
+    const size = options.size ?? 20;
+
+    const aggregator = this.attachmentSearchResultAggregator;
+    if (aggregator == null) {
+      throw new Error('Attachment search is not initialized');
+    }
+
+    const input = await this.createAttachmentSearchInput(keyword, viewer);
+    return aggregator.searchPrimary(input, { from, size });
+  }
+
+  /**
+   * Attachment hits for page ids the client got from the page search.
+   *
+   * @throws {RangeError} when more than 20 distinct ids are given
+   * @throws when the attachment search is not initialized or the aggregator fails
+   */
+  async resolveAttachmentSecondary(
+    keyword: string,
+    viewer: AttachmentSearchViewer,
+    { primaryIds }: { primaryIds: string[] },
+  ): Promise<IResolvedSecondaryResult> {
+    const aggregator = this.attachmentSearchResultAggregator;
+    if (aggregator == null) {
+      throw new Error('Attachment search is not initialized');
+    }
+    const input = await this.createAttachmentSearchInput(keyword, viewer);
+    return aggregator.resolveSecondary(input, { primaryIds });
   }
 
   async resolveFilterData(
@@ -865,32 +967,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
   }
 
   canShowSnippet(pageData, user, userGroups): boolean {
-    const Page = mongoose.model('Page') as unknown as PageModel;
-
-    const testGrant = pageData.grant;
-    const testGrantedUser = pageData.grantedUsers?.[0];
-    const testGrantedGroups = pageData.grantedGroups;
-
-    if (testGrant === Page.GRANT_RESTRICTED) {
-      return false;
-    }
-
-    if (testGrant === Page.GRANT_OWNER) {
-      if (user == null) return false;
-
-      return user._id.toString() === testGrantedUser.toString();
-    }
-
-    if (testGrant === Page.GRANT_USER_GROUP) {
-      if (userGroups == null) return false;
-
-      return hasIntersection(
-        userGroups.map((id) => id.toString()),
-        testGrantedGroups,
-      );
-    }
-
-    return true;
+    return canShowSnippetOfPage(pageData, user, userGroups);
   }
 }
 

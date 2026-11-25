@@ -183,7 +183,11 @@ describe('change proposal flow: apply, revert everything, then revert the revert
     });
     if (!created.ok) throw new Error(JSON.stringify(created.error));
     const proposalId = created.value.proposalId;
-    await service.approve(proposalId, users.requester, 'all', BACKGROUND);
+    await service.approve(proposalId, {
+      user: users.requester,
+      channel: 'ui',
+      trigger: BACKGROUND,
+    });
     await waitForPageOperations();
     const original = await kit.reload(proposalId);
     expect(original.lifecycle).toBe('settled');

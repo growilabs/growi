@@ -110,6 +110,17 @@ export const setup = (crowi, app) => {
     ),
   );
   app.use(PLUGIN_EXPRESS_STATIC_DIR, express.static(PLUGIN_STORING_PATH));
+  // Kept out of the session like the static files above: a response that
+  // re-sends the session cookie could put a browser back on a session that a
+  // login has just replaced. A file that is not there (a development build
+  // lives under .next/dev) falls through to Next.js behind the session.
+  app.use(
+    '/_next/static',
+    express.static(resolveFromRoot('.next/static'), {
+      maxAge: '1y',
+      immutable: true,
+    }),
+  );
 
   app.use(methodOverride());
 

@@ -416,6 +416,11 @@ describe('config-definition multi-provider ai keys', () => {
 describe('config-definition change-proposal keys', () => {
   const cases = [
     ['app:changeProposalEnabled', 'CHANGE_PROPOSAL_ENABLED', false],
+    [
+      'app:changeProposalReviewersEnabled',
+      'CHANGE_PROPOSAL_REVIEWERS_ENABLED',
+      false,
+    ],
     ['changeProposal:isEditEnabled', 'CHANGE_PROPOSAL_IS_EDIT_ENABLED', true],
     [
       'changeProposal:isCreateEnabled',
@@ -486,5 +491,16 @@ describe('config-definition change-proposal keys', () => {
         'changeProposal:perPageNotificationsEnabled',
       ]);
     });
+  });
+});
+
+describe('config-definition interrupted duplicate recovery key', () => {
+  it('runs the recovery every 10 minutes by default', () => {
+    const definition =
+      CONFIG_DEFINITIONS['app:interruptedDuplicateRecoveryCronSchedule'];
+    expect(definition.envVarName).toBe(
+      'INTERRUPTED_DUPLICATE_RECOVERY_CRON_SCHEDULE',
+    );
+    expect(definition.defaultValue).toBe('*/10 * * * *');
   });
 });

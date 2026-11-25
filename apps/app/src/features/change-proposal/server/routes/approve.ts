@@ -3,6 +3,7 @@ import { ErrorV3 } from '@growi/core/dist/models';
 import type { RequestHandler } from 'express';
 
 import type Crowi from '~/server/crowi';
+import type { AccessTokenParserReq } from '~/server/middlewares/access-token-parser';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import loggerFactory from '~/utils/logger';
@@ -12,6 +13,7 @@ import type {
   GetChangeProposalService,
 } from './read-access';
 import {
+  detectChannel,
   operationKeysValidator,
   requestTrigger,
   respondWithServiceError,
@@ -23,7 +25,7 @@ const logger = loggerFactory('growi:features:change-proposal:routes:approve');
 type Req = AuthenticatedRequest<
   Record<string, string>,
   { operationKeys?: string[] },
-  unknown
+  AccessTokenParserReq['query']
 >;
 
 /**
@@ -32,13 +34,17 @@ type Req = AuthenticatedRequest<
  *    /change-proposals/{id}/approve:
  *      post:
  *        tags: [ChangeProposals]
- *        summary: Approve and apply pending operations of the caller's change proposal
+ *        summary: Approve and apply pending operations of a change proposal, as its requester or a reviewer
  *        description: >
  *          Approves the chosen pending operations (each chosen key also approves the other
  *          pending operations on the same page), or every pending operation when
  *          operationKeys is omitted, and applies them before responding. "in-progress"
- *          means another run holds the apply; it applies the approved operations.
- *          Only the requester may approve; anyone else gets the same 404 as a missing id.
+ *          means another run holds the apply; it applies the approved operations, and its
+ *          optional results hold the caller's operations as freshly read so a client can
+ *          show progress.
+ *          The requester and the reviewers may approve, each only the operations on pages
+ *          they may view; anyone else, and a reviewer who may view none of its pages, gets
+ *          the same 404 as a missing id.
  *          Requires the `write:features:page` scope.
  *        parameters:
  *          - name: id
@@ -84,11 +90,11 @@ type Req = AuthenticatedRequest<
  *                              reason:
  *                                type: string
  *          400:
- *            description: Invalid request body, or a read-only user
+ *            description: Invalid request body (code validation_failed), or a read-only user
  *          403:
  *            description: Not authenticated or insufficient scope
  *          404:
- *            description: The proposal does not exist or the caller is not its requester (code notfound)
+ *            description: The proposal does not exist, or the caller is neither its requester nor a reviewer who may view one of its pages (code notfound)
  *          409:
  *            description: The proposal is no longer open (code not_open)
  */
@@ -106,9 +112,8 @@ export const approveRouteHandlersFactory = (
       // The service settles the activity before it returns — see rules/activity-recording.md.
       const result = await getService().approve(
         req.params.id,
-        user,
-        req.body.operationKeys ?? 'all',
-        requestTrigger(res),
+        { user, channel: detectChannel(req), trigger: requestTrigger(res) },
+        req.body.operationKeys,
       );
       if (!result.ok) {
         return respondWithServiceError(res, result.error);

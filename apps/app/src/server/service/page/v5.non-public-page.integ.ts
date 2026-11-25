@@ -1562,7 +1562,7 @@ describe('PageService page operations with non-public pages', () => {
         onlyDuplicateUserRelatedResources,
       );
 
-      // Wait for the async duplicateRecursivelyMainOperation to complete
+      // duplicatePage copies the descendants in the background; wait for it to finish
       if (page.grant !== Page.GRANT_RESTRICTED && isRecursively) {
         await waitForPageOperationComplete(fromPath, PageActionType.Duplicate);
       }

@@ -1,5 +1,7 @@
 import type { HasObjectId, IUser, IUserHasId, Ref } from '@growi/core';
 
+import type { ReviewChannel } from '~/features/change-proposal/interfaces';
+
 import type { PaginateResult } from './mongoose-utils';
 
 // Model
@@ -61,6 +63,7 @@ const ACTION_PAGE_RECURSIVELY_REVERT = 'PAGE_RECURSIVELY_REVERT';
 const ACTION_PAGE_SUBSCRIBE = 'PAGE_SUBSCRIBE';
 const ACTION_PAGE_UNSUBSCRIBE = 'PAGE_UNSUBSCRIBE';
 const ACTION_PAGE_EXPORT = 'PAGE_EXPORT';
+const ACTION_PAGE_DUPLICATE_INTERRUPTED = 'PAGE_DUPLICATE_INTERRUPTED';
 const ACTION_PAGE_BULK_EXPORT_COMPLETED = 'PAGE_BULK_EXPORT_COMPLETED';
 const ACTION_PAGE_BULK_EXPORT_FAILED = 'PAGE_BULK_EXPORT_FAILED';
 const ACTION_PAGE_BULK_EXPORT_JOB_EXPIRED = 'PAGE_BULK_EXPORT_JOB_EXPIRED';
@@ -96,6 +99,7 @@ const ACTION_SHARE_LINK_NOT_FOUND = 'SHARE_LINK_NOT_FOUND';
 const ACTION_ATTACHMENT_ADD = 'ATTACHMENT_ADD';
 const ACTION_ATTACHMENT_REMOVE = 'ATTACHMENT_REMOVE';
 const ACTION_ATTACHMENT_DOWNLOAD = 'ATTACHMENT_DOWNLOAD';
+const ACTION_ATTACHMENT_REEXTRACT = 'ATTACHMENT_REEXTRACT';
 const ACTION_SEARCH_PAGE = 'SEARCH_PAGE';
 const ACTION_SEARCH_PAGE_VIEW = 'SEARCH_PAGE_VIEW';
 const ACTION_ADMIN_APP_SETTINGS_UPDATE = 'ADMIN_APP_SETTING_UPDATE';
@@ -104,6 +108,12 @@ const ACTION_ADMIN_AI_MODEL_CATALOG_REFRESH = 'ADMIN_AI_MODEL_CATALOG_REFRESH';
 const ACTION_CHANGE_PROPOSAL_CREATE = 'CHANGE_PROPOSAL_CREATE';
 const ACTION_CHANGE_PROPOSAL_APPLY = 'CHANGE_PROPOSAL_APPLY';
 const ACTION_CHANGE_PROPOSAL_REVERT = 'CHANGE_PROPOSAL_REVERT';
+const ACTION_CHANGE_PROPOSAL_APPROVE = 'CHANGE_PROPOSAL_APPROVE';
+const ACTION_CHANGE_PROPOSAL_REJECT = 'CHANGE_PROPOSAL_REJECT';
+const ACTION_CHANGE_PROPOSAL_ABSTAIN = 'CHANGE_PROPOSAL_ABSTAIN';
+const ACTION_CHANGE_PROPOSAL_REVIEWER_ADD = 'CHANGE_PROPOSAL_REVIEWER_ADD';
+const ACTION_CHANGE_PROPOSAL_REVIEWER_REMOVE =
+  'CHANGE_PROPOSAL_REVIEWER_REMOVE';
 const ACTION_ADMIN_CHANGE_PROPOSAL_SETTINGS_UPDATE =
   'ADMIN_CHANGE_PROPOSAL_SETTINGS_UPDATE';
 const ACTION_ADMIN_SITE_URL_UPDATE = 'ADMIN_SITE_URL_UPDATE';
@@ -117,6 +127,8 @@ const ACTION_ADMIN_PAGE_BULK_EXPORT_SETTINGS_UPDATE =
   'ADMIN_PAGE_BULK_EXPORT_SETTINGS_UPDATE';
 const ACTION_ADMIN_ATTACHMENT_DISPOSITION_UPDATE =
   'ADMIN_ATTACHMENT_DISPOSITION_UPDATE';
+const ACTION_ADMIN_ATTACHMENT_SEARCH_SETTINGS_UPDATE =
+  'ADMIN_ATTACHMENT_SEARCH_SETTINGS_UPDATE';
 const ACTION_ADMIN_PAGE_TREE_REPAIR = 'ADMIN_PAGE_TREE_REPAIR';
 const ACTION_ADMIN_MAINTENANCEMODE_ENABLED = 'ADMIN_MAINTENANCEMODE_ENABLED';
 const ACTION_ADMIN_MAINTENANCEMODE_DISABLED = 'ADMIN_MAINTENANCEMODE_DISABLED';
@@ -356,6 +368,7 @@ export const SupportedAction = {
   ACTION_ATTACHMENT_ADD,
   ACTION_ATTACHMENT_REMOVE,
   ACTION_ATTACHMENT_DOWNLOAD,
+  ACTION_ATTACHMENT_REEXTRACT,
   ACTION_SEARCH_PAGE,
   ACTION_SEARCH_PAGE_VIEW,
   ACTION_ADMIN_APP_SETTINGS_UPDATE,
@@ -364,6 +377,11 @@ export const SupportedAction = {
   ACTION_CHANGE_PROPOSAL_CREATE,
   ACTION_CHANGE_PROPOSAL_APPLY,
   ACTION_CHANGE_PROPOSAL_REVERT,
+  ACTION_CHANGE_PROPOSAL_APPROVE,
+  ACTION_CHANGE_PROPOSAL_REJECT,
+  ACTION_CHANGE_PROPOSAL_ABSTAIN,
+  ACTION_CHANGE_PROPOSAL_REVIEWER_ADD,
+  ACTION_CHANGE_PROPOSAL_REVIEWER_REMOVE,
   ACTION_ADMIN_CHANGE_PROPOSAL_SETTINGS_UPDATE,
   ACTION_ADMIN_SITE_URL_UPDATE,
   ACTION_ADMIN_MAIL_SMTP_UPDATE,
@@ -372,6 +390,7 @@ export const SupportedAction = {
   ACTION_ADMIN_MAIL_TEST_SUBMIT,
   ACTION_ADMIN_FILE_UPLOAD_CONFIG_UPDATE,
   ACTION_ADMIN_ATTACHMENT_DISPOSITION_UPDATE,
+  ACTION_ADMIN_ATTACHMENT_SEARCH_SETTINGS_UPDATE,
   ACTION_ADMIN_PAGE_BULK_EXPORT_SETTINGS_UPDATE,
   ACTION_ADMIN_PAGE_TREE_REPAIR,
   ACTION_ADMIN_MAINTENANCEMODE_ENABLED,
@@ -456,6 +475,7 @@ export const SupportedAction = {
   ACTION_ADMIN_SEARCH_INDICES_REBUILD,
   ACTION_ADMIN_SEARCH_AUDITLOG_INDICES_NORMALIZE,
   ACTION_ADMIN_SEARCH_AUDITLOG_INDICES_REBUILD,
+  ACTION_PAGE_DUPLICATE_INTERRUPTED,
   ACTION_PAGE_BULK_EXPORT_COMPLETED,
   ACTION_PAGE_BULK_EXPORT_FAILED,
   ACTION_PAGE_BULK_EXPORT_JOB_EXPIRED,
@@ -514,6 +534,7 @@ export const EssentialActionGroup = {
   ACTION_PAGE_RECURSIVELY_REVERT,
   ACTION_COMMENT_CREATE,
   ACTION_USER_REGISTRATION_APPROVAL_REQUEST,
+  ACTION_PAGE_DUPLICATE_INTERRUPTED,
   ACTION_PAGE_BULK_EXPORT_COMPLETED,
   ACTION_PAGE_BULK_EXPORT_FAILED,
   ACTION_PAGE_BULK_EXPORT_JOB_EXPIRED,
@@ -523,6 +544,11 @@ export const EssentialActionGroup = {
   ACTION_AUDIT_LOG_BULK_EXPORT_NO_RESULTS,
   ACTION_CHANGE_PROPOSAL_APPLY,
   ACTION_CHANGE_PROPOSAL_REVERT,
+  ACTION_CHANGE_PROPOSAL_APPROVE,
+  ACTION_CHANGE_PROPOSAL_REJECT,
+  ACTION_CHANGE_PROPOSAL_ABSTAIN,
+  ACTION_CHANGE_PROPOSAL_REVIEWER_ADD,
+  ACTION_CHANGE_PROPOSAL_REVIEWER_REMOVE,
 } as const;
 
 export const ActionGroupSize = {
@@ -594,11 +620,17 @@ export const MediumActionGroup = {
   ACTION_ATTACHMENT_ADD,
   ACTION_ATTACHMENT_REMOVE,
   ACTION_ATTACHMENT_DOWNLOAD,
+  ACTION_ATTACHMENT_REEXTRACT,
   ACTION_SEARCH_PAGE,
   ACTION_SEARCH_PAGE_VIEW,
   ACTION_CHANGE_PROPOSAL_CREATE,
   ACTION_CHANGE_PROPOSAL_APPLY,
   ACTION_CHANGE_PROPOSAL_REVERT,
+  ACTION_CHANGE_PROPOSAL_APPROVE,
+  ACTION_CHANGE_PROPOSAL_REJECT,
+  ACTION_CHANGE_PROPOSAL_ABSTAIN,
+  ACTION_CHANGE_PROPOSAL_REVIEWER_ADD,
+  ACTION_CHANGE_PROPOSAL_REVIEWER_REMOVE,
 } as const;
 
 // MediumActionGroup + All Actions by Admin Users - PAGE_VIEW
@@ -616,6 +648,7 @@ export const LargeActionGroup = {
   ACTION_ADMIN_MAIL_TEST_SUBMIT,
   ACTION_ADMIN_FILE_UPLOAD_CONFIG_UPDATE,
   ACTION_ADMIN_ATTACHMENT_DISPOSITION_UPDATE,
+  ACTION_ADMIN_ATTACHMENT_SEARCH_SETTINGS_UPDATE,
   ACTION_ADMIN_PAGE_BULK_EXPORT_SETTINGS_UPDATE,
   ACTION_ADMIN_PAGE_TREE_REPAIR,
   ACTION_ADMIN_MAINTENANCEMODE_ENABLED,
@@ -807,7 +840,8 @@ export type DefaultSnapshot = Partial<Pick<IUser, 'username'>>;
 
 /**
  * Canonical snapshot variant shared by every attachment activity
- * (ACTION_ATTACHMENT_ADD / ACTION_ATTACHMENT_REMOVE / ACTION_ATTACHMENT_DOWNLOAD).
+ * (ACTION_ATTACHMENT_ADD / ACTION_ATTACHMENT_REMOVE / ACTION_ATTACHMENT_DOWNLOAD /
+ * ACTION_ATTACHMENT_REEXTRACT).
  * Every field is optional: snapshot builders omit fields they cannot resolve
  * (e.g. pagePath when the page is gone, username on guest downloads).
  */
@@ -826,11 +860,24 @@ export type AttachmentSnapshot = {
 export type AttachmentRemoveSnapshot = AttachmentSnapshot;
 
 /**
+ * Snapshot variant for the change proposal review activities (approve /
+ * reject / abstain / reviewer add / reviewer remove), carrying where the
+ * request came from.
+ */
+export type ChangeProposalReviewSnapshot = {
+  username?: string;
+  reviewChannel?: ReviewChannel;
+};
+
+/**
  * Discriminated union of snapshot shapes. The discriminant is the activity's
  * existing `action` field (see the isAttachment*Activity guards); snapshots
  * carry no discriminator field of their own.
  */
-export type ISnapshot = DefaultSnapshot | AttachmentSnapshot;
+export type ISnapshot =
+  | DefaultSnapshot
+  | AttachmentSnapshot
+  | ChangeProposalReviewSnapshot;
 
 export type IActivity = {
   user?: Ref<IUser>;
@@ -875,6 +922,36 @@ export const isAttachmentDownloadActivity = (
 ): activity is Pick<IActivity, 'action' | 'snapshot'> & {
   snapshot?: AttachmentSnapshot;
 } => activity.action === SupportedAction.ACTION_ATTACHMENT_DOWNLOAD;
+
+const CHANGE_PROPOSAL_REVIEW_ACTIONS: ReadonlySet<SupportedActionType> =
+  new Set([
+    SupportedAction.ACTION_CHANGE_PROPOSAL_APPROVE,
+    SupportedAction.ACTION_CHANGE_PROPOSAL_REJECT,
+    SupportedAction.ACTION_CHANGE_PROPOSAL_ABSTAIN,
+    SupportedAction.ACTION_CHANGE_PROPOSAL_REVIEWER_ADD,
+    SupportedAction.ACTION_CHANGE_PROPOSAL_REVIEWER_REMOVE,
+  ]);
+
+/**
+ * Narrows a change proposal review activity's snapshot to
+ * ChangeProposalReviewSnapshot. Same pattern as isAttachmentRemoveActivity:
+ * `action` is the sole discriminant.
+ */
+export const isChangeProposalReviewActivity = (
+  activity: Pick<IActivity, 'action' | 'snapshot'>,
+): activity is Pick<IActivity, 'action' | 'snapshot'> & {
+  snapshot?: ChangeProposalReviewSnapshot;
+} => CHANGE_PROPOSAL_REVIEW_ACTIONS.has(activity.action);
+
+/**
+ * Narrows an ATTACHMENT_REEXTRACT activity's snapshot to AttachmentSnapshot.
+ * Same pattern as isAttachmentRemoveActivity: `action` is the sole discriminant.
+ */
+export const isAttachmentReextractActivity = (
+  activity: Pick<IActivity, 'action' | 'snapshot'>,
+): activity is Pick<IActivity, 'action' | 'snapshot'> & {
+  snapshot?: AttachmentSnapshot;
+} => activity.action === SupportedAction.ACTION_ATTACHMENT_REEXTRACT;
 
 export type IActivityHasId = IActivity & HasObjectId;
 

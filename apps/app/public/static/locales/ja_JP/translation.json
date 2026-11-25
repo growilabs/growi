@@ -429,7 +429,9 @@
     "user_not_admin": "権限のあるユーザーのみが削除できます",
     "single_deletion_empty_pages": "空ページの単体削除はできません",
     "complete_deletion_not_allowed_for_user": "ページを完全に削除する権限がありません",
-    "deletion_not_allowed_for_user": "ページを削除する権限がありません"
+    "deletion_not_allowed_for_user": "ページを削除する権限がありません",
+    "grant_not_assignable": "親ページの公開範囲のほうが狭いため、現在の公開範囲のままではこのパスにページを置けません。",
+    "operation_in_progress": "このページまたは近くのページに対する別の操作がまだ実行中です。しばらくしてからもう一度お試しください。"
   },
   "page_history": {
     "revision_list": "更新履歴",
@@ -823,6 +825,7 @@
     "successfully_created": "{{username}} が作成されました。",
     "can_not_activate_maximum_number_of_users": "ユーザーが上限に達したためアクティベートできません。",
     "failed_to_activate": "アクティベートに失敗しました。",
+    "only_invited_user_can_activate": "招待されたユーザーのみアカウントを有効化できます。",
     "unable_to_use_this_user": "利用できないユーザーIDです。",
     "complete_to_install1": "GROWI のインストールが完了しました！管理者アカウントでログインしてください。",
     "complete_to_install2": "GROWI のインストールが完了しました！はじめに、このページで各種設定を確認してください。",
@@ -1276,6 +1279,15 @@
     },
     "achievement": {
       "settled_with_percent": "完了（達成度 {{percent}}%）"
+    },
+    "review_term": {
+      "reviewer": "承認者",
+      "approve": "承認",
+      "reject": "却下",
+      "abstain": "放棄",
+      "comment": "コメント",
+      "purpose": "変更の目的",
+      "decision": "判断"
     }
   },
   "plantuml": {

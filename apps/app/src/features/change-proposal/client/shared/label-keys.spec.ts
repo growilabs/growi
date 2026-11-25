@@ -10,6 +10,7 @@ import {
   PROPOSAL_LINK_LABEL_KEYS,
   PROPOSAL_STATUS_LABEL_KEYS,
   REVERT_REFUSAL_REASON_LABEL_KEYS,
+  REVIEW_TERM_LABEL_KEYS,
 } from './label-keys';
 
 const LOCALES = ['en_US', 'ja_JP', 'zh_CN', 'fr_FR', 'ko_KR'] as const;
@@ -22,6 +23,7 @@ const TABLES = {
   'change_proposal.revert_refusal_reason': REVERT_REFUSAL_REASON_LABEL_KEYS,
   'change_proposal.lifecycle': PROPOSAL_LIFECYCLE_LABEL_KEYS,
   'change_proposal.link': PROPOSAL_LINK_LABEL_KEYS,
+  'change_proposal.review_term': REVIEW_TERM_LABEL_KEYS,
 } as const;
 
 const readTranslation = (locale: string): Record<string, unknown> =>
