@@ -385,9 +385,14 @@ describe('VaultGatewayRouter', () => {
       );
     });
 
-    describe('when isGuestAllowedToRead() === false (default restrictGuestMode=Deny / private wiki)', () => {
+    describe.each([
+      { isGuestAllowedToRead: false },
+      { isGuestAllowedToRead: true },
+    ])('when isGuestAllowedToRead() === $isGuestAllowedToRead', ({
+      isGuestAllowedToRead,
+    }) => {
       it('GET /info/refs returns 401 + WWW-Authenticate and exposes no page info', async () => {
-        const crowi = buildCrowi({ isGuestAllowedToRead: false });
+        const crowi = buildCrowi({ isGuestAllowedToRead });
         const createActivity = vi.fn().mockResolvedValue(undefined);
         const app = buildApp({
           crowi,
@@ -403,27 +408,22 @@ describe('VaultGatewayRouter', () => {
         expect(res.headers['www-authenticate']).toBe(
           'Basic realm="GROWI Vault"',
         );
-        // Must not leak any public page content / list / existence info (req 2.3)
         expect(res.text).not.toMatch(/\/|page|path|exist/i);
 
-        // Anonymous access must be denied BEFORE namespace computation / view
-        // composition / upstream proxying (req 2.3 / 3.2).
+        // Denied BEFORE namespace computation / view composition / proxying.
         expect(
           vaultNamespaceMapper.computeAccessibleNamespaces,
         ).not.toHaveBeenCalled();
         expect(vaultManagerClient.composeView).not.toHaveBeenCalled();
         expect(vaultManagerClient.proxyGitRequest).not.toHaveBeenCalled();
 
-        // The single source of truth was consulted (req 11).
-        expect(crowi.aclService.isGuestAllowedToRead).toHaveBeenCalled();
-        // Recorded as an auth failure in the audit log (req 10.4).
         expect(createActivity).toHaveBeenCalledWith(
           expect.objectContaining({ action: 'VAULT_AUTH_FAILURE' }),
         );
       });
 
       it('POST /git-upload-pack returns 401 + WWW-Authenticate and exposes no page info', async () => {
-        const crowi = buildCrowi({ isGuestAllowedToRead: false });
+        const crowi = buildCrowi({ isGuestAllowedToRead });
         const createActivity = vi.fn().mockResolvedValue(undefined);
         const app = buildApp({
           crowi,
@@ -447,51 +447,6 @@ describe('VaultGatewayRouter', () => {
         expect(createActivity).toHaveBeenCalledWith(
           expect.objectContaining({ action: 'VAULT_AUTH_FAILURE' }),
         );
-      });
-    });
-
-    describe('when isGuestAllowedToRead() === true (public wiki / restrictGuestMode=Readonly)', () => {
-      it('GET /info/refs proceeds anonymously with userId=null (public namespaces only)', async () => {
-        const crowi = buildCrowi({ isGuestAllowedToRead: true });
-        const app = buildApp({ crowi, vaultPatAuth: anonymousAdapter });
-
-        const res = await request(app).get(
-          '/vault.git/info/refs?service=git-upload-pack',
-        );
-
-        expect(res.status).toBe(200);
-        // computeAccessibleNamespaces(null) yields ['public'] only.
-        expect(
-          vaultNamespaceMapper.computeAccessibleNamespaces,
-        ).toHaveBeenCalledWith(null, undefined);
-        expect(vaultManagerClient.composeView).toHaveBeenCalledWith({
-          userId: null,
-          namespaces: ['public'],
-        });
-      });
-
-      it('POST /git-upload-pack proceeds anonymously with userId=null', async () => {
-        (
-          vaultManagerClient.proxyGitRequest as ReturnType<typeof vi.fn>
-        ).mockResolvedValue(
-          makeProxyOkResponse('application/x-git-upload-pack-result'),
-        );
-        const crowi = buildCrowi({ isGuestAllowedToRead: true });
-        const app = buildApp({ crowi, vaultPatAuth: anonymousAdapter });
-
-        const res = await request(app)
-          .post('/vault.git/git-upload-pack')
-          .set('Content-Type', 'application/x-git-upload-pack-request')
-          .send(Buffer.from('0011want abc\n0000'));
-
-        expect(res.status).toBe(200);
-        expect(
-          vaultNamespaceMapper.computeAccessibleNamespaces,
-        ).toHaveBeenCalledWith(null, undefined);
-        expect(vaultManagerClient.composeView).toHaveBeenCalledWith({
-          userId: null,
-          namespaces: ['public'],
-        });
       });
     });
   });

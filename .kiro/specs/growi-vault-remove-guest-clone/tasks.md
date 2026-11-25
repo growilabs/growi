@@ -3,7 +3,7 @@
 順番の理由: `@growi/core` の型（`ComposeViewRequest.userId`）を先に `string` にすると、gateway が型検査を通らなくなる。そのため、gateway（1）と vault-manager（2）から `null` を消した後で、型（3）を変える。機能を取り除いた後の形の点検（4）は、削除がすべて終わってから行う。
 
 - [ ] 1. gateway: 認証情報のない要求を拒否する
-- [ ] 1.1 認証情報のない clone / fetch を、ゲスト閲覧の設定によらず 401 にする
+- [x] 1.1 認証情報のない clone / fetch を、ゲスト閲覧の設定によらず 401 にする
   - 先にテストを書く。`vault-gateway.spec.ts` と `vault-gateway.integ.ts` で、ゲスト閲覧が許可されている設定（`security:wikiMode='public'`、`restrictGuestMode='Readonly'`）のもと、認証情報のない `info/refs` と `git-upload-pack` が 401 + `WWW-Authenticate: Basic realm="GROWI Vault"` になり、本文が空であることを確かめる。同じ設定で、PAT つきの要求が今までどおり 200 になることも確かめる
   - `loginRequiredFactory` の第 2 引数を `false` にする
   - 完了の目安: 追加したテストが修正前に落ち、修正後に通る。ゲスト閲覧の設定ごとに「通る／通らない」を分けていた既存のテストは、「どの設定でも 401」を確かめる形に直っている

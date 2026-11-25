@@ -129,10 +129,8 @@ async function assertGatewayReady(
  * The standard loginRequired fallback redirects an unauthenticated browser to
  * `/login`. A git client cannot follow that — so this fallback returns the
  * git-native challenge `401 + WWW-Authenticate: Basic realm="GROWI Vault"` and
- * records a VAULT_AUTH_FAILURE audit event (req 10.4). This is the single point
- * where the "anonymous + guests denied → 401" decision (req 2.4a) surfaces; the
- * guest/user decision itself is made by loginRequiredFactory via
- * `aclService.isGuestAllowedToRead()` (single source of truth — req 11).
+ * records a VAULT_AUTH_FAILURE audit event (req 10.4). Every request without a
+ * valid credential reaches this fallback, regardless of the guest-read setting.
  *
  * The response body intentionally carries no page content / list / existence
  * information (req 2.3).
@@ -195,7 +193,7 @@ function readIdentity(req: Request): {
  * of re-implementing authz (req 11):
  *
  *   [maintenanceMode] → credentialAdapter (seam #1)
- *     → loginRequiredFactory(crowi, isGuestAllowed=true, gitFallback) → handler
+ *     → loginRequiredFactory(crowi, isGuestAllowed=false, gitFallback) → handler
  *
  * The rate limiter is applied at the mount point (server/routes/index.js,
  * req 10.3) so it is intentionally NOT added here.
@@ -228,7 +226,7 @@ export const createVaultGatewayRouter = (
       ? [
           generateUnavailableWhenMaintenanceModeMiddlewareForApi(crowi),
           credentialAdapter,
-          loginRequiredFactory(crowi, true, createGitFallback(createActivity)),
+          loginRequiredFactory(crowi, false, createGitFallback(createActivity)),
         ]
       : [credentialAdapter];
 
