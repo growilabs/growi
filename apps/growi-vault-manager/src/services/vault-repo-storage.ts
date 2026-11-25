@@ -298,7 +298,7 @@ export async function updateRef(
  * @throws while packed-refs exists.
  */
 export async function readRef(refPath: string): Promise<string | null> {
-  await assertNoPackedRefs(refPath);
+  await assertRefsReadable();
   return readLooseRef(refPath);
 }
 
@@ -319,10 +319,12 @@ function packedRefsPath(): string {
 /**
  * Neither a missing nor a loose ref can be trusted while packed-refs exists
  * (see design.md, VaultMaintenanceScheduler).
+ *
+ * @throws while packed-refs exists.
  */
-async function assertNoPackedRefs(refPath: string): Promise<void> {
+export async function assertRefsReadable(): Promise<void> {
   if (await fileExists(packedRefsPath())) {
-    throw new Error(`Cannot resolve ${refPath}: ${PACKED_REFS_MESSAGE}`);
+    throw new Error(PACKED_REFS_MESSAGE);
   }
 }
 
