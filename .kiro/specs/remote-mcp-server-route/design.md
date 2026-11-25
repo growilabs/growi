@@ -37,7 +37,7 @@
 ### Out of Boundary
 
 - 認可サーバーが発行するトークンの検証、401 への認可サーバーの案内の追加、well-known（`remote-mcp-server-oauth`）。
-- アクセストークンの発行・失効・一覧、`accessTokenParser` の約束。この spec は `accessTokenParser` を変更しないし、使わない。
+- アクセストークンの発行・失効・一覧、`accessTokenParser` の約束。この spec は `accessTokenParser` を変更しない。MCP エンドポイント（`/_api/v3/mcp`）の認証では使わない。管理 API（`/_api/v3/mcp-settings`）は、他の管理 API と同じく `accessTokenParser` を使う。
 - 全文検索とページ閲覧の権限判定そのもの（`SearchService`、`Page.findByIdAndViewer` / `findByPathAndViewer`）。
 - エージェント用のツール（`fullTextSearchTool`、`getPageContentTool`、`limitedSearchTool`）の入出力の約束。取り出しの前後で変えない。
 - 監査ログの記録対象を決める仕組み（グループ、追加・除外の設定）。

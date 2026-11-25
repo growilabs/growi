@@ -54,7 +54,7 @@ GROWI 本体に MCP サーバーを組み込み、claude.ai（web 版 Claude）�
 ## Boundary Strategy
 
 - **Why this split**: MCP ルートは「特定された利用者としてツールを実行する」ことを持ち、認可サーバーは「トークンを発行・失効し、`/_api/v3/mcp` に届いたトークンを検証する」ことを持つ。前者は、暫定の認証（手動発行のアクセストークン）で動作確認できるので、認可サーバーの未決事項を待たずに実装を進められる。
-- **2 spec の接点**: 「リクエストから利用者を得る」認証の差し込み口だけにする。`remote-mcp-server-route` は、中身を暫定の認証（`Authorization: Bearer` のアクセストークンを `accessTokenParser` で検証する）にしておく。`remote-mcp-server-oauth` は、中身を「認可サーバーが発行したトークンだけを受け付ける」認証に入れ替える。ツールと、利用者を特定したあとの処理（回数制限、Activity）は変更しない。
+- **2 spec の接点**: 「リクエストから利用者を得る」認証の差し込み口だけにする。`remote-mcp-server-route` は、中身を暫定の認証（`Authorization: Bearer` のアクセストークンを、AccessToken モデルで直接検証する。`accessTokenParser` は使わない）にしておく。`remote-mcp-server-oauth` は、中身を「認可サーバーが発行したトークンだけを受け付ける」認証に入れ替える。ツールと、利用者を特定したあとの処理（回数制限、Activity）は変更しない。
 - **Shared seams to watch**:
   - **未認証時の 401 応答**: `remote-mcp-server-route` は `WWW-Authenticate` チャレンジを出さない 401 を返す。`remote-mcp-server-oauth` はここに `resource_metadata` と `scope` を足す。ハンドラを書き換えずに足せるよう、`remote-mcp-server-route` の設計で 401 応答の差し込み口を用意する。
   - **discovery を出すタイミング**: claude.ai は接続のたびに well-known を確認し、認可サーバーのメタデータを見つけたのに CIMD も DCR も無いと接続を拒否する。well-known と 401 のチャレンジは `remote-mcp-server-oauth` が全部そろった状態でだけ出す。
@@ -77,7 +77,7 @@ GROWI 本体に MCP サーバーを組み込み、claude.ai（web 版 Claude）�
 ## 未決の論点
 
 1. **DCR（`POST /oauth/register`）に対応するか。** claude.ai・Claude Code・ChatGPT・VS Code は CIMD に対応している。Cursor と Gemini CLI は DCR が必須という第三者の報告がある。手動発行のトークンを受け付けないので、CIMD だけに対応した場合、これらのクライアントは接続する手段が無い。DCR は MCP 仕様 2026-07-28 で非推奨。推奨案は「初回は CIMD のみ。要望が出てから足す」。`remote-mcp-server-oauth` の要件で決める。
-2. **OAuth で発行するアクセストークンの持ち方。** 案 A は既存の AccessToken に「どの連携から発行したか」の参照を足す（`/_api/v3/mcp` では、参照を持つトークンだけを選り分ける。発行トークンは、同じスコープを要求する REST API でも通る）。案 B は OAuth 専用の Prisma モデル（発行トークンを `/_api/v3/mcp` 専用に閉じられる。`/_api/v3/mcp` は `accessTokenParser` を使わなくなるので、同 parser の約束は変わらない）。推奨案は B。「認可サーバーが発行したトークンだけを受け付ける」という決定に、そのまま沿うためである。`remote-mcp-server-oauth` の要件で決める。
+2. **OAuth で発行するアクセストークンの持ち方。** 案 A は既存の AccessToken に「どの連携から発行したか」の参照を足す（`/_api/v3/mcp` の認証が、参照を持つトークンだけを選り分ける。発行トークンは、同じスコープを要求する REST API でも通る）。案 B は OAuth 専用の Prisma モデル（発行トークンを `/_api/v3/mcp` 専用に閉じられる）。`/_api/v3/mcp` は暫定の認証の時点から `accessTokenParser` を使わないので、どちらの案でも同 parser の約束は変わらない。推奨案は B。「認可サーバーが発行したトークンだけを受け付ける」という決定に、そのまま沿うためである。`remote-mcp-server-oauth` の要件で決める。
 3. **Basic 認証つき環境向けのプロキシ除外設定を、どこに書くか。** リポジトリ内にリバースプロキシの文書は無く、外部の docs.growi.org にある。推奨案は docs.growi.org への追記を `remote-mcp-server-oauth` の成果物に挙げ、管理画面の MCP 設定にも要点を表示すること。
 4. ~~`remote-mcp-server-route` を単独でリリースしない方法。~~ 統合ブランチ `feat/remote-mcp-server` の運用で守ると決めた。`remote-mcp-server-oauth` が揃うまで master へ入れない。管理画面の項目を隠す仕組みは作らない。
 

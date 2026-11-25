@@ -86,7 +86,7 @@ GROWI 本体が OAuth 2.1 の認可サーバーを兼ねる。MCP 仕様は、�
 ## Existing Spec Touchpoints
 
 - **Extends**:
-  - `access-token-parser`: 未決 2 で案 A（既存の AccessToken に載せる）を選び、「連携から発行したトークン」の選り分けを parser に持たせる場合は、spec-lifecycle のルールに従った書き戻しが要る。案 B（OAuth 専用のモデル）なら、`/_api/v3/mcp` は parser を使わなくなるので、parser の約束は変わらない。
+  - `access-token-parser`: `/_api/v3/mcp` は、`remote-mcp-server-route` の暫定の認証の時点から `accessTokenParser` を使っていない。そのため、未決 2 のどちらの案でも parser の約束は変わらない。案 A（既存の AccessToken に載せる）を選んだ場合に影響するのは AccessToken モデルと、発行トークンが通ってしまう既存の REST API である。モデルの約束を変えるなら、spec-lifecycle のルールに従った書き戻しが要る。
 - **Adjacent**:
   - `oauth2-email-support`: メール送信用の OAuth クライアント。名前が似ているが関係しない。
   - 既存の Passport の OAuth / OIDC ログイン: GROWI が OAuth の**クライアント**になる機能。この spec は GROWI が**認可サーバー**になる機能で、コードを共有しない。
@@ -125,8 +125,8 @@ requirements を始める前に決める。
    - DCR は MCP 仕様 2026-07-28 で非推奨。対応すると、登録の回数制限、使われていないクライアントの掃除、Basic 認証の除外パスの追加が要る。
    - 推奨案: 初回は CIMD のみ。DCR は umbrella の Future に残し、要望が出てから足す。
 2. **OAuth で発行するアクセストークンの持ち方。**
-   - 案 A: 既存の AccessToken に「どの連携から発行したか」の参照を足す。`/_api/v3/mcp` では、参照を持つトークンだけを選り分ける。既存の `accessTokenParser` は利用者しか返さないので、選り分けのための変更が要る。個人設定のトークン一覧からは除外し、既存の「全トークン削除」の対象には含める。発行トークンは、同じスコープを要求する REST API でも通る。
-   - 案 B: OAuth 専用の Prisma モデルにする。発行トークンを `/_api/v3/mcp` 専用に閉じられ、MCP 仕様の「自分宛てに発行されたトークンだけを受け付ける」に沿う。`/_api/v3/mcp` は `accessTokenParser` を使わなくなる。
+   - 案 A: 既存の AccessToken に「どの連携から発行したか」の参照を足す。`/_api/v3/mcp` の認証（`accessTokenParser` を使わない独自のもの）が、参照を持つトークンだけを選り分ける。個人設定のトークン一覧からは除外し、既存の「全トークン削除」の対象には含める。発行トークンは、同じスコープを要求する REST API でも通る。
+   - 案 B: OAuth 専用の Prisma モデルにする。発行トークンを `/_api/v3/mcp` 専用に閉じられ、MCP 仕様の「自分宛てに発行されたトークンだけを受け付ける」に沿う。
    - 推奨案: B。「認可サーバーが発行したトークンだけを受け付ける」という決定に、そのまま沿う。
 3. **`resource`（RFC 8707）の検証の厳しさ。** claude.ai は authorize と token の両方に `resource` を送る。認可コードに紐付けて token で一致を確かめるところまでは行う。未決 2 で案 A を選ぶ場合は、トークン自体に宛先を持たせないので、仕様の audience 検証をどこまで満たすかを設計で明記する。
 4. **有効期間。** 参考として、Outline はアクセストークン 1 時間、リフレッシュトークン 30 日、認可コード 300 秒。既存の期限切れ削除のジョブは 1 日 1 回なので、1 時間のトークンは最大 1 日分たまる。

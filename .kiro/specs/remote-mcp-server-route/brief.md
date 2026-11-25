@@ -26,7 +26,7 @@ GROWI の利用者は、claude.ai などの MCP クライアントから wiki �
 `@mastra/mcp` 2.8.0 の `MCPServer` を、既存の Express に `POST /_api/v3/mcp` としてマウントする。
 
 - **ステートレス**: 2.x は常にリクエスト単位で動く。`legacy: 'stateless'` を指定して、2025 年系のクライアントも受ける（claude.ai の接続確認が 2025-11-25 で来るという報告があるため）。
-- **認証**: 「リクエストから利用者を得る」処理を 1 つの差し込み口にする。この spec では、中身を `accessTokenParser`（`Authorization: Bearer` のアクセストークン）にする。`remote-mcp-server-oauth` が、中身を「認可サーバーが発行したトークンだけを受け付ける」ものに入れ替える。得た利用者は、`req.auth` と `mapAuthInfoToUser` でツールの requestContext の `user` に渡す。
+- **認証**: 「リクエストから利用者を得る」処理を 1 つの差し込み口にする。この spec では、中身を、`Authorization: Bearer` のアクセストークンを AccessToken モデルで直接検証する認証にする（`accessTokenParser` は使わない。理由は [design.md](./design.md) の McpAuth）。`remote-mcp-server-oauth` が、中身を「認可サーバーが発行したトークンだけを受け付ける」ものに入れ替える。得た利用者は、`req.auth` と `mapAuthInfoToUser` でツールの requestContext の `user` に渡す。
 - **未認証**: `loginRequired` は `/_api` 配下の未認証リクエストに 403 を返すので使わない。`/_api/v3/mcp` 用に 401 を返す。この時点では `WWW-Authenticate` チャレンジを付けない。
 - **全文検索ツール**: `searchService` を requestContext からではなく、外から注入できる形に作り直す。
 - **有効化フラグ**: 管理者が切り替える。既定は無効。`aiReadyGuard` は使わない（MCP に LLM の設定は要らない）。
@@ -53,7 +53,7 @@ GROWI の利用者は、claude.ai などの MCP クライアントから wiki �
 
 ## Boundary Candidates
 
-- **ルートと認証の入口**: フラグの確認、認証の差し込み口と暫定の中身（`accessTokenParser`）、401 応答、回数制限
+- **ルートと認証の入口**: フラグの確認、認証の差し込み口と暫定の中身（Bearer のアクセストークンの検証）、401 応答、回数制限
 - **MCP サーバーの組み立て**: `MCPServer` の生成、ツールの登録、`req.auth` から `user` への受け渡し、遅延ロード
 - **ツールの公開用の定義**: 2 ツールの description・annotation、`searchService` の注入
 - **管理者の設定**: 設定キー、管理 API、管理画面
