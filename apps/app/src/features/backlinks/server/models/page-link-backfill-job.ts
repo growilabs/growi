@@ -40,9 +40,23 @@ export interface BackfillCheckpointReply {
   readonly stopRequested: boolean;
 }
 
+export interface BackfillFailureOptions {
+  /**
+   * The wait before each retry of a failed run, by the number of failures in a row; its length
+   * is the cap. One more failure in a row leaves the job for the admin.
+   */
+  readonly retryDelaysMs: readonly number[];
+}
+
 const assertValidLeaseMs = (leaseMs: number): void => {
   if (!Number.isFinite(leaseMs) || leaseMs <= 0) {
     throw new Error('leaseMs value is invalid');
+  }
+};
+
+const assertValidRetryDelays = (retryDelaysMs: readonly number[]): void => {
+  if (!retryDelaysMs.every((ms) => Number.isFinite(ms) && ms > 0)) {
+    throw new Error('retryDelaysMs value is invalid');
   }
 };
 
@@ -50,7 +64,8 @@ const toOid = (hex: string | null) => (hex != null ? { $oid: hex } : null);
 const toDate = (date: Date | null) =>
   date != null ? { $date: date.toISOString() } : null;
 
-// Held by someone, with a lease not yet past; `tryClaim` takes over exactly when this is false.
+// Held by someone, with a lease not yet past; `tryClaim` takes a `running` job over exactly when
+// this is false.
 const HOLDS_LIVE_LEASE = {
   $and: [
     { $ne: ['$claimedBy', null] },
@@ -80,10 +95,28 @@ const releaseClaimFields = {
   leaseExpiresAt: null,
 };
 
+/** No failures in a row and no retry due: written wherever a run makes progress or settles. */
+const noFailureFields = {
+  failedAttempts: 0,
+  retryAt: null,
+};
+
 /** Written by the endings that settle a Stop: the run is over, so a pending one is moot. */
 const settledEndingFields = {
   ...releaseClaimFields,
+  ...noFailureFields,
   stopRequested: false,
+};
+
+// A run is outstanding while it is requested, running, or failed with a retry due: the poll
+// runs only then (design.md, Batch / Job Contract). A query filter, where `$ne: null` also
+// excludes a document written before `retryAt` existed.
+const RUN_OUTSTANDING_FILTER = {
+  _id: JOB_ID,
+  $or: [
+    { status: { $in: ['requested', 'running'] } },
+    { status: 'failed', retryAt: { $ne: null } },
+  ],
 };
 
 // Raw commands, not the query API: Prisma's `upsert` has no `$setOnInsert`, and `update`
@@ -144,6 +177,7 @@ export const createPageLinkBackfillJobModel = (
                 skippedPages: 0,
                 completedAt: null,
                 lastError: null,
+                ...noFailureFields,
                 claimedBy: null,
                 leaseExpiresAt: null,
               },
@@ -267,15 +301,17 @@ export const createPageLinkBackfillJobModel = (
     },
 
     /**
-     * Atomically claim the job for `owner`. Succeeds only for a `requested` job, or for a
-     * `running` / `failed` one that nobody holds or whose holder's lease has expired. Any
-     * other status is never handed out (rationale: design.md, "Stop and resume").
+     * Atomically claim the job for `owner`. Succeeds only for a `requested` job, a `running`
+     * one that nobody holds or whose holder's lease has expired, or a `failed` one whose
+     * `retryAt` has passed. Any other job is never handed out (rationale: design.md, "Stop and
+     * resume" and "Failed run").
      *
      * A claim from `requested` clears any stale `stopRequested` in the same write; a take-over
-     * of a `running` / `failed` job keeps it, so a live Stop is not lost.
+     * keeps it, so a live Stop is not lost. Every claim clears `retryAt`; `failedAttempts` stays
+     * until the run's first checkpoint.
      *
-     * Expiry is judged on the database clock (`$$NOW`), so instances whose own clocks
-     * disagree cannot steal a live claim from each other.
+     * Expiry and the retry time are judged on the database clock (`$$NOW`), so instances whose
+     * own clocks disagree cannot steal a live claim from each other.
      *
      * @throws when `leaseMs` is not a positive finite number, or the write is not confirmed
      *
@@ -296,8 +332,17 @@ export const createPageLinkBackfillJobModel = (
               { $eq: ['$status', 'requested'] },
               {
                 $and: [
-                  { $in: ['$status', ['running', 'failed']] },
+                  { $eq: ['$status', 'running'] },
                   { $not: [HOLDS_LIVE_LEASE] },
+                ],
+              },
+              {
+                $and: [
+                  { $eq: ['$status', 'failed'] },
+                  // In `$expr` null and a missing field sort before every date, so a bare `$lte`
+                  // would hand out a job whose retries are used up.
+                  { $gt: ['$retryAt', null] },
+                  { $lte: ['$retryAt', '$$NOW'] },
                 ],
               },
             ],
@@ -318,12 +363,28 @@ export const createPageLinkBackfillJobModel = (
               claimedBy: { $literal: owner },
               status: 'running',
               leaseExpiresAt: { $add: ['$$NOW', leaseMs] },
+              retryAt: null,
             },
           },
         ],
       });
       throwOnWriteErrors(result, 'backfill job tryClaim');
       return result.value != null;
+    },
+
+    /**
+     * Whether a run is outstanding: `requested`, `running`, or `failed` with a retry due.
+     * False when the document is missing.
+     */
+    async isRunOutstanding(): Promise<boolean> {
+      const result = await client.$runCommandRaw({
+        find: COLLECTION,
+        filter: RUN_OUTSTANDING_FILTER,
+        projection: { _id: 1 },
+        limit: 1,
+      });
+      const { firstBatch } = result.cursor as { firstBatch: unknown[] };
+      return firstBatch.length > 0;
     },
 
     /**
@@ -356,7 +417,8 @@ export const createPageLinkBackfillJobModel = (
     },
 
     /**
-     * Save the progress and renew the lease.
+     * Save the progress and renew the lease. Saved progress ends a run of failures, so the
+     * failure count restarts here.
      *
      * @throws when `leaseMs` is not a positive finite number, or the write is not confirmed
      * @returns the admin-owned flags of the written document, or null when `owner` no longer
@@ -370,6 +432,7 @@ export const createPageLinkBackfillJobModel = (
       assertValidLeaseMs(leaseMs);
       const value = await fencedWrite(owner, 'checkpoint', {
         ...progressFields(progress),
+        failedAttempts: 0,
         leaseExpiresAt: { $add: ['$$NOW', leaseMs] },
       });
       if (value == null) return null;
@@ -410,16 +473,52 @@ export const createPageLinkBackfillJobModel = (
     },
 
     /**
-     * End the run on an error. The claim is released, so the next idle tick claims the `failed`
-     * job again and resumes from the marker saved at the last checkpoint; the in-memory progress
-     * is not written, so pages skipped since then are redone. A pending Stop is kept: the retry
-     * claim keeps it too (`tryClaim`), so the retry stops at its first checkpoint.
+     * End the run on an error, count the failure, and schedule the retry: `retryAt` is the
+     * delay for this many failures in a row from now, or null once they pass the cap or while a
+     * Stop is pending, which leaves the job for the admin. The retry resumes from the marker
+     * saved at the last checkpoint; the in-memory progress is not written, so pages skipped since
+     * then are redone.
+     *
+     * @throws when a retry delay is not a positive finite number, or the write is not confirmed
      */
-    async finishFailed(owner: string, lastError: string): Promise<boolean> {
+    async finishFailed(
+      owner: string,
+      lastError: string,
+      { retryDelaysMs }: BackfillFailureOptions,
+    ): Promise<boolean> {
+      assertValidRetryDelays(retryDelaysMs);
+      // One `$set` stage reads every field as it was before the write, so both fields start
+      // from the stored count.
+      const failuresInARow = {
+        $add: [{ $ifNull: ['$failedAttempts', 0] }, 1],
+      };
       const value = await fencedWrite(owner, 'finishFailed', {
         ...releaseClaimFields,
         status: 'failed',
         lastError: { $literal: lastError },
+        failedAttempts: failuresInARow,
+        retryAt: {
+          $cond: [
+            {
+              $or: [
+                { $eq: ['$stopRequested', true] },
+                { $gt: [failuresInARow, retryDelaysMs.length] },
+              ],
+            },
+            null,
+            {
+              $add: [
+                '$$NOW',
+                {
+                  $arrayElemAt: [
+                    { $literal: [...retryDelaysMs] },
+                    { $subtract: [failuresInARow, 1] },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
       });
       return value != null;
     },

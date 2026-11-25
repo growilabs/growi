@@ -9,7 +9,10 @@ import { prisma } from '~/utils/prisma';
 import type { BacklinksBackfillProgressData } from '../../interfaces/page-link-backfill';
 import { ensurePageLinkIndexes } from '../models/page-link-indexes';
 import { throwOnWriteErrors } from '../models/throw-on-write-errors';
-import type { BackfillPacing } from './backfill-pacing';
+import {
+  BACKFILL_RETRY_DELAYS_MS,
+  type BackfillPacing,
+} from './backfill-pacing';
 import { PageLinkBackfillCron } from './page-link-backfill-cron';
 import { handlePageUpsertById } from './page-link-service-handlers';
 
@@ -44,6 +47,15 @@ const DEFAULT_PACING: BackfillPacing = {
 };
 
 let Page: PageModel;
+
+// Armed but due only at New Year's midnight, so a test can watch a poll stop itself while
+// driving every tick by hand.
+const NEVER_DURING_TEST = '0 0 1 1 *';
+const armedCrons: PageLinkBackfillCron[] = [];
+
+afterEach(() => {
+  for (const cron of armedCrons.splice(0)) cron.stopCron();
+});
 
 beforeAll(async () => {
   const db = mongoose.connection.db;
@@ -129,6 +141,8 @@ const requestRun = (scope: Scope): Promise<void> =>
     progressMarker: null,
     processed: 0,
     skippedPages: 0,
+    failedAttempts: 0,
+    retryAt: null,
   });
 
 const readJob = () => prisma.pagelinkbackfilljobs.findFirst({});
@@ -150,9 +164,12 @@ const sourcesWithRows = async (): Promise<string[]> =>
 const createCron = ({
   pacing = DEFAULT_PACING,
   onSleep,
+  armed = false,
 }: {
   pacing?: BackfillPacing;
   onSleep?: (ctx: { sleeps: number; advance: (ms: number) => void }) => unknown;
+  /** Start the scheduler (on a schedule that never fires here), to observe the self-stop. */
+  armed?: boolean;
 } = {}) => {
   let offsetMs = 0;
   let sleeps = 0;
@@ -162,7 +179,7 @@ const createCron = ({
     offsetMs += ms;
   };
   const cron = new PageLinkBackfillCron({
-    cronSchedule: '* * * * *',
+    cronSchedule: NEVER_DURING_TEST,
     pacing,
     getSiteUrl: () => SITE_URL,
     emitProgress: (data) => emitted.push(data),
@@ -173,6 +190,10 @@ const createCron = ({
       await onSleep?.({ sleeps, advance });
     },
   });
+  if (armed) {
+    cron.startCron();
+    armedCrons.push(cron);
+  }
   return { cron, emitted, now };
 };
 
@@ -663,33 +684,161 @@ describe('PageLinkBackfillCron (integration)', () => {
     });
   });
 
-  // One instance for both ticks: the second is the same poll's next tick, which must not be
-  // shut out by the first run's in-process guard.
-  it('records a failed run and retries it from the next tick', async () => {
-    await seedPage({ path: '/retry/a', body: '[x](/retry/x)' });
-    await patchJob({
-      status: 'requested',
-      requestedScope: { kind: 'no-such-scope', maxPages: null, since: null },
-    });
-    const { cron } = createCron();
+  describe('self-stop', () => {
+    it('keeps the poll through the run, and the next tick after it ends complete stops it', async () => {
+      await seedPage({ path: '/done/a', body: '[b](/done/b)' });
+      await requestRun({ kind: 'all' });
+      const { cron } = createCron({ armed: true });
 
-    await cron.runPendingJob();
+      await cron.runPendingJob();
 
-    expect(await readJob()).toMatchObject({
-      status: 'failed',
-      lastError: expect.stringMatching(/unknown backfill scope/),
-      claimedBy: null,
+      expect(await readJob()).toMatchObject({ status: 'complete' });
+      expect(cron.isJobRunning()).toBe(true);
+
+      await cron.runPendingJob();
+
+      expect(cron.isJobRunning()).toBe(false);
     });
 
-    await patchJob({
-      requestedScope: { kind: 'all', maxPages: null, since: null },
-    });
-    await cron.runPendingJob();
+    it.each([
+      { status: 'idle' },
+      { status: 'stopped' },
+      { status: 'failed', retryAt: null },
+    ])('stops the poll on a tick that finds $status', async (set) => {
+      await patchJob(set);
+      const { cron } = createCron({ armed: true });
 
-    expect(await readJob()).toMatchObject({
-      status: 'complete',
-      coverage: 'all',
-      processed: 1,
+      await cron.runPendingJob();
+
+      expect(cron.isJobRunning()).toBe(false);
+    });
+
+    it('stops the poll on a tick that finds the job document missing', async () => {
+      await prisma.pagelinkbackfilljobs.deleteMany({});
+      const { cron } = createCron({ armed: true });
+
+      await cron.runPendingJob();
+
+      expect(cron.isJobRunning()).toBe(false);
+      expect(await prisma.pagelinkbackfilljobs.count()).toBe(0);
+    });
+
+    it('keeps the poll while another instance holds a live run, so it can take over', async () => {
+      await patchJob({
+        status: 'running',
+        claimedBy: 'other-instance',
+        leaseExpiresAt: { $date: '2999-01-01T00:00:00Z' },
+      });
+      const { cron } = createCron({ armed: true });
+
+      await cron.runPendingJob();
+
+      expect(cron.isJobRunning()).toBe(true);
+      expect(await readJob()).toMatchObject({ claimedBy: 'other-instance' });
+    });
+
+    it('claimNow starts a stopped poll and runs the request without waiting for a tick', async () => {
+      await seedPage({ path: '/now/a', body: '[b](/now/b)' });
+      await requestRun({ kind: 'all' });
+      const { cron } = createCron();
+      armedCrons.push(cron);
+      expect(cron.isJobRunning()).toBe(false);
+
+      await cron.claimNow();
+
+      expect(cron.isJobRunning()).toBe(true);
+      expect(await readJob()).toMatchObject({
+        status: 'complete',
+        coverage: 'all',
+        processed: 1,
+      });
+    });
+  });
+
+  describe('a failed run', () => {
+    // An unknown scope fails the run at its first claim, before any checkpoint.
+    const requestFailingRun = () =>
+      patchJob({
+        status: 'requested',
+        requestedScope: { kind: 'no-such-scope', maxPages: null, since: null },
+        failedAttempts: 0,
+        retryAt: null,
+      });
+    const makeRetryDue = () =>
+      patchJob({ retryAt: { $date: '2000-01-01T00:00:00Z' } });
+    /** The DB clock sets `retryAt`; allow for it differing from this process's clock. */
+    const CLOCK_SKEW_MS = 5000;
+
+    it('is not retried before its retryAt, and the poll waits for it', async () => {
+      await seedPage({ path: '/retry/a', body: '[x](/retry/x)' });
+      await requestFailingRun();
+      const { cron } = createCron({ armed: true });
+
+      await cron.runPendingJob();
+      expect(await readJob()).toMatchObject({
+        status: 'failed',
+        lastError: expect.stringMatching(/unknown backfill scope/),
+        failedAttempts: 1,
+        claimedBy: null,
+      });
+
+      await patchJob({
+        requestedScope: { kind: 'all', maxPages: null, since: null },
+      });
+      await cron.runPendingJob();
+
+      expect(await readJob()).toMatchObject({ status: 'failed' });
+      expect(cron.isJobRunning()).toBe(true);
+
+      await makeRetryDue();
+      await cron.runPendingJob();
+
+      expect(await readJob()).toMatchObject({
+        status: 'complete',
+        coverage: 'all',
+        processed: 1,
+        failedAttempts: 0,
+        retryAt: null,
+      });
+    });
+
+    it('waits 5, 15 then 30 minutes between failures in a row, then is left for the admin and the poll stops', async () => {
+      await seedPage({ path: '/retry/a', body: '[x](/retry/x)' });
+      await requestFailingRun();
+      const { cron } = createCron({ armed: true });
+
+      for (const [attempt, delayMs] of BACKFILL_RETRY_DELAYS_MS.entries()) {
+        const before = Date.now();
+        // biome-ignore lint/performance/noAwaitInLoops: each retry follows the previous failure
+        await cron.runPendingJob();
+        const job = await readJob();
+        expect(job).toMatchObject({
+          status: 'failed',
+          failedAttempts: attempt + 1,
+        });
+        const retryAt = job?.retryAt?.getTime() ?? Number.NaN;
+        expect(retryAt).toBeGreaterThanOrEqual(
+          before + delayMs - CLOCK_SKEW_MS,
+        );
+        expect(retryAt).toBeLessThanOrEqual(
+          Date.now() + delayMs + CLOCK_SKEW_MS,
+        );
+        await makeRetryDue();
+      }
+      expect(BACKFILL_RETRY_DELAYS_MS).toEqual([300_000, 900_000, 1_800_000]);
+
+      await cron.runPendingJob();
+
+      expect(await readJob()).toMatchObject({
+        status: 'failed',
+        failedAttempts: 4,
+        retryAt: null,
+      });
+      expect(cron.isJobRunning()).toBe(true);
+
+      await cron.runPendingJob();
+
+      expect(cron.isJobRunning()).toBe(false);
     });
   });
 });
