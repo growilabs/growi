@@ -698,6 +698,38 @@ describe('op: reset-all', () => {
     expect(VaultNamespaceStateModel.deleteAll).toHaveBeenCalled();
     expect(VaultUserViewModel.deleteAll).toHaveBeenCalled();
   });
+
+  describe('when a step of the wipe fails', () => {
+    const failure = new Error('wipe step failed');
+
+    beforeEach(() => {
+      asMock(VaultNamespaceStateModel.find).mockReturnValue({
+        lean: () => Promise.resolve([{ namespace: 'public' }]),
+      });
+      asMock(VaultNamespaceStateModel.deleteAll).mockResolvedValue(undefined);
+    });
+
+    it.each([
+      ['deleting a namespace ref', () => asMock(VaultRepoStorage.deleteRef)],
+      [
+        'clearing the namespace state',
+        () => asMock(VaultNamespaceStateModel.deleteAll),
+      ],
+      ['clearing the views', () => asMock(VaultUserViewModel.deleteAll)],
+      [
+        'superseding the pending instructions',
+        () => asMock(VaultInstructionModel.supersedeUnprocessedBefore),
+      ],
+    ])('leaves packed-refs in place when %s fails', async (_step, failingStep) => {
+      failingStep().mockRejectedValue(failure);
+
+      await expect(
+        applyInstruction(makeInstruction({ op: 'reset-all', payload: {} })),
+      ).rejects.toThrow(failure);
+
+      expect(VaultRepoStorage.dropPackedNamespaceRefs).not.toHaveBeenCalled();
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------

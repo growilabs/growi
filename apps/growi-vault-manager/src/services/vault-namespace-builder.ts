@@ -651,8 +651,6 @@ async function applyResetAll(
   instruction: VaultInstructionDoc,
   namespaces: readonly string[],
 ): Promise<void> {
-  await VaultRepoStorage.dropPackedNamespaceRefs();
-
   // Delete every namespace ref from the bare repository.
   await Promise.all(
     namespaces.map((namespace) => VaultRepoStorage.deleteRef(nsRef(namespace))),
@@ -662,6 +660,10 @@ async function applyResetAll(
   await VaultNamespaceStateModel.deleteAll();
   await VaultUserViewModel.deleteAll();
   await VaultInstructionModel.supersedeUnprocessedBefore(instruction.issuedAt);
+
+  // Last: packed-refs is what keeps refs unreadable, so a wipe that fails
+  // halfway must leave it in place (see design.md, VaultMaintenanceScheduler).
+  await VaultRepoStorage.dropPackedNamespaceRefs();
 }
 
 // ---------------------------------------------------------------------------
