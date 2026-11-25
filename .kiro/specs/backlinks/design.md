@@ -188,8 +188,8 @@ graph TB
 
 ### Directory Structure
 
-Tests are co-located (`*.spec.ts` / `*.integ.ts`) and omitted below. Files marked **(B3)** are the
-backfill, which is not yet built.
+Tests are co-located (`*.spec.ts` / `*.integ.ts`) and omitted below. Files marked **(B3)** belong to the
+backfill.
 
 ```
 apps/app/src/features/backlinks/
@@ -221,19 +221,36 @@ apps/app/src/features/backlinks/
 │   │   ├── backfill-link-resolver.ts   # (B3) in-memory path->id map + permalink id set (one projection query per run)
 │   │   ├── backfill-page.ts            # (B3) one page: body read, size cap, extract, resolve, write; bounded retries
 │   │   ├── page-link-backfill-run.ts   # (B3) one claimed run: first-claim cutoff/total, paced walk, fenced checkpoints and endings
-│   │   └── page-link-backfill-cron.ts  # (B3) CronService start poll: in-process guard, claim, self-stop, admin progress emitter
+│   │   ├── page-link-backfill-cron.ts  # (B3) CronService start poll: in-process guard, claim, self-stop, admin progress emitter
+│   │   ├── backfill-scope-request.ts   # (B3) pure: validates the admin's start body into a scope
+│   │   ├── backfill-admin-state.ts     # (B3) pure: job row + page counts -> the admin state DTO (claim left out)
+│   │   ├── read-backfill-admin-state.ts    # (B3) admin state read: job row + the not-included / total page counts
+│   │   ├── backlinks-index-state.ts    # (B3) pure: job row (or none) -> the panel's coverage summary
+│   │   └── read-backlinks-index-state.ts   # (B3) the panel's one job read: no counts, no boot upsert
 │   └── routes/
 │       ├── backlinks.ts                # apiv3 route factory (GET) — getBacklinksHandlerFactory
 │       └── backlinks-backfill-admin.ts # (B3) apiv3 admin routes: GET state, POST start (scope), POST stop, POST resume
 └── client/
     ├── stores/
     │   ├── backlinks.ts                # SWR hook — useSWRxBacklinks
-    │   └── backlinks-backfill.ts       # (B3) SWR hook for the admin settings section
+    │   └── backlinks-backfill.ts       # (B3) SWR hook for the admin state; polls while a run is requested or running
+    ├── hooks/
+    │   ├── use-backfill-progress-socket.ts  # (B3) admin-socket progress -> state cache, then revalidate
+    │   └── use-backfill-actions.ts     # (B3) POST start / stop / resume, refusals toasted
+    ├── utils/
+    │   ├── backfill-admin-view.ts      # (B3) pure: state -> which row of the admin-settings table, and its controls
+    │   ├── backfill-progress.ts        # (B3) pure: the counts shown to the admin (percent capped until complete)
+    │   ├── backfill-start-request.ts   # (B3) pure: scope picker input -> start body
+    │   └── backlinks-index-notice.ts   # (B3) pure: the panel's coverage summary -> which notice, if any
     └── components/
-        ├── BacklinksPanel.tsx          # incoming list + empty state + link-status-unavailable notice
+        ├── BacklinksPanel.tsx          # incoming list + empty state + link-status-unavailable notice + index notice
+        ├── BacklinksIndexNotice.tsx    # (B3) the panel's "index still building / partial" notice
         ├── LinkTargetsSection.tsx      # "outgoing links needing attention" section (forward-health rows)
         ├── BacklinkListItem.tsx        # one row (path label linking to /{pageId}, + target-state badge for forward-health rows)
-        └── BacklinksBackfillAdmin.tsx  # (B3) admin settings section: scope picker, progress, coverage line
+        ├── BacklinksBackfillAdmin.tsx  # (B3) admin settings section: composes the parts below
+        ├── BackfillStatusMessage.tsx   # (B3) the state line (not started, error and retry, stopped, coverage)
+        ├── BackfillProgress.tsx        # (B3) processed of runTotal, percent, skipped pages
+        └── BackfillScopeForm.tsx       # (B3) scope picker + Start
 
 # Migration: apps/app/src/migrations/20260901064500-add-indexes-to-pagelinks.js provisions
 # the three pagelinks indexes. Required because pagelinks is a prisma-only collection — no
@@ -268,6 +285,11 @@ apps/app/src/features/backlinks/
   parameter (`maxDepth`), not baked into the pipeline: `$graphLookup` is memory-bound at 100MB with
   no disk spill, so the save path passes `REDIRECT_CHAIN_MAX_DEPTH`, while page view passes nothing — a cap there would
   answer an old URL with a not-found once the chain outgrows it.
+- `apps/app/src/client/components/Admin/App/AppSettingsPageContents.tsx` — **(B3)** mount
+  `BacklinksBackfillAdmin` as a section of the App settings page, after the page bulk export
+  section: a one-off data job beside the other ones there, with no new admin route or menu entry.
+  Its strings are in every locale's `admin.json` (`backlinks_backfill.*`); the panel's notice
+  strings are in `translation.json` (`backlinks.index_*`).
 - `apps/app/src/client/components/PageAccessoriesModal/PageAccessoriesModal.tsx` (+ the
   modal-contents map in `apps/app/src/states/ui/modal/page-accessories.ts`) — add the **Backlinks**
   tab mapping to `BacklinksPanel`.
