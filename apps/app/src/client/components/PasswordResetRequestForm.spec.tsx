@@ -6,7 +6,6 @@ import { mock } from 'vitest-mock-extended';
 import { apiv3Post } from '~/client/util/apiv3-client';
 import { toastError, toastSuccess } from '~/client/util/toastr';
 import { forgotPasswordErrorCode } from '~/interfaces/errors/forgot-password';
-import { rateLimitErrorCode } from '~/interfaces/errors/rate-limit';
 import { apiV3ErrorCode } from '~/interfaces/errors/v3-error';
 import { isMailerSetupAtom } from '~/states/server-configurations';
 
@@ -74,11 +73,6 @@ const immediateRejections = [
     messageKey: 'forgot_password.password_reset_disabled',
   },
   {
-    status: 429,
-    code: rateLimitErrorCode.TOO_MANY_REQUESTS,
-    messageKey: 'forgot_password.too_many_requests',
-  },
-  {
     status: 400,
     code: apiV3ErrorCode.VALIDATION_FAILED,
     messageKey: 'forgot_password.invalid_input_format',
@@ -108,6 +102,21 @@ describe('PasswordResetRequestForm', () => {
     await advance(IMMEDIATE_REJECTION_WAIT_MS);
 
     expect(mockToastError).toHaveBeenCalledWith(messageKey);
+    expect(mockToastError).toHaveBeenCalledTimes(1);
+    expect(mockToastSuccess).not.toHaveBeenCalled();
+  });
+
+  // e.g. a plain 429 from the rate limiter or a 502 page from a proxy
+  it('shows only the retry guidance when the request fails at once without an error code', async () => {
+    mockApiv3Post.mockRejectedValue([]);
+    renderForm();
+
+    submitEmail('user@example.com');
+    await advance(IMMEDIATE_REJECTION_WAIT_MS);
+
+    expect(mockToastError).toHaveBeenCalledWith(
+      'forgot_password.request_failed',
+    );
     expect(mockToastError).toHaveBeenCalledTimes(1);
     expect(mockToastSuccess).not.toHaveBeenCalled();
   });
@@ -160,36 +169,23 @@ describe('PasswordResetRequestForm', () => {
     expect(mockToastError).toHaveBeenCalledTimes(1);
   });
 
-  it('still shows the specific message when a rate limit arrives after the window', async () => {
+  it.each([
+    ['without an error code', []],
+    ['with an unknown error code', [{ message: 'other', code: 'unknown' }]],
+  ])('shows the retry guidance after the neutral toast when the request fails later %s', async (_label, error) => {
     const request = deferredRequest();
     renderForm();
 
     submitEmail('user@example.com');
     await advance(IMMEDIATE_REJECTION_WAIT_MS);
-    request.reject([
-      {
-        message: 'Too many requests',
-        code: rateLimitErrorCode.TOO_MANY_REQUESTS,
-      },
-    ]);
+    request.reject(error);
     await advance(0);
 
     expect(mockToastSuccess).toHaveBeenCalledWith(NEUTRAL_TOAST);
     expect(mockToastError).toHaveBeenCalledWith(
-      'forgot_password.too_many_requests',
+      'forgot_password.request_failed',
     );
-  });
-
-  it('shows other API errors as they are after the neutral toast', async () => {
-    const otherError = [{ message: 'Something else', code: 'unknown-code' }];
-    mockApiv3Post.mockRejectedValue(otherError);
-    renderForm();
-
-    submitEmail('user@example.com');
-    await advance(IMMEDIATE_REJECTION_WAIT_MS);
-
-    expect(mockToastSuccess).toHaveBeenCalledWith(NEUTRAL_TOAST);
-    expect(mockToastError).toHaveBeenCalledWith(otherError);
+    expect(mockToastError).toHaveBeenCalledTimes(1);
   });
 
   it('asks for an email address without sending a request when the input is empty', () => {

@@ -9,10 +9,7 @@ import { toastError, toastSuccess } from '~/client/util/toastr';
 import { PASSWORD_RESET_RESPONSE_DELAY_MS } from '~/interfaces/password-reset';
 import { isMailerSetupAtom } from '~/states/server-configurations';
 
-import {
-  isPasswordResetRequestFailure,
-  resolveImmediateRejectionMessageKey,
-} from './password-reset-request-error';
+import { resolvePasswordResetFailureMessageKey } from './password-reset-request-error';
 
 import styles from './PasswordResetRequestForm.module.scss';
 
@@ -66,35 +63,21 @@ const PasswordResetRequestForm: FC = () => {
       );
 
       // The server answers every processed request after a fixed delay
-      // (PASSWORD_RESET_RESPONSE_DELAY_MS), but
-      // rejects an unavailable feature, a rate limit or invalid input at
-      // once. Wait briefly for such a rejection so it replaces the neutral
-      // acknowledgement instead of following it.
+      // (PASSWORD_RESET_RESPONSE_DELAY_MS), so a failure this early never
+      // depends on whether the account exists (an unavailable feature, a rate
+      // limit, invalid input, an unreachable server). Wait briefly for such a
+      // failure so it replaces the neutral acknowledgement instead of
+      // following it.
       const early = await settleWithin(request, IMMEDIATE_REJECTION_WAIT_MS);
-      if (early != null && !early.ok) {
-        const key = resolveImmediateRejectionMessageKey(early.error);
-        if (key != null) {
-          toastError(t(key));
-          return;
-        }
+      if (early == null || early.ok) {
+        // Acknowledge and keep the form usable; only a failure needs a toast.
+        toastSuccess(t('forgot_password.email_sent_if_account_exists'));
       }
 
-      // Acknowledge and keep the form usable; only a failure needs a toast.
-      toastSuccess(t('forgot_password.email_sent_if_account_exists'));
       const result = early ?? (await request);
-      if (result.ok) {
-        return;
+      if (!result.ok) {
+        toastError(t(resolvePasswordResetFailureMessageKey(result.error)));
       }
-      const key =
-        resolveImmediateRejectionMessageKey(result.error) ??
-        (isPasswordResetRequestFailure(result.error)
-          ? 'forgot_password.request_failed'
-          : null);
-      if (key != null) {
-        toastError(t(key));
-        return;
-      }
-      toastError(result.error);
     },
     [t, email],
   );
