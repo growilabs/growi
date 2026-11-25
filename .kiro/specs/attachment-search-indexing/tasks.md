@@ -416,5 +416,5 @@
   - `searchWithinPages` が返す hit の `_source.bookmark_count` を、抜粋を入れる項目の `meta.bookmarkCount` に入れる (ページ検索の `formatSearchResult` と同じく、無ければ 0)。抜粋の無い項目には入れない
   - 抜粋の付いた項目にブックマーク数が入ること、抜粋の無い項目には入らないことをテストで固定する。本物の Elasticsearch の結合テスト (`attachment-search-routes.integ.ts`) でも、抜粋の付いた項目の `meta.bookmarkCount` が数であることを確かめる
   - _Requirements: 9.8_
-  - _Boundary: SearchService (`formatFacetSearchItems`), `server/service/search/page-search-item.ts`_
+  - _Boundary: SearchService (`formatFacetSearchItems`)_
   - _Depends: 13.1_

@@ -707,8 +707,8 @@ class SearchService implements SearchQueryParser, SearchResolver {
   }
 
   /**
-   * The highlight and bookmark count of each page that matches the query;
-   * empty on failure (research.md 14.4).
+   * The highlight and bookmark count of each page that matches the query with
+   * a highlight; empty on failure (research.md 14.3, 14.4).
    */
   private async searchHitsOfPages(
     { terms, resolvedFilterData, viewer }: AttachmentSearchInput,
@@ -725,13 +725,19 @@ class SearchService implements SearchQueryParser, SearchResolver {
         FACET_SNIPPET_TIMEOUT_MS,
       );
       return new Map(
-        data.map((hit) => [
-          hit._id,
-          {
-            highlight: hit._highlight,
-            bookmarkCount: hit._source.bookmark_count || 0,
-          },
-        ]),
+        data.flatMap((hit) =>
+          hit._highlight == null
+            ? []
+            : [
+                [
+                  hit._id,
+                  {
+                    highlight: hit._highlight,
+                    bookmarkCount: hit._source.bookmark_count || 0,
+                  },
+                ],
+              ],
+        ),
       );
     } catch (err) {
       logger.warn(

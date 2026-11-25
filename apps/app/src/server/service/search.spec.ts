@@ -728,6 +728,24 @@ describe('page documents and snippets', () => {
       expect(item.meta?.bookmarkCount).toBe(0);
     });
 
+    it('answers an item without a snippet or a bookmark count when its hit carries no highlight', async () => {
+      const page = createPage('/page', PageGrant.GRANT_PUBLIC);
+      service.pagesInMongo = [page];
+      vi.spyOn(delegator, 'searchKeyword').mockResolvedValue({
+        data: [
+          {
+            ...pageHit(page, {}, { bookmark_count: 4 }),
+            _highlight: undefined,
+          },
+        ],
+        meta: { total: 1, hitsCount: 1 },
+      });
+
+      const [item] = await searchItems([itemOf(page)]);
+
+      expect(item.meta).toEqual({ attachmentHits: [] });
+    });
+
     it('answers the items without snippets when the snippet search fails', async () => {
       const page = createPage('/page', PageGrant.GRANT_PUBLIC);
       service.pagesInMongo = [page];
