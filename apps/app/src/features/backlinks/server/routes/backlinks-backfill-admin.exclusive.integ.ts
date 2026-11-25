@@ -1,3 +1,4 @@
+import { EventEmitter } from 'node:events';
 import { performance } from 'node:perf_hooks';
 import express from 'express';
 import mongoose, { Types } from 'mongoose';
@@ -5,11 +6,14 @@ import request from 'supertest';
 import { mock } from 'vitest-mock-extended';
 
 import type { Prisma } from '~/generated/prisma/client';
+import { ActionGroupSize, SupportedAction } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
 import type { PageModel } from '~/server/models/page';
 import PageModelFactory from '~/server/models/page';
 import { UserStatus } from '~/server/models/user/conts';
+import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import addCustomFunctionToResponse from '~/server/routes/apiv3/response';
+import ActivityService from '~/server/service/activity';
 import type { SocketIoService } from '~/server/service/socket-io';
 import { prisma } from '~/utils/prisma';
 
@@ -60,6 +64,29 @@ let app: express.Application;
 let currentUser: FakeUser | undefined;
 
 const jobs = () => prisma.pagelinkbackfilljobs;
+
+// One emitter for the routes and a real ActivityService, so an emitted action is settled into
+// an `activities` row the way it is in the app.
+const activityEvents = new EventEmitter();
+const AUDIT_CONFIG: Record<string, unknown> = {
+  'app:auditLogEnabled': true,
+  'app:auditLogActionGroupSize': ActionGroupSize.Large,
+};
+
+// Assigned after mock<Crowi>(): an override object is deep-proxied, which would wrap the real
+// emitter and service instead of handing them over.
+/** What happened, in order: an emitted action and the response being sent. */
+const sequence: string[] = [];
+activityEvents.prependListener('update', () => {
+  sequence.push('emit');
+});
+
+const crowiWith = (pageLinkService: PageLinkService): Crowi => {
+  const crowi = mock<Crowi>();
+  crowi.events.activity = activityEvents;
+  crowi.pageLinkService = pageLinkService;
+  return crowi;
+};
 
 // --- fixtures --------------------------------------------------------------
 
@@ -182,6 +209,13 @@ const buildApp = (crowi: Crowi): express.Application => {
   built.use(express.json());
   built.use((req: express.Request & { user?: FakeUser }, res, next) => {
     Object.assign(res, responseHelpers.response);
+    // The apiv3 helpers were just assigned above; the type cannot follow Object.assign.
+    const apiv3Res = res as ApiV3Response;
+    const { apiv3 } = apiv3Res;
+    apiv3Res.apiv3 = (...args) => {
+      sequence.push('response');
+      return apiv3.apply(res, args);
+    };
     if (currentUser != null) req.user = currentUser;
     next();
   });
@@ -195,9 +229,18 @@ beforeAll(async () => {
   await ensurePageLinkIndexes(db);
   Page = PageModelFactory(null);
 
+  const activityCrowi = mock<Crowi>({
+    configManager: {
+      // mockImplementation rather than vi.fn(impl): getConfig is generic over the key.
+      getConfig: vi.fn().mockImplementation((key: string) => AUDIT_CONFIG[key]),
+    },
+  });
+  activityCrowi.events.activity = activityEvents;
+  new ActivityService(activityCrowi);
+
   // The auth middlewares read nothing from crowi for a logged-in or anonymous API caller. The
   // stubbed service claims nothing, so these tests see the document as the routes wrote it.
-  app = buildApp(mock<Crowi>({ pageLinkService: mock<PageLinkService>() }));
+  app = buildApp(crowiWith(mock<PageLinkService>()));
 });
 
 beforeEach(async () => {
@@ -207,6 +250,8 @@ beforeEach(async () => {
   await prisma.pagelinks.deleteMany({});
   await jobs().deleteMany({});
   await jobs().ensureExists();
+  await prisma.activities.deleteMany({});
+  sequence.length = 0;
 });
 
 // --- tests -----------------------------------------------------------------
@@ -778,6 +823,96 @@ describe('backlinks backfill admin routes', () => {
   });
 });
 
+describe('backlinks backfill admin routes, audit log', () => {
+  // The listener settles the row after the response, so a read polls for it.
+  const waitForActivities = (endpoint: string) =>
+    vi.waitFor(
+      async () => {
+        const rows = await prisma.activities.findMany({ where: { endpoint } });
+        expect(rows).not.toHaveLength(0);
+        return rows;
+      },
+      { timeout: 5000, interval: 50 },
+    );
+
+  it.each([
+    [
+      'start',
+      SupportedAction.ACTION_ADMIN_BACKLINKS_BACKFILL_START,
+      async () => {},
+      { kind: 'all' },
+    ],
+    [
+      'stop',
+      SupportedAction.ACTION_ADMIN_BACKLINKS_BACKFILL_STOP,
+      () => patchJob({ ...PREVIOUS_RUN, status: 'requested' }),
+      undefined,
+    ],
+    [
+      'resume',
+      SupportedAction.ACTION_ADMIN_BACKLINKS_BACKFILL_RESUME,
+      () => patchJob({ ...PREVIOUS_RUN, status: 'stopped' }),
+      undefined,
+    ],
+  ] as const)('records %s with the admin who did it', async (action, recorded, arrange, body) => {
+    await arrange();
+
+    const res = await post(action, body);
+
+    expect(res.status).toBe(200);
+    // The listener takes the operator synchronously; after the response it may be gone.
+    expect(sequence).toEqual(['emit', 'response']);
+    const rows = await waitForActivities(`${MOUNT_PATH}/${action}`);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      action: recorded,
+      userId: ADMIN._id.toString(),
+    });
+  });
+
+  const requestPending = () =>
+    patchJob({ ...PREVIOUS_RUN, status: 'requested' });
+  const atRest = () => patchJob({ status: 'idle' });
+
+  it.each([
+    [
+      'a start refused while a run is active',
+      'start',
+      requestPending,
+      { kind: 'all' },
+    ],
+    ['a start with an invalid scope', 'start', atRest, { kind: 'newest' }],
+    ['a stop with nothing to stop', 'stop', atRest, undefined],
+    [
+      'a resume of a run that is not stopped or failed',
+      'resume',
+      requestPending,
+      undefined,
+    ],
+  ] as const)('records %s as an unsettled attempt by the admin', async (_case, action, arrange, body) => {
+    await arrange();
+
+    const res = await post(action, body);
+
+    expect(res.status).toBeGreaterThanOrEqual(400);
+    const rows = await waitForActivities(`${MOUNT_PATH}/${action}`);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      action: SupportedAction.ACTION_UNSETTLED,
+      userId: ADMIN._id.toString(),
+    });
+  });
+
+  it('records nothing for reading the state', async () => {
+    const res = await getState();
+
+    expect(res.status).toBe(200);
+    // Long enough for a stray emit to settle, as the positive cases above do.
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(await prisma.activities.count()).toBe(0);
+  });
+});
+
 describe('backlinks backfill admin routes, with the real PageLinkService', () => {
   // Paced to finish a handful of pages at once.
   const CONFIG: Record<string, string | number> = {
@@ -801,7 +936,7 @@ describe('backlinks backfill admin routes, with the real PageLinkService', () =>
         socketIoService: mock<SocketIoService>(),
       }),
     );
-    appWithService = buildApp(mock<Crowi>({ pageLinkService: service }));
+    appWithService = buildApp(crowiWith(service));
   });
 
   afterEach(() => {
