@@ -21,7 +21,7 @@
   - `vault-view-composer.spec.ts` と `clone-e2e.integ.ts` のうち、`anonymous-view` を使っているテストを、消すか、利用者のビューに置き換える
   - 完了の目安: 追加した結合テストが修正前に落ち、修正後に通る。`vault-view-composer.ts` に `anonymous-view` という文字列がない
   - _Requirements: 2.1, 2.2_
-- [ ] 2.2 namespace 1 つの ref と HEAD を消す処理を、storage に足す
+- [x] 2.2 namespace 1 つの ref と HEAD を消す処理を、storage に足す
   - 先にテストを書く。`vault-repo-storage.spec.ts`（実際の bare repo と git を使う）で、loose の ref・`packed-refs` の中の ref・HEAD が消えること、ほかの namespace と `refs/vault/sparse-filters/` が残ること、対象がなければ何もしないことを確かめる
   - ref は `git update-ref -d` で消し、その後で namespace のディレクトリを消す
   - 完了の目安: 追加したテストが、実装前に落ち、実装後に通る
