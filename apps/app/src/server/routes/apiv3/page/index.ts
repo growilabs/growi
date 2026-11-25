@@ -1127,6 +1127,20 @@ export const setup = (crowi: Crowi): Router => {
       const userId = req.user._id;
 
       try {
+        // Unsubscribing stays allowed so a user who lost access can still opt out.
+        if (
+          status === SubscriptionStatusType.SUBSCRIBE &&
+          (await Page.countByIdAndViewer(pageId, req.user)) === 0
+        ) {
+          return res.apiv3Err(
+            new ErrorV3(
+              `Page '${pageId}' is not found or forbidden`,
+              'notfound_or_forbidden',
+            ),
+            404,
+          );
+        }
+
         const subscription = await Subscription.subscribeByPageId(
           userId,
           pageId,
