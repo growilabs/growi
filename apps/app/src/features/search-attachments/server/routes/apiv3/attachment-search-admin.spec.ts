@@ -519,6 +519,14 @@ describe('GET /config', () => {
   });
 });
 
+const setEnvVarsLock = (locked: boolean) =>
+  vi
+    .mocked(configManager.getConfig)
+    .mockImplementation(((key: string) =>
+      key === 'env:useOnlyEnvVars:app:attachmentFullTextSearch'
+        ? locked
+        : undefined) as never);
+
 describe('PUT /config validation', () => {
   const put = (body: Record<string, unknown>) =>
     supertest(buildTestApp(true))
@@ -528,6 +536,7 @@ describe('PUT /config validation', () => {
     vi.mocked(configManager.updateConfigs).mock.calls[0]?.[0];
 
   beforeEach(() => {
+    setEnvVarsLock(false);
     vi.mocked(configManager.updateConfigs).mockReset();
     vi.mocked(configManager.updateConfigs).mockResolvedValue(undefined);
   });
@@ -653,6 +662,57 @@ describe('PUT /config — attachment index creation', () => {
     const res = await supertest(buildTestApp(true, ensureAttachmentIndex))
       .put('/admin/attachment-search/config')
       .send({ extractorUri: 'http://extractor:8000', extractorToken: 'token' });
+
+    expect(res.status).toBe(200);
+    expect(configManager.updateConfigs).toHaveBeenCalledOnce();
+  });
+});
+
+describe('PUT /config — settings pinned by environment variables', () => {
+  const putWith = (
+    body: Record<string, unknown>,
+    ensureAttachmentIndex = vi.fn().mockResolvedValue(undefined),
+  ) =>
+    supertest(buildTestApp(true, ensureAttachmentIndex))
+      .put('/admin/attachment-search/config')
+      .send(body);
+
+  beforeEach(() => {
+    vi.mocked(configManager.updateConfigs).mockReset();
+    vi.mocked(configManager.updateConfigs).mockResolvedValue(undefined);
+  });
+
+  it.each([
+    { name: 'a valid body', body: { timeoutMs: 30000 } },
+    {
+      name: 'an invalid extractorUri',
+      body: { extractorUri: 'file:///etc/passwd' },
+    },
+    { name: 'an out-of-range timeoutMs', body: { timeoutMs: 999 } },
+  ])('refuses $name with 409 and stores nothing', async ({ body }) => {
+    // Feature enabled, so an index would be created if the lock did not stop the request
+    vi.mocked(configManager.getConfig).mockImplementation(((key: string) => {
+      if (key === 'env:useOnlyEnvVars:app:attachmentFullTextSearch')
+        return true;
+      if (key === 'app:attachmentFullTextSearch:extractorUri')
+        return 'http://extractor:8000';
+      if (key === 'app:attachmentFullTextSearch:extractorToken') return 'token';
+      return undefined;
+    }) as never);
+    const ensureAttachmentIndex = vi.fn().mockResolvedValue(undefined);
+
+    const res = await putWith(body, ensureAttachmentIndex);
+
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('config_locked_by_env_vars');
+    expect(configManager.updateConfigs).not.toHaveBeenCalled();
+    expect(ensureAttachmentIndex).not.toHaveBeenCalled();
+  });
+
+  it('still saves when the settings are not pinned', async () => {
+    setEnvVarsLock(false);
+
+    const res = await putWith({ timeoutMs: 30000 });
 
     expect(res.status).toBe(200);
     expect(configManager.updateConfigs).toHaveBeenCalledOnce();
