@@ -52,6 +52,10 @@ export interface BacklinksBackfillState {
   readonly coveredSince: string | null;
   readonly completedAt: string | null;
   readonly lastError: string | null;
+  /** Failures in a row with no progress between them. */
+  readonly failedAttempts: number;
+  /** When a failed run is retried on its own; null when no retry is due. */
+  readonly retryAt: string | null;
   /** Pages the walk scans that the coverage does not include yet; computed on read. */
   readonly notIncludedCount: number;
   /** Pages the walk scans (neither trashed nor empty); computed on read. */

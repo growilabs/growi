@@ -68,6 +68,15 @@ const conflict = (res: ApiV3Response, message: string, code: string) =>
  *         lastError:
  *           type: string
  *           nullable: true
+ *         failedAttempts:
+ *           type: integer
+ *           description: Failures in a row with no progress between them
+ *         retryAt:
+ *           type: string
+ *           format: date-time
+ *           nullable: true
+ *           description: >
+ *             When a failed run is retried on its own; null when no retry is due
  *         notIncludedCount:
  *           type: integer
  *           description: Pages the coverage does not include yet
@@ -118,9 +127,10 @@ const conflict = (res: ApiV3Response, message: string, code: string) =>
  *          - accessTokenHeaderAuth: []
  *        summary: Request a new backlinks backfill run over a scope
  *        description: >
- *          Admin only. Requires the `write:admin:app` scope. Writes the request and clears
- *          the previous run's progress; an idle poll then claims and runs it. Refused while
- *          a run is requested or running, and once every page is covered.
+ *          Admin only. Requires the `write:admin:app` scope. Writes the request, clears the
+ *          previous run's progress, and claims it in this process at once; the run continues
+ *          after the response. Refused while a run is active (requested, running, or failed
+ *          with a retry due), and once every page is covered.
  *        requestBody:
  *          required: true
  *          content:
@@ -171,8 +181,9 @@ const conflict = (res: ApiV3Response, message: string, code: string) =>
  *            description: Invalid scope
  *          409:
  *            description: >
- *              A run is already requested or running (code backfill_run_active), or every
- *              page is already covered (code backfill_already_complete)
+ *              A run is already requested, running or waiting to retry (code
+ *              backfill_run_active), or every page is already covered (code
+ *              backfill_already_complete)
  *          302:
  *            description: The caller is logged in but not an admin (redirected to /)
  *          403:
@@ -193,7 +204,8 @@ const conflict = (res: ApiV3Response, message: string, code: string) =>
  *        description: >
  *          Admin only. Requires the `write:admin:app` scope. Cancels a request not yet
  *          claimed, asks a running run to stop at its next checkpoint (`stopRequested`), or
- *          ends a run whose owner's lease has expired directly as `stopped`.
+ *          ends directly as `stopped` a run whose owner's lease has expired or a failed run
+ *          waiting to retry.
  *        responses:
  *          200:
  *            description: The job state after the stop
@@ -205,7 +217,8 @@ const conflict = (res: ApiV3Response, message: string, code: string) =>
  *                    state:
  *                      $ref: '#/components/schemas/BacklinksBackfillState'
  *          409:
- *            description: No run is requested or running (code backfill_not_stoppable)
+ *            description: >
+ *              No run is requested, running or waiting to retry (code backfill_not_stoppable)
  *          302:
  *            description: The caller is logged in but not an admin (redirected to /)
  *          403:
@@ -222,10 +235,11 @@ const conflict = (res: ApiV3Response, message: string, code: string) =>
  *          - bearer: []
  *          - accessTokenInQuery: []
  *          - accessTokenHeaderAuth: []
- *        summary: Resume a stopped backlinks backfill run
+ *        summary: Resume a stopped or failed backlinks backfill run
  *        description: >
- *          Admin only. Requires the `write:admin:app` scope. Requests the stopped run again,
- *          keeping its scope, range and progress, so it continues where it stopped.
+ *          Admin only. Requires the `write:admin:app` scope. Requests the run again, keeping
+ *          its scope, range and progress, and claims it in this process at once, so it
+ *          continues where it stopped. A failed run gets its retries again.
  *        responses:
  *          200:
  *            description: The job state after the request
@@ -237,7 +251,7 @@ const conflict = (res: ApiV3Response, message: string, code: string) =>
  *                    state:
  *                      $ref: '#/components/schemas/BacklinksBackfillState'
  *          409:
- *            description: The run is not stopped (code backfill_not_stopped)
+ *            description: The run is neither stopped nor failed (code backfill_not_resumable)
  *          302:
  *            description: The caller is logged in but not an admin (redirected to /)
  *          403:
@@ -254,6 +268,11 @@ export const createBacklinksBackfillAdminRouter = (crowi: Crowi): Router => {
 
   const respondWithState = async (res: ApiV3Response) =>
     res.apiv3({ state: await readBacklinksBackfillState() });
+
+  // Not awaited: the run continues after the response. It logs its own failures and never rejects.
+  const claimNow = (): void => {
+    void crowi.pageLinkService.claimBackfillNow();
+  };
 
   router.get(
     '/',
@@ -288,10 +307,11 @@ export const createBacklinksBackfillAdminRouter = (crowi: Crowi): Router => {
               )
             : conflict(
                 res,
-                'A backlinks backfill run is already requested or running',
+                'A backlinks backfill run is already requested, running or waiting to retry',
                 'backfill_run_active',
               );
         }
+        claimNow();
         return await respondWithState(res);
       } catch (err) {
         return internalError(res, err, 'start');
@@ -308,7 +328,7 @@ export const createBacklinksBackfillAdminRouter = (crowi: Crowi): Router => {
         if (!(await jobs.requestStop())) {
           return conflict(
             res,
-            'No backlinks backfill run is requested or running',
+            'No backlinks backfill run is requested, running or waiting to retry',
             'backfill_not_stoppable',
           );
         }
@@ -328,10 +348,11 @@ export const createBacklinksBackfillAdminRouter = (crowi: Crowi): Router => {
         if (!(await jobs.requestResume())) {
           return conflict(
             res,
-            'Only a stopped backlinks backfill run can be resumed',
-            'backfill_not_stopped',
+            'Only a stopped or failed backlinks backfill run can be resumed',
+            'backfill_not_resumable',
           );
         }
+        claimNow();
         return await respondWithState(res);
       } catch (err) {
         return internalError(res, err, 'resume');

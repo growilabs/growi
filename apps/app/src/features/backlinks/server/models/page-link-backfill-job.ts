@@ -77,6 +77,12 @@ const IS_RUNNING_WITH_LIVE_LEASE = {
   $and: [{ $eq: ['$status', 'running'] }, HOLDS_LIVE_LEASE],
 };
 
+// A failed run the poll will retry on its own. In `$expr` null and a missing field sort before
+// every date, so `$gt` null is the test for "set".
+const IS_FAILED_WITH_RETRY_DUE = {
+  $and: [{ $eq: ['$status', 'failed'] }, { $gt: ['$retryAt', null] }],
+};
+
 const toStoredScope = (scope: BackfillScope) => ({
   kind: scope.kind,
   maxPages: scope.kind === 'maxPages' ? scope.maxPages : null,
@@ -191,9 +197,9 @@ export const createPageLinkBackfillJobModel = (
 
     /**
      * The admin's start: write the request and clear the previous run, so the loop's first claim
-     * treats it as a new run over its own range. Refused while a run is active (`requested`, or
-     * `running` under a live lease) and once coverage is `all`; a dead owner's later fenced
-     * writes are refused too, since the job is no longer `running`.
+     * treats it as a new run over its own range. Refused while a run is active (`requested`,
+     * `running` under a live lease, or `failed` with a retry due) and once coverage is `all`; a
+     * dead owner's later fenced writes are refused too, since the job is no longer `running`.
      *
      * @returns whether the request was written
      */
@@ -204,7 +210,11 @@ export const createPageLinkBackfillJobModel = (
           _id: JOB_ID,
           coverage: { $ne: 'all' },
           status: { $ne: 'requested' },
-          $expr: { $not: [IS_RUNNING_WITH_LIVE_LEASE] },
+          $expr: {
+            $not: [
+              { $or: [IS_RUNNING_WITH_LIVE_LEASE, IS_FAILED_WITH_RETRY_DUE] },
+            ],
+          },
         },
         update: {
           $set: {
@@ -219,6 +229,7 @@ export const createPageLinkBackfillJobModel = (
               skippedPages: 0,
             }),
             ...releaseClaimFields,
+            ...noFailureFields,
             lastError: null,
           },
           $currentDate: { requestedAt: true },
@@ -236,6 +247,8 @@ export const createPageLinkBackfillJobModel = (
      * - `running` under a live lease: `stopRequested`, which the loop acts on at its checkpoint.
      * - `running` whose lease has expired: `stopped` with the claim released, since no loop will
      *   see the flag; the dead owner's later fenced writes are refused.
+     * - `failed` with a retry due: `stopped`, with the retry cancelled. Nobody holds the claim
+     *   while a retry waits, so nothing else has to see the Stop.
      *
      * @returns whether the Stop applied; false in any other state
      */
@@ -253,7 +266,13 @@ export const createPageLinkBackfillJobModel = (
 
       const result = await client.$runCommandRaw({
         findAndModify: COLLECTION,
-        query: { _id: JOB_ID, status: { $in: ['requested', 'running'] } },
+        query: {
+          _id: JOB_ID,
+          $or: [
+            { status: { $in: ['requested', 'running'] } },
+            { status: 'failed', retryAt: { $ne: null } },
+          ],
+        },
         update: [
           {
             $set: {
@@ -271,6 +290,11 @@ export const createPageLinkBackfillJobModel = (
               leaseExpiresAt: keepIfLive('$leaseExpiresAt'),
               requestedScope: keepUnlessNewRunRequest('$requestedScope'),
               requestedAt: keepUnlessNewRunRequest('$requestedAt'),
+              // A failed run's count ends with the Stop; a live run keeps its own until it settles.
+              failedAttempts: {
+                $cond: [IS_FAILED_WITH_RETRY_DUE, 0, '$failedAttempts'],
+              },
+              retryAt: null,
             },
           },
         ],
@@ -281,17 +305,22 @@ export const createPageLinkBackfillJobModel = (
     },
 
     /**
-     * The admin's Resume of a `stopped` run: request it again, keeping its scope, cutoff, total,
-     * marker and counts, so the next claim continues where it stopped.
+     * The admin's Resume of a `stopped` or `failed` run: request it again, keeping its scope,
+     * cutoff, total, marker and counts, so the next claim continues where it stopped. A failed
+     * run gets its retries again; one with a retry due is retried now instead of at `retryAt`.
      *
-     * @returns whether the job was `stopped` and is now requested
+     * @returns whether the job was `stopped` or `failed` and is now requested
      */
     async requestResume(): Promise<boolean> {
       const result = await client.$runCommandRaw({
         findAndModify: COLLECTION,
-        query: { _id: JOB_ID, status: 'stopped' },
+        query: { _id: JOB_ID, status: { $in: ['stopped', 'failed'] } },
         update: {
-          $set: { status: 'requested', stopRequested: false },
+          $set: {
+            status: 'requested',
+            stopRequested: false,
+            ...noFailureFields,
+          },
           $currentDate: { requestedAt: true },
         },
         new: true,
@@ -337,11 +366,10 @@ export const createPageLinkBackfillJobModel = (
                 ],
               },
               {
+                // Without the "set" test a bare `$lte` would also hand out a job whose retries
+                // are used up: null sorts before `$$NOW`.
                 $and: [
-                  { $eq: ['$status', 'failed'] },
-                  // In `$expr` null and a missing field sort before every date, so a bare `$lte`
-                  // would hand out a job whose retries are used up.
-                  { $gt: ['$retryAt', null] },
+                  IS_FAILED_WITH_RETRY_DUE,
                   { $lte: ['$retryAt', '$$NOW'] },
                 ],
               },

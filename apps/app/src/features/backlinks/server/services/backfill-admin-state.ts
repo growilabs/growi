@@ -29,6 +29,8 @@ export type BackfillJobRow = Pick<
   | 'coveredSince'
   | 'completedAt'
   | 'lastError'
+  | 'failedAttempts'
+  | 'retryAt'
 >;
 
 export interface BackfillPageCounts {
@@ -62,6 +64,8 @@ export const toBacklinksBackfillState = (
         : null,
     completedAt: job.completedAt?.toISOString() ?? null,
     lastError: job.lastError,
+    failedAttempts: job.failedAttempts,
+    retryAt: job.retryAt?.toISOString() ?? null,
     ...counts,
   };
 };
