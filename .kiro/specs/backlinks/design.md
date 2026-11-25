@@ -107,9 +107,6 @@ Re-check this feature if any of the following change:
   (would force consumers of the read API to revalidate).
 - The page-bulk-export job pattern / `CronService` base, or the backfill job's claim/progress
   contract (affects backfill resumability and multi-instance safety).
-- The `PageLinkBackfillJob` document's operator-facing fields (`status`, `coverage`,
-  `coveredSince`, `processed`, `completedAt`, `lastError`) or its collection name: GROWI.cloud infra reads them
-  directly to watch progress, so a rename breaks their monitoring.
 - `isPermalink` / `removeHeadingSlash` semantics, or GROWI's permalink convention (`/{pageId}`).
 - The `app:siteUrl` config key, or `NextLink`'s own-host rule (`isExternalLink`: compares
   `baseUrl.host !== hrefUrl.host`) that link extraction mirrors for absolute URLs.
@@ -220,11 +217,11 @@ apps/app/src/features/backlinks/
 │   │   ├── page-link-service.ts        # thin Crowi adapter: subscribes to crowi.events.page, owns config access, delegates
 │   │   ├── duty-cycle-rest.ts          # pure: rest owed after measured work at a duty (shared by the drain and the backfill)
 │   │   ├── backfill-range.ts           # (B3) pure: the walk's page filter; scope cutoff + coverage -> the run's updatedAt range; coverage after a run
-│   │   ├── backfill-pacing.ts          # (B3) backfill config validation, rest with the page-rate floor, checkpoint cadence, lease length
+│   │   ├── backfill-pacing.ts          # (B3) backfill config validation, rest with the page-rate floor, checkpoint cadence, lease length, failed-run retry schedule
 │   │   ├── backfill-link-resolver.ts   # (B3) in-memory path->id map + permalink id set (one projection query per run)
 │   │   ├── backfill-page.ts            # (B3) one page: body read, size cap, extract, resolve, write; bounded retries
 │   │   ├── page-link-backfill-run.ts   # (B3) one claimed run: first-claim cutoff/total, paced walk, fenced checkpoints and endings
-│   │   └── page-link-backfill-cron.ts  # (B3) CronService start poll: in-process guard, claim, admin progress emitter
+│   │   └── page-link-backfill-cron.ts  # (B3) CronService start poll: in-process guard, claim, self-stop, admin progress emitter
 │   └── routes/
 │       ├── backlinks.ts                # apiv3 route factory (GET) — getBacklinksHandlerFactory
 │       └── backlinks-backfill-admin.ts # (B3) apiv3 admin routes: GET state, POST start (scope), POST stop, POST resume
@@ -249,8 +246,9 @@ apps/app/src/features/backlinks/
 
 ### Modified Files
 - `apps/app/src/server/crowi/index.ts` — instantiate and initialize `PageLinkService`
-  (subscribe to events) in the page-service setup phase, mirroring `search.ts`; **(B3)** also register
-  the backfill `CronService` (mirroring the page-bulk-export job-cron registration).
+  (subscribe to events) in the page-service setup phase, mirroring `search.ts`; `setupCron()` calls
+  `PageLinkService.startBackfillPoll()`, which schedules the backfill poll only while a run is
+  outstanding.
 - `apps/app/src/server/routes/apiv3/index.js` — register the backlinks route.
 - `apps/app/src/server/models/page-redirect.ts` — add `retrieveFromPathsRedirectingTo` (the reverse
   walk: which paths reach a given one) and re-implement `removePageRedirectsByToPath` over it, so
@@ -274,8 +272,9 @@ apps/app/src/features/backlinks/
 > Each file owns one responsibility. `extract-internal-link-paths.ts` is pure (its inputs are
 > parameters; no config or DB access); `target-page-resolution.ts` is not — it reads `Page` and the
 > Prisma `pageredirects` extension — but holds no state and is testable against a real collection.
-> `page-link-service.ts` is the only framework adapter (event wiring and config access); it hands
-> page ids to the queue and the handlers own the lifecycle logic.
+> `page-link-service.ts` is the only framework adapter (event wiring, holding the backfill poll —
+> started at boot or on the admin's request, see the Batch / Job Contract — and config access); it
+> hands page ids to the queue and the handlers own the lifecycle logic.
 
 ## System Flows
 
@@ -879,8 +878,10 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
 
 **Responsibilities & Constraints**
 - Runs as a **self-paced loop**, not a chunk per cron tick. The `CronService` (node-cron) poll only
-  starts it: each idle tick reads the job document and, when it holds a start request or a run whose
-  lease has expired, claims the job and runs the loop until the run completes, fails or is stopped. This departs from the page-bulk-export
+  starts it: each idle tick tries to claim the job (a start request, a run whose lease has expired,
+  or a failed run whose retry is due) and, when it wins, runs the loop until the run completes,
+  fails or is stopped. The poll runs only while a run is outstanding (see the Batch / Job
+  Contract's Trigger). This departs from the page-bulk-export
   chunk-per-tick shape; the scaffolding it reuses is the `CronService` base and the
   marker→resume skeleton, with keyset batches in place of a long-lived cursor (see the Batch / Job
   Contract). Options compared are in research.md.
@@ -943,21 +944,26 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
     `max(5000 ms × restRatio, 1000 / backfillMaxPagesPerSecond)` and the margin (15 s) covers the
     attempts' own page cycles and the checkpoint write. At the defaults that is
     10 + 15 + 20 + 15 = **60 s**: long enough that a healthy loop never loses its claim between
-    checkpoints, short enough that a dead owner's job is taken over within about one minute plus
-    one idle tick (B3.3: 1–5 min). A lower configured duty lengthens the lease with the rest.
+    checkpoints, short enough that a dead owner's job is taken over within about the lease plus
+    one idle tick (one minute), by any instance whose poll is running (see "Crash recovery via a
+    lease"). A lower configured duty lengthens the lease with the rest.
 - **Failing page**: an error on a page (body read, parse or write) is retried in place up to 5
   attempts with a 5 s backoff, the live drain's `MAX_UPSERT_ATTEMPTS` shape, enough to ride out a
   replica-set failover. Then the page is logged, counted in `skippedPages`, and the walk moves on,
   so a page that keeps failing cannot stall it; it is indexed on its next save. If the database is
   down rather than the page bad, the next checkpoint write fails too, the run ends `failed`, and
-  the pages skipped since the last saved marker are redone on retry. **Known gap:** a page that
+  the pages skipped since the last saved marker are redone on retry (see "Failed run" below for
+  when a retry happens). **Known gap:** a page that
   crashes the process, or stalls the thread past the lease, is retried by every owner that takes
   the job over, with no cross-instance detection of "no progress"; the cap above makes the stall
   case unlikely, and the crash case is not handled.
 - **No overlapping loops.** node-cron 3.0.3 does not await the tick callback and has no no-overlap
   option, so an idle tick that falls due while the loop is running would start a second loop on
   the same progress marker. An **in-process `isRunning` flag**, set when the loop starts and reset
-  in `finally`, makes that tick return immediately.
+  in `finally`, makes that tick return immediately. A claim asked for by the admin endpoints
+  (see the Trigger) goes through the same flag, but must not be lost to it: a claim requested
+  while a tick is in flight makes that tick try the claim again instead of stopping the poll, so a
+  request written just before an in-flight tick decides to stop is still claimed in this process.
 - **Resumable**: a `PageLinkBackfillJob` document stores a progress marker —
   the **last `_id` processed, walking pages in `_id` order** — so a restart continues
   rather than restarting (4.3). The marker resets at the start of each run.
@@ -973,9 +979,20 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
   overlap flag.
 - **Crash recovery via a lease**: a claim held by a dead owner would otherwise block the job
   forever. The claim carries `leaseExpiresAt`, **renewed at every checkpoint**, and the claim filter also
-  matches a `running` or `failed` document whose lease has expired, so another instance takes over and
-  resumes from the progress marker. The filter never matches `idle`, `stopped` or `complete`, so an
-  admin's cancel or Stop that lands after the caller's read is not overridden.
+  matches a `running` document whose lease has expired (or that nobody holds), so another instance
+  takes over and resumes from the progress marker. It matches a `failed` document only once its
+  `retryAt` has passed (see "Failed run"). The filter never matches `idle`, `stopped` or `complete`,
+  nor a `failed` document with no retry due, so an admin's cancel or Stop that lands after the
+  caller's read is not overridden.
+  - **Only an instance whose poll is running takes over.** A poll runs on every instance that
+    booted while a run was outstanding, and on the instance that received the admin's Start or
+    Resume (see the Trigger). A rolling deploy or a restart during a run is therefore covered: the
+    new process boots with the run outstanding and schedules its poll. **Accepted gap:** if the
+    owner disappears without a restart (for example on scale-in) and no other instance has a
+    poll, the job stays `running` until some instance restarts; the admin can end it sooner with
+    Stop, which sets `stopped` directly on an expired lease, then Resume (research.md). A
+    `requested` job is left the same way if the instance that received the Start disappears before
+    its claim; Stop cancels it and a new Start is claimed at once.
 - **Write ordering vs. the live listener — the narrow window is accepted.** The backfill reads a
   page body and writes its rows a moment later, and the save-time listener may rewrite the same
   page's rows in between, on this or another instance. A stale backfill write can then land after
@@ -999,10 +1016,26 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
 **Contracts**: Batch [x] / State [x]
 
 ##### Batch / Job Contract
-- Trigger: an administrator's start request on the job document (see the Delivery decision). The cron
-  poll is registered from `crowi` setup and, on every idle tick, claims a pending request or a run
-  whose lease has expired; the loop then runs (paced). It is not scheduled at boot when coverage is
-  already `all`, since nothing can start.
+- Trigger: an administrator's start request on the job document (see the Delivery decision). The
+  poll runs **only while a run is outstanding**, so an app whose admin never starts a backfill, or
+  whose backfill has ended, polls nothing. A run is outstanding when the job document's `status`
+  is `requested` or `running`, or `failed` with `retryAt` set (a retry is due, see "Failed run").
+  One predicate defines this, and both the boot gate and the tick's self-stop read it.
+  - **At boot**, after the boot upsert, `PageLinkService` schedules the poll only when a run is
+    outstanding. With `idle`, `stopped`, `complete`, or `failed` with no retry due, nothing is
+    scheduled. Boot does not claim or run anything itself: the poll's first tick does, so boot
+    never waits on a run.
+  - **From the admin endpoints**: after Start or Resume writes `requested`, the endpoint calls
+    `PageLinkService`, which starts the poll in this process if it is not running and asks for one
+    claim right away without waiting for the run, so the run starts at once rather than on the
+    next tick. The endpoint responds without waiting for the run.
+  - **Self-stop**: a tick that does not win the claim reads the job document and stops the poll
+    unless a run is outstanding; a missing document stops it too. In the process that ran the
+    job, the poll therefore stops itself on the first tick after the run ends `complete` (or
+    `stopped`, or `failed` with no retry due). An instance that did not run the job stops the
+    same way once the owner settles it.
+  - The poll ticks every minute; each tick is one `findAndModify` on the job document by primary
+    key, plus one read when it does not win the claim.
 - Input: keyset batches of 100 pages (`Page.find({ ...range filter, _id: { $gt: marker } })
   .sort({ _id: 1 }).limit(100)`), restricted to the run's `updatedAt` range and starting after the
   progress marker; body via the page's revision. Batches are re-queried rather than read from one
@@ -1043,12 +1076,14 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
   not expect one, so a wiki reads "not started" until someone starts it. There are no start-flag,
   start-window or scope-limit environment variables. The control is the same on GROWI.cloud (below).
 - **Start request.** The start endpoint (apiv3, `loginRequired` + `adminRequired`) writes the request
-  to the job document (`requestedScope`, `requestedAt`, status `requested`) and does not run the loop
-  itself. The poll's next idle tick claims it atomically, so the same path also serves resume after a
-  crash or a lapsed lease. The endpoint rejects a request while a run is active (`requested`, or
-  `running` with a live lease) and when coverage is already `all`, and validates the scope (N a
-  positive integer, the date not in the future). Whether it also nudges an immediate claim, so the
-  admin does not wait up to one idle interval, is a B3.3 choice.
+  to the job document (`requestedScope`, `requestedAt`, status `requested`), then makes sure the
+  poll runs in its own process and asks for one claim right away (see the Trigger); it does not
+  wait for the run. The claim is atomic, the same path as resume after a crash or a lapsed lease.
+  The endpoint rejects a request while a run is active (`requested`, `running` with a live lease,
+  or `failed` with a retry due) and when coverage is already `all`, and validates the scope (N a
+  positive integer, the date not in the future). If the job document is missing, the endpoints
+  recreate it through the boot upsert before reading or writing (see "If the document goes
+  missing").
 - **A scope resolves to one cutoff per run.** At the run's first claim the scope becomes `runCutoff`
   (a date; none for all pages) and is stored on the job document, so it does not float across
   restarts. `since` is that date; `maxPages` is the `updatedAt` of the Nth newest page, read from the
@@ -1106,7 +1141,8 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
   | `coverage: none`, idle | "Backlinks have not been built for existing pages" (with the page count) | scope picker + Start |
   | `requested` / `running` | processed of `runTotal` pages (count and percent, capped as in "Counts shown to the admin"), over the admin Socket.IO channel | Stop; Start disabled |
   | `running` with `stopRequested` | "Stopping…" | none |
-  | `failed` | the last error; the poll retries from the marker | none |
+  | `failed`, retry due (`retryAt` set) | the last error, and when it retries (`retryAt`, retry `failedAttempts` of 3) | Stop, or Resume to retry now; Start disabled |
+  | `failed`, no retry due | the last error; it is not retried | Resume, or a new scope + Start |
   | `stopped` | where it stopped (processed of `runTotal`) | Resume, or a new scope + Start |
   | `coverage: partial`, idle | "Backlinks cover pages edited since `<coveredSince>`; about N older pages are not included" | scope picker + Start |
   | `coverage: all` | "Backlinks are indexed for all pages (completed `<completedAt>`)" | none |
@@ -1115,8 +1151,7 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
   tell "finished" from "feature missing". The server enforces the same rules (the start endpoint
   rejects while a run is active or when coverage is `all`); hiding the control is a convenience, not
   the check.
-- **Stop and resume.** Stop is an admin-owned `stopRequested` flag on the job document; there is no
-  infra-owned pause field.
+- **Stop and resume.** Stop is an admin-owned `stopRequested` flag on the job document.
   - A request not yet claimed (`requested`) is cancelled: the request is cleared and the document
     returns to rest, with coverage unchanged.
   - For a `running` run the endpoint sets `stopRequested`. The loop checks it at each checkpoint,
@@ -1125,14 +1160,19 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
     at most one rest (about 15 s at 25% duty), which is why the UI shows "Stopping…" until the
     status changes. If the run's lease has already expired (a dead owner), the endpoint sets
     `stopped` directly, since no loop will see the flag.
+  - A `failed` job with a retry due holds no claim, so Stop sets `stopped` directly and clears
+    `retryAt` and `failedAttempts`; the marker stays, so Resume continues from it.
   - Only a claim from `requested` clears a stale `stopRequested`, so a Stop clicked as a run finishes
-    cannot stop the next one at once. A take-over of a `running` or `failed` job keeps the flag, so a
-    live Stop still takes effect at the next owner's checkpoint. For the same reason the `failed`
-    ending keeps the flag; only the `stopped` and `complete` endings, which settle the run, clear it.
-  - Resume (`POST resume`, valid only in `stopped`) sets `requested` and keeps `requestedScope`,
-    `runCutoff` and the marker, so the run continues over the same range and redoes at most one
-    checkpoint interval (idempotent upserts), the same path as crash recovery. A new start with a
-    scope resets the marker instead. A `stopped` document is not picked up by the poll.
+    cannot stop the next one at once. A take-over of a `running` job keeps the flag, so a live Stop
+    still takes effect at the next owner's checkpoint. A run that fails while a Stop is pending is
+    not retried (the `failed` ending leaves `retryAt` null), so the Stop holds; that ending keeps the
+    flag, and only the `stopped` and `complete` endings, which settle the run, clear it.
+  - Resume (`POST resume`, valid in `stopped` and `failed`) sets `requested`
+    and keeps `requestedScope`, `runCutoff` and the marker, so the run continues over the same range
+    and redoes at most one checkpoint interval (idempotent upserts), the same path as crash
+    recovery. It resets `failedAttempts` and `retryAt`, so a resumed run gets its retries again. A
+    new start with a scope resets the marker and the retry fields instead. Neither a `stopped`
+    document nor a `failed` one with no retry due is picked up by the poll.
   - Stopping never changes coverage: `coveredSince` moves only on completion.
 - **GROWI.cloud: the same control as on-prem, bounded by the per-app limits only.** GROWI.cloud apps
   share a MongoDB, and a duty cycle bounds one app's busy share, not the total: many customer admins
@@ -1170,21 +1210,46 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
   (`$setOnInsert`: idle, `coverage: none`); the admin endpoints write the request (`requestedScope`,
   `requestedAt`, `stopRequested`); the job writes everything else (`status`, `runCutoff`,
   `coverage`, `coveredSince`, progress marker, `processed`, `skippedPages`, `runTotal`,
-  claim/lease, `completedAt`, `lastError`). Infra reads `status` / `coverage` / `processed` /
-  `lastError` to watch progress; it never has to write. It is a document and not a config key
-  because completion is state the job writes, not a setting an operator edits, and a copy in config
-  could disagree with it. The tick reads the document directly from the database, not through
+  claim/lease, `completedAt`, `lastError`, `failedAttempts`, `retryAt`); Start and Resume also
+  reset `failedAttempts` and `retryAt`. It is a document and not a config key because completion
+  is state the job writes, not a setting an operator edits, and a copy in config could disagree
+  with it. The tick reads the document directly from the database, not through
   `configManager`. `complete` is not terminal: the document returns to rest after a run, and a new
-  run may start while coverage is not `all`. `failed` is not terminal either: the failure write
-  records `lastError` and releases the claim, and the next idle tick claims the job again and
-  resumes from the saved marker — every tick, with no attempt cap or backoff, since a page-level
-  failure is already absorbed by the failing-page policy and what remains is a systemic fault the
-  admin sees in `lastError`. A completed run clears `lastError`. Idle cost is one primary-key read
-  per idle tick; the interval is a B3.3 choice (1 to 5 minutes).
+  run may start while coverage is not `all`. A completed run clears `lastError`.
+- **Failed run: retried three times with a growing delay, then left for the admin.** A page-level failure
+  is already absorbed by the failing-page policy, so a run that ends `failed` met a systemic fault
+  (the database down, or a bug), and each retry rebuilds the in-memory path map. So the failure
+  write records `lastError`, releases the claim, increments `failedAttempts`, and sets `retryAt`
+  on the database clock: **5 minutes** after the first failure, **15 minutes** after the second,
+  **30 minutes** after the third, and null after the fourth in a row (see below), which leaves the job `failed` until the admin
+  resumes it. A run that fails while a Stop is pending gets no retry either (see "Stop and
+  resume").
+  - The poll does the retry: a tick claims a `failed` job once its `retryAt` has passed, and
+    resumes from the saved marker. There is no in-process timer, so any instance whose poll is
+    running takes the retry over, including when the instance that failed dies while waiting, and
+    a restart does not reset the count. Polls keep ticking while a retry is due (a run is still
+    outstanding, see the Trigger) and stop once `retryAt` is null.
+  - The count is of failures **in a row with no progress between them**: the first checkpoint a
+    claimed run saves resets `failedAttempts` to 0 in the same fenced write, so a retry that gets
+    going and fails again much later starts over at the first retry. A fault that always strikes
+    at the same point never reaches a new checkpoint, so it still hits the cap. Start, Resume, and
+    the `complete` and `stopped` endings reset `failedAttempts` and `retryAt` too. A claim of a
+    `failed` job clears `retryAt`.
+  - Accepted: a fault that strikes just after every checkpoint never reaches the cap. Each retry
+    still saves progress, so the run moves toward its end rather than retrying forever, though
+    each retry rebuilds the path map.
+  - The schedule is a list of delays in `backfill-pacing.ts` (`BACKFILL_RETRY_DELAYS_MS`), whose
+    length is the cap. The failure write takes it as a parameter and picks the delay on the
+    database, from the stored count in the same write, so the count and the retry time cannot
+    disagree.
 - **If the document goes missing**, the boot upsert recreates it as `coverage: none`: the admin
   settings read "not started", and a run redoes work already in `pagelinks`, which the idempotent
   upsert makes harmless. A run that finds its document gone at a checkpoint (its fenced write is
-  refused) stops and recreates it, through the boot upsert, instead of continuing. The rows in `pagelinks` stay valid either way.
+  refused) stops and recreates it, through the boot upsert, instead of continuing. The admin
+  endpoints also run the boot upsert before they read or write, so a document deleted while the
+  server is up reads "not started" and a Start works; since the endpoint starts the poll itself,
+  the request is claimed whether or not a poll was scheduled at boot. A tick that finds the
+  document missing stops the poll, as at rest. The rows in `pagelinks` stay valid either way.
 - The backlinks panel shows an "index still building / partial" state whenever coverage is not `all`
   or a run is active, so a gated or in-progress backfill is a visible gap and not a silent one; for
   a partial index it says that pages not edited since `coveredSince` are not included (4.4). Whether

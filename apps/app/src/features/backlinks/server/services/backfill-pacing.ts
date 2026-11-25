@@ -13,6 +13,16 @@ export const BACKFILL_CHECKPOINT_INTERVAL_MS = 10_000;
 export const MAX_BACKFILL_PAGE_ATTEMPTS = 5;
 export const BACKFILL_PAGE_RETRY_BACKOFF_MS = 5000;
 
+/**
+ * The wait before the poll retries a failed run, by the number of failures in a row; after one
+ * more failure the job is left for the admin (design.md, "Failed run").
+ */
+export const BACKFILL_RETRY_DELAYS_MS: readonly number[] = [
+  5 * 60_000,
+  15 * 60_000,
+  30 * 60_000,
+];
+
 /** Covers the page cycles of one page's attempts and the checkpoint write's own latency. */
 const LEASE_MARGIN_MS = 15_000;
 

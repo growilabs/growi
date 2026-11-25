@@ -7,6 +7,7 @@ import { throwOnWriteErrors } from './throw-on-write-errors';
 
 const COLLECTION = 'pagelinkbackfilljobs';
 const LEASE_MS = 60_000;
+const RETRY_DELAYS_MS = [60_000, 120_000];
 
 // Writes the way an admin endpoint and a crashed owner leave the document:
 // a field-level $set straight into MongoDB, not through the model under test.
@@ -33,8 +34,8 @@ const readStoredJob = async (): Promise<unknown> => {
   return (result.cursor as { firstBatch: object[] }).firstBatch[0] ?? null;
 };
 
-// Infra reads this document straight from MongoDB, so the stored field names are the contract.
-// A Prisma read cannot show them: it reports a nullable field that was never written as null.
+// Raw inserts get no schema `@default`, so `ensureExists` must write every field itself. A
+// Prisma read cannot show a missing one: it reports a never-written field as null or its default.
 const readStoredFieldNames = async (): Promise<string[]> => {
   const result = await prisma.$runCommandRaw({
     find: COLLECTION,
@@ -92,6 +93,8 @@ describe('pagelinkbackfilljobs (integration)', () => {
           'skippedPages',
           'completedAt',
           'lastError',
+          'failedAttempts',
+          'retryAt',
           'claimedBy',
           'leaseExpiresAt',
         ].sort(),
@@ -200,18 +203,59 @@ describe('pagelinkbackfilljobs (integration)', () => {
     });
 
     it.each([
-      'idle',
-      'stopped',
-      'complete',
-    ])('never hands out an unclaimed %s job', async (status) => {
-      await patchJobDocument({ status });
+      { status: 'idle' },
+      { status: 'stopped' },
+      { status: 'complete' },
+      { status: 'failed', retryAt: null },
+      { status: 'failed', retryAt: { $date: '2999-01-01T00:00:00Z' } },
+    ])('never hands out an unclaimed job in $status with retryAt $retryAt', async (set) => {
+      await patchJobDocument(set);
 
       const claimed = await prisma.pagelinkbackfilljobs.tryClaim('owner-a', {
         leaseMs: LEASE_MS,
       });
 
       expect(claimed).toBe(false);
-      expect(await readJob()).toMatchObject({ status, claimedBy: null });
+      expect(await readJob()).toMatchObject({
+        status: set.status,
+        claimedBy: null,
+      });
+    });
+
+    it('never hands out a failed job written before retryAt existed', async () => {
+      await prisma.$runCommandRaw({
+        update: COLLECTION,
+        updates: [
+          { q: {}, u: { $set: { status: 'failed' }, $unset: { retryAt: '' } } },
+        ],
+      });
+
+      const claimed = await prisma.pagelinkbackfilljobs.tryClaim('owner-a', {
+        leaseMs: LEASE_MS,
+      });
+
+      expect(claimed).toBe(false);
+    });
+
+    it('hands out a failed job once its retryAt has passed, and clears retryAt', async () => {
+      await patchJobDocument({
+        status: 'failed',
+        failedAttempts: 2,
+        retryAt: { $date: '2000-01-01T00:00:00Z' },
+      });
+
+      const claimed = await prisma.pagelinkbackfilljobs.tryClaim('owner-a', {
+        leaseMs: LEASE_MS,
+      });
+
+      expect(claimed).toBe(true);
+      // The count stays until the retry saves progress, so a retry that fails at once counts on.
+      expect(await readJob()).toMatchObject({
+        status: 'running',
+        claimedBy: 'owner-a',
+        failedAttempts: 2,
+        retryAt: null,
+      });
     });
 
     it.each([
@@ -233,8 +277,7 @@ describe('pagelinkbackfilljobs (integration)', () => {
     it.each([
       'requested',
       'running',
-      'failed',
-    ])('hands out an unclaimed %s job, so a request, an interrupted run or a failed run can be picked up', async (status) => {
+    ])('hands out an unclaimed %s job, so a request or an interrupted run can be picked up', async (status) => {
       await patchJobDocument({ status });
 
       const claimed = await prisma.pagelinkbackfilljobs.tryClaim('owner-a', {
@@ -248,12 +291,9 @@ describe('pagelinkbackfilljobs (integration)', () => {
       });
     });
 
-    it.each([
-      'running',
-      'failed',
-    ])('does not take a %s job from a holder whose lease is still live', async (status) => {
+    it('does not take a running job from a holder whose lease is still live', async () => {
       await patchJobDocument({
-        status,
+        status: 'running',
         claimedBy: 'live-owner',
         leaseExpiresAt: { $date: '2999-01-01T00:00:00Z' },
       });
@@ -264,7 +304,7 @@ describe('pagelinkbackfilljobs (integration)', () => {
 
       expect(claimed).toBe(false);
       expect(await readJob()).toMatchObject({
-        status,
+        status: 'running',
         claimedBy: 'live-owner',
       });
     });
@@ -299,11 +339,12 @@ describe('pagelinkbackfilljobs (integration)', () => {
       });
     });
 
-    it('keeps a live stopRequested when taking over an unheld failed job', async () => {
+    it('keeps a live stopRequested when claiming a failed job whose retry is due', async () => {
       await patchJobDocument({
         status: 'failed',
         claimedBy: null,
         stopRequested: true,
+        retryAt: { $date: '2000-01-01T00:00:00Z' },
       });
 
       const claimed = await prisma.pagelinkbackfilljobs.tryClaim('owner-b', {
@@ -369,6 +410,41 @@ describe('pagelinkbackfilljobs (integration)', () => {
     });
   });
 
+  describe('isRunOutstanding', () => {
+    beforeEach(async () => {
+      await prisma.pagelinkbackfilljobs.ensureExists();
+    });
+
+    it.each([
+      { set: { status: 'idle' }, outstanding: false },
+      { set: { status: 'requested' }, outstanding: true },
+      { set: { status: 'running' }, outstanding: true },
+      { set: { status: 'stopped' }, outstanding: false },
+      { set: { status: 'complete' }, outstanding: false },
+      {
+        set: { status: 'failed', retryAt: { $date: '2999-01-01T00:00:00Z' } },
+        outstanding: true,
+      },
+      {
+        set: { status: 'failed', retryAt: { $date: '2000-01-01T00:00:00Z' } },
+        outstanding: true,
+      },
+      { set: { status: 'failed', retryAt: null }, outstanding: false },
+    ])('is $outstanding for $set', async ({ set, outstanding }) => {
+      await patchJobDocument(set);
+
+      expect(await prisma.pagelinkbackfilljobs.isRunOutstanding()).toBe(
+        outstanding,
+      );
+    });
+
+    it('is false when the job document does not exist', async () => {
+      await prisma.pagelinkbackfilljobs.deleteMany({});
+
+      expect(await prisma.pagelinkbackfilljobs.isRunOutstanding()).toBe(false);
+    });
+  });
+
   describe('writes of the running loop', () => {
     const OWNER = 'owner-a';
     const marker = new Types.ObjectId();
@@ -403,7 +479,9 @@ describe('pagelinkbackfilljobs (integration)', () => {
           coverage: 'all',
         }),
       finishFailed: (owner: string) =>
-        prisma.pagelinkbackfilljobs.finishFailed(owner, 'boom'),
+        prisma.pagelinkbackfilljobs.finishFailed(owner, 'boom', {
+          retryDelaysMs: RETRY_DELAYS_MS,
+        }),
     };
     const refused = (reply: unknown): boolean =>
       reply === false || reply === null;
@@ -571,47 +649,144 @@ describe('pagelinkbackfilljobs (integration)', () => {
       expect(job?.completedAt?.getTime()).toBeGreaterThanOrEqual(before - 5000);
     });
 
-    it('finishFailed records the error verbatim and leaves the job, with its last checkpoint, for the next claim', async () => {
+    /** The DB clock sets `retryAt`; allow for it differing from this process's clock. */
+    const CLOCK_SKEW_MS = 5000;
+    const expectRetryAfter = async (
+      delayMs: number,
+      { before, after }: { before: number; after: number },
+    ): Promise<void> => {
+      const retryAt = (await readJob())?.retryAt?.getTime();
+      expect(retryAt).toBeGreaterThanOrEqual(before + delayMs - CLOCK_SKEW_MS);
+      expect(retryAt).toBeLessThanOrEqual(after + delayMs + CLOCK_SKEW_MS);
+    };
+
+    const failAgain = async (): Promise<void> => {
+      await patchJobDocument({ retryAt: { $date: '2000-01-01T00:00:00Z' } });
+      expect(
+        await prisma.pagelinkbackfilljobs.tryClaim(OWNER, {
+          leaseMs: LEASE_MS,
+        }),
+      ).toBe(true);
+      await prisma.pagelinkbackfilljobs.finishFailed(OWNER, 'boom', {
+        retryDelaysMs: RETRY_DELAYS_MS,
+      });
+    };
+
+    it('finishFailed records the error verbatim, keeps the last checkpoint, and schedules the first retry', async () => {
       const lastError = '$exists is not a field path';
       await prisma.pagelinkbackfilljobs.checkpoint(OWNER, progress, {
         leaseMs: LEASE_MS,
       });
+      const before = Date.now();
 
-      await prisma.pagelinkbackfilljobs.finishFailed(OWNER, lastError);
+      await prisma.pagelinkbackfilljobs.finishFailed(OWNER, lastError, {
+        retryDelaysMs: RETRY_DELAYS_MS,
+      });
 
       expect(await readJob()).toMatchObject({
         status: 'failed',
         lastError,
         claimedBy: null,
-        progressMarker: marker.toString(),
-      });
-      expect(
-        await prisma.pagelinkbackfilljobs.tryClaim('owner-b', {
-          leaseMs: LEASE_MS,
-        }),
-      ).toBe(true);
-      expect(await readJob()).toMatchObject({
-        status: 'running',
+        failedAttempts: 1,
         progressMarker: marker.toString(),
         processed: 7,
       });
+      await expectRetryAfter(RETRY_DELAYS_MS[0], { before, after: Date.now() });
     });
 
-    it('finishFailed keeps a pending Stop, so the owner of the retry sees it at its first checkpoint', async () => {
-      await patchJobDocument({ stopRequested: true });
+    it('finishFailed waits the next delay for each failure in a row, and leaves the job for the admin past the cap', async () => {
+      await prisma.pagelinkbackfilljobs.finishFailed(OWNER, 'boom', {
+        retryDelaysMs: RETRY_DELAYS_MS,
+      });
 
-      await prisma.pagelinkbackfilljobs.finishFailed(OWNER, 'boom');
-      const claimed = await prisma.pagelinkbackfilljobs.tryClaim('owner-b', {
+      const before = Date.now();
+      await failAgain();
+      expect(await readJob()).toMatchObject({ failedAttempts: 2 });
+      await expectRetryAfter(RETRY_DELAYS_MS[1], { before, after: Date.now() });
+
+      await failAgain();
+      expect(await readJob()).toMatchObject({
+        status: 'failed',
+        failedAttempts: 3,
+        retryAt: null,
+      });
+      expect(await prisma.pagelinkbackfilljobs.isRunOutstanding()).toBe(false);
+    });
+
+    it('finishFailed after a retry has saved a checkpoint schedules the first retry again', async () => {
+      await prisma.pagelinkbackfilljobs.finishFailed(OWNER, 'boom', {
+        retryDelaysMs: RETRY_DELAYS_MS,
+      });
+      await patchJobDocument({ retryAt: { $date: '2000-01-01T00:00:00Z' } });
+      await prisma.pagelinkbackfilljobs.tryClaim(OWNER, { leaseMs: LEASE_MS });
+      await prisma.pagelinkbackfilljobs.checkpoint(OWNER, progress, {
         leaseMs: LEASE_MS,
       });
-      const reply = await prisma.pagelinkbackfilljobs.checkpoint(
-        'owner-b',
-        progress,
-        { leaseMs: LEASE_MS },
-      );
+      const before = Date.now();
 
-      expect(claimed).toBe(true);
-      expect(reply).toEqual({ stopRequested: true });
+      await prisma.pagelinkbackfilljobs.finishFailed(OWNER, 'later fault', {
+        retryDelaysMs: RETRY_DELAYS_MS,
+      });
+
+      expect(await readJob()).toMatchObject({ failedAttempts: 1 });
+      await expectRetryAfter(RETRY_DELAYS_MS[0], { before, after: Date.now() });
+    });
+
+    it('finishFailed schedules no retry while a Stop is pending, and keeps the Stop', async () => {
+      await patchJobDocument({ stopRequested: true });
+
+      await prisma.pagelinkbackfilljobs.finishFailed(OWNER, 'boom', {
+        retryDelaysMs: RETRY_DELAYS_MS,
+      });
+
+      expect(await readJob()).toMatchObject({
+        status: 'failed',
+        stopRequested: true,
+        failedAttempts: 1,
+        retryAt: null,
+      });
+    });
+
+    it.each([
+      [
+        'finishStopped',
+        () => prisma.pagelinkbackfilljobs.finishStopped(OWNER, progress),
+      ],
+      [
+        'finishComplete',
+        () =>
+          prisma.pagelinkbackfilljobs.finishComplete(OWNER, progress, {
+            coverage: 'all',
+          }),
+      ],
+    ])('%s clears the failures in a row', async (_name, settle) => {
+      await prisma.pagelinkbackfilljobs.finishFailed(OWNER, 'boom', {
+        retryDelaysMs: RETRY_DELAYS_MS,
+      });
+      await patchJobDocument({ retryAt: { $date: '2000-01-01T00:00:00Z' } });
+      await prisma.pagelinkbackfilljobs.tryClaim(OWNER, { leaseMs: LEASE_MS });
+
+      await settle();
+
+      expect(await readJob()).toMatchObject({
+        failedAttempts: 0,
+        retryAt: null,
+      });
+    });
+
+    it.each([
+      [[0]],
+      [[60_000, Number.NaN]],
+    ])('finishFailed rejects retryDelaysMs=%j without touching the job', async (retryDelaysMs) => {
+      await expect(
+        prisma.pagelinkbackfilljobs.finishFailed(OWNER, 'boom', {
+          retryDelaysMs,
+        }),
+      ).rejects.toThrow(/retryDelaysMs/);
+      expect(await readJob()).toMatchObject({
+        status: 'running',
+        claimedBy: OWNER,
+      });
     });
 
     it.each([

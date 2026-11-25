@@ -534,19 +534,37 @@ Independent of B4/B5.
   - _Boundary: PageLinkBackfillCron, backfill-range_
   - _Depends: B3.1, B1.3, B1.2_
 
-- [ ] B3.3 Register the backfill job and start it from a request
-  - Register the backfill cron poll in server setup; an idle tick claims a pending start request, or
-    a run whose lease has expired, and starts the paced loop (B3.2). Do not schedule the poll at boot
-    when coverage is already `all`. The tick reads the job document directly from the database, not
-    through `configManager`; the idle interval is chosen here (1 to 5 minutes), as is whether the
-    start endpoint (B3.6) also nudges an immediate claim. `failed` keeps the tick so the job is
-    retried from the marker; a finished run returns the document to rest
+- [x] B3.3 Register the backfill job and start it from a request
+  - Start the backfill poll only while a run is outstanding: the job's `status` is `requested` or
+    `running`, or `failed` with `retryAt` set (one predicate, read by the boot gate and the
+    self-stop). At boot, after the boot upsert, schedule it only then; with `idle`, `stopped`,
+    `complete`, or `failed` with no retry due, schedule nothing, and do not wait on a run. A tick
+    claims a pending request, a `running` job whose lease has expired, or a `failed` job whose
+    `retryAt` has passed, and runs the paced loop (B3.2); a tick that wins nothing stops the poll
+    unless a run is outstanding, and a missing document stops it too. The tick reads the job
+    document directly from the database, not through `configManager`; it runs every minute
+  - Add the method the admin endpoints (B3.6) call after writing `requested`: start the poll in
+    this process if it is not running and ask for one claim right away without waiting for the run.
+    A claim asked for while a tick is in flight must not be dropped (design.md, "No overlapping
+    loops")
+  - Add `failedAttempts` and `retryAt` to the job model. The failure write increments the count and
+    sets `retryAt` from the retry schedule (5 min, then 15 min, then 30 min, then none), and sets none when a
+    Stop is pending; the first checkpoint after a claim resets the count, and the `complete` and
+    `stopped` endings reset both; a claim clears `retryAt`; the claim filter matches `failed` only
+    once `retryAt` has passed (design.md, "Failed run")
   - Note: edits the same server-setup file as B1.12 — sequence after it to avoid a merge
-  - Done when a pending request starts within one idle interval, the job claims and runs
-    to completion on a fresh dataset and records its coverage, an idle document with no request
-    starts nothing, and a document with coverage `all` schedules no poll
+  - Done when booting with `status` `idle`, `complete`, `stopped`, or `failed` with no retry due
+    schedules no poll; booting with `requested`, `running`, or `failed` with a retry due schedules
+    it; after a run ends `complete`, the next tick stops the poll (tested with a schedule that stays
+    armed, not with the scheduler stopped); a tick on a missing document stops it; the endpoint
+    method claims a request at once and starts the poll when none is running, including when a
+    tick is in flight; a failed run is not claimed before its `retryAt`, is claimed after it, and
+    after the fourth failure in a row stays `failed` with no retry due and the poll stops; a retry
+    that saves a checkpoint and then fails again is scheduled as the first retry (5 min), not the
+    next one; a run that fails with a Stop pending gets no retry; each failure in a row waits its delay from the schedule; and a run claimed
+    from a request still runs to completion and records its coverage
   - _Requirements: 4.1, 4.5_
-  - _Boundary: crowi setup, PageLinkBackfillCron_
+  - _Boundary: crowi setup, PageLinkService, PageLinkBackfillCron, PageLinkBackfillJob_
   - _Depends: B3.2, B1.12_
 
 - [ ] B3.4 Backfill tests
@@ -606,27 +624,36 @@ Independent of B4/B5.
     `processed` and `skippedPages` in the same write (the loop treats a claimed job with
     `runTotal == null` as a new run, design.md; without the reset a new start resumes the old
     range); POST stop, which cancels an unclaimed request, sets `stopRequested` on a running
-    run, and sets `stopped` directly when the run's lease has expired; and POST resume, valid only in
-    `stopped`, which sets `requested` and keeps the scope, `runCutoff` and the marker. Validate the
-    scope (N a positive integer, the date not in the future). Reject a start while a run is active
-    and when coverage is `all`
+    run, and sets `stopped` directly when the run's lease has expired or when the job is `failed`
+    with a retry due (clearing `failedAttempts` and `retryAt`); and POST resume, valid in `stopped`
+    and `failed`, which sets `requested`, keeps the scope, `runCutoff` and the
+    marker, and resets `failedAttempts` and `retryAt`. A start also resets `failedAttempts` and
+    `retryAt`. After start or resume writes `requested`, call the `PageLinkService` method from
+    B3.3 that starts the poll in this process and claims at once; respond without waiting for the
+    run. Validate the scope (N a positive integer, the date not in the future). Reject a start while
+    a run is active (`requested`, `running` with a live lease, or `failed` with a retry due) and
+    when coverage is `all`. Run the boot upsert before reading or writing, so a missing job document
+    is recreated (design.md, "If the document goes missing"). GET returns `failedAttempts` and
+    `retryAt`
   - Done when a non-admin is refused on every route; a valid start writes the request, clears the
     previous run's fields, and returns the state; a new start after a completed or stopped run walks
     its own range rather than resuming the old one; a start while a run is active, with coverage `all`, or with an invalid scope is rejected
     without changing the document; two concurrent starts leave exactly one request; after a partial run the not-included count equals
     the number of seeded pages older than `coveredSince` and excludes pages the walk skips; stop cancels an
-    unclaimed request, flags a running one, and ends an expired-lease run directly; resume is
-    rejected outside `stopped`
+    unclaimed request, flags a running one, and ends an expired-lease run and a `failed` job with a
+    retry due directly; resume is accepted in `stopped` and `failed` and rejected otherwise; a start or resume is claimed in the same process without waiting for a
+    tick; with the job document deleted, GET reports "not started" and a start succeeds
   - _Requirements: 4.5, 4.6, 4.8, 4.9, 4.10_
   - _Boundary: backlinks-backfill-admin routes_
-  - _Depends: B3.1_
+  - _Depends: B3.1, B3.3_
 
 - [ ] B3.7 Add the admin settings section and the panel's partial-index state
   - Add an SWR hook for the job state and a section in the admin settings with a scope picker (all
     pages, newest N, edited after a date), progress (processed of `runTotal`, count and percent, capped at 99% until
     `complete` and with skipped pages as their own count, per design.md's "Counts shown to the admin") over the admin Socket.IO channel, the
     not-included count in the partial-coverage line, and the states
-    in design.md's table: not started, running, failed, stopping, stopped (Resume or a new scope), partial coverage (the
+    in design.md's table: not started, running, failed with a retry due (when it retries; Stop or
+    Resume), failed and not retried (Resume or a new scope), stopping, stopped (Resume or a new scope), partial coverage (the
     control stays), all pages covered (a status line, no control). Choose where it sits in the admin
     menu and add the i18n keys for every locale the repo keeps
   - Make the backlinks panel show an "index still building / partial" state whenever coverage is not
