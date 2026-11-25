@@ -54,7 +54,7 @@
 
 次の変更は、`remote-mcp-server-oauth` の再確認を要する。
 
-- `McpAuth` の型（`authenticate` の戻り値、`respondUnauthorized` の引数）の変更。
+- `McpAuth` の型（`authenticate` の戻り値、`McpAuthFailureReason` の種類、`respondAuthFailure` の引数）の変更。
 - `MCP_ENDPOINT_PATH` または `MCP_REQUIRED_SCOPES` の値の変更。認可サーバーのメタデータ・同意画面・トークンの宛先が同じ値を使う。
 - `app:mcpEnabled` の意味の変更（「MCP 連携全体」を 1 つで切り替える前提）。
 - `isMcpAvailable` の条件の変更（有効で、かつサイト URL が設定済み）。認可サーバーのエンドポイントも、同じ関数で応答するかどうかを決める。
@@ -156,9 +156,9 @@ features/mastra/
 │   │   │   ├── index.ts                 # McpRouter: 処理の流れを組み立てるファクトリ
 │   │   │   ├── auth/
 │   │   │   │   ├── index.ts             # mcpAuth（差し込み口の現在の中身）を公開する
-│   │   │   │   ├── types.ts             # McpAuth、McpAuthResult
+│   │   │   │   ├── types.ts             # McpAuth、McpAuthResult、McpAuthFailureReason
 │   │   │   │   ├── access-token-authenticator.ts   # 暫定: Bearer のアクセストークンから利用者を得る
-│   │   │   │   └── unauthorized-response.ts        # 暫定: チャレンジなしの 401
+│   │   │   │   └── auth-failure-response.ts        # 暫定: 理由によらず、チャレンジなしの 401
 │   │   │   ├── json-rpc-error-response.ts          # 401 / 429 / 400 / 500 の固定の応答を書く
 │   │   │   ├── is-batch-request.ts                 # 本文が配列かどうかの判定（純粋な関数）
 │   │   │   └── mcp-request-handler.ts              # 重い層の入口。@mastra/mcp を読み込み、startHTTP を呼ぶ
@@ -222,7 +222,7 @@ flowchart TD
     Maint -->|no| Enabled{isMcpAvailable}
     Enabled -->|no| Fall[Fall through as unknown path]
     Enabled -->|yes| AuthQ{authenticate}
-    AuthQ -->|not authenticated| R401[respondUnauthorized]
+    AuthQ -->|not authenticated| R401[respondAuthFailure]
     AuthQ -->|authenticated| Limit{consumeUserPoints}
     Limit -->|exceeded| R429[429]
     Limit -->|ok| Batch{Body is array}
@@ -281,7 +281,7 @@ sequenceDiagram
 | 2.5 | 無効なトークンは 401 | AccessTokenAuthenticator | `AccessToken.findUserIdByToken` | 処理の流れ |
 | 2.6 | 旧形式の API トークンは 401 | AccessTokenAuthenticator | API トークンの経路を持たない | — |
 | 2.7, 2.8 | セッションだけ・ゲストは 401 | McpRouter、AccessTokenAuthenticator | `req.user` を見ない | 処理の流れ |
-| 2.9, 2.10 | リダイレクトしない、理由を区別しない | UnauthorizedResponse | 固定の 401 | — |
+| 2.9, 2.10 | リダイレクトしない、理由を区別しない | AuthFailureResponse | 理由によらず固定の 401 | — |
 | 2.11 | 認証を差し替えても同じ利用者を基準にする | McpAuth、McpCallerContext | `McpAuth` の型 | 両方の流れ |
 | 3.1, 3.2 | 接続確認、ツールの一覧 | GrowiMcpServer、McpToolDeclarations | `MCPServer` | — |
 | 3.3 | 2026-07-28 版と 2025 年の各版 | GrowiMcpServer、MongoSanitizeWithExemptions | `legacy: 'stateless'`、除外パス | — |
@@ -384,7 +384,7 @@ export const factory: (crowi: Crowi) => express.Router;
 
 | Field | Detail |
 |-------|--------|
-| Intent | リクエストから利用者を得る処理と、未認証時の応答を、1 つの型に閉じ込める |
+| Intent | リクエストから利用者を得る処理と、認証に失敗したときの応答を、1 つの型に閉じ込める |
 | Requirements | 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 2.10, 2.11, 8.4 |
 
 **Responsibilities & Constraints**
@@ -392,10 +392,12 @@ export const factory: (crowi: Crowi) => express.Router;
 - `routes/mcp/auth/index.ts` が公開する `mcpAuth` が、差し込み口の現在の中身である。`remote-mcp-server-oauth` は、このオブジェクトの 2 つの関数を差し替える。ルーターとツールは変更しない。
 - 暫定の `authenticate`（`access-token-authenticator.ts`）:
   - `Authorization` ヘッダーの Bearer トークンだけを見る。`X-GROWI-ACCESS-TOKEN`、クエリ、本文は見ない。
-  - `AccessToken.findUserIdByToken(token, MCP_REQUIRED_SCOPES)` で検証する。存在しない・期限切れ・スコープ不足は、どれも同じ「未認証」になる。
+  - `AccessToken.findUserIdByToken(token, MCP_REQUIRED_SCOPES)` で検証する。存在しない・期限切れ・スコープ不足は、1 回の検索で区別できないので、どれも `invalid_token` として返す。Bearer が無いときは `missing_token` を返す。`insufficient_scope` は、暫定の認証では返さない。
   - 閲覧専用の利用者のトークンは受け付けない（既存の `accessTokenParser` と同じ扱い）。
   - 戻す利用者は `serializeUserSecurely` を通す。
-- 暫定の `respondUnauthorized`（`unauthorized-response.ts`）: 固定の本文の 401 を返す。`WWW-Authenticate` を付けない。リダイレクトしない。
+- 暫定の `respondAuthFailure`（`auth-failure-response.ts`）: 理由によらず、固定の本文の 401 を返す。`WWW-Authenticate` を付けない。リダイレクトしない（2.5、2.9、2.10）。
+- **失敗の理由を型で運ぶ理由**: MCP の認可の仕様は、無効なトークンに 401（`error="invalid_token"`）、スコープ不足に 403（`error="insufficient_scope"`）、トークンなしに案内だけの 401 を求める。`remote-mcp-server-oauth` がこれらを出し分けるとき、理由が型に無いと `McpAuth` の型を変えることになり、ルーターにも変更が及ぶ。理由を先に型に入れておけば、差し替えは 2 つの関数の中身だけで済む。
+- 理由は、応答を選ぶためにだけ使う。Activity には記録しない。応答の本文に、トークンが拒否された理由（存在しない・期限切れ）を区別して書かないことは、差し替えた後も保つ（2.10）。
 - `accessTokenParser` を使わない理由: parser は、トークンが無い・不正なときにセッションの `req.user` を残す。また `X-GROWI-ACCESS-TOKEN`・クエリ・本文も読む。parser を変えずに 2.2〜2.4 と 2.7 を満たすには、parser の前後に打ち消しの処理を重ねることになる。暫定の認証は `remote-mcp-server-oauth` が置き換えるので、消しやすい独立したファイルにする。引き換えに、「閲覧専用の利用者を拒否する」判定が parser と 2 か所になる。この判定は、境界のテストで固定する。
 
 **Dependencies**
@@ -411,25 +413,38 @@ export const factory: (crowi: Crowi) => express.Router;
 import type { IUserHasId } from '@growi/core';
 import type { Request, Response } from 'express';
 
+// missing_token:      Authorization: Bearer が無い
+// invalid_token:      トークンが存在しない・期限切れ・失効済み、または持ち主が利用できない
+// insufficient_scope: トークンは有効だが、MCP_REQUIRED_SCOPES を満たさない
+export type McpAuthFailureReason =
+  | 'missing_token'
+  | 'invalid_token'
+  | 'insufficient_scope';
+
 export type McpAuthResult =
   | { readonly authenticated: true; readonly user: IUserHasId }
-  | { readonly authenticated: false };
+  | { readonly authenticated: false; readonly reason: McpAuthFailureReason };
 
 export type McpAuthenticator = (req: Request) => Promise<McpAuthResult>;
 
-export type McpUnauthorizedResponder = (req: Request, res: Response) => void;
+// 認証に失敗したリクエストに、理由に応じた応答を書いて終える
+export type McpAuthFailureResponder = (
+  req: Request,
+  res: Response,
+  reason: McpAuthFailureReason,
+) => void;
 
 export type McpAuth = {
   readonly authenticate: McpAuthenticator;
-  readonly respondUnauthorized: McpUnauthorizedResponder;
+  readonly respondAuthFailure: McpAuthFailureResponder;
 };
 
 export const mcpAuth: McpAuth;
 ```
 
 - Preconditions: なし。`req.user` の有無に依存しない。
-- Postconditions: `authenticated: true` のとき、`user` は有効な利用者である。`authenticated: false` は、拒否の理由を運ばない（2.10）。
-- Invariants: `authenticate` は例外を投げない。検証中の例外は、ログに残して `authenticated: false` にする。
+- Postconditions: `authenticated: true` のとき、`user` は有効な利用者である。`authenticated: false` は、失敗の理由を 3 種類のどれかで運ぶ。存在しないトークンと期限切れのトークンは、同じ `invalid_token` であり、区別しない（2.10）。
+- Invariants: `authenticate` は例外を投げない。検証中の例外は、ログに残して `invalid_token` の失敗にする。
 
 #### McpRequestHandler
 
@@ -808,7 +823,7 @@ HTTP の層のエラーと、ツールの結果としてのエラーを分ける
 | メンテナンスモード | 503 `{ error: 'GROWI is under maintenance.' }` | 既存のミドルウェア |
 | MCP 連携が無効 | 存在しないパスと同じ | McpRouter（素通し） |
 | `Origin` の検査に失敗 | apiv3 のエラー形式 | 既存の `CertifyOrigin` |
-| 未認証 | 401、固定の JSON-RPC エラー、`WWW-Authenticate` なし | `mcpAuth.respondUnauthorized` |
+| 認証に失敗（理由によらず） | 401、固定の JSON-RPC エラー、`WWW-Authenticate` なし | `mcpAuth.respondAuthFailure` |
 | 利用者単位の上限を超過 | 429、固定の JSON-RPC エラー | McpRouter |
 | IP 単位の上限を超過 | 429（本文なし） | 既存のグローバルの制限 |
 | バッチのリクエスト | 400、JSON-RPC の Invalid Request（-32600） | McpRouter |
@@ -844,7 +859,7 @@ HTTP の層のエラーと、ツールの結果としてのエラーを分ける
 - **ルーターの処理の順序**（`routes/mcp/index.integ.ts`、`McpRequestHandler` は差し替える）:
   - 無効のとき、存在しないパスと同じ応答になる（1.4）。有効でもサイト URL が未設定なら、同じ応答になる（1.10）。
   - `req.user` が入っていても、Bearer が無ければ 401 になる（2.7）。401 に `WWW-Authenticate` と `Location` が無い（2.9）。
-  - 401 の本文が、拒否の理由によらず同じである（2.10）。
+  - 401 の応答が、失敗の理由（`missing_token`、`invalid_token`）によらず同じである（2.10）。
   - 利用者単位の上限を超えると 429 になり、別の利用者は通る（6.2、6.3）。
   - ログインセッションの Cookie と Bearer トークンを両方送るリクエストでも、利用者単位の枠は 1 リクエストにつき 1 回だけ減る（6.1）。
   - 配列の本文は 400 になり、ハンドラが呼ばれない（3.11、6.7）。

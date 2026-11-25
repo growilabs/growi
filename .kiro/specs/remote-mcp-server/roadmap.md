@@ -56,7 +56,7 @@ GROWI 本体に MCP サーバーを組み込み、claude.ai（web 版 Claude）�
 - **Why this split**: MCP ルートは「特定された利用者としてツールを実行する」ことを持ち、認可サーバーは「トークンを発行・失効し、`/_api/v3/mcp` に届いたトークンを検証する」ことを持つ。前者は、暫定の認証（手動発行のアクセストークン）で動作確認できるので、認可サーバーの未決事項を待たずに実装を進められる。
 - **2 spec の接点**: 「リクエストから利用者を得る」認証の差し込み口だけにする。`remote-mcp-server-route` は、中身を暫定の認証（`Authorization: Bearer` のアクセストークンを、AccessToken モデルで直接検証する。`accessTokenParser` は使わない）にしておく。`remote-mcp-server-oauth` は、中身を「認可サーバーが発行したトークンだけを受け付ける」認証に入れ替える。ツールと、利用者を特定したあとの処理（回数制限、Activity）は変更しない。
 - **Shared seams to watch**:
-  - **未認証時の 401 応答**: `remote-mcp-server-route` は `WWW-Authenticate` チャレンジを出さない 401 を返す。`remote-mcp-server-oauth` はここに `resource_metadata` と `scope` を足す。ハンドラを書き換えずに足せるよう、`remote-mcp-server-route` の設計で 401 応答の差し込み口を用意する。
+  - **認証に失敗したときの応答**: `remote-mcp-server-route` は、理由によらず `WWW-Authenticate` チャレンジを出さない 401 を返す。`remote-mcp-server-oauth` はここに `resource_metadata` と `scope` を足し、失敗の理由に応じて応答を出し分ける（トークンなしは案内だけの 401、無効なトークンは `invalid_token` の 401、スコープ不足は `insufficient_scope` の 403）。出し分けに使う失敗の理由は、認証の差し込み口の型（`McpAuthFailureReason`）が最初から運ぶ。ハンドラを書き換えずに足せるよう、`remote-mcp-server-route` の設計で 401 応答の差し込み口を用意する。
   - **discovery を出すタイミング**: claude.ai は接続のたびに well-known を確認し、認可サーバーのメタデータを見つけたのに CIMD も DCR も無いと接続を拒否する。well-known と 401 のチャレンジは `remote-mcp-server-oauth` が全部そろった状態でだけ出す。
   - **要求スコープ**: `/_api/v3/mcp` が要求するスコープは、`remote-mcp-server-oauth` の protected-resource メタデータ・同意画面・401 のチャレンジが同じ値を使う。値は 1 か所で宣言する。
   - **有効化フラグ**: `/_api/v3/mcp` と認可サーバーのエンドポイントは、1 つのフラグ（`app:mcpEnabled`。「MCP 連携全体」を表す）で一緒に切り替える。`remote-mcp-server-route` がキーを定義し、`remote-mcp-server-oauth` は同じキーを読む。別のフラグは作らない。管理画面のスイッチも 1 つである。実際に応答するかどうかは、フラグが有効で、かつサイト URL が設定済みのとき、という 1 つの判定（`isMcpAvailable`）で決め、2 つの spec が同じ判定を使う。
