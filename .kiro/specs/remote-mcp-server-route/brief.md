@@ -26,9 +26,9 @@ GROWI の利用者は、claude.ai などの MCP クライアントから wiki �
 `@mastra/mcp` 2.8.0 の `MCPServer` を、既存の Express に `POST /_api/v3/mcp` としてマウントする。
 
 - **ステートレス**: 2.x は常にリクエスト単位で動く。`legacy: 'stateless'` を指定して、2025 年系のクライアントも受ける（claude.ai の接続確認が 2025-11-25 で来るという報告があるため）。
-- **認証**: 「リクエストから利用者を得る」処理を 1 つの差し込み口にする。この spec では、中身を、`Authorization: Bearer` のアクセストークンを AccessToken モデルで直接検証する認証にする（`accessTokenParser` は使わない。理由は [design.md](./design.md) の McpAuth）。`remote-mcp-server-oauth` が、中身を「認可サーバーが発行したトークンだけを受け付ける」ものに入れ替える。得た利用者は、`req.auth` と `mapAuthInfoToUser` でツールの requestContext の `user` に渡す。
+- **認証**: 「リクエストから利用者を得る」処理を 1 つの差し込み口にする。この spec では、中身を、`Authorization: Bearer` のアクセストークンを AccessToken モデルで直接検証する認証にする（`accessTokenParser` は使わない。理由は [design.md](./design.md) の McpAuth）。`remote-mcp-server-oauth` が、中身を「認可サーバーが発行したトークンだけを受け付ける」ものに入れ替える。得た利用者は、IP とエンドポイントと一緒に `req.auth` の `extra` に入れ、ツールが `authInfo.extra` から取り出す。`mapAuthInfoToUser` と requestContext は使わない（[design.md](./design.md) の McpCallerContext）。
 - **未認証**: `loginRequired` は `/_api` 配下の未認証リクエストに 403 を返すので使わない。`/_api/v3/mcp` 用に 401 を返す。この時点では `WWW-Authenticate` チャレンジを付けない。
-- **全文検索ツール**: `searchService` を requestContext からではなく、外から注入できる形に作り直す。
+- **全文検索ツール**: 既存の 2 ツールから処理の中身を、依存（利用者、`searchService`）を引数で受け取る関数として取り出す。エージェント用のツールと、MCP 用に別に定義するツールが、同じ関数を呼ぶ。
 - **有効化フラグ**: 管理者が切り替える。既定は無効。`aiReadyGuard` は使わない（MCP に LLM の設定は要らない）。
 - **遅延ロード**: `@mastra/mcp` は、フラグが有効なときの最初のリクエストで読み込む。起動時には読み込まない。
 
@@ -80,7 +80,7 @@ GROWI の利用者は、claude.ai などの MCP クライアントから wiki �
 
 - **Extends**:
   - `ai-agentic-search`: 全文検索ツールが `searchService` を受け取る方法を変える。この spec の設計が決めた約束を変えることになる場合は、spec-lifecycle のルールに従い、最後のタスクで変えた内容を `ai-agentic-search` へ書き戻す（この spec 自体は新しい機能なので削除しない）。
-  - `access-token-parser`: 取得元を `Authorization: Bearer` に限る方法を parser のオプションとして足す場合だけ、同じく書き戻しが要る。parser は Bearer を最優先で読むので、`/_api/v3/mcp` 側で「Bearer が無ければ 401」と先に判定すれば、parser の約束を変えずに済む。どちらにするかは設計で決める。
+  - `access-token-parser`: 変更しない。MCP エンドポイントの認証は parser を使わないので、書き戻しは要らない。
 - **Adjacent**:
   - `suggest-path`: 全文検索ツールを `limited-search-tool` で包んで使っている。作り直しで壊さない。
   - `change-proposal-ai-agent`: 同じ 2 ツールを `withReadRecording` で包んで登録し直す予定（未実装）。ツールの名前と生成方法を変えるときは、この予定と突き合わせる。
@@ -90,12 +90,12 @@ GROWI の利用者は、claude.ai などの MCP クライアントから wiki �
 
 - **採用バージョン**: `@mastra/mcp` 2.8.0。`@mastra/core` 1.80.x のまま入る最新版で、Apache-2.0。2.7.0 以降は `tsx` と `json-schema-to-typescript` を実行時の依存に持つので、`package-dependencies` のルールでの分類を設計で確かめる。
 - **遅延ロード**: `server-boot-imports` のルールに従う。既存の `no-eager-ai-imports.spec.ts` の禁止リストは `@mastra/` で始まるパッケージをすでに含むので、`/_api/v3/mcp` のルートの入口を検査の起点に足す。
-- **Activity**: `activity-recording` のルールは、応答を返す前に Activity を確定することを求める。`/_api/v3/mcp` は 1 つのエンドポイントで接続確認・ツール一覧・ツール呼び出しをすべて受けるので、記録の単位を要件で決める。推奨案は「ツール呼び出し単位（ツール名を記録する）。接続確認とツール一覧は記録しない」。
+- **Activity**: `activity-recording` のルールは、応答を返す前に Activity を確定することを求める。`/_api/v3/mcp` は 1 つのエンドポイントで接続確認・ツール一覧・ツール呼び出しをすべて受けるので、記録はツール呼び出しの単位とし、ツールごとのアクションで記録する。接続確認とツール一覧は記録しない（要件 7）。
 - **回数制限**: 既存のグローバルな回数制限は `accessTokenParser` より前に走るので、トークンだけのリクエストには IP 単位の制限しか効かない。claude.ai の通信は Anthropic の送信元アドレスに集まるので、IP 単位だけでは全利用者が 1 つの枠を分け合う。認証の後に、利用者単位で数える制限が要る。
 - **存在を漏らさない**: ツールのエラー応答で、ページの存在を「見つからない」と「権限がない」の違いで漏らさない。ページ本文取得ツールは、例外を捕まえたときに `err.message` を `reason` へそのまま入れている。MCP で外へ出す前に、この経路で内部の情報が出ないか確かめる。
-- **要求スコープ**: `/_api/v3/mcp` が要求するスコープは 1 か所で宣言し、`remote-mcp-server-oauth` が同じ値を使えるようにする。作業上の前提は既存の `read:features:page`（ページ取得と全文検索の API がすでに要求しているスコープ）。確定は要件で行う。
-- **本文サイズ**: SDK 側の上限（4 MiB）は、body-parser が先に本文を読むと効かない。グローバルの上限は 50 MB なので、`/_api/v3/mcp` に合った上限を設計で決める。
-- **メンテナンスモード**: `/_api/v3/mcp` をメンテナンス中に止めるかどうかを要件で決める（マウントする位置で決まる）。
+- **要求スコープ**: `/_api/v3/mcp` が要求するスコープは 1 か所で宣言し、`remote-mcp-server-oauth` が同じ値を使えるようにする。値は既存の `read:features:page`（ページ取得と全文検索の API がすでに要求しているスコープ）とする。
+- **本文サイズ**: SDK 側の上限（4 MiB）は、body-parser が先に本文を読むと効かない。グローバルの上限は 50 MB である。本文はルートに届く前に読み終わっているので、ルートで上限を見てもメモリの消費は防げない。`/_api/v3/mcp` だけの上限は、この spec では設けない（design.md の Non-Goals）。
+- **メンテナンスモード**: メンテナンス中は、既存の API と同じく 503 を返す（要件 3.10）。
 - **パス**: `/_api` 配下はページを作れないパスなので、wiki のページと衝突しない。代わりに、`/_api` 全体にかかる `CertifyOrigin` の検査を受ける。
 - **複数インスタンス**: プロセス内にセッションや利用者ごとの状態を持たない。`suspend()` を使うツールは公開しない。
 
