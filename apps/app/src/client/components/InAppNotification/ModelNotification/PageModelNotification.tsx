@@ -2,13 +2,14 @@ import React, { useCallback } from 'react';
 import { useRouter } from 'next/router';
 import type { HasObjectId, IPage } from '@growi/core';
 
-import { SupportedTargetModel } from '~/interfaces/activity';
+import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import type { IInAppNotification } from '~/interfaces/in-app-notification';
 import * as pageSerializers from '~/models/serializers/in-app-notification-snapshot/page';
 
 import type { ModelNotificationUtils } from '.';
 import { buildActionUsersLabel } from './build-action-users-label';
 import { ModelNotification } from './ModelNotification';
+import { PageDuplicateInterruptedSubMsg } from './PageDuplicateInterruptedSubMsg';
 import { useActionMsgAndIconForModelNotification } from './useActionAndMsg';
 
 export const usePageModelNotification = (
@@ -39,6 +40,9 @@ export const usePageModelNotification = (
     notification.snapshot,
   );
 
+  const isDuplicateInterrupted =
+    notification.action === SupportedAction.ACTION_PAGE_DUPLICATE_INTERRUPTED;
+
   const Notification = () => {
     return (
       <ModelNotification
@@ -46,6 +50,12 @@ export const usePageModelNotification = (
         actionMsg={actionMsg}
         actionIcon={actionIcon}
         actionUsers={actionUsers}
+        hideActionUsers={isDuplicateInterrupted}
+        subMsg={
+          isDuplicateInterrupted ? (
+            <PageDuplicateInterruptedSubMsg snapshot={notification.snapshot} />
+          ) : undefined
+        }
       />
     );
   };

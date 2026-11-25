@@ -2,6 +2,7 @@ import { ErrorV3 } from '@growi/core/dist/models';
 import type { NextFunction, Request, Response } from 'express';
 import { validationResult } from 'express-validator';
 
+import { apiV3ErrorCode } from '~/interfaces/errors/v3-error';
 import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:middlewares:ApiV3FormValidator');
@@ -23,7 +24,10 @@ export const apiV3FormValidator = (
 
   const errs = errObjArray.array().map((err) => {
     logger.error(`${err.location}.${err.param}: ${err.value} - ${err.msg}`);
-    return new ErrorV3(`${err.param}: ${err.msg}`, 'validation_failed');
+    return new ErrorV3(
+      `${err.param}: ${err.msg}`,
+      apiV3ErrorCode.VALIDATION_FAILED,
+    );
   });
 
   res.apiv3Err(errs);

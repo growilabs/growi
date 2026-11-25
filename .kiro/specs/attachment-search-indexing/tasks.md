@@ -396,7 +396,7 @@
 
 ## 13. 下流の画面 (`attachment-search-ui`) のための追加
 
-- [ ] 13.1 添付だけを対象にした検索の項目に、ページ検索と同じページ文書を入れる
+- [x] 13.1 添付だけを対象にした検索の項目に、ページ検索と同じページ文書を入れる
   - `GET /_api/search` の `facet=attachments` の処理で、aggregator が返したページ ID を `findPageListByIds` で読み、各項目の `data` に入れる。`lastUpdateUser` の `serializeUserSecurely` と `seenUserCount` は、ページ検索の `formatSearchResult` と同じにする (同じ処理を共有する)
   - MongoDB に無いページの項目は落とす。`meta.hitsCount` は落とす前の項目数のままにする
   - ページが MongoDB から消えていても `hitsCount` が減らないこと、`data` に `path`・`revision`・`lastUpdateUser` が入ることを、route のテストで固定する。権限で見えないページが入らないことは、既存の権限の結合テストで確かめる
@@ -404,10 +404,17 @@
   - 本文も一致したページにだけ抜粋が付くこと、一致しないページと抜粋の検索が失敗したときは抜粋なしで項目が返ることを、テストで固定する
   - OpenAPI の `facet=attachments` の応答の説明を直す
   - _Requirements: 9.7_
-  - _Boundary: apps/app/src/server/routes/search.ts (と `search.spec.ts`), SearchService (`formatSearchResult` の共有部分と、id に絞ったページ検索), `features/search-attachments/server/routes/apiv1/facet-search-contract.ts`_
+  - _Boundary: apps/app/src/server/routes/search.ts (と `search.spec.ts`), SearchService (`formatSearchResult` の共有部分と、項目の組み立て), ElasticsearchDelegator (ページ検索のクエリの組み立てを `search()` と共有する、id に絞ったページ検索 `searchWithinPages`), `features/search-attachments/server/routes/apiv1/facet-search-contract.ts`_
 
-- [ ] 13.2 設定の取得 API で、環境変数で固定されているかを返す
-  - `GET /_api/v3/admin/attachment-search/config` の `config` に `useOnlyEnvVars` (`env:useOnlyEnvVars:app:attachmentFullTextSearch` の値) を足す。`AttachmentSearchConfig` の型と OpenAPI を直す
+- [x] 13.2 設定の取得 API で、環境変数で固定されているかを返す
+  - `GET /_api/v3/admin/attachment-search/config` の `config` に `useOnlyEnvVars` (`env:useOnlyEnvVars:app:attachmentFullTextSearch` の値) を足す。`AttachmentSearchConfig` の型と、route のファイル先頭の一覧の説明を直す (この feature の route には OpenAPI の記述が無い)
   - 固定されているときと、されていないときの両方で値が返ることを、route のテストで固定する
   - _Requirements: 5.7_
   - _Boundary: features/search-attachments/server/routes/apiv3/attachment-search-admin.ts (と `.spec.ts`), features/search-attachments/interfaces/attachment-search.ts_
+
+- [x] 13.3 添付だけを対象にした検索で、抜粋を入れる項目にブックマーク数も入れる
+  - `searchWithinPages` が返す hit の `_source.bookmark_count` を、抜粋を入れる項目の `meta.bookmarkCount` に入れる (ページ検索の `formatSearchResult` と同じく、無ければ 0)。抜粋の無い項目には入れない
+  - 抜粋の付いた項目にブックマーク数が入ること、抜粋の無い項目には入らないことをテストで固定する。本物の Elasticsearch の結合テスト (`attachment-search-routes.integ.ts`) でも、抜粋の付いた項目の `meta.bookmarkCount` が数であることを確かめる
+  - _Requirements: 9.8_
+  - _Boundary: SearchService (`formatFacetSearchItems`)_
+  - _Depends: 13.1_

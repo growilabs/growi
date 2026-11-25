@@ -2142,7 +2142,7 @@ describe('PageService page operations with only public pages', () => {
         false,
       );
 
-      // Wait for the async duplicateRecursivelyMainOperation to complete
+      // duplicatePage copies the descendants in the background; wait for it to finish
       if (isRecursively) {
         await waitForDuplicateOperationComplete(fromPath);
       }

@@ -1,3 +1,4 @@
+import { ErrorV3 } from '@growi/core/dist/models';
 import type { NextFunction, Request, Response } from 'express';
 import createError from 'http-errors';
 
@@ -6,6 +7,7 @@ import loggerFactory from '~/utils/logger';
 
 import type Crowi from '../crowi';
 import type { IPasswordResetOrder } from '../models/password-reset-order';
+import type { ApiV3Response } from './apiv3/interfaces/apiv3-response';
 
 const logger = loggerFactory('growi:routes:forgot-password');
 
@@ -33,9 +35,19 @@ export const checkForgotPasswordEnabledMiddlewareFactory = (
         'Forgot-password function is unavailable because neither LocalStrategy and LdapStrategy is not setup.';
       logger.error(message);
 
-      const statusCode = forApi ? 405 : 404;
+      if (forApi) {
+        (res as ApiV3Response).apiv3Err(
+          new ErrorV3(
+            message,
+            forgotPasswordErrorCode.PASSWORD_RESET_IS_UNAVAILABLE,
+          ),
+          405,
+        );
+        return;
+      }
+
       next(
-        createError(statusCode, message, {
+        createError(404, message, {
           code: forgotPasswordErrorCode.PASSWORD_RESET_IS_UNAVAILABLE,
         }),
       );
