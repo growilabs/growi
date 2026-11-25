@@ -857,6 +857,29 @@ describe('namespace lock', () => {
     );
   });
 
+  it('builds on the HEAD left by the writer that held the namespace before it', async () => {
+    const heads = new Map([['refs/namespaces/public/refs/heads/main', 'c1']]);
+    asMock(VaultRepoStorage.readRef).mockImplementation((ref: string) =>
+      Promise.resolve(heads.get(ref) ?? null),
+    );
+    let releaseHolder: () => void = () => {};
+    const holder = withNamespaceLock(['public'], async () => {
+      await new Promise<void>((r) => {
+        releaseHolder = r;
+      });
+      heads.set('refs/namespaces/public/refs/heads/main', 'c2');
+    });
+
+    const applying = applyInstruction(upsertOn('public'));
+    await flush();
+    releaseHolder();
+    await Promise.all([holder, applying]);
+
+    expect(VaultRepoStorage.writeCommit).toHaveBeenCalledWith(
+      expect.objectContaining({ parents: ['c2'] }),
+    );
+  });
+
   it('does not wait for a writer that holds a different namespace', async () => {
     const holder = holdNamespaces(['group-g1']);
 

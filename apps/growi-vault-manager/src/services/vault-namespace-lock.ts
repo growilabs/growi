@@ -1,15 +1,9 @@
 /**
- * Per-namespace write lock shared by every writer of a namespace ref.
+ * Per-namespace lock that every writer of a namespace ref holds for its whole
+ * read-build-write sequence (see the squash / instruction serialization notes
+ * in .kiro/specs/growi-vault-manager/tasks.md).
  *
- * A namespace ref is advanced by reading the current commit, building a new
- * commit on top of it and overwriting the ref, with no compare-and-swap. Two
- * writers interleaving on the same namespace therefore silently discard one
- * another's commit, so instruction application and squash must both run
- * their whole read-build-write sequence inside this lock. Namespaces that a
- * task does not name are never blocked (requirement 6.6).
- *
- * The lock is not reentrant: a task must not acquire it again for a
- * namespace it already holds.
+ * Not reentrant: a task must not acquire it again for a namespace it holds.
  */
 
 /** Settles when the most recently queued task on the namespace finishes. */

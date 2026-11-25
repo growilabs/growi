@@ -8,8 +8,7 @@
  * Object I/O delegates to isomorphic-git; ref management uses plain Node.js
  * fs calls with an atomic tmpfile-then-rename pattern so that concurrent
  * readers always see a consistent ref value.  Those calls only see loose ref
- * files, so every ref is kept loose: init() unpacks packed-refs and the
- * maintenance gc runs with gc.packRefs=false.
+ * files, so refs are kept loose (see design.md, VaultMaintenanceScheduler).
  *
  * GCSFuse and similar object-storage FUSE mounts are explicitly NOT supported
  * because they do not guarantee atomic rename semantics (requirement 9.5).
@@ -141,13 +140,7 @@ export async function init(): Promise<void> {
 
   // Check whether the repo already looks initialised by testing for the
   // presence of the 'HEAD' file, which git init always creates.
-  const headFile = path.join(repoPath, 'HEAD');
-  const initialised = await fs.promises
-    .access(headFile)
-    .then(() => true)
-    .catch(() => false);
-
-  if (!initialised) {
+  if (!(await fileExists(path.join(repoPath, 'HEAD')))) {
     // Ensure the parent directory exists before initialising.
     await fs.promises.mkdir(repoPath, { recursive: true });
 
@@ -193,6 +186,7 @@ async function unpackRefs(repoPath: string): Promise<void> {
     const loose = await readLooseRef(ref);
     if (loose == null) {
       await updateRef(ref, oid);
+      logger.info({ ref, oid }, 'restored a packed ref as a loose ref');
     } else if (loose !== oid) {
       // The packed value is the only remaining pointer to that commit once
       // packed-refs is removed; log it so it stays recoverable until gc.
@@ -349,21 +343,29 @@ export async function updateRef(
  */
 export async function readRef(refPath: string): Promise<string | null> {
   const oid = await readLooseRef(refPath);
-  if (oid == null && (await packedRefsExists())) {
-    // The ref may be packed; reporting it as missing would make the caller
-    // rebuild the namespace from nothing. init() unpacks it on restart.
-    throw new Error(
-      `Cannot read ${refPath}: packed-refs exists; restart vault-manager to unpack refs`,
-    );
+  if (oid == null) {
+    await assertNoPackedRefs(refPath);
   }
   return oid;
 }
 
-function packedRefsExists(): Promise<boolean> {
+function fileExists(filePath: string): Promise<boolean> {
   return fs.promises
-    .access(path.join(getRepoPath(), 'packed-refs'))
+    .access(filePath)
     .then(() => true)
     .catch(() => false);
+}
+
+/**
+ * A ref without a loose file may be packed; treating it as missing would
+ * rebuild or drop it from nothing. init() unpacks packed refs on restart.
+ */
+async function assertNoPackedRefs(refPath: string): Promise<void> {
+  if (await fileExists(path.join(getRepoPath(), 'packed-refs'))) {
+    throw new Error(
+      `Cannot resolve ${refPath}: packed-refs exists; restart vault-manager to unpack refs`,
+    );
+  }
 }
 
 async function readLooseRef(refPath: string): Promise<string | null> {
@@ -384,6 +386,7 @@ async function readLooseRef(refPath: string): Promise<string | null> {
  * If the ref does not exist, this is a no-op (idempotent).
  *
  * @param refPath - Ref path relative to the git directory.
+ * @throws when the ref has no loose file and packed-refs exists.
  */
 export async function deleteRef(refPath: string): Promise<void> {
   const target = refFilePath(refPath);
@@ -391,7 +394,7 @@ export async function deleteRef(refPath: string): Promise<void> {
     await fs.promises.unlink(target);
   } catch (err: unknown) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
-      // Already gone — treat as success.
+      await assertNoPackedRefs(refPath);
       return;
     }
     throw err;

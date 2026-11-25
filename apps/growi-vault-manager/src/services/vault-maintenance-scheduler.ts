@@ -30,10 +30,13 @@
  */
 
 import * as childProcess from 'node:child_process';
+import { loggerFactory } from '@growi/logger';
 
 import { VaultNamespaceStateModel } from '../models/vault-namespace-state.js';
 import { withNamespaceLock } from './vault-namespace-lock.js';
 import * as VaultRepoStorage from './vault-repo-storage.js';
+
+const logger = loggerFactory('growi:vault-manager:vault-maintenance-scheduler');
 
 // ---------------------------------------------------------------------------
 // Environment-variable thresholds (with defaults)
@@ -182,8 +185,7 @@ function runGitGc(repoPath: string): Promise<void> {
   return new Promise((resolve, reject) => {
     childProcess.execFile(
       'git',
-      // VaultRepoStorage reads refs only as loose files; packing them would
-      // make every namespace HEAD read as missing.
+      // Refs must stay loose (see design.md, VaultMaintenanceScheduler).
       [
         '-c',
         'gc.packRefs=false',
@@ -234,8 +236,8 @@ export function createVaultMaintenanceScheduler(): VaultMaintenanceScheduler {
   let lastSquashAt: Date | null = null;
   let lastGcAt: Date | null = null;
 
-  // Namespaces currently being squashed — used to prevent concurrent squash
-  // and upsert instruction processing on the same namespace.
+  // Namespaces queued for or undergoing a squash, so a later tick does not
+  // queue them again.
   const inflightSquash = new Set<string>();
 
   // ---------------------------------------------------------------------------
@@ -425,14 +427,16 @@ export function createVaultMaintenanceScheduler(): VaultMaintenanceScheduler {
   async function tick(): Promise<void> {
     try {
       await runSquashCheck();
-    } catch (_squashErr) {
-      // Squash errors are non-fatal; the next tick will retry.
+    } catch (err) {
+      // Non-fatal; the next tick retries.
+      logger.error({ err }, 'squash check failed');
     }
 
     try {
       await runGcCheck();
-    } catch (_gcErr) {
-      // GC errors are non-fatal; the next tick will retry.
+    } catch (err) {
+      // Non-fatal; the next tick retries.
+      logger.error({ err }, 'gc check failed');
     }
   }
 

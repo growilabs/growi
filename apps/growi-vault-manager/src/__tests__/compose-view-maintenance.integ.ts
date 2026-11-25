@@ -506,26 +506,15 @@ async function triggerGcAndWait(): Promise<{
       expect(stateAfterSquash?.commitOid).toMatch(/^[0-9a-f]{40}$/);
 
       // The namespace HEAD is a single root commit that still holds every page.
-      const repoPath = process.env.VAULT_REPO_PATH;
-      if (repoPath == null) {
-        throw new Error('VAULT_REPO_PATH is not set by the integ setup');
-      }
-      const headRef = `refs/namespaces/${squashNs}/refs/heads/main`;
       const { stdout: depth } = await execFileAsync('git', [
         '-C',
-        repoPath,
+        requireRepoPath(),
         'rev-list',
         '--count',
-        headRef,
+        `refs/namespaces/${squashNs}/refs/heads/main`,
       ]);
       expect(Number(depth.trim())).toBe(1);
-
-      const { stdout: files } = await execFileAsync(
-        'git',
-        ['-C', repoPath, 'ls-tree', '-r', '--name-only', headRef],
-        { maxBuffer: 10 * 1024 * 1024 },
-      );
-      expect(files.trim().split('\n')).toHaveLength(COMMIT_COUNT);
+      expect(await listNamespaceFiles(squashNs)).toHaveLength(COMMIT_COUNT);
     });
 
     // -------------------------------------------------------------------------
