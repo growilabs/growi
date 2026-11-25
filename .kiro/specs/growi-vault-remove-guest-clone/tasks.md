@@ -1,0 +1,91 @@
+# Implementation Plan
+
+順番の理由: `@growi/core` の型（`ComposeViewRequest.userId`）を先に `string` にすると、gateway が型検査を通らなくなる。そのため、gateway（1）と vault-manager（2）から `null` を消した後で、型（3）を変える。機能を取り除いた後の形の点検（4）は、削除がすべて終わってから行う。
+
+- [ ] 1. gateway: 認証情報のない要求を拒否する
+- [ ] 1.1 認証情報のない clone / fetch を、ゲスト閲覧の設定によらず 401 にする
+  - 先にテストを書く。`vault-gateway.spec.ts` と `vault-gateway.integ.ts` で、ゲスト閲覧が許可されている設定（`security:wikiMode='public'`、`restrictGuestMode='Readonly'`）のもと、認証情報のない `info/refs` と `git-upload-pack` が 401 + `WWW-Authenticate: Basic realm="GROWI Vault"` になり、本文が空であることを確かめる。同じ設定で、PAT つきの要求が今までどおり 200 になることも確かめる
+  - `loginRequiredFactory` の第 2 引数を `false` にする
+  - 完了の目安: 追加したテストが修正前に落ち、修正後に通る。ゲスト閲覧の設定ごとに「通る／通らない」を分けていた既存のテストは、「どの設定でも 401」を確かめる形に直っている
+  - _Requirements: 1.1, 1.2, 1.3, 1.4_
+- [ ] 1.2 gateway のハンドラと namespace の計算から、「利用者なし」を消す
+  - 先にテストを書く。`crowi` を渡さない経路でも、認証情報のない要求が 401 になり、namespace の計算と compose-view の依頼が呼ばれないことを確かめる
+  - `readIdentity` は、利用者がいなければ `null` を返す。ハンドラは、そのとき 401 を返して終わる
+  - `computeAccessibleNamespaces` の `userId` を `string` にし、`null` の分岐と、そのテストを消す
+  - 完了の目安: `apps/app` の `pnpm run lint`（型検査を含む）が通る。`vault-namespace-mapper.ts` に `null` の分岐がない
+  - _Requirements: 1.5_
+- [ ] 2. vault-manager: 利用者なしのビューを作らず、既存のものを消す
+- [ ] 2.1 利用者なしの合成の依頼を拒否する
+  - 先にテストを書く。`compose-view-maintenance.integ.ts` で、`userId: null` の compose-view が 400 になり、`refs/namespaces/anonymous-view/` も `vault_user_views` の記録もできないことを確かめる
+  - controller で `userId` が空でない文字列であることを確かめる。`compose` と `vault_user_views` のモデルの `userId` を `string` にし、`'anonymous-view'` の分岐を消す
+  - `vault-view-composer.spec.ts` と `clone-e2e.integ.ts` のうち、`anonymous-view` を使っているテストを、消すか、利用者のビューに置き換える
+  - 完了の目安: 追加した結合テストが修正前に落ち、修正後に通る。`vault-view-composer.ts` に `anonymous-view` という文字列がない
+  - _Requirements: 2.1, 2.2_
+- [ ] 2.2 namespace 1 つの ref と HEAD を消す処理を、storage に足す
+  - 先にテストを書く。`vault-repo-storage.spec.ts`（実際の bare repo と git を使う）で、loose の ref・`packed-refs` の中の ref・HEAD が消えること、ほかの namespace と `refs/vault/sparse-filters/` が残ること、対象がなければ何もしないことを確かめる
+  - ref は `git update-ref -d` で消し、その後で namespace のディレクトリを消す
+  - 完了の目安: 追加したテストが、実装前に落ち、実装後に通る
+  - _Requirements: 3.3, 3.6_
+- [ ] 2.3 起動時に、`anonymous-view` の残りを消す
+  - 結合テスト用の起動処理（`src/__tests__/setup/integ-server.ts`）は、テストより先にサーバを起動するので、今のままでは起動前にデータを置けない。テストの中でサーバを止め、データを置いてから起動し直せるようにする（止める・起動し直すための手段を、起動処理が返す値に足す）
+  - 先にテストを書く。起動の結合テストで、bare repo に `anonymous-view` の ref と HEAD を、`vault_user_views` に `userId: null` の記録を置いてから起動し、どちらも消え、同時に置いた `user-<uid>-view` と `public` が残ることを確かめる。単体テストで、消す処理が失敗しても例外を投げず、error ログを出すことを確かめる
+  - `vault-legacy-anonymous-view.ts` を作り、`server-runtime.ts` の `initRepo()` の後、watcher の開始の前に呼ぶ。`vault_user_views` のモデルに、`userId: null` の記録を消す static を足す
+  - 完了の目安: 追加したテストが、実装前に落ち、実装後に通る。`anonymous-view` がない状態での起動が、今までどおり成功する
+  - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6_
+  - _Depends: 2.2_
+- [ ] 3. RPC の型から「利用者なし」を消す
+  - `packages/core/src/interfaces/vault/vault-compose-view.ts` の `ComposeViewRequest.userId` を `string` にし、changeset を足す
+  - 完了の目安: `@growi/core` を再ビルドした後、`apps/app` と `apps/growi-vault-manager` の lint（型検査を含む）が通る。`userId` に `null` を渡すコードを書くと、型検査で落ちる
+  - _Requirements: 1.5, 2.1_
+  - _Depends: 1.2, 2.1_
+- [ ] 4. 機能を取り除いた後の形を整える
+- [ ] 4.1 残骸を洗い出して消す
+  - `apps/app/src/features/growi-vault`・`apps/growi-vault-manager`・`packages/core/src/interfaces/vault` を、`anonymous`・`guest`・`userId: null`・`isGuestAllowed` で検索する
+  - 残ってよいのは、設計書の「取り除いた後に確かめる形」の 1 に挙げた 3 つだけである。それ以外（コメント、テストの名前、使われなくなった引数・補助関数・fixture・mock）を消す
+  - 完了の目安: 検索の結果と、残した各行の理由を、タスクの報告に書いてある
+  - _Requirements: 1.5, 2.2_
+  - _Depends: 1.2, 2.3, 3_
+- [ ] 4.2 401 を返す処理を 1 つにまとめる
+  - 認証 middleware の `rejectWithChallenge` と、gateway の `createGitFallback` が、同じ応答と同じ監査ログを別々に作っている。応答と監査ログを作る処理を 1 つにし、2 か所はそれを呼ぶだけにする
+  - 振る舞いは変えない。既存のテスト（無効な PAT で 401、認証情報なしで 401、どちらも監査ログが残る）が、そのまま通ること
+  - 完了の目安: 401 の応答を組み立てるコードが 1 か所にしかない
+  - _Requirements: 1.1, 1.3_
+  - _Depends: 1.2_
+- [ ] 4.3 凝集度を点検して直す
+  - この spec で触ったファイルごとに、残った関数・型・テストが、そのファイルの 1 つの責務に属することを確かめる（`.claude/rules/coding-style.md` の File Organization と Module Design）。属さないものは置き場所を移す
+  - テストの構成を、残った振る舞いに合わせる。場合分けが消えて 1 件だけになった `describe` や `it.each` をほどく
+  - 以前からある重複など、この変更で生まれたのではない問題は直さず、一覧にして PR の説明文に載せる
+  - 完了の目安: `git diff --stat master` で、テストを含めた削除の行数が追加の行数を上回っている。上回らない場合は、その理由を報告に書いてある。触ったファイルごとの点検結果を、タスクの報告に書いてある
+  - _Requirements: 1.5, 2.2_
+  - _Depends: 4.1, 4.2_
+- [ ] 4.4 独立したレビューで、取り除いた後の形を確かめる
+  - 実装していない Opus のサブエージェントに、差分全体を「この機能が最初から無かったとしたら、こう書くか」という基準でレビューさせる。設計書の「取り除いた後に確かめる形」の 5 点を、そのまま確認項目として渡す
+  - 指摘を直し、直した後の lint・単体テスト・結合テストが通ることを確かめる
+  - 完了の目安: レビューの指摘と、それぞれへの対応を、タスクの報告に書いてある
+  - _Requirements: 1.5, 2.2_
+  - _Depends: 4.3_
+- [ ] 5. 利用者への案内を合わせる
+  - `apps/growi-vault-manager/README.md` に、クローンには PAT が必要であることを書く
+  - GROWI の画面のうち、ログインしていない閲覧者にクローン手順を示すものがないことを、検索して確かめる。あれば、その表示を消す
+  - PR の説明文に載せる「リリースノートに書くこと」の文面を用意する。ゲスト閲覧を許可しているサイトでも認証情報なしのクローンができなくなること、PAT を発行すればクローンできること、更新の前にクローンされた内容は取り消せないことを書く。GROWI のドキュメントサイトで直すべき箇所も挙げる
+  - 完了の目安: README に追記があり、PR の説明文の下書きがタスクの報告にある
+  - _Requirements: 4.1, 4.2, 4.3_
+- [ ] 6. 変更を元の spec に書き戻し、この spec を削除する
+- [ ] 6.1 growi-vault-gateway の requirements.md と design.md を書き直す
+  - 設計書の「Amend target」の表のとおりに直す。要件の番号は変えない（2.4a と 3.2 は番号を残す）。「以前はこうだった」という経緯は書かず、今の事実だけを書く
+  - Revalidation Triggers から、`security:restrictGuestMode` / `security:wikiMode` の仕様変更を消す
+  - _Requirements: 1.1, 1.2, 1.5_
+- [ ] 6.2 growi-vault と growi-vault-manager の requirements.md と design.md を書き直す
+  - growi-vault の要件 3.4 と、design.md の `anonymous-view` の記述を直す
+  - growi-vault-manager の要件 4.7 と、design.md の `userId: string | null`・`anonymous-view`・`vault_user_views` の匿名の記録を直す
+  - 起動時の片付けは、growi-vault-manager の requirements.md の末尾に新しい要件として足し、design.md にも書く。既存の要件の番号は変えない
+  - _Requirements: 2.1, 3.1_
+- [ ] 6.3 設計の判断を、元の spec の research.md に移す
+  - この spec の research.md の Decision 1〜4 と「漏れの経路」を、growi-vault-gateway の research.md（なければ作る）に移す。起動時の片付けと ref の消し方は、growi-vault-manager の research.md に移す
+  - _Requirements: 1.1, 3.1_
+- [ ] 6.4 3 つの spec の spec.json の `updated_at` を更新する（`phase` と `approvals` は変えない）
+  - _Requirements: 1.1_
+- [ ] 6.5 roadmap.md にこの spec の行があれば消し、`.kiro/specs/growi-vault-remove-guest-clone/` を削除する
+  - 削除の前に、`.claude/rules/spec-lifecycle.md` の Checklist を上から確かめる（brief.md と design.md に「Amend target」があること、元の spec の本文に改訂の注記を書き込んでいないこと、を含む）
+  - 完了の目安: `.kiro/` と `.claude/` を `growi-vault-remove-guest-clone` で検索して、何も見つからない
+  - _Requirements: 1.1_

@@ -135,6 +135,32 @@ flowchart LR
 - `apps/app/src/features/growi-vault/server/routes/vault-gateway.spec.ts`、`__tests__/vault-gateway.integ.ts`、`__tests__/clone-e2e.integ.ts`、`server/services/vault-namespace-mapper.spec.ts`、`server/middlewares/vault-pat-auth.spec.ts`
 - `apps/growi-vault-manager/src/services/vault-view-composer.spec.ts`、`src/services/vault-repo-storage.spec.ts`、`src/__tests__/compose-view-maintenance.integ.ts`、`src/__tests__/clone-e2e.integ.ts`
 
+## 取り除くコードと、取り除いた後の形
+
+この変更は、機能を足すのではなく取り除く。足すのは「起動時の片付け」と「受け口での確認」だけで、ほかはすべて削除か、型を狭める変更である。差分は、テストを含めて、追加より削除が多くなる見込みである。
+
+### 取り除くもの
+
+| 場所 | 取り除くもの |
+|---|---|
+| vault-gateway.ts | `readIdentity` の `userId: null`、ハンドラ 2 つの `userId ?? undefined`、匿名を前提にしたコメント |
+| vault-pat-auth.ts | 「匿名の候補」「guest gate が決める」というコメント |
+| vault-namespace-mapper.ts | `userId === null` の分岐 |
+| `@growi/core` の `ComposeViewRequest` | `userId` の `null` |
+| vault-view-composer.ts | `'anonymous-view'` の分岐 |
+| vault-user-view.ts | `userId` の `null`、匿名の 1 件についてのコメント |
+| テスト | ゲスト閲覧の設定ごとに「通る／通らない」を確かめていた場合分け、`anonymous-view` を使うテスト |
+
+### 取り除いた後に確かめる形
+
+「この機能が最初から無かったとしたら、こう書くか」を基準にする。機能を消した跡（使われない引数、1 通りにしか分岐しない条件、役目のなくなった補助関数、中身が 1 件だけになった `describe`）を残さない。確かめる点は次のとおり。
+
+1. **残骸がない。** `anonymous`・`guest`・`userId: null`・`isGuestAllowed` を検索して、残るのは次の 3 つだけである: 起動時の片付け（`vault-legacy-anonymous-view.ts` とそのテスト）、`loginRequiredFactory(crowi, false, ...)` の呼び出し、「認証情報のない要求は 401」を確かめるテスト。
+2. **401 を返す場所の役割が分かれている。** 今は 2 か所ある。認証 middleware の `rejectWithChallenge`（認証情報はあるが無効）と、gateway の `createGitFallback`（利用者がいない）。どちらも同じ応答と同じ監査ログを作る。ゲストを通さなくなると、この 2 つは「利用者を特定できなかった」という同じ結果を表す。応答と監査ログを作る処理を 1 つにし、2 か所はそれを呼ぶだけにする。
+3. **ファイルの名前が中身を言い表している。** 触ったファイルごとに、残った関数がすべてそのファイルの 1 つの責務に属することを確かめる。属さないものが出たら、置き場所を移す。
+4. **テストの構成が、残った振る舞いに合っている。** 場合分けが消えて 1 件だけになった `describe` や `it.each` をほどく。消したテストだけが使っていた補助関数・fixture・mock を消す。
+5. **範囲を広げない。** 直すのは、この変更で生まれた跡だけである。以前からある重複（`info/refs` と `git-upload-pack` のハンドラが、利用者の特定からビューの合成までを同じ形で繰り返している点など）は、見つけたら PR の説明文に書くにとどめ、この spec では直さない。
+
 ## System Flows
 
 ### 認証情報のない clone
