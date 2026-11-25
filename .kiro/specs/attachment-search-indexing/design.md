@@ -416,6 +416,7 @@ sequenceDiagram
 - 「続きを読み込む」の終わりは、`meta.hitsCount` が `limit` に満たないことで判定できる。窓はどの `offset` でも上位 200 件で頭打ちになり、各要求が同じ範囲を見るので、短い応答の後に続きは出ない (research.md 14.1)
 - 各項目の `data` は、ページ検索と同じ形のページ文書である。`SearchService` が `findPageListByIds` で読み、`lastUpdateUser` を `serializeUserSecurely` で直し、`seenUserCount` を入れる (ページ検索の `formatSearchResult` と同じ処理)。MongoDB に無いページの項目は落とす。`meta.hitsCount` は落とす前の項目数にする (ページ検索の `hitsCount` と同じ数え方。落としたことで続きの読み込みが止まらないように)。下流の画面は、ページ検索と同じ一覧とプレビューの部品でこの結果を描く (Req 9.7、research.md 14.1)
 - ページのパス・本文・コメントも検索語に一致する項目には、ページ検索と同じ抜粋 (`meta.elasticSearchResult` の `snippet` / `highlightedPath`) を入れる。返すページの id (最大 `limit` 件) に絞って、`ElasticsearchDelegator.searchWithinPages` で page_index を 1 回検索する。クエリは、ページ検索の `search()` と同じ組み立て (検索語・演算子・viewer filter・強調表示) を delegator の中で共有し、id の絞り込みだけを足したものである。抜粋の作り方 (`canShowSnippet`、`filterXss`) は `formatSearchResult` と共有する。権限確認の `searchAccessiblePages` には相乗りさせない (役割を混ぜない)。検索語に一致しないページは返ってこないので、抜粋は付かない。この検索が失敗するか時間の上限 (500ms) を超えたときは、抜粋を付けずに項目を返し、ログに残す。抜粋は項目の補足であり、無くても項目は正しいため (research.md 14.3)
+- 抜粋を入れる項目には、同じ検索の hit の `_source.bookmark_count` から、ページ検索と同じ `meta.bookmarkCount` も入れる。抜粋の無い項目には入れない (下流の一覧は、抜粋の無い行だけページの付随情報を取り、そこでブックマーク数も埋まる。research.md 14.4)
 - `sort` / `order` / `type` は適用しない (点数順だけ)
 
 #### 2.3 API 呼び出しパターン (アプリ実装)
@@ -589,6 +590,7 @@ Key decisions:
 | 9.5 | 有効時もページ検索は不変、添付ヒットは別の要求 | `GET /_api/search` は `facet=attachments` のときだけ aggregator を呼ぶ。検索結果のページへの添付ヒットは `GET /_api/v3/search/attachments` | AttachmentSearchResultAggregator.resolveSecondary | Flow 2 |
 | 9.6 | 添付ヒットの取得の失敗はエラーで返す | `resolveSecondary` は失敗と 500ms 超過で例外を投げ、ルートは 500 を返す | AttachmentSearchResultAggregator.resolveSecondary | Flow 2.1 |
 | 9.7 | 添付だけの検索の項目にページ文書と、ページも一致したときの抜粋を入れる | `GET /_api/search` の `facet=attachments` の処理 (`findPageListByIds`、`ElasticsearchDelegator.searchWithinPages`) | `IFacetedSearchResult` | Flow 2.2 |
+| 9.8 | 抜粋を入れる項目にブックマーク数も入れる | `GET /_api/search` の `facet=attachments` の処理 (`searchWithinPages` の hit の `_source.bookmark_count`) | `IFacetedSearchResult` | Flow 2.2 |
 
 ## Components and Interfaces
 

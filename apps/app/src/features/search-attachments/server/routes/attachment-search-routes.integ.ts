@@ -88,6 +88,7 @@ type SearchBody = {
     data: { _id: string; path?: string };
     meta?: {
       elasticSearchResult?: { snippet?: string | null };
+      bookmarkCount?: number;
       attachmentHits?: unknown[];
     };
   }>;
@@ -538,6 +539,7 @@ describe.skipIf(esUri == null)(
           expect(item.meta?.elasticSearchResult?.snippet).toContain(
             `<em class="highlighted-keyword">${TOKEN}</em>`,
           );
+          expect(typeof item.meta?.bookmarkCount).toBe('number');
         }
       });
 
@@ -555,6 +557,7 @@ describe.skipIf(esUri == null)(
         ]);
         for (const item of body.data ?? []) {
           expect(item.meta).not.toHaveProperty('elasticSearchResult');
+          expect(item.meta).not.toHaveProperty('bookmarkCount');
           expect(item.meta?.attachmentHits).not.toHaveLength(0);
         }
       });

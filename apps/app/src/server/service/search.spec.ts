@@ -542,10 +542,14 @@ describe('page documents and snippets', () => {
       data: mock<IPageWithSearchMeta['data']>({ _id: String(page._id) }),
       meta: { attachmentHits: [] },
     });
-    const pageHit = (page: { _id: unknown }, highlight: object) => ({
+    const pageHit = (
+      page: { _id: unknown },
+      highlight: object,
+      source: { bookmark_count?: number } = {},
+    ) => ({
       _id: String(page._id),
       _score: 1,
-      _source: {},
+      _source: source,
       _highlight: highlight,
     });
 
@@ -648,11 +652,15 @@ describe('page documents and snippets', () => {
         .spyOn(delegator, 'searchKeyword')
         .mockResolvedValue({
           data: [
-            pageHit(matched, {
-              body: [
-                'the <em class="highlighted-keyword">word</em><img src=x onerror=alert(1)>',
-              ],
-            }),
+            pageHit(
+              matched,
+              {
+                body: [
+                  'the <em class="highlighted-keyword">word</em><img src=x onerror=alert(1)>',
+                ],
+              },
+              { bookmark_count: 4 },
+            ),
           ],
           meta: { total: 1, hitsCount: 1 },
         });
@@ -662,6 +670,7 @@ describe('page documents and snippets', () => {
       expect(toJson(result).map((item) => item.meta)).toEqual([
         {
           attachmentHits: [],
+          bookmarkCount: 4,
           elasticSearchResult: {
             snippet:
               'the <em class="highlighted-keyword">word</em>&lt;img src=x onerror=alert(1)&gt;',
@@ -700,6 +709,41 @@ describe('page documents and snippets', () => {
         snippet: null,
         highlightedPath: '/<em class="highlighted-keyword">owner-only</em>',
       });
+    });
+
+    it('answers a bookmark count of 0 for a snippet item whose hit carries none, as page search does', async () => {
+      const page = createPage('/page', PageGrant.GRANT_PUBLIC);
+      service.pagesInMongo = [page];
+      vi.spyOn(delegator, 'searchKeyword').mockResolvedValue({
+        data: [
+          pageHit(page, {
+            body: ['<em class="highlighted-keyword">word</em>'],
+          }),
+        ],
+        meta: { total: 1, hitsCount: 1 },
+      });
+
+      const [item] = await searchItems([itemOf(page)]);
+
+      expect(item.meta?.bookmarkCount).toBe(0);
+    });
+
+    it('answers an item without a snippet or a bookmark count when its hit carries no highlight', async () => {
+      const page = createPage('/page', PageGrant.GRANT_PUBLIC);
+      service.pagesInMongo = [page];
+      vi.spyOn(delegator, 'searchKeyword').mockResolvedValue({
+        data: [
+          {
+            ...pageHit(page, {}, { bookmark_count: 4 }),
+            _highlight: undefined,
+          },
+        ],
+        meta: { total: 1, hitsCount: 1 },
+      });
+
+      const [item] = await searchItems([itemOf(page)]);
+
+      expect(item.meta).toEqual({ attachmentHits: [] });
     });
 
     it('answers the items without snippets when the snippet search fails', async () => {
