@@ -27,7 +27,11 @@ import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 
 import type Crowi from '../crowi';
-import { generateSnapshot } from './in-app-notification/in-app-notification-utils';
+import { filterUsersWhoCanViewPage } from './in-app-notification/filter-page-viewers';
+import {
+  generateSnapshot,
+  isIPage,
+} from './in-app-notification/in-app-notification-utils';
 import { type PreNotify, preNotifyService } from './pre-notify';
 import { getRoomNameWithId, RoomPrefix } from './socket-io/helper';
 
@@ -374,12 +378,15 @@ export class InAppNotificationService {
 
       await preNotify(props);
 
-      await this.upsertByActivity(
-        props.notificationTargetUsers,
-        activity,
-        snapshot,
-      );
-      await this.emitSocketIo(props.notificationTargetUsers);
+      const recipients = isIPage(targetModel, target)
+        ? await filterUsersWhoCanViewPage(
+            target,
+            props.notificationTargetUsers ?? [],
+          )
+        : props.notificationTargetUsers;
+
+      await this.upsertByActivity(recipients, activity, snapshot);
+      await this.emitSocketIo(recipients);
     } else {
       throw Error('no activity to notify');
     }

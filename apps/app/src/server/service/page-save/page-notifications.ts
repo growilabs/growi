@@ -88,7 +88,13 @@ export const emitPageUpdateActivity = async (
       'update',
       activityId,
       parameters,
-      { path: page.path, creator },
+      {
+        path: page.path,
+        creator,
+        grant: page.grant,
+        grantedUsers: page.grantedUsers,
+        grantedGroups: page.grantedGroups,
+      },
       preNotifyService.generatePreNotify,
     );
   } catch (err) {

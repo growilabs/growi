@@ -2127,7 +2127,8 @@ class PageService implements IPageService {
   ): Promise<number> {
     const pageIdsToDelete = pagesToDelete.map((p) => p._id);
     const Page = mongoose.model<IPage, PageModel>('Page');
-    const trashPage = { path: '/trash' };
+    // The notification names only the trash itself, which every user can see.
+    const trashPage = { path: '/trash', grant: PageGrant.GRANT_PUBLIC };
 
     const parameters = {
       ...activityParameters,
