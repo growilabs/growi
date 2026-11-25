@@ -1552,4 +1552,4 @@ flowchart LR
 2. **`packages/attachment-text-extractor-client` の公開境界**: server 専用依存として apps/app から import し、UI 側に混入させないレイヤリング制約を lint ルール化するか検討
 3. **`requiresReindex` cardinality agg の共有 ES コスト**: 30 秒のキャッシュはインスタンスごとに独立しているので、複数インスタンスでは admin GET のたびに各インスタンスが集計を投げうる。`precision_threshold` の指定、共有のキャッシュ、MongoDB 上の件数の記録への置き換えのどれかを、リリース後に検討する
 4. **複数インスタンスでの作り直し**: 実行中の判定と、作り直し中の削除の記録はインスタンスごとのメモリにある (research.md 8.6 の「残っている制約」)
-5. **残っている作業**: tasks.md の未完了のタスク (3.4 監視メトリクス、13.4 環境変数で固定されているときの保存の拒否)
+5. **残っている作業**: tasks.md の未完了のタスク (3.4 監視メトリクス)

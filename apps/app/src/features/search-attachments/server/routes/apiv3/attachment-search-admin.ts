@@ -4,6 +4,8 @@
  * GET  /_api/v3/admin/attachment-search/config    — read current config values
  *      (`useOnlyEnvVars`: true when the 4 keys are pinned by environment variables)
  * PUT  /_api/v3/admin/attachment-search/config    — update config values
+ *      (409 `config_locked_by_env_vars` while the settings are pinned by
+ *      environment variables; nothing is saved)
  * GET  /_api/v3/admin/attachment-search/failures  — list recent extraction failures
  *
  * Every route: accessTokenParser([SCOPE.*.ADMIN.FULL_TEXT_SEARCH]) +
@@ -290,6 +292,22 @@ export const attachmentSearchAdminFactory = (crowi: Crowi): express.Router => {
     apiV3FormValidator,
     async (req, res: ApiV3Response) => {
       try {
+        // Checked before anything else so no input can be saved, validated or
+        // audited as a success while the environment variables win (research.md 14.5).
+        if (
+          configManager.getConfig(
+            'env:useOnlyEnvVars:app:attachmentFullTextSearch',
+          )
+        ) {
+          return res.apiv3Err(
+            new ErrorV3(
+              'Attachment full-text search settings are pinned by environment variables and cannot be changed here',
+              'config_locked_by_env_vars',
+            ),
+            409,
+          );
+        }
+
         const { extractorUri, extractorToken, timeoutMs, maxFileSizeBytes } =
           req.body as {
             extractorUri?: string | null;
