@@ -611,7 +611,9 @@ interface MaintenanceStatus {
 | ジョブ | トリガ | 動作 |
 |--------|--------|------|
 | **Squash** | commit 数 > N（デフォルト 1000）**または** 経過時間 > T（デフォルト 1h）。5 分間隔チェック | 現 tree OID を取得 → `parents: []` の新 commit → `updateRef` → `vault_namespace_state.version++` |
-| **GC** | 24h ごと **または** loose object 数 > L（デフォルト 50,000） | `git gc --prune=2.weeks.ago` を spawn |
+| **GC** | 24h ごと **または** loose object 数 > L（デフォルト 50,000） | `git -c gc.packRefs=false gc --prune=2.weeks.ago` を spawn |
+
+**ref は常に loose ファイルで保つ**: `VaultRepoStorage` の `readRef` / `updateRef` / `deleteRef` は ref ファイルを直接読み書きし、`packed-refs` を見ない。gc が ref を `packed-refs` にまとめると namespace の HEAD が「無い」と読まれ、次の instruction がその 1 ページだけの root commit で namespace を置き換えてしまう。そのため gc は `gc.packRefs=false` で実行し、過去の gc でまとめられた ref は起動時の `init()` で loose ファイルに戻す
 
 **env var override**: `VAULT_SQUASH_COMMIT_THRESHOLD` / `VAULT_SQUASH_AGE_HOURS` / `VAULT_GC_INTERVAL_HOURS` / `VAULT_GC_LOOSE_OBJECT_THRESHOLD`
 
