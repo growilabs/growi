@@ -15,7 +15,7 @@
   - 完了の目安: `apps/app` の `pnpm run lint`（型検査を含む）が通る。`vault-namespace-mapper.ts` に `null` の分岐がない
   - _Requirements: 1.5_
 - [ ] 2. vault-manager: 利用者なしのビューを作らず、既存のものを消す
-- [ ] 2.1 利用者なしの合成の依頼を拒否する
+- [x] 2.1 利用者なしの合成の依頼を拒否する
   - 先にテストを書く。`compose-view-maintenance.integ.ts` で、`userId: null` の compose-view が 400 になり、`refs/namespaces/anonymous-view/` も `vault_user_views` の記録もできないことを確かめる
   - controller で `userId` が空でない文字列であることを確かめる。`compose` と `vault_user_views` のモデルの `userId` を `string` にし、`'anonymous-view'` の分岐を消す
   - `vault-view-composer.spec.ts` と `clone-e2e.integ.ts` のうち、`anonymous-view` を使っているテストを、消すか、利用者のビューに置き換える

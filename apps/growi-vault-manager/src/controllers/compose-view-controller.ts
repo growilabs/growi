@@ -18,7 +18,7 @@ import type {
 } from '@growi/core/dist/interfaces/vault';
 import { BodyParams, UseBefore } from '@tsed/common';
 import { Controller } from '@tsed/di';
-import { InternalServerError } from '@tsed/exceptions';
+import { BadRequest, InternalServerError } from '@tsed/exceptions';
 import { Logger } from '@tsed/logger';
 import { Post, Returns } from '@tsed/schema';
 
@@ -41,13 +41,19 @@ export class ComposeViewController {
    */
   @Post('/')
   @(Returns(200).ContentType('application/json'))
+  @Returns(400)
   @Returns(401)
   @Returns(500)
   async composeView(
     @BodyParams() body: ComposeViewRequest,
   ): Promise<ComposeViewResponse> {
+    const { userId } = body;
+    if (typeof userId !== 'string' || userId === '') {
+      throw new BadRequest('userId must be a non-empty string');
+    }
+
     try {
-      return await VaultViewComposer.compose(body.userId, body.namespaces);
+      return await VaultViewComposer.compose(userId, body.namespaces);
     } catch (err) {
       this.logger.error('compose-view failed', err);
       throw new InternalServerError(

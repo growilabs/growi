@@ -311,6 +311,40 @@ async function triggerGcAndWait(): Promise<{
       expect(second.commitOid).toMatch(/^[0-9a-f]{40}$/);
     });
 
+    it('compose-view rejects a request without a user and creates neither a view ref nor a view record', async () => {
+      const res = await fetch(`${BASE_URL}/internal/compose-view`, {
+        method: 'POST',
+        headers: {
+          Authorization: AUTH_HEADER,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId: null, namespaces: ['public'] }),
+      });
+      expect(res.status).toBe(400);
+
+      const repoPath = process.env.VAULT_REPO_PATH;
+      if (repoPath == null || !fs.existsSync(repoPath)) {
+        throw new Error('VAULT_REPO_PATH is not a local directory');
+      }
+      const { stdout: refs } = await execFileAsync('git', [
+        '-C',
+        repoPath,
+        'for-each-ref',
+        '--format=%(refname)',
+        'refs/namespaces/anonymous-view/',
+      ]);
+      expect(refs.trim()).toBe('');
+
+      const db = mongoose?.connection.db;
+      if (db == null) {
+        throw new Error('Mongoose connection db is not available');
+      }
+      const views = await db
+        .collection('vault_user_views')
+        .countDocuments({ userId: null });
+      expect(views).toBe(0);
+    });
+
     // -------------------------------------------------------------------------
     // Test 2: squash auto-trigger after 1000+ commits
     // -------------------------------------------------------------------------

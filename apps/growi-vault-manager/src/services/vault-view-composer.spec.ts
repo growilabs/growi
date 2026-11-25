@@ -242,19 +242,6 @@ describe('compose — full merge (initial)', () => {
     expect(mockUpsertView).toHaveBeenCalledOnce();
   });
 
-  it('uses anonymous-view ref when userId is null', async () => {
-    mockFindByUserId.mockResolvedValue(null);
-    mockGetCommitOidMap.mockResolvedValue({ public: COMMIT_OID_PUBLIC });
-
-    const result = await compose(null, ['public']);
-
-    expect(result.viewRef).toBe('anonymous-view');
-    expect(mockUpdateRef).toHaveBeenCalledWith(
-      'refs/namespaces/anonymous-view/refs/heads/main',
-      COMMIT_OID_VIEW_NEW,
-    );
-  });
-
   it('creates commit with no parents on initial compose', async () => {
     mockFindByUserId.mockResolvedValue(null);
 
