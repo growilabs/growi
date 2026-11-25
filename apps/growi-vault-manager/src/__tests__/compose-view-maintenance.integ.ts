@@ -27,7 +27,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 const execFileAsync = promisify(execFile);
 
@@ -236,6 +236,7 @@ async function newRevision(
 async function insertInstructionAndSettle(
   op: string,
   payload: Record<string, unknown>,
+  issuedAt: Date = new Date(),
 ): Promise<{ id: unknown; processed: boolean; lastError: string | null }> {
   if (mongoose?.connection.db == null) {
     throw new Error('Mongoose not connected');
@@ -244,7 +245,7 @@ async function insertInstructionAndSettle(
   const { insertedId } = await instructions.insertOne({
     op,
     payload,
-    issuedAt: new Date(),
+    issuedAt,
     processedAt: null,
     attempts: 0,
     lastError: null,
@@ -266,6 +267,71 @@ async function insertInstructionAndSettle(
   throw new Error(
     `Instruction ${String(insertedId)} did not settle within 15 s`,
   );
+}
+
+/** Inserts an upsert of one new page and waits until it settles. */
+async function upsertNewPageAndSettle(
+  namespace: string,
+): Promise<{ id: unknown; processed: boolean; lastError: string | null }> {
+  const ids = await newRevision(`# ${namespace}`);
+  return insertInstructionAndSettle('upsert', {
+    namespace,
+    ...ids,
+    pagePath: `/${namespace}/page-${ids.pageId}`,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Helpers: refs in the bare repository
+// ---------------------------------------------------------------------------
+
+const SPARSE_FILTER_REF = 'refs/vault/sparse-filters/exclude-user-pages';
+
+function namespaceRef(namespace: string): string {
+  return `refs/namespaces/${namespace}/refs/heads/main`;
+}
+
+function packedRefsExist(): boolean {
+  return fs.existsSync(path.join(requireRepoPath(), 'packed-refs'));
+}
+
+/** Packs every ref the way a gc without gc.packRefs=false does. */
+async function packAllRefs(): Promise<void> {
+  await execFileAsync('git', [
+    '-C',
+    requireRepoPath(),
+    'pack-refs',
+    '--all',
+    '--prune',
+  ]);
+}
+
+/** Resolves a ref the way git does (loose file first, then packed-refs). */
+async function resolveRef(ref: string): Promise<string | null> {
+  try {
+    const { stdout } = await execFileAsync('git', [
+      '-C',
+      requireRepoPath(),
+      'rev-parse',
+      '--verify',
+      '--quiet',
+      ref,
+    ]);
+    return stdout.trim();
+  } catch {
+    return null;
+  }
+}
+
+async function findInstruction(
+  id: unknown,
+): Promise<Record<string, unknown> | null> {
+  if (mongoose?.connection.db == null) {
+    throw new Error('Mongoose not connected');
+  }
+  return mongoose.connection.db
+    .collection('vault_instructions')
+    .findOne({ _id: id as never });
 }
 
 // ---------------------------------------------------------------------------
@@ -687,48 +753,144 @@ async function triggerGcAndWait(): Promise<{
       await upsertNewPages(ns, 3);
 
       await triggerGcAndWait();
+      expect(packedRefsExist()).toBe(false);
       await upsertNewPages(ns, 1);
 
       expect(await listNamespaceFiles(ns)).toHaveLength(4);
     });
 
-    // Runs last: the reset-all it issues wipes every namespace.
-    it('refuses writes while refs are packed, until a rebuild (reset-all) clears them', {
-      timeout: 120_000,
-    }, async () => {
-      const ns = 'integ-refuse-packed-ref-ns';
-      await upsertNewPages(ns, 3);
-      await execFileAsync('git', [
-        '-C',
-        requireRepoPath(),
-        'pack-refs',
-        '--all',
-        '--prune',
-      ]);
+    // Runs last: every reset-all issued here wipes every namespace.
+    describe('while refs are packed', () => {
+      async function rebuildVault(issuedAt?: Date): Promise<void> {
+        const rebuild = await insertInstructionAndSettle(
+          'reset-all',
+          {},
+          issuedAt,
+        );
+        expect(rebuild.lastError).toBeNull();
+      }
 
-      const refused = await insertInstructionAndSettle('upsert', {
-        namespace: ns,
-        ...(await newRevision('# refused')),
-        pagePath: `/${ns}/refused`,
+      afterEach(async () => {
+        if (packedRefsExist()) {
+          await rebuildVault();
+        }
       });
-      expect(refused.lastError).toMatch(/Rebuild Vault/);
-      expect(await listNamespaceFiles(ns)).toHaveLength(3);
 
-      const rebuild = await insertInstructionAndSettle('reset-all', {});
-      expect(rebuild.lastError).toBeNull();
-      expect(fs.existsSync(path.join(requireRepoPath(), 'packed-refs'))).toBe(
-        false,
-      );
+      it('refuses writes until a rebuild (reset-all) clears the packed refs', {
+        timeout: 120_000,
+      }, async () => {
+        const ns = 'integ-refuse-packed-ref-ns';
+        await upsertNewPages(ns, 3);
+        await packAllRefs();
 
-      // The refused write is superseded by the rebuild, so no later drain
-      // replays it on top of the rebuilt namespace.
-      const refusedAfterRebuild = await mongoose?.connection.db
-        ?.collection('vault_instructions')
-        .findOne({ _id: refused.id });
-      expect(refusedAfterRebuild?.processedAt).not.toBeNull();
+        const refused = await upsertNewPageAndSettle(ns);
+        expect(refused.lastError).toMatch(/Rebuild Vault/);
+        expect(await listNamespaceFiles(ns)).toHaveLength(3);
 
-      await upsertNewPages(ns, 1);
-      expect(await listNamespaceFiles(ns)).toHaveLength(1);
+        await rebuildVault();
+        expect(packedRefsExist()).toBe(false);
+
+        // The refused write is superseded by the rebuild, so no later drain
+        // replays it on top of the rebuilt namespace.
+        expect((await findInstruction(refused.id))?.processedAt).not.toBeNull();
+
+        await upsertNewPages(ns, 1);
+        expect(await listNamespaceFiles(ns)).toHaveLength(1);
+      });
+
+      it('refuses a write to a namespace whose ref is also loose, or that has no ref yet', {
+        timeout: 120_000,
+      }, async () => {
+        const looseNs = 'integ-packed-and-loose-ns';
+        const newNs = 'integ-packed-new-ns';
+        await upsertNewPages(looseNs, 3);
+        const head = await resolveRef(namespaceRef(looseNs));
+        const filterOid = await resolveRef(SPARSE_FILTER_REF);
+        await packAllRefs();
+        const looseRefFile = path.join(
+          requireRepoPath(),
+          namespaceRef(looseNs),
+        );
+        await fs.promises.mkdir(path.dirname(looseRefFile), {
+          recursive: true,
+        });
+        await fs.promises.writeFile(looseRefFile, `${head}\n`);
+
+        const refusedLoose = await upsertNewPageAndSettle(looseNs);
+        expect(refusedLoose.lastError).toMatch(/Rebuild Vault/);
+        expect(await listNamespaceFiles(looseNs)).toHaveLength(3);
+
+        const refusedNew = await upsertNewPageAndSettle(newNs);
+        expect(refusedNew.lastError).toMatch(/Rebuild Vault/);
+        expect(await resolveRef(namespaceRef(newNs))).toBeNull();
+
+        await rebuildVault();
+        expect(packedRefsExist()).toBe(false);
+        expect(await resolveRef(namespaceRef(looseNs))).toBeNull();
+        expect(await resolveRef(SPARSE_FILTER_REF)).toBe(filterOid);
+
+        await upsertNewPages(looseNs, 1);
+        expect(await listNamespaceFiles(looseNs)).toHaveLength(1);
+      });
+
+      it('refuses compose-view until a rebuild, even for a view composed before', {
+        timeout: 120_000,
+      }, async () => {
+        const ns = 'integ-packed-compose-ns';
+        const cachedUserId = 'cafebabedeadbeef00000004';
+        const newUserId = 'cafebabedeadbeef00000005';
+        await upsertNewPages(ns, 1);
+        await callComposeView(cachedUserId, [ns]);
+        await packAllRefs();
+
+        await expect(callComposeView(cachedUserId, [ns])).rejects.toThrow(
+          /compose-view returned 500/,
+        );
+        await expect(callComposeView(newUserId, [ns])).rejects.toThrow(
+          /compose-view returned 500/,
+        );
+
+        await rebuildVault();
+        const { commitOid } = await callComposeView(cachedUserId, [ns]);
+        expect(commitOid).toMatch(/^[0-9a-f]{40}$/);
+      });
+
+      it('a rebuild supersedes an instruction that was given up on, but not one issued after the rebuild', {
+        timeout: 120_000,
+      }, async () => {
+        const ns = 'integ-packed-supersede-ns';
+        await upsertNewPages(ns, 1);
+        await packAllRefs();
+
+        const givenUp = await upsertNewPageAndSettle(ns);
+        await mongoose?.connection.db
+          ?.collection('vault_instructions')
+          .updateOne({ _id: givenUp.id as never }, { $set: { attempts: 7 } });
+        const rebuildIssuedAt = new Date();
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        const issuedLater = await upsertNewPageAndSettle(ns);
+        expect(issuedLater.lastError).toMatch(/Rebuild Vault/);
+
+        await rebuildVault(rebuildIssuedAt);
+
+        expect((await findInstruction(givenUp.id))?.processedAt).not.toBeNull();
+        expect((await findInstruction(issuedLater.id))?.processedAt).toBeNull();
+      });
+
+      it('gc leaves packed-refs and the refs in it as they are', {
+        timeout: 120_000,
+      }, async () => {
+        const ns = 'integ-packed-gc-ns';
+        await upsertNewPages(ns, 2);
+        const head = await resolveRef(namespaceRef(ns));
+        await packAllRefs();
+
+        await triggerGcAndWait();
+
+        expect(packedRefsExist()).toBe(true);
+        expect(await resolveRef(namespaceRef(ns))).toBe(head);
+        expect(await listNamespaceFiles(ns)).toHaveLength(2);
+      });
     });
   },
 );
