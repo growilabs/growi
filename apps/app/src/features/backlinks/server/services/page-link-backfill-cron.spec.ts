@@ -5,6 +5,7 @@ import type { SocketIoService } from '~/server/service/socket-io';
 
 import type { BacklinksBackfillProgressData } from '../../interfaces/page-link-backfill';
 import {
+  BACKFILL_POLL_CRON_SCHEDULE,
   createAdminProgressEmitter,
   PageLinkBackfillCron,
 } from './page-link-backfill-cron';
@@ -49,6 +50,12 @@ describe('createAdminProgressEmitter', () => {
       createAdminProgressEmitter(socketIoService)(PROGRESS),
     ).not.toThrow();
   });
+});
+
+// design.md (Batch / Job Contract): a request starts, and a dead owner is taken over, within a
+// minute plus the lease.
+it('polls every minute', () => {
+  expect(BACKFILL_POLL_CRON_SCHEDULE).toBe('* * * * *');
 });
 
 describe('PageLinkBackfillCron, when an admin request arrives during a tick that found nothing', () => {
