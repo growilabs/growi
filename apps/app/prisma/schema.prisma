@@ -582,10 +582,8 @@ type PagelinkbackfilljobsRequestedScope {
 }
 
 model pagelinkbackfilljobs {
-  // The single control/status document of the backlinks backfill. Prisma-only and `v`-less like
-  // pagelinks. GROWI.cloud infra reads `status`, `coverage`, `coveredSince`, `processed`,
-  // `completedAt` and `lastError` directly to watch progress, so this collection name and
-  // those field names are an operator contract. The admin endpoints write the request fields
+  // The single control/status document of the backlinks backfill, read by the admin settings.
+  // Prisma-only and `v`-less like pagelinks. The admin endpoints write the request fields
   // (`requestedScope`, `requestedAt`, `stopRequested`); the job writes everything else.
   id             String                              @id @default(auto()) @map("_id") @db.ObjectId
   // idle / requested / running / stopped / complete / failed
@@ -608,6 +606,10 @@ model pagelinkbackfilljobs {
   skippedPages   Int                                 @default(0)
   completedAt    DateTime?
   lastError      String?
+  // Failures in a row with no checkpoint between them, and when the poll may retry the failed
+  // run; null once the retries are used up (design.md, "Failed run").
+  failedAttempts Int                                 @default(0)
+  retryAt        DateTime?
   claimedBy      String?
   leaseExpiresAt DateTime?
 }

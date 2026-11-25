@@ -26,13 +26,15 @@ const logger = loggerFactory('growi:features:backlinks:page-link-service');
  * Crowi-facing entry point for the backlinks index.
  *
  * Deliberately thin: it owns only the wiring that needs a Crowi instance —
- * lifecycle-event subscription, starting the backfill poll at boot, and config
- * access — and delegates the work to modules that need none of it. The write
+ * lifecycle-event subscription, holding the backfill poll, and config access —
+ * and delegates the work to modules that need none of it. The write
  * side is paced by `PageLinkUpsertQueue`, the read side is `findBacklinks`.
  */
 export class PageLinkService {
   private crowi: Crowi;
   private upsertQueue: PageLinkUpsertQueue;
+  /** Built on first use: at boot when a run is outstanding, else by the first admin request. */
+  private backfillPollInstance: PageLinkBackfillCron | undefined;
 
   constructor(crowi: Crowi) {
     this.crowi = crowi;
@@ -58,27 +60,44 @@ export class PageLinkService {
     return pageLinkService;
   }
 
-  /**
-   * Boot step: create the backfill job document when it is missing, then start the backfill's
-   * idle poll unless every page is already covered.
-   *
-   * @returns the started poll, or null when none was scheduled
-   */
-  async startBackfillPoll(): Promise<PageLinkBackfillCron | null> {
-    await prisma.pagelinkbackfilljobs.ensureExists();
-    const job = await prisma.pagelinkbackfilljobs.findFirst({
-      select: { coverage: true },
-    });
-    // With every page covered no request can be accepted, so there is nothing to poll for.
-    if (job?.coverage === 'all') {
-      logger.info(
-        'backlinks backfill poll not scheduled: every page is covered',
-      );
-      return null;
-    }
+  /** The backfill poll this process holds, if one was built. */
+  get backfillPoll(): PageLinkBackfillCron | undefined {
+    return this.backfillPollInstance;
+  }
 
+  /**
+   * Boot step: create the backfill job document when it is missing, then schedule the
+   * backfill poll only when a run is outstanding. Claims nothing itself, so boot never waits on
+   * a run: the poll's first tick does that.
+   */
+  async startBackfillPoll(): Promise<void> {
+    await prisma.pagelinkbackfilljobs.ensureExists();
+    if (!(await prisma.pagelinkbackfilljobs.isRunOutstanding())) {
+      logger.info(
+        'backlinks backfill poll not scheduled: no run is outstanding',
+      );
+      return;
+    }
+    this.getOrCreateBackfillPoll().startCron();
+  }
+
+  /**
+   * For the admin start and resume endpoints, after they write a request: start the poll in
+   * this process if it is not running, and claim at once. The endpoint does not await it; it
+   * resolves when the claim, and any run it started, has ended.
+   */
+  async claimBackfillNow(): Promise<void> {
+    try {
+      await this.getOrCreateBackfillPoll().claimNow();
+    } catch (err) {
+      logger.error({ err }, 'backlinks backfill claim failed');
+    }
+  }
+
+  private getOrCreateBackfillPoll(): PageLinkBackfillCron {
+    if (this.backfillPollInstance != null) return this.backfillPollInstance;
     const { configManager } = this.crowi;
-    const poll = new PageLinkBackfillCron({
+    this.backfillPollInstance = new PageLinkBackfillCron({
       cronSchedule: BACKFILL_POLL_CRON_SCHEDULE,
       pacing: resolveBackfillPacing({
         dutyCyclePercent: configManager.getConfig(
@@ -93,8 +112,7 @@ export class PageLinkService {
       getSiteUrl: () => configManager.getConfig('app:siteUrl'),
       emitProgress: createAdminProgressEmitter(this.crowi.socketIoService),
     });
-    poll.startCron();
-    return poll;
+    return this.backfillPollInstance;
   }
 
   private registerEvents(): void {

@@ -50,14 +50,19 @@ export const createAdminProgressEmitter =
   };
 
 /**
- * The backfill's start poll: each tick tries to claim the job (a request, or a run nobody is
- * holding) and, when it wins the claim, runs the paced loop until the run ends.
+ * The backfill's start poll: each tick tries to claim the job (a request, a run nobody is
+ * holding, or a failed run whose retry is due) and, when it wins the claim, runs the paced loop
+ * until the run ends. It runs only while a run is outstanding: a tick that wins nothing stops it
+ * unless one is (design.md, Batch / Job Contract).
  */
 export class PageLinkBackfillCron extends CronService {
   private readonly deps: PageLinkBackfillCronDeps;
 
   /** node-cron does not await a tick, so a tick falling due mid-run must not start a second loop. */
   private isRunning = false;
+
+  /** Set by `claimNow` so a tick already in flight claims again instead of stopping the poll. */
+  private isClaimRequested = false;
 
   constructor(deps: PageLinkBackfillCronDeps) {
     super();
@@ -72,18 +77,48 @@ export class PageLinkBackfillCron extends CronService {
     await this.runPendingJob();
   }
 
-  /** Claims and runs a pending job; returns at once when one is running here or none is pending. */
+  /**
+   * Claims and runs a pending job; returns at once when one is running here. Stops the poll
+   * when nothing was claimed and no run is outstanding.
+   */
   async runPendingJob(): Promise<void> {
     if (this.isRunning) return;
     this.isRunning = true;
     try {
-      await this.claimAndRun();
+      do {
+        this.isClaimRequested = false;
+        // biome-ignore lint/performance/noAwaitInLoops: claims are sequential by design
+        const claimed = await this.claimAndRun();
+        if (!claimed && !this.isClaimRequested) {
+          await this.stopUnlessRunOutstanding();
+        }
+      } while (this.isClaimRequested);
     } finally {
       this.isRunning = false;
     }
   }
 
-  private async claimAndRun(): Promise<void> {
+  /**
+   * For the admin endpoints, after they write a request: make sure the poll runs in this
+   * process and claim at once rather than on the next tick. Resolves when the claim, and any
+   * run it started, has ended.
+   */
+  async claimNow(): Promise<void> {
+    if (!this.isJobRunning()) this.startCron();
+    this.isClaimRequested = true;
+    await this.runPendingJob();
+  }
+
+  private async stopUnlessRunOutstanding(): Promise<void> {
+    const outstanding = await prisma.pagelinkbackfilljobs.isRunOutstanding();
+    // A claim asked for during the read may be for a request this read did not see.
+    if (outstanding || this.isClaimRequested) return;
+    this.stopCron();
+    logger.info('backlinks backfill poll stopped: no run is outstanding');
+  }
+
+  /** @returns whether this process won the claim (and so ran the job) */
+  private async claimAndRun(): Promise<boolean> {
     const leaseMs = backfillLeaseMsFor(this.deps.pacing);
     // Per claim, not per process: a stalled loop and its successor in the same process must not
     // both pass the claim fence.
@@ -91,7 +126,7 @@ export class PageLinkBackfillCron extends CronService {
     const claimed = await prisma.pagelinkbackfilljobs.tryClaim(owner, {
       leaseMs,
     });
-    if (!claimed) return;
+    if (!claimed) return false;
 
     const runDeps: BackfillRunDeps = {
       ...this.deps,
@@ -103,5 +138,6 @@ export class PageLinkBackfillCron extends CronService {
     };
     logger.info({ owner }, 'backlinks backfill claimed the job');
     await runClaimedBackfill(owner, runDeps);
+    return true;
   }
 }

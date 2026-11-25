@@ -13,6 +13,7 @@ import { loadBackfillLinkResolver } from './backfill-link-resolver';
 import {
   BACKFILL_CHECKPOINT_EVERY_PAGES,
   BACKFILL_CHECKPOINT_INTERVAL_MS,
+  BACKFILL_RETRY_DELAYS_MS,
   type BackfillPacing,
   restAfterBackfillPageMs,
 } from './backfill-pacing';
@@ -132,7 +133,8 @@ type RunEnd = 'complete' | 'stopped' | 'refused';
  * after the saved marker, checkpoint, and end it as complete or stopped.
  *
  * Ending on a refused write touches nothing (another instance owns the job now, or the document
- * is gone and is recreated idle); an error ends the run as `failed`.
+ * is gone and is recreated idle); an error ends the run as `failed`, with a retry scheduled
+ * unless the failures in a row have reached the cap.
  */
 export const runClaimedBackfill = async (
   owner: string,
@@ -146,6 +148,7 @@ export const runClaimedBackfill = async (
     const recorded = await prisma.pagelinkbackfilljobs.finishFailed(
       owner,
       err instanceof Error ? err.message : String(err),
+      { retryDelaysMs: BACKFILL_RETRY_DELAYS_MS },
     );
     if (!recorded) await onRefused(owner);
   }
