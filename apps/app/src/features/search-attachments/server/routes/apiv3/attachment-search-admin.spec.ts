@@ -688,8 +688,17 @@ describe('PUT /config — settings pinned by environment variables', () => {
       name: 'an invalid extractorUri',
       body: { extractorUri: 'file:///etc/passwd' },
     },
+    { name: 'an out-of-range timeoutMs', body: { timeoutMs: 999 } },
   ])('refuses $name with 409 and stores nothing', async ({ body }) => {
-    setEnvVarsLock(true);
+    // Feature enabled, so an index would be created if the lock did not stop the request
+    vi.mocked(configManager.getConfig).mockImplementation(((key: string) => {
+      if (key === 'env:useOnlyEnvVars:app:attachmentFullTextSearch')
+        return true;
+      if (key === 'app:attachmentFullTextSearch:extractorUri')
+        return 'http://extractor:8000';
+      if (key === 'app:attachmentFullTextSearch:extractorToken') return 'token';
+      return undefined;
+    }) as never);
     const ensureAttachmentIndex = vi.fn().mockResolvedValue(undefined);
 
     const res = await putWith(body, ensureAttachmentIndex);

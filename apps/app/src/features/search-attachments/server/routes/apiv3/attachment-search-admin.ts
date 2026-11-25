@@ -158,6 +158,27 @@ const TIMEOUT_MS_MAX = 600_000;
 const MAX_FILE_SIZE_BYTES_MAX = 500 * 1024 * 1024;
 const EXTRACTOR_TOKEN_MAX_LENGTH = 1024;
 
+// Runs before the validators so no input, valid or not, can reach the save
+// path while the environment variables win (research.md 14.5).
+const refuseWhenPinnedByEnvVars: express.RequestHandler = (
+  _req,
+  res: ApiV3Response,
+  next,
+) => {
+  if (
+    configManager.getConfig('env:useOnlyEnvVars:app:attachmentFullTextSearch')
+  ) {
+    return res.apiv3Err(
+      new ErrorV3(
+        'Attachment full-text search settings are pinned by environment variables and cannot be changed here',
+        'config_locked_by_env_vars',
+      ),
+      409,
+    );
+  }
+  return next();
+};
+
 const putConfigValidator = [
   // The URI itself is checked in the handler, which answers invalid_extractor_uri
   body('extractorUri')
@@ -288,26 +309,11 @@ export const attachmentSearchAdminFactory = (crowi: Crowi): express.Router => {
     loginRequiredStrictly,
     adminRequired,
     addActivity,
+    refuseWhenPinnedByEnvVars,
     putConfigValidator,
     apiV3FormValidator,
     async (req, res: ApiV3Response) => {
       try {
-        // Checked before anything else so no input can be saved, validated or
-        // audited as a success while the environment variables win (research.md 14.5).
-        if (
-          configManager.getConfig(
-            'env:useOnlyEnvVars:app:attachmentFullTextSearch',
-          )
-        ) {
-          return res.apiv3Err(
-            new ErrorV3(
-              'Attachment full-text search settings are pinned by environment variables and cannot be changed here',
-              'config_locked_by_env_vars',
-            ),
-            409,
-          );
-        }
-
         const { extractorUri, extractorToken, timeoutMs, maxFileSizeBytes } =
           req.body as {
             extractorUri?: string | null;
