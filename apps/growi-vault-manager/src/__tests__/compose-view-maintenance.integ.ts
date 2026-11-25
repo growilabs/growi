@@ -29,6 +29,8 @@ import path from 'node:path';
 import { promisify } from 'node:util';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import * as VaultRepoStorage from '../services/vault-repo-storage.js';
+
 const execFileAsync = promisify(execFile);
 
 // ---------------------------------------------------------------------------
@@ -162,6 +164,53 @@ async function upsertPageAndWait(opts: {
   }
 
   throw new Error(`Instruction ${instrId} was not processed within 15 s`);
+}
+
+// ---------------------------------------------------------------------------
+// Helper: list the files in a namespace's HEAD tree
+// ---------------------------------------------------------------------------
+
+function requireRepoPath(): string {
+  const repoPath = process.env.VAULT_REPO_PATH;
+  if (repoPath == null) {
+    throw new Error('VAULT_REPO_PATH is not set by the integ setup');
+  }
+  return repoPath;
+}
+
+async function listNamespaceFiles(namespace: string): Promise<string[]> {
+  const { stdout } = await execFileAsync(
+    'git',
+    [
+      '-C',
+      requireRepoPath(),
+      'ls-tree',
+      '-r',
+      '--name-only',
+      `refs/namespaces/${namespace}/refs/heads/main`,
+    ],
+    { maxBuffer: 10 * 1024 * 1024 },
+  );
+  return stdout.trim().split('\n').filter(Boolean);
+}
+
+/** Upserts `count` new pages into the namespace, one instruction at a time. */
+async function upsertNewPages(namespace: string, count: number): Promise<void> {
+  if (mongoose == null) {
+    throw new Error('Mongoose not connected');
+  }
+  const { ObjectId } = mongoose.mongo;
+  for (let i = 0; i < count; i++) {
+    const pageId = new ObjectId().toHexString();
+    // biome-ignore lint/performance/noAwaitInLoops: instructions are applied one at a time
+    await upsertPageAndWait({
+      namespace,
+      pageId,
+      pagePath: `/${namespace}/page-${pageId}`,
+      revisionId: new ObjectId().toHexString(),
+      bodyText: `# ${pageId}`,
+    });
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -581,6 +630,41 @@ async function triggerGcAndWait(): Promise<{
       expect(gcResult.looseObjectCountAfter).toBeLessThanOrEqual(
         gcResult.looseObjectCountBefore,
       );
+    });
+
+    // -------------------------------------------------------------------------
+    // Test 4: namespace pages survive gc
+    // -------------------------------------------------------------------------
+
+    it('keeps every page of a namespace when a page is written after gc', {
+      timeout: 120_000,
+    }, async () => {
+      const ns = 'integ-pages-after-gc-ns';
+      await upsertNewPages(ns, 3);
+
+      await triggerGcAndWait();
+      await upsertNewPages(ns, 1);
+
+      expect(await listNamespaceFiles(ns)).toHaveLength(4);
+    });
+
+    it('keeps every page of a namespace whose ref an earlier gc packed, once the repository is initialised again', {
+      timeout: 120_000,
+    }, async () => {
+      const ns = 'integ-pages-after-packed-ref-ns';
+      await upsertNewPages(ns, 3);
+      await execFileAsync('git', [
+        '-C',
+        requireRepoPath(),
+        'pack-refs',
+        '--all',
+        '--prune',
+      ]);
+
+      await VaultRepoStorage.init();
+      await upsertNewPages(ns, 1);
+
+      expect(await listNamespaceFiles(ns)).toHaveLength(4);
     });
   },
 );

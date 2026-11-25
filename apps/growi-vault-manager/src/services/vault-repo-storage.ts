@@ -7,7 +7,9 @@
  *
  * Object I/O delegates to isomorphic-git; ref management uses plain Node.js
  * fs calls with an atomic tmpfile-then-rename pattern so that concurrent
- * readers always see a consistent ref value.
+ * readers always see a consistent ref value.  Those calls only see loose ref
+ * files, so every ref is kept loose: init() unpacks packed-refs and the
+ * maintenance gc runs with gc.packRefs=false.
  *
  * GCSFuse and similar object-storage FUSE mounts are explicitly NOT supported
  * because they do not guarantee atomic rename semantics (requirement 9.5).
@@ -125,8 +127,9 @@ export function getRepoPath(): string {
 }
 
 /**
- * Initialises the bare repository if it does not already exist.
- * Idempotent: calling this when the repo exists is a no-op.
+ * Initialises the bare repository if it does not already exist, and moves
+ * any ref an earlier `git gc` packed back into its own loose file.
+ * Idempotent.
  *
  * Corresponds to `git init --bare <repoPath>`.
  */
@@ -136,25 +139,61 @@ export async function init(): Promise<void> {
   // Check whether the repo already looks initialised by testing for the
   // presence of the 'HEAD' file, which git init always creates.
   const headFile = path.join(repoPath, 'HEAD');
-  if (
-    await fs.promises
-      .access(headFile)
-      .then(() => true)
-      .catch(() => false)
-  ) {
-    // Already initialised — nothing to do.
-    return;
+  const initialised = await fs.promises
+    .access(headFile)
+    .then(() => true)
+    .catch(() => false);
+
+  if (!initialised) {
+    // Ensure the parent directory exists before initialising.
+    await fs.promises.mkdir(repoPath, { recursive: true });
+
+    await git.init({
+      fs,
+      gitdir: repoPath,
+      bare: true,
+      defaultBranch: 'main',
+    });
   }
 
-  // Ensure the parent directory exists before initialising.
-  await fs.promises.mkdir(repoPath, { recursive: true });
+  await unpackRefs(repoPath);
+}
 
-  await git.init({
-    fs,
-    gitdir: repoPath,
-    bare: true,
-    defaultBranch: 'main',
-  });
+/**
+ * Writes every ref listed in packed-refs to its own loose file, then removes
+ * packed-refs.  A loose file that already exists is newer than its packed
+ * entry (git reads it first), so it is left as is.
+ */
+async function unpackRefs(repoPath: string): Promise<void> {
+  const packedRefsPath = path.join(repoPath, 'packed-refs');
+  let content: string;
+  try {
+    content = await fs.promises.readFile(packedRefsPath, 'utf8');
+  } catch (err: unknown) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+      return;
+    }
+    throw err;
+  }
+
+  // Lines are "<oid> <ref>"; '#' starts the header and '^' a peeled tag.
+  const packed = content
+    .split('\n')
+    .filter((line) => line !== '' && !/^[#^]/.test(line))
+    .map((line) => {
+      const [oid, ref] = line.split(' ');
+      return { oid, ref };
+    });
+
+  await Promise.all(
+    packed.map(async ({ oid, ref }) => {
+      if ((await readRef(ref)) == null) {
+        await updateRef(ref, oid);
+      }
+    }),
+  );
+
+  await fs.promises.unlink(packedRefsPath);
 }
 
 /**

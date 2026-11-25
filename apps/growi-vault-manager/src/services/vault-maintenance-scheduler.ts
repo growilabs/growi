@@ -182,7 +182,16 @@ function runGitGc(repoPath: string): Promise<void> {
   return new Promise((resolve, reject) => {
     childProcess.execFile(
       'git',
-      ['--git-dir', repoPath, 'gc', '--prune=2.weeks.ago'],
+      // VaultRepoStorage reads refs only as loose files; packing them would
+      // make every namespace HEAD read as missing.
+      [
+        '-c',
+        'gc.packRefs=false',
+        '--git-dir',
+        repoPath,
+        'gc',
+        '--prune=2.weeks.ago',
+      ],
       (err) => {
         if (err != null) {
           reject(err);
