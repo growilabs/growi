@@ -323,15 +323,13 @@ async function resolveRef(ref: string): Promise<string | null> {
   }
 }
 
-async function findInstruction(
-  id: unknown,
-): Promise<Record<string, unknown> | null> {
+function findInstruction(id: unknown): Promise<Record<string, unknown> | null> {
   if (mongoose?.connection.db == null) {
     throw new Error('Mongoose not connected');
   }
   return mongoose.connection.db
     .collection('vault_instructions')
-    .findOne({ _id: id as never });
+    .findOne({ _id: id });
 }
 
 // ---------------------------------------------------------------------------
@@ -865,7 +863,7 @@ async function triggerGcAndWait(): Promise<{
         const givenUp = await upsertNewPageAndSettle(ns);
         await mongoose?.connection.db
           ?.collection('vault_instructions')
-          .updateOne({ _id: givenUp.id as never }, { $set: { attempts: 7 } });
+          .updateOne({ _id: givenUp.id }, { $set: { attempts: 7 } });
         const rebuildIssuedAt = new Date();
         await new Promise((resolve) => setTimeout(resolve, 50));
         const issuedLater = await upsertNewPageAndSettle(ns);
