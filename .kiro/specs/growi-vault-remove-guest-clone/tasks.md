@@ -2,7 +2,7 @@
 
 順番の理由: `@growi/core` の型（`ComposeViewRequest.userId`）を先に `string` にすると、gateway が型検査を通らなくなる。そのため、gateway（1）と vault-manager（2）から `null` を消した後で、型（3）を変える。機能を取り除いた後の形の点検（4）は、削除がすべて終わってから行う。
 
-- [ ] 1. gateway: 認証情報のない要求を拒否する
+- [x] 1. gateway: 認証情報のない要求を拒否する
 - [x] 1.1 認証情報のない clone / fetch を、ゲスト閲覧の設定によらず 401 にする
   - 先にテストを書く。`vault-gateway.spec.ts` と `vault-gateway.integ.ts` で、ゲスト閲覧が許可されている設定（`security:wikiMode='public'`、`restrictGuestMode='Readonly'`）のもと、認証情報のない `info/refs` と `git-upload-pack` が 401 + `WWW-Authenticate: Basic realm="GROWI Vault"` になり、本文が空であることを確かめる。同じ設定で、PAT つきの要求が今までどおり 200 になることも確かめる
   - `loginRequiredFactory` の第 2 引数を `false` にする
@@ -14,7 +14,7 @@
   - `computeAccessibleNamespaces` の `userId` を `string` にし、`null` の分岐と、そのテストを消す
   - 完了の目安: `apps/app` の `pnpm run lint`（型検査を含む）が通る。`vault-namespace-mapper.ts` に `null` の分岐がない
   - _Requirements: 1.5_
-- [ ] 2. vault-manager: 利用者なしのビューを作らず、既存のものを消す
+- [x] 2. vault-manager: 利用者なしのビューを作らず、既存のものを消す
 - [x] 2.1 利用者なしの合成の依頼を拒否する
   - 先にテストを書く。`compose-view-maintenance.integ.ts` で、`userId: null` の compose-view が 400 になり、`refs/namespaces/anonymous-view/` も `vault_user_views` の記録もできないことを確かめる
   - controller で `userId` が空でない文字列であることを確かめる。`compose` と `vault_user_views` のモデルの `userId` を `string` にし、`'anonymous-view'` の分岐を消す
@@ -26,7 +26,7 @@
   - ref は `git update-ref -d` で消し、その後で namespace のディレクトリを消す
   - 完了の目安: 追加したテストが、実装前に落ち、実装後に通る
   - _Requirements: 3.3, 3.6_
-- [ ] 2.3 起動時に、`anonymous-view` の残りを消す
+- [x] 2.3 起動時に、`anonymous-view` の残りを消す
   - 結合テスト用の起動処理（`src/__tests__/setup/integ-server.ts`）は、テストより先にサーバを起動するので、今のままでは起動前にデータを置けない。テストの中でサーバを止め、データを置いてから起動し直せるようにする（止める・起動し直すための手段を、起動処理が返す値に足す）
   - 先にテストを書く。起動の結合テストで、bare repo に `anonymous-view` の ref と HEAD を、`vault_user_views` に `userId: null` の記録を置いてから起動し、どちらも消え、同時に置いた `user-<uid>-view` と `public` が残ることを確かめる。単体テストで、消す処理が失敗しても例外を投げず、error ログを出すことを確かめる
   - `vault-legacy-anonymous-view.ts` を作り、`server-runtime.ts` の `initRepo()` の後、watcher の開始の前に呼ぶ。`vault_user_views` のモデルに、`userId: null` の記録を消す static を足す
@@ -92,4 +92,4 @@
 
 ## Implementation Notes
 
-- vault-manager の結合テストのうち、squash のテスト（`namespace history is squashed to depth=1 ...`）は、この spec の変更と無関係に `expected 1 to be greater than or equal to 1001` で落ちることがある。テスト側の競争で、修正は PR #12334 にあり、このブランチの元の master にはまだ入っていない。この 1 件だけが落ちた場合は、この spec の不具合として扱わない。
+- master を取り込んだ後の `vault-repo-storage.ts` は、`packed-refs` のある repo を「再構築が必要」な状態として扱う（`init()` が error ログを出し、`readRef` が例外を投げる）。`deleteNamespace` は `packed-refs` から対象の行だけを消し、`packed-refs` のファイル自体は残すので、この状態を隠しも悪くもしない。

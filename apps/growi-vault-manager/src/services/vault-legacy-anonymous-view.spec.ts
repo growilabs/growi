@@ -54,6 +54,7 @@ describe('removeLegacyAnonymousView', () => {
       expect.objectContaining({ err: failure }),
       expect.any(String),
     );
+    expect(mockDeleteAnonymous).not.toHaveBeenCalled();
   });
 
   it('resolves and logs at error level when removing the record fails', async () => {
