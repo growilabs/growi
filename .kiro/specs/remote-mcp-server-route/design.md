@@ -70,11 +70,16 @@
 
 - **`features/mastra` のルーター**（`/_api/v3/mastra`）は、全体に `aiReadyGuard` をかけ、最初のリクエストでハンドラ群を動的に読み込む。MCP は LLM の設定を必要としないので（1.8）、このルーターの下には置かない。遅延ロードの形（Promise を保持し、失敗したら捨てる）は同じものを使う。
 - **`features/mastra` の中のコードを別の URL にマウントする前例**は `routes/admin-ai-settings`（`/_api/v3/ai-settings`）にある。管理 API はこれに倣う。
-- **`/_api` 配下の共通処理**: `/_api/v3/mcp` は、ルートに届く前に次を通る。
-  - グローバルの回数制限（IP 単位。認証前なので利用者は分からない）
-  - `CertifyOrigin`: `Origin` ヘッダーが GROWI のオリジンと違う JSON の POST を拒否する。`Origin` を送らないリクエストは通す。
-  - セッション、csurf、passport: csurf と passport はセッションがあることを前提にしており、セッションを通さないとエラーになる。そのため `avoid-session-routes` は使えない。
-  - `mongoSanitize`: 本文から、`.` を含むキーと `$` で始まるキーを削除する。2026-07-28 版のリクエストは `params._meta` に `.` を含むキーを必ず持つので、そのままでは全件が拒否される。
+- **`/_api` 配下の共通処理**: `/_api/v3/mcp` は、ルートに届く前に次を、この順に通る。1〜5 は `server/crowi/express-init.js`、6 は `server/routes/index.js` にある。
+  1. `bodyParser.json`: 本文を読み終える（上限 50 MB）。
+  2. セッション: Cookie の無いリクエストには、パスごとの固定のセッション ID を割り当てる。セッションストアを読む。
+  3. csurf と passport（4 を挟む）: どちらもセッションがあることを前提にしており、セッションを通さないとエラーになる。そのため `avoid-session-routes` は使えない。
+  4. `CertifyOrigin`（csurf の後、passport の前）: `Origin` ヘッダーが GROWI のオリジンと違う JSON の POST を拒否する。`Origin` を送らないリクエストは通す。
+  5. `mongoSanitize`: 本文から、`.` を含むキーと `$` で始まるキーを削除する。2026-07-28 版のリクエストは `params._meta` に `.` を含むキーを必ず持つので、そのままでは全件が拒否される。
+  6. グローバルの回数制限（IP 単位。認証前なので利用者は分からない）。
+- この順序から、次のことが言える。
+  - 本文の読み込み、セッションストアの読み取り、`CertifyOrigin` の判定は、回数制限より前に起きる。IP 単位の上限を超えたリクエストでも、ここまでの処理は行われる。これは `/_api` 配下のどのパスでも同じである。
+  - `CertifyOrigin` が拒否したリクエストは、回数制限に数えられない。
 - **既存の 2 ツール**は、モジュールの読み込み時に作られる定数で、`searchService` を requestContext から読む。`MCPServer` 経由の requestContext には `searchService` が入らない。また 2 ツールとも、例外の文面（`err.message`）をそのまま結果に入れる。
 
 ### Architecture Pattern & Boundary Map
@@ -82,11 +87,12 @@
 ```mermaid
 graph TB
     Client[MCP client]
-    subgraph Global[Express global middleware]
-        RateIp[Rate limiter per IP]
-        Origin[CertifyOrigin]
+    subgraph Global[Express global middleware in actual order]
+        Body[Body parser]
         Session[Session with fixed id]
+        Origin[CertifyOrigin]
         Sanitize[Mongo sanitize with exemption]
+        RateIp[Rate limiter per IP]
     end
     subgraph Route[routes mcp light]
         Router[McpRouter]
@@ -107,7 +113,7 @@ graph TB
     SearchService[SearchService]
     PageModel[Page model]
 
-    Client --> RateIp --> Origin --> Session --> Sanitize --> Router
+    Client --> Body --> Session --> Origin --> Sanitize --> RateIp --> Router
     Router --> Auth
     Router --> UserLimit
     Router --> Handler
@@ -915,4 +921,4 @@ HTTP の層のエラーと、ツールの結果としてのエラーを分ける
 
 - **起動時のメモリ**: `@mastra/mcp` は、有効で認証済みのリクエストが最初に届くまで読み込まない。無効な GROWI と、未認証のリクエストしか届かない GROWI では、読み込まれない。
 - **複数インスタンス**: プロセス内に利用者ごとの状態を持たない。回数は MongoDB で数える。設定の反映は `configManager` に従う。
-- **認証のコスト**: リクエストごとに、トークンのハッシュでの検索が 1 回と、利用者の取得が 1 回かかる。未認証のリクエストは、IP 単位の制限が先に止める。
+- **認証のコスト**: リクエストごとに、トークンのハッシュでの検索が 1 回と、利用者の取得が 1 回かかる。未認証のリクエストは、上限を超えると IP 単位の制限が止めるので、トークンの検索までは進まない。ただし、本文の読み込みとセッションストアの読み取りは、回数制限より前に行われる（Existing Architecture Analysis の順序）。固定のセッション ID を使うので、Cookie の無いリクエストがセッションの記録を増やすことは無い。
