@@ -46,7 +46,7 @@
 - `@growi/chat`: `COMMAND_NAMES`・`COMMAND_TRAITS`・`CapabilityReport`・`ConnectionStatusView`・`RelationSettings`・`ChannelInventory`・`NativeChannelId` の型と値（読み取りのみ）。
 - GROWI application の既存の部品: `useSiteUrl`・`useAppTitle`（`~/states/global`）、`apiv3-client`、`toastr`、reactstrap の `Modal`・`Collapse`、SWR、`next-i18next`。**新しい依存は足さない。**
 - server 側: `loadChannelInventory`（`server/channel-inventory.ts`）、`ChatNotificationDestination` モデル。
-- 依存の向き: 純粋な関数（ラベル・フォーム・行の組み立て）← 部品 ← `AdminChatIntegration`。client は server のコードを import しない。HTTP は `client/admin/api.ts` だけを通る。
+- 依存の向き: 純粋な関数（フォーム・行の組み立て・並び順）と文言の hook ← 部品 ← `AdminChatIntegration`。client は server のコードを import しない。HTTP は `client/admin/api.ts` だけを通る。
 
 ### Revalidation Triggers
 
@@ -98,6 +98,7 @@ graph TB
         Destinations[NotificationDestinationsSection]
         DisconnectModal
         PureLogic[Pure modules]
+        LabelHooks[Label hooks]
         Api[api.ts]
     end
     subgraph Server
@@ -119,7 +120,12 @@ graph TB
     PermissionsForm --> ChannelPicker
     PermissionsForm --> PureLogic
     ConnectionCard --> PureLogic
-    PairingForm --> PureLogic
+    ConnectionCard --> LabelHooks
+    CapabilityReportTable --> LabelHooks
+    PermissionsForm --> LabelHooks
+    ChannelPicker --> LabelHooks
+    Destinations --> LabelHooks
+    PairingForm --> LabelHooks
     Shell --> Api
     PermissionsSection --> Api
     Destinations --> Api
@@ -133,7 +139,7 @@ graph TB
 **Architecture Integration**:
 
 - **Selected pattern**: 既存の「素の hook と SWR の部品」を保ち、肥大した 1 ファイルを責務ごとの小さなファイルに割る。ロジックは純粋な関数に出し、部品は薄く保つ（`coding-style.md`）。
-- **Domain/feature boundaries**: 部品は「何を見せるか」、純粋な関数は「何を意味するか（ラベル、既定値の分類、フォームから保存の形への変換、変更の検出、行の組み立て）」を持つ。HTTP は `api.ts` だけ。
+- **Domain/feature boundaries**: 部品は「何を見せるか」、純粋な関数は「何を意味するか（既定値の分類、フォームから保存の形への変換、変更の検出、行の組み立て、並び順）」、文言の hook は「値をどの言葉で示すか」を持つ。文言は、ほかの管理画面と同じく `useTranslation('admin')` を呼ぶ場所（部品か文言の hook）でだけ引く。HTTP は `api.ts` だけ。
 - **Existing patterns preserved**: `data-testid` の名前、`ErrorV3` の code による分岐、反応の遅れを「保存は成功」と扱うこと、機能表を「proxy が決めた値を欠落させず出す」こと。
 - **New components rationale**: チャンネルを選ぶ部品はサービスに依存しない汎用の部品として切り出す（Slack・Discord・Teams・Mattermost で共通）。ほかの新しい部品は、既存の 1 ファイルを割った結果である。
 - **Steering compliance**: named export、`import type`、バレルは `index.ts` のみ、コメントは英語で「なぜ」だけ。
@@ -144,7 +150,7 @@ graph TB
 |-------|------------------|-----------------|-------|
 | Frontend | React 18, reactstrap 9 (`Modal`, `Collapse`), Bootstrap 5 grid | カード、折りたたみ、モーダル、2 列 | 既存の依存のみ |
 | Frontend state | SWR, `useState` | サーバーの値と編集中のフォーム | Jotai は使わない（この feature の決まり） |
-| i18n | `next-i18next`（`admin` namespace） | 5 言語の文言 | キーは `t('…')` の文字列リテラルで書く |
+| i18n | `next-i18next`（`admin` namespace） | 5 言語の文言 | `useTranslation('admin')` を呼ぶ部品か hook の中で、キーを `t('…')` の文字列リテラルで書く |
 | Backend | Express（`admin-router.ts`）、Mongoose | チャンネル一覧の口、通知先の削除 | 既存の `loadChannelInventory`・`ChatNotificationDestination` を使う |
 | Data | MongoDB `chat_notification_destinations` | 通知先の行の削除 | スキーマ・索引は変えない |
 
@@ -163,7 +169,8 @@ apps/app/src/features/chat-integration/
 │   ├── pairing/
 │   │   ├── PairingSection.tsx           # "Connections" heading + Add connection button + modal
 │   │   ├── PairingForm.tsx              # Hints, initial values, persistent failure alert
-│   │   └── describe-pairing-failure.ts  # Pure: failed outcome -> { title, steps } (replaces describe-pairing-outcome.ts)
+│   │   ├── types.ts                     # PairingOutcome (moved from describe-pairing-outcome.ts)
+│   │   └── use-pairing-failure-view.ts  # Hook: failed outcome -> { title, steps } (replaces describe-pairing-outcome.ts)
 │   ├── connections/
 │   │   ├── index.ts                     # Barrel: ConnectionList
 │   │   ├── ConnectionList.tsx           # Ordering, 2-column grid, empty state
@@ -173,19 +180,20 @@ apps/app/src/features/chat-integration/
 │   │   ├── DisconnectModal.tsx          # Confirmation modal (replaces UnpairButton)
 │   │   └── sort-relations.ts            # Pure: active first, unpaired last, stable
 │   ├── status/
-│   │   ├── status-labels.ts             # Pure: badge / health -> words, unknown -> raw value
-│   │   ├── capability-labels.ts         # Pure: platform / capability / level -> words, unknown -> raw value
+│   │   ├── use-status-labels.ts         # Hook: badge / health -> words, unknown -> raw value
+│   │   ├── use-capability-labels.ts     # Hook: platform / capability / level -> words, unknown -> raw value
 │   │   └── CapabilityReportTable.tsx    # Generic table over CapabilityReport
 │   ├── permissions/
 │   │   ├── ChannelPermissionsSection.tsx # Fetches settings + channels, mounts the form keyed by version
 │   │   ├── ChannelPermissionsForm.tsx   # Form state, dirty indicator, save
 │   │   ├── PermissionRow.tsx            # One command: scope select, picked channels, DM flag
 │   │   ├── permission-form.ts           # Pure: form model, default behavior, conversion, dirty check, validation
-│   │   └── describe-save-result.ts      # Pure: save outcome / failure -> message
+│   │   └── use-save-result-message.ts   # Hook: save outcome / failure -> message
 │   ├── channel-picker/
-│   │   ├── index.ts                     # Barrel: ChannelPickerModal, describeChannel, PickerChannel
+│   │   ├── index.ts                     # Barrel: ChannelPickerModal, useDescribeChannel, PickerChannel
 │   │   ├── ChannelPickerModal.tsx       # Generic checkbox list modal with filter
-│   │   └── channel-picker-rows.ts       # Pure: rows (listed / missing), filter, describeChannel
+│   │   ├── channel-picker-rows.ts       # Pure: rows (listed / missing), filter
+│   │   └── use-describe-channel.ts      # Hook: channel -> "#name (id)" + private marker
 │   └── NotificationDestinationsSection.tsx # + i18n, delete button, zero-event guard
 ├── server/admin/
 │   ├── admin-router.ts                  # + GET /relations/:relationId/channels, DELETE .../notification-destinations
@@ -194,13 +202,13 @@ apps/app/src/features/chat-integration/
 apps/app/public/static/locales/{en_US,ja_JP,zh_CN,fr_FR,ko_KR}/admin.json   # chat_integration.* keys
 ```
 
-> 各ファイルの `*.spec.ts(x)` は隣に置く。`describe-pairing-outcome.ts` は `describe-pairing-failure.ts` に置き換える（型 `PairingOutcome` はそこへ移す）。
+> 各ファイルの `*.spec.ts(x)` は隣に置く。`describe-pairing-outcome.ts` は `use-pairing-failure-view.ts` に置き換え、型 `PairingOutcome` は `pairing/types.ts` へ移す。`use-*.ts` は文言の hook で、中で `useTranslation('admin')` を呼ぶ（「文言の hook」）。
 
 ### Modified Files
 
 - `client/admin/AdminChatIntegration.tsx` — 745 行を、シェル（警告、接続の追加、一覧）に縮める。機能表・権限・切断・カードは上のファイルへ移す。
 - `client/admin/AdminChatIntegration.spec.tsx`（1,092 行）— 部品ごとの spec に割り、英語の直書きの文言への依存を、キーまたは表示された言葉への依存に改める。`data-testid` は維持する。
-- `client/admin/NotificationDestinationsSection.tsx` — 文言を `t()` に。行に削除の操作を足す。配信イベントが 0 件のとき追加を押せなくし、理由を示す。チャンネルの表示を `describeChannel`（`channel-picker`）に揃える。
+- `client/admin/NotificationDestinationsSection.tsx` — 文言を `t()` に。行に削除の操作を足す。配信イベントが 0 件のとき追加を押せなくし、理由を示す。チャンネルの表示を `useDescribeChannel`（`channel-picker`）に揃える。
 - `client/admin/api.ts`・`types.ts` — 口の追加。
 - `server/admin/admin-router.ts` — ルート 2 つの追加。
 - `server/admin/notification-destinations.ts` — 削除の関数の追加。
@@ -254,8 +262,8 @@ stateDiagram-v2
 
 | Requirement | Summary | Components | Interfaces / Contracts |
 |---|---|---|---|
-| 1.23 | 機能表を分かる言葉で | CapabilityReportTable, capability-labels | `describePlatform` / `describeCapability` / `describeCapabilityLevel` |
-| 1.24 | 知らない値はそのまま、行を欠落させない | capability-labels, CapabilityReportTable | 各 `describe*` の既定は生の値。表は `flatMap` で全行を出す |
+| 1.23 | 機能表を分かる言葉で | CapabilityReportTable, use-capability-labels | `useCapabilityLabels` の `describePlatform` / `describeCapability` / `describeCapabilityLevel` |
+| 1.24 | 知らない値はそのまま、行を欠落させない | use-capability-labels, CapabilityReportTable | 各 `describe*` の既定は生の値。表は `flatMap` で全行を出す |
 | 2.15 | 通知先の削除 | NotificationDestinationsSection, admin-router, notification-destinations | `DELETE …/notification-destinations`、`deleteNotificationDestination` |
 | 2.16 | 削除後はその通知先へ投稿しない | notification-destinations | 行の削除。以降のイベントは、宛先を引く時点で行が無い（outbox の既存の行は対象外。後述） |
 | 2.17 | 配信イベント 0 件は保存せず示す | NotificationDestinationsSection（表示）、`parseDestinationInput`（既存の 400） | 追加ボタンの無効化と理由の表示。サーバーの検査は既存のまま |
@@ -263,25 +271,25 @@ stateDiagram-v2
 | 9.15 | URL と表示名の初期値 | PairingForm | `useSiteUrl()`・`useAppTitle()` から初期値 |
 | 9.16 | サイト URL 未設定なら空と例 | PairingForm | 空の初期値と placeholder `https://wiki.example.com` |
 | 9.17 | 失敗の知らせを閉じずに残す | PairingForm | アラートの状態（送信の開始・モーダルを閉じるときに消す） |
-| 9.18 | 登録コードの期限切れ | describe-pairing-failure | `code-expired` |
-| 9.19 | 所有を確認できない（原因を断定しない） | describe-pairing-failure | `ownership-unverified`（確認点 3 つ） |
-| 9.20 | proxy に接続できない | describe-pairing-failure | `call-failed`（`reason` を補足に） |
-| 9.21 | すでに接続済み、`unregister` の案内 | describe-pairing-failure | `already-paired`（`unregister` の手順を常に添える） |
-| 9.22 | 識別子がすでにある | describe-pairing-failure | `relation-already-known` |
-| 9.23 | 暗号化キー未設定 | describe-pairing-failure | `key-encryption-unconfigured` |
+| 9.18 | 登録コードの期限切れ | use-pairing-failure-view | `code-expired` |
+| 9.19 | 所有を確認できない（原因を断定しない） | use-pairing-failure-view | `ownership-unverified`（確認点 3 つ） |
+| 9.20 | proxy に接続できない | use-pairing-failure-view | `call-failed`（`reason` を補足に） |
+| 9.21 | すでに接続済み、`unregister` の案内 | use-pairing-failure-view | `already-paired`（`unregister` の手順を常に添える） |
+| 9.22 | 識別子がすでにある | use-pairing-failure-view | `relation-already-known` |
+| 9.23 | 暗号化キー未設定 | use-pairing-failure-view | `key-encryption-unconfigured` |
 | 9.24 | 0 件の空状態（キーあり） | EmptyConnections | 「接続を追加」への案内 |
 | 9.25 | 0 件の空状態（キーなし） | EmptyConnections | キー未設定を示し、誘導しない |
 | 9.26 | 切断の確認（名前、確認までは切断しない） | DisconnectModal | タイトルに接続の名前 |
 | 9.27 | 確認の 3 点 | DisconnectModal | 削除されるもの／残るもの／注意 |
 | 9.28 | 切断済みの再接続の手順 | ConnectionCard | 切断済みのカードの案内 |
-| 9.29 | 状態の言葉づかい | status-labels, ConnectionCard | `describeRelationBadge` / `describeConnectionHealth` |
+| 9.29 | 状態の言葉づかい | use-status-labels, ConnectionCard | `useStatusLabels` の `describeRelationBadge` / `describeConnectionHealth` |
 | 11.9 | 4 つの選択肢 | PermissionRow, permission-form | `ScopeChoice` |
 | 11.10 | 「既定値」に既定の挙動を添える | PermissionRow, permission-form | `defaultBehaviorOf` |
 | 11.11 | 分類をコマンドの性質から決める | permission-form | `COMMAND_TRAITS[c].writes`。コマンド名で分岐しない |
 | 11.12 | 保存された設定が無ければ「既定値」 | permission-form | `toFormState` |
 | 11.13 | 「既定値」で保存すると設定を保存しない（DM を許したときは例外） | permission-form | `normalizeForm`（DM だけを許す行。後述） |
 | 11.14 | 一覧から絞り込んでチェック | ChannelPickerModal | `ChannelPickerModalProps` |
-| 11.15 | 名前と識別子、非公開の印 | channel-picker-rows | `describeChannel` |
+| 11.15 | 名前と識別子、非公開の印 | use-describe-channel | `useDescribeChannel` |
 | 11.16 | 識別子で保存 | permission-form | `CommandFormState.channelIds` |
 | 11.17 | 一覧が取れないとき | ChannelPermissionsSection, PermissionRow | `AdminChannelListView.unavailable`。「チャンネルを選ぶ」の無効化と、`listed` の行の中の理由の表示 |
 | 11.18 | 取れないあいだ、保存済みの指定を残す | permission-form | フォームは保存済みの識別子を保つ |
@@ -292,9 +300,9 @@ stateDiagram-v2
 | 16.3 | 切断済みは最後 | sort-relations | `sortRelations` |
 | 16.4 | 変更が無ければ保存を押せない | ChannelPermissionsForm, permission-form | `isFormDirty`（`normalizeForm` の結果どうしの比較） |
 | 16.5 | 未保存の変更を示す | ChannelPermissionsForm | 保存ボタンの横の表示 |
-| 16.6 | 成功の文言 | describe-save-result | 内部の用語を含まない |
-| 16.7 | 反映の遅れの文言 | describe-save-result | `push.ok === false` |
-| 16.8 | 保存失敗の文言 | describe-save-result | `ErrorV3` の code で分ける |
+| 16.6 | 成功の文言 | use-save-result-message | 内部の用語を含まない |
+| 16.7 | 反映の遅れの文言 | use-save-result-message | `push.ok === false` |
+| 16.8 | 保存失敗の文言 | use-save-result-message | `ErrorV3` の code で分ける |
 | 16.9 | 5 言語の文言 | admin.json ×5、全部品 | `t('…')` |
 | 16.10 | 識別する値は翻訳しない | PermissionRow, channel-picker-rows | コマンド名・チャンネルの名前と識別子はそのまま |
 
@@ -303,15 +311,16 @@ stateDiagram-v2
 | Component | Layer | Intent | Req Coverage | Key Dependencies (P0/P1) | Contracts |
 |-----------|-------|--------|--------------|--------------------------|-----------|
 | AdminChatIntegration | UI | 画面の骨組み | 9.24, 9.25 | ConnectionList (P0), PairingSection (P0) | — |
-| PairingSection / PairingForm | UI | 接続の追加 | 9.14〜9.23 | describe-pairing-failure (P0), `useSiteUrl`・`useAppTitle` (P0) | State |
+| PairingSection / PairingForm | UI | 接続の追加 | 9.14〜9.23 | use-pairing-failure-view (P0), `useSiteUrl`・`useAppTitle` (P0) | State |
 | ConnectionList / EmptyConnections | UI | 一覧、並び、空の表示 | 9.24, 9.25, 16.1, 16.3 | sort-relations (P0) | — |
-| ConnectionCard / ConnectionDetails | UI | 接続 1 件の表示と折りたたみ | 9.28, 9.29, 16.2 | status-labels (P0) | — |
+| ConnectionCard / ConnectionDetails | UI | 接続 1 件の表示と折りたたみ | 9.28, 9.29, 16.2 | use-status-labels (P0) | — |
 | DisconnectModal | UI | 切断の確認 | 9.26, 9.27 | api (P0) | — |
-| CapabilityReportTable | UI | 機能表 | 1.23, 1.24 | capability-labels (P0) | — |
+| CapabilityReportTable | UI | 機能表 | 1.23, 1.24 | use-capability-labels (P0) | — |
 | ChannelPermissionsSection / Form / PermissionRow | UI | 権限の編集 | 11.9〜11.20, 16.4〜16.8 | permission-form (P0), ChannelPickerModal (P0) | State |
 | ChannelPickerModal | UI（汎用） | チャンネルの選択 | 11.14, 11.15, 11.19 | channel-picker-rows (P0) | State |
 | NotificationDestinationsSection | UI | 通知先の一覧・追加・削除 | 2.15, 2.17 | api (P0) | API |
 | permission-form ほかの純粋な関数 | Logic | 意味の決定 | 11.10〜11.13, 11.20, 16.3, 16.4 | `@growi/chat` (P0) | Service |
+| 文言の hook（`use-*`） | Logic（i18n） | 値を表示の言葉に | 1.23, 1.24, 9.18〜9.23, 9.29, 11.15, 16.6〜16.8, 16.9 | `next-i18next`（`admin`）(P0) | Service |
 | channel list route / delete route | Server | 管理画面の API | 11.14〜11.19, 2.15, 2.16 | `loadChannelInventory` (P0) | API |
 
 ### Logic（純粋な関数）
@@ -379,28 +388,50 @@ function buildPickerRows(
   selectedIds: readonly string[],
   filter: string,
 ): readonly PickerRow[];
-function describeChannel(t: TFunction, channel: PickerChannel): string; // "#general (C0123ABCDEF)" + private marker
 ```
 
 - `missing` は、選択済みなのに一覧にない識別子。**絞り込みに関わらず、常に先頭に出す**（絞り込みで隠れて、残っていることに気づけなくなるのを防ぐ。11.19）。
 - 絞り込みは、名前または識別子への、大文字小文字を区別しない部分一致。
 
-#### status-labels / capability-labels
+#### sort-relations
+
+`sortRelations(relations: readonly AdminRelationListItem[]): readonly AdminRelationListItem[]` — `state === 'active'` を先、`unpaired` を後ろにし、同じ状態の中は元の順を保つ（16.3）。
+
+### 文言の hook
+
+値を画面の文に変える処理は、管理画面のほかの部品と同じく、`useTranslation('admin')` を呼ぶ場所に置く。同じ対応を部品ごとに書かないよう、小さな hook にまとめる。hook は、中で `useTranslation('admin')` を呼び、文を返す関数を返す。
+
+- **`t` を引数で受け取る純粋な関数にはしない。** `pnpm run lint:i18n`（i18next-cli）は、同じ関数の中に `useTranslation('admin')` が無い `t('…')` を、既定の namespace（`translation`）のキーとして数える。`admin.json` のキーは未使用、`translation.json` には無いキーとなり、基準値が上がる（research.md の「i18n の検査」）。
+- 既知の値は `switch` の各 `case` に、文字列リテラルの `t('chat_integration.…')` を書く（`admin:` の前置きは付けない。ほかの管理画面と同じ）。動的に組んだキーは、検査で使われているとみなされない。
+- どの対応も、**知らない値には、受け取った値をそのまま返す**（1.24、9.29。知らない値を欠落させず、`undefined` にもしない）。
+
+#### use-status-labels / use-capability-labels
 
 ```typescript
-function describeRelationBadge(t: TFunction, badge: RelationBadge): string;
-function describeConnectionHealth(t: TFunction, health: string): string;
-function describePlatform(t: TFunction, platform: string): string;
-function describeCapability(t: TFunction, capability: string): string;
-function describeCapabilityLevel(t: TFunction, level: string): string;
+function useStatusLabels(): {
+  readonly describeRelationBadge: (badge: RelationBadge) => string;
+  readonly describeConnectionHealth: (health: string) => string;
+};
+function useCapabilityLabels(): {
+  readonly describePlatform: (platform: string) => string;
+  readonly describeCapability: (capability: string) => string;
+  readonly describeCapabilityLevel: (level: string) => string;
+};
 ```
 
-- 既知の値は `switch` の各 `case` に、文字列リテラルの `t('chat_integration.…')` を書く。**どの `default` も、受け取った値をそのまま返す**（1.24、9.29。知らない値を欠落させず、`undefined` にもしない）。
-- キーを文字列リテラルで書くのは、`lint:i18n` が未使用のキーとして数えないようにするため。動的に組んだキーは数えられない（research.md の決定）。
 - サービス名（Slack・Discord・Microsoft Teams・Mattermost）は固有名なので、5 言語で同じ値にする。
 - `substitute`（代わりの方法）の文は、proxy が返した文をそのまま出す。
 
-#### describe-pairing-failure
+#### use-describe-channel
+
+```typescript
+/** "#general (C0123ABCDEF)" plus a private marker in the display language. */
+function useDescribeChannel(): (channel: PickerChannel) => string;
+```
+
+- `channel-picker` の barrel から出し、`PermissionRow`・`ChannelPickerModal`・`NotificationDestinationsSection` が同じ表示を使う。
+
+#### use-pairing-failure-view
 
 ```typescript
 type PairingOutcome =
@@ -417,21 +448,29 @@ interface PairingFailureView {
   /** Things the administrator can check or do next, in order. */
   readonly steps: readonly string[];
 }
-function describePairingFailure(
-  t: TFunction,
+function usePairingFailureView(): (
   outcome: Exclude<PairingOutcome, { status: 'paired' }>,
-): PairingFailureView;
+) => PairingFailureView;
 ```
+
+- 型 `PairingOutcome` は `pairing/types.ts` に置く（hook のファイルに型を同居させない）。
 
 - `ownership-unverified` は、`detail` を使わず、原因を断定しない（9.19）。確認点 3 つを `steps` に入れる。
 - `call-failed` は `reason` を補足として `title` に添える（9.20）。
 - `already-paired` は、一覧の確認を案内し、`unregister` の手順を `steps` に**常に**足す（9.21）。手順の文は、「一覧に有効な接続が無い場合は、proxy 側の登録が残っています」と、条件を自分で述べる形にする。proxy の `already-paired` の `detail` は、GROWI の表示名しか含まず、どのワークスペースかを特定できない。そのため、一覧の状態から出し分ける作りにすると、別のワークスペースの有効な接続があるだけで、手順が出なくなる。常に出せば、どの場合も要件を満たし、判断は管理者が一覧を見て行える。
-- `t` を受け取る純粋な関数は、すべて `t` を第 1 引数に取る。
-- `describe-save-result` も同じ形（`t` を受け取り、文字列を返す）で、`SaveSettingsOutcome` と `ErrorV3` の code（`save-conflict`・`invalid-settings`・`relation-not-found`・それ以外）から、成功・反映の遅れ・失敗の文を返す（16.6〜16.8）。
 
-#### sort-relations
+#### use-save-result-message
 
-`sortRelations(relations: readonly AdminRelationListItem[]): readonly AdminRelationListItem[]` — `state === 'active'` を先、`unpaired` を後ろにし、同じ状態の中は元の順を保つ（16.3）。
+```typescript
+function useSaveResultMessage(): {
+  /** Success, or saved but not yet pushed to the chat service (`push.ok === false`). */
+  readonly describeSaved: (outcome: SaveSettingsOutcome) => string;
+  /** By `ErrorV3` code: `save-conflict`, `invalid-settings`, `relation-not-found`, anything else. */
+  readonly describeSaveFailure: (errorCode: string | undefined) => string;
+};
+```
+
+- 成功・反映の遅れ・失敗の文を返す（16.6〜16.8）。どの文も、内部の用語（設定の版、proxy）を含めない。
 
 ### UI
 
@@ -449,7 +488,7 @@ function describePairingFailure(
 
 #### ConnectionCard / ConnectionDetails / DisconnectModal
 
-- カードの上部（折りたたみの外）: 名前（`label ?? workspaceName`）、サービス名、状態のバッジ（`describeRelationBadge`）、接続状態の行（`describeConnectionHealth`。接続が切れているときは今の文言を使う）、機能表。
+- カードの上部（折りたたみの外）: 名前（`label ?? workspaceName`）、サービス名、状態のバッジ（`useStatusLabels` の `describeRelationBadge`）、接続状態の行（同じく `describeConnectionHealth`。接続が切れているときは今の文言を使う）、機能表。
 - 使用中のカードは、「チャンネル権限・通知先・切断」を 1 つの `Collapse` にまとめ、開閉のボタンで開く。**初めて開いたときに初めて描画し、そのあとは閉じても描画したままにする**（編集中の内容を、閉じても失わないため）。初めて開くまで、権限と通知先の取得（proxy へのチャンネル一覧の問い合わせを含む）は走らない。
 - 接続が切れているカード（`connection-lost`）の説明（既存の `chat_integration.connection_lost.detail`）は、今、「下の「Disconnect」を押す」と案内している。切断の操作は折りたたみの中に入るので、この文を、5 言語すべてで、「この接続の設定を開き、「切断」を押すか、もう一度ペアリングする」という案内に直す。切断のボタンの名前は、画面の言語の「切断」にそろえる。自動で開く作りにはしない（開閉の状態を、接続の状態の取得の結果に結び付けないため）。
 - 切断済みのカードは、`Collapse` を持たない。消える日（今と同じ）と、再接続の手順（チャットサービスで `unregister` を実行し、新しい登録コードで接続を追加する）を示す（9.28）。
@@ -459,7 +498,7 @@ function describePairingFailure(
 
 - `ChannelPermissionsSection` が、設定（`GET settings`）とチャンネルの一覧（`GET channels`）を取る。チャンネルの一覧は、`revalidateOnFocus: false` にし、編集中に一覧が変わって「一覧にない」の判定が揺れないようにする。
 - `ChannelPermissionsForm` は `PermissionForm` を持ち、`isFormDirty` で保存ボタンを制御する（押せるのは「変更あり」かつ「保存中でない」）。「保存していない変更があります」を保存ボタンの横に示す（16.5）。保存を押したとき、`toChannelPermissions` が `ok: false` なら、該当の行にエラーを示して、送らない（11.20）。エラーの文は、一覧が取れているときは「チャンネルを 1 つ以上選んでください」、取れていないときは「チャンネルの一覧を取得できないため、チャンネルを選べません。別の選択にするか、時間をおいてやり直してください」（選べない状態で「選んでください」と言わない）。
-- `PermissionRow`: コマンド名（翻訳しない。16.10）、選択肢の `<select>`。「既定値」の項目は、`defaultBehaviorOf` に応じて「既定値（すべてのチャンネルで許可）」または「既定値（許可しない）」。`listed` のとき、選ばれたチャンネルを `describeChannel` で並べ（一覧にない識別子には印を付ける）、「チャンネルを選ぶ」で `ChannelPickerModal` を開く。`mayCreatePages` の注意書きと、DM の欄は、今のまま（`chat-integration-agent` の範囲）。
+- `PermissionRow`: コマンド名（翻訳しない。16.10）、選択肢の `<select>`。「既定値」の項目は、`defaultBehaviorOf` に応じて「既定値（すべてのチャンネルで許可）」または「既定値（許可しない）」。`listed` のとき、選ばれたチャンネルを `useDescribeChannel` で並べ（一覧にない識別子には印を付ける）、「チャンネルを選ぶ」で `ChannelPickerModal` を開く。`mayCreatePages` の注意書きと、DM の欄は、今のまま（`chat-integration-agent` の範囲）。
 - **一覧が取れないとき**（11.17）: 取れなかったことと理由（`unavailable`）を、セクションの上部に示す。選択肢の `<select>` は、`listed` を含め、すべて選べるままにする（項目を無効にすると、なぜ選べないかを示せないため）。「チャンネルを選ぶ」だけを無効にし、`listed` が選ばれた行の中に、「チャンネルの一覧を取得できないため、チャンネルを選べません。時間をおいて画面を開き直してください」を示す。新しく `listed` にした行は 0 件のままなので、保存は 11.20 の検査で止まり、誤った設定は保存されない。保存済みの指定チャンネルは、フォームが識別子を保つので、別の選択に変えて `listed` に戻しても残り、保存しても変わらない（11.18）。名前が引けないので、識別子だけを示し、「一覧にない」の印は付けない（一覧が無いので、判定できない）。
 - 「設定の版」の表示は消す（16.6）。
 
@@ -531,11 +570,15 @@ type AdminChannelListView =
 ### Unit Tests（純粋な関数）
 
 - `permission-form`: 行が無いコマンドが `default` になる／`default` が保存の形に出ない／`listed` で空だと `ok: false`／`separate-flag` のコマンドで `default` に DM を許すと、既定の挙動に等しい `allowedChannels` の行が 1 つ出る／`isFormDirty` が `channelIds` の順序と重複を無視する／`listed` → 別の選択 → 元の選択と戻すと `isFormDirty` が偽になる（保持した `channelIds` を比べない）／`separate-flag` でないコマンドの `allowedInDirectMessage` だけを変えても `isFormDirty` が偽／`defaultBehaviorOf` が `writes` の真偽だけで決まる（`COMMAND_TRAITS` の全コマンドについて、書き込み系は `deny`、それ以外は `allow`）。
-- `channel-picker-rows`: 絞り込みが名前と識別子の両方に効く／`missing` が絞り込みに関わらず先頭に出る／`describeChannel` が `#名前 (識別子)` に非公開の印を付ける。
-- `describe-pairing-failure`: 6 つの失敗の status それぞれの `title`・`steps`／`already-paired` で、`unregister` の手順が常に出る／`ownership-unverified` が原因を断定しない。
-- `status-labels`・`capability-labels`: 既知の値の言葉／知らない値が生のまま返る。
+- `channel-picker-rows`: 絞り込みが名前と識別子の両方に効く／`missing` が絞り込みに関わらず先頭に出る。
 - `sort-relations`: 切断済みが最後／同じ状態の中の順が保たれる。
-- `describe-save-result`: 成功／反映の遅れ／`save-conflict`／知らない code。
+
+### Hook Tests（文言の hook。`renderHook` と、キーをそのまま返す `t` の差し替え。既存の spec と同じ）
+
+- `use-pairing-failure-view`: 6 つの失敗の status それぞれの `title`・`steps` のキー／`already-paired` で、`unregister` の手順が常に出る／`ownership-unverified` が原因を断定しない（`detail` を使わない）。
+- `use-status-labels`・`use-capability-labels`: 既知の値がキーに対応する／知らない値が生のまま返る。
+- `use-describe-channel`: `#名前 (識別子)` の形で、非公開のときだけ印のキーが付く。
+- `use-save-result-message`: 成功／反映の遅れ／`save-conflict`／知らない code。
 
 ### Component Tests（`@testing-library/react`。`essential-test-design`・`essential-test-patterns` に従う）
 
@@ -560,7 +603,7 @@ type AdminChannelListView =
 
 ### Mechanical Checks
 
-- `pnpm run lint:i18n`: 基準値（`baseline.json`）を上げずに通る。5 言語に同時にキーを足す。
+- `pnpm run lint:i18n`: 基準値（`baseline.json`）を上げずに通る。5 言語に同時にキーを足す。`{ count }` を渡す文（チャンネルの選択数など）は、`_one`・`_other` のキーも足す（i18next-cli は複数形のキーを求める）。
 - `turbo run lint --filter @growi/app`・`turbo run test --filter @growi/app`（chat-integration の spec は、1 ファイルずつ回す）。
 
 ## Security Considerations
