@@ -53,7 +53,7 @@
   - `GET /_api/search` (apiv1): `facet` なしは従来のページ検索。`facet=attachments` は添付だけを対象にした検索 (`IFacetedSearchResult`、`meta.total` は null、`meta.hitsCount`、`meta.primaryResultIncomplete`)。`limit` は 1〜200。各項目の `data` はページ検索と同じページ文書 (`lastUpdateUser` は秘匿化済み。`tags` は入らない)。`meta` は `attachmentHits` と、ページ自身 (パス・本文・コメント) も検索語に一致したときだけ、ページ検索と同じ `elasticSearchResult` (抜粋の検索が失敗・500ms 超過なら入らない)。`meta.bookmarkCount` は、抜粋の入った項目にだけ入る (上流 Req 9.8)。MongoDB に無いページの項目は落とし、`meta.hitsCount` は落とす前の項目数 (上流 Req 9.7)
   - `GET /_api/v3/search/attachments?q=&pageIds=`: 重複を除いて 1〜20 件のページ ID。応答 `{ enrichments: Record<pageId, { attachmentHits?: IAttachmentHit[] }> }`。失敗と 500ms 超過は 500、機能が無効なら 503 `feature_disabled`
   - `POST /_api/v3/attachments/:id/reextract`: 応答 `{ outcome: { kind } }`。エラーは 404 `notfound_or_forbidden`、429 (コードなし)、500 `reextract_failed` / `internal_server_error`、503 `feature_disabled` / `reextract_timeout`
-  - `GET|PUT /_api/v3/admin/attachment-search/config` (GET の `config.useOnlyEnvVars` は 4 つの設定が環境変数で固定されているか。上流 Req 5.7)、`GET /_api/v3/admin/attachment-search/failures`、`PUT /_api/v3/search/indices` の `includeAttachments` (409 `rebuild_in_progress`)
+  - `GET|PUT /_api/v3/admin/attachment-search/config` (GET の `config.useOnlyEnvVars` は 4 つの設定が環境変数で固定されているか。上流 Req 5.7。固定されているときの PUT は何も保存せず 409 `config_locked_by_env_vars`。上流 Req 5.8)、`GET /_api/v3/admin/attachment-search/failures`、`PUT /_api/v3/search/indices` の `includeAttachments` (409 `rebuild_in_progress`)
   - Socket.io の `AddAttachmentProgress` / `FinishAddAttachment` (`{ totalCount, count }`)、`AttachmentRebuildingFailed` (`{ error: string }`)。既存の `AddPageProgress` / `FinishAddPage` / `RebuildingFailed`
   - SSR prop `searchConfig.isAttachmentFullTextSearchEnabled?: boolean`
   - 型: `IAttachmentHit` / `ISnippetSegment` / `ReextractResponse` / `AttachmentSearchConfig` / `AttachmentSearchConfigUpdate` / `ExtractionFailureEntry` (`features/search-attachments/interfaces/attachment-search.ts`)、`IFacetedSearchResult` (`interfaces/search.ts`)
@@ -839,4 +839,3 @@ type AttachmentRebuildOptionProps = {
 ## Open Questions / Risks
 
 1. **`PageListItemL` の高さ**: 行の中に添付の一致を足すと、行の高さが取得の後に変わる。一覧は描画後に高さを測り直すので並びは崩れないが、スクロール中に行が伸びる見え方を見た目の案で確かめる
-2. **環境変数の固定と保存の API**: 上流の `PUT /config` は、固定されているときも保存を受け付ける (値は使われない)。画面は保存の操作を出さないので利用者は迷わないが、API を直接使う場合の扱いは上流で決める
