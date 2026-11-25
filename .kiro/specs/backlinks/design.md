@@ -195,7 +195,7 @@ backfill, which is not yet built.
 apps/app/src/features/backlinks/
 ├── interfaces/
 │   ├── page-link.ts              # IPageLink only
-│   └── backlink.ts               # read DTOs: IBacklink, IBacklinkResponse, ILinkTarget, LinkTargetState
+│   └── backlink.ts               # read DTOs: IBacklink, IBacklinkResponse, ILinkTarget, LinkTargetState, IBacklinksIndexState
 ├── server/
 │   ├── models/
 │   │   ├── page-link.ts          # Prisma extension (Prisma.defineExtension) — the pagelinks model methods
@@ -217,7 +217,7 @@ apps/app/src/features/backlinks/
 │   │   ├── page-link-service.ts        # thin Crowi adapter: subscribes to crowi.events.page, owns config access, delegates
 │   │   ├── duty-cycle-rest.ts          # pure: rest owed after measured work at a duty (shared by the drain and the backfill)
 │   │   ├── backfill-range.ts           # (B3) pure: the walk's page filter; scope cutoff + coverage -> the run's updatedAt range; coverage after a run
-│   │   ├── backfill-pacing.ts          # (B3) backfill config validation, rest with the page-rate floor, checkpoint cadence, lease length, failed-run retry schedule
+│   │   ├── backfill-pacing.ts          # (B3) backfill config validation, rest with the page-rate floor, checkpoint cadence, lease length
 │   │   ├── backfill-link-resolver.ts   # (B3) in-memory path->id map + permalink id set (one projection query per run)
 │   │   ├── backfill-page.ts            # (B3) one page: body read, size cap, extract, resolve, write; bounded retries
 │   │   ├── page-link-backfill-run.ts   # (B3) one claimed run: first-claim cutoff/total, paced walk, fenced checkpoints and endings
@@ -1254,7 +1254,8 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
   - Accepted: a fault that strikes just after every checkpoint never reaches the cap. Each retry
     still saves progress, so the run moves toward its end rather than retrying forever, though
     each retry rebuilds the path map.
-  - The schedule is a list of delays in `backfill-pacing.ts` (`BACKFILL_RETRY_DELAYS_MS`), whose
+  - The schedule is a list of delays, `BACKFILL_RETRY_DELAYS_MS` in
+    `interfaces/page-link-backfill.ts` (shared because the admin settings show the cap), whose
     length is the cap. The failure write takes it as a parameter and picks the delay on the
     database, from the stored count in the same write, so the count and the retry time cannot
     disagree.
@@ -1268,8 +1269,11 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
   document missing stops the poll, as at rest. The rows in `pagelinks` stay valid either way.
 - The backlinks panel shows an "index still building / partial" state whenever coverage is not `all`
   or a run is active, so a gated or in-progress backfill is a visible gap and not a silent one; for
-  a partial index it says that pages not edited since `coveredSince` are not included (4.4). Whether
-  the coverage summary rides on the backlinks response or on its own hook is a B3 choice.
+  a partial index it says that pages not edited since `coveredSince` are not included (4.4). The
+  coverage summary rides on `GET /page/backlinks` as `indexState: { coverage, coveredSince } | null`,
+  not on the admin endpoint, which is admin-only: one read of the job document with no page counts
+  and no boot upsert, and `null` when that read fails (the panel then shows no notice). No run is
+  ever outstanding at coverage `all`, so "coverage is not `all`" is the whole condition.
 
 ## Data Models
 
