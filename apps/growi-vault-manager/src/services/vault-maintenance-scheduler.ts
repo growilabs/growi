@@ -317,24 +317,29 @@ export function createVaultMaintenanceScheduler(): VaultMaintenanceScheduler {
       .lean()
       .exec();
 
-    const tasks = allStates
+    const namespaces = allStates
       .filter((state) => {
         const exceedsCommitThreshold = state.version > squashCommitThreshold;
         const ageMs = now - state.updatedAt.getTime();
         const exceedsAge = ageMs > squashAgeMs;
         return exceedsCommitThreshold || exceedsAge;
       })
-      .map(({ namespace }) =>
-        withNamespaceLock([namespace], () => squashNamespace(namespace)),
-      );
+      .map((state) => state.namespace);
 
     // Errors are non-fatal per namespace; wait for every squash to settle.
-    const results = await Promise.allSettled(tasks);
-    for (const result of results) {
+    const results = await Promise.allSettled(
+      namespaces.map((namespace) =>
+        withNamespaceLock([namespace], () => squashNamespace(namespace)),
+      ),
+    );
+    results.forEach((result, index) => {
       if (result.status === 'rejected') {
-        logger.error({ err: result.reason }, 'squash failed');
+        logger.error(
+          { err: result.reason, namespace: namespaces[index] },
+          'squash failed',
+        );
       }
-    }
+    });
   }
 
   // ---------------------------------------------------------------------------

@@ -755,6 +755,10 @@ describe('VaultMaintenanceScheduler', () => {
         GROUP_REF,
         'squashed-oid',
       );
+      expect(mockLoggerError).toHaveBeenCalledWith(
+        expect.objectContaining({ namespace: 'public' }),
+        expect.any(String),
+      );
     });
 
     it('reports unreadable refs once per tick, not once per namespace, and still runs the gc check', async () => {
