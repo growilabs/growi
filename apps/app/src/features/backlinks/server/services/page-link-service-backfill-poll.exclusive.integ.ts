@@ -10,7 +10,6 @@ import { prisma } from '~/utils/prisma';
 
 import { ensurePageLinkIndexes } from '../models/page-link-indexes';
 import { throwOnWriteErrors } from '../models/throw-on-write-errors';
-import type { PageLinkBackfillCron } from './page-link-backfill-cron';
 import { PageLinkService } from './page-link-service';
 
 // Exclusive project: a run walks the whole `pages` collection, so each test empties it.
@@ -29,7 +28,7 @@ const CONFIG: Record<string, string | number> = {
 };
 
 let Page: PageModel;
-let poll: PageLinkBackfillCron | null = null;
+let service: PageLinkService | undefined;
 
 beforeAll(async () => {
   const db = mongoose.connection.db;
@@ -47,14 +46,15 @@ beforeEach(async () => {
 });
 
 // node-cron keeps a ref'd timer per started task; a poll left running would tick against the
-// shared database mid-suite and hold the worker open. Tests that drive ticks by hand stop the
-// scheduler first, so a real minute-boundary tick cannot claim the job between them.
+// shared database mid-suite and hold the worker open. The self-stop is tested on
+// PageLinkBackfillCron with a schedule that never fires; here the poll runs on the real
+// one-minute schedule, so each test stops it as soon as it has looked.
 afterEach(() => {
-  poll?.stopCron();
-  poll = null;
+  service?.backfillPoll?.stopCron();
+  service = undefined;
 });
 
-const startPollAtBoot = async (): Promise<PageLinkBackfillCron | null> => {
+const createService = (): PageLinkService => {
   const crowi = mock<Crowi>({
     configManager: {
       // mockImplementation rather than vi.fn(impl): getConfig is generic over the config key.
@@ -62,8 +62,19 @@ const startPollAtBoot = async (): Promise<PageLinkBackfillCron | null> => {
     },
     socketIoService: mock<SocketIoService>(),
   });
-  poll = await new PageLinkService(crowi).startBackfillPoll();
-  return poll;
+  service = new PageLinkService(crowi);
+  return service;
+};
+
+/** Runs the boot step and reports whether it left a poll scheduled, and on what schedule. */
+const bootSchedulesPoll = async (): Promise<boolean> => {
+  const booted = createService();
+  await booted.startBackfillPoll();
+  const scheduled = booted.backfillPoll?.isJobRunning() ?? false;
+  booted.backfillPoll?.stopCron();
+  if (scheduled)
+    expect(booted.backfillPoll?.getCronSchedule()).toBe('* * * * *');
+  return scheduled;
 };
 
 const seedPage = async (
@@ -102,6 +113,8 @@ const requestRun = (kind: string): Promise<void> =>
     progressMarker: null,
     processed: 0,
     skippedPages: 0,
+    failedAttempts: 0,
+    retryAt: null,
   });
 
 const readJob = () => prisma.pagelinkbackfilljobs.findFirst({});
@@ -112,64 +125,60 @@ const readRows = () =>
     orderBy: [{ fromPageId: 'asc' }, { toPath: 'asc' }],
   });
 
-describe('PageLinkService#startBackfillPoll (boot registration)', () => {
-  it('creates the job document at rest when it is missing, and starts the poll', async () => {
+describe('PageLinkService#startBackfillPoll (boot)', () => {
+  it('creates the job document at rest when it is missing, and schedules no poll', async () => {
     await prisma.pagelinkbackfilljobs.deleteMany({});
 
-    const started = await startPollAtBoot();
-
+    expect(await bootSchedulesPoll()).toBe(false);
     expect(await readJob()).toMatchObject({
       status: 'idle',
       coverage: 'none',
     });
-    expect(started?.isJobRunning()).toBe(true);
   });
 
-  it('schedules no poll and leaves the document as it is when coverage is already all', async () => {
-    await patchJob({ status: 'complete', coverage: 'all' });
+  it.each([
+    { status: 'idle', coverage: 'none' },
+    { status: 'idle', coverage: 'partial' },
+    { status: 'complete', coverage: 'partial' },
+    { status: 'complete', coverage: 'all' },
+    { status: 'stopped', coverage: 'none' },
+    { status: 'failed', coverage: 'none', retryAt: null },
+  ])('schedules no poll when the job is $status (coverage $coverage, nothing to retry)', async (set) => {
+    await patchJob(set);
 
-    expect(await startPollAtBoot()).toBeNull();
-    expect(await readJob()).toMatchObject({
-      status: 'complete',
-      coverage: 'all',
-    });
+    expect(await bootSchedulesPoll()).toBe(false);
+    expect(await readJob()).toMatchObject(set);
   });
 
-  it('starts the poll over a partial coverage, keeping that coverage', async () => {
-    await patchJob({ status: 'complete', coverage: 'partial' });
+  it.each([
+    { status: 'requested' },
+    {
+      status: 'running',
+      claimedBy: 'old-pod',
+      leaseExpiresAt: { $date: '2999-01-01T00:00:00Z' },
+    },
+    { status: 'failed', retryAt: { $date: '2999-01-01T00:00:00Z' } },
+  ])('schedules the poll when the job is $status, and claims nothing itself', async (set) => {
+    await requestRun('all');
+    await patchJob(set);
 
-    const started = await startPollAtBoot();
-
-    expect(started?.isJobRunning()).toBe(true);
-    expect(await readJob()).toMatchObject({ coverage: 'partial' });
+    expect(await bootSchedulesPoll()).toBe(true);
+    expect(await readJob()).toMatchObject({ status: set.status });
   });
+});
 
-  it('polls every minute, and a tick starts nothing while no request is pending', async () => {
-    await seedPage('/idle/a', '[b](/idle/b)');
-
-    const started = await startPollAtBoot();
-    expect(started?.isJobRunning()).toBe(true);
-    expect(started?.getCronSchedule()).toBe('* * * * *');
-    started?.stopCron();
-    await started?.executeJob();
-
-    expect(await readJob()).toMatchObject({
-      status: 'idle',
-      claimedBy: null,
-    });
-    expect(await readRows()).toEqual([]);
-  });
-
-  it('claims a pending request on the next tick and runs it to completion', async () => {
+describe('PageLinkService#claimBackfillNow (after the admin writes a request)', () => {
+  it('starts the poll in this process and runs the request to completion without waiting for a tick', async () => {
     const a = await seedPage('/fresh/a', '[b](/fresh/b)');
     const b = await seedPage('/fresh/b', '[a](/fresh/a)');
+    const booted = createService();
+    await booted.startBackfillPoll();
+    expect(booted.backfillPoll).toBeUndefined();
     await requestRun('all');
 
-    const started = await startPollAtBoot();
-    expect(started?.isJobRunning()).toBe(true);
-    started?.stopCron();
-    await started?.executeJob();
+    await booted.claimBackfillNow();
 
+    expect(booted.backfillPoll?.isJobRunning()).toBe(true);
     expect(await readJob()).toMatchObject({
       status: 'complete',
       coverage: 'all',
@@ -193,25 +202,16 @@ describe('PageLinkService#startBackfillPoll (boot registration)', () => {
     );
   });
 
-  it('retries a failed run on the next tick', async () => {
-    await seedPage('/retry/a', '[x](/retry/x)');
-    await requestRun('no-such-scope');
+  it('reuses the poll that boot scheduled', async () => {
+    await seedPage('/again/a', '[b](/again/b)');
+    await requestRun('all');
+    const booted = createService();
+    await booted.startBackfillPoll();
+    const scheduled = booted.backfillPoll;
 
-    const started = await startPollAtBoot();
-    expect(started?.isJobRunning()).toBe(true);
-    started?.stopCron();
-    await started?.executeJob();
+    await booted.claimBackfillNow();
 
-    expect(await readJob()).toMatchObject({ status: 'failed' });
-
-    await patchJob({
-      requestedScope: { kind: 'all', maxPages: null, since: null },
-    });
-    await started?.executeJob();
-
-    expect(await readJob()).toMatchObject({
-      status: 'complete',
-      coverage: 'all',
-    });
+    expect(booted.backfillPoll).toBe(scheduled);
+    expect(await readJob()).toMatchObject({ status: 'complete' });
   });
 });
