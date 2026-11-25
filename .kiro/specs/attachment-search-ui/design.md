@@ -50,7 +50,7 @@
 ### Allowed Dependencies
 
 - 上流 `attachment-search-indexing` が提供する次の契約:
-  - `GET /_api/search` (apiv1): `facet` なしは従来のページ検索。`facet=attachments` は添付だけを対象にした検索 (`IFacetedSearchResult`、`meta.total` は null、`meta.hitsCount`、`meta.primaryResultIncomplete`)。`limit` は 1〜200。各項目の `data` はページ検索と同じページ文書 (`lastUpdateUser` は秘匿化済み。`tags` は入らない)。`meta` は `attachmentHits` と、ページ自身 (パス・本文・コメント) も検索語に一致したときだけ、ページ検索と同じ `elasticSearchResult` (抜粋の検索が失敗・500ms 超過なら入らない)。`meta.bookmarkCount` は入らない。MongoDB に無いページの項目は落とし、`meta.hitsCount` は落とす前の項目数 (上流 Req 9.7)
+  - `GET /_api/search` (apiv1): `facet` なしは従来のページ検索。`facet=attachments` は添付だけを対象にした検索 (`IFacetedSearchResult`、`meta.total` は null、`meta.hitsCount`、`meta.primaryResultIncomplete`)。`limit` は 1〜200。各項目の `data` はページ検索と同じページ文書 (`lastUpdateUser` は秘匿化済み。`tags` は入らない)。`meta` は `attachmentHits` と、ページ自身 (パス・本文・コメント) も検索語に一致したときだけ、ページ検索と同じ `elasticSearchResult` (抜粋の検索が失敗・500ms 超過なら入らない)。`meta.bookmarkCount` は、抜粋の入った項目にだけ入る (上流 Req 9.8)。MongoDB に無いページの項目は落とし、`meta.hitsCount` は落とす前の項目数 (上流 Req 9.7)
   - `GET /_api/v3/search/attachments?q=&pageIds=`: 重複を除いて 1〜20 件のページ ID。応答 `{ enrichments: Record<pageId, { attachmentHits?: IAttachmentHit[] }> }`。失敗と 500ms 超過は 500、機能が無効なら 503 `feature_disabled`
   - `POST /_api/v3/attachments/:id/reextract`: 応答 `{ outcome: { kind } }`。エラーは 404 `notfound_or_forbidden`、429 (コードなし)、500 `reextract_failed` / `internal_server_error`、503 `feature_disabled` / `reextract_timeout`
   - `GET|PUT /_api/v3/admin/attachment-search/config` (GET の `config.useOnlyEnvVars` は 4 つの設定が環境変数で固定されているか。上流 Req 5.7)、`GET /_api/v3/admin/attachment-search/failures`、`PUT /_api/v3/search/indices` の `includeAttachments` (409 `rebuild_in_progress`)
@@ -834,10 +834,9 @@ type AttachmentRebuildOptionProps = {
 - ページ検索の表示は添付ヒットの取得を待たない。添付ヒットは 20 ページ分で p95 36.5〜42.3ms (上流 research.md 8.7)
 - 要求の数: 描画された行の組の数だけ。読み込みのまとまり 1 つ (50 件) を最後までスクロールしても 3 回。回数の上限 (ログイン利用者は 1 分 500 回) に、スクロールで届くことは無い
 - 行が描画し直されても、SWR の値を使い回して取り直さない (`revalidateIfStale: false`)
-- 「添付ファイル」のときは、ページ自身が一致しなかった行 (抜粋が無い行) のために、既存の `useSWRxPageInfoForList` が本文の冒頭を取る。ページ自身も一致した行は抜粋がサーバから届くので要求しない。読み込んだページが増えるたびにその一覧で要求が出るので、件数が多いときの重さを実装時に確かめる
+- 「添付ファイル」のときは、ページ自身が一致しなかった行 (抜粋が無い行) のために、既存の `useSWRxPageInfoForList` が本文の冒頭を取る。ページ自身も一致した行は、抜粋とブックマーク数がサーバから届くので要求しない (上流 Req 9.8)。読み込んだページが増えるたびにその一覧で要求が出るので、件数が多いときの重さを実装時に確かめる
 
 ## Open Questions / Risks
 
-1. **「添付ファイル」の行のブックマーク数**: 項目に `meta.bookmarkCount` が入らない。`PageListItemL` は `meta.bookmarkCount` を初期値にし、`useSWRxPageInfoForList` の結果で上書きするが、その一覧に入るのは抜粋の無い行だけである。そのため、ページ自身も一致した (抜粋のある) 行は、ブックマーク数が 0 のまま直らない。ページ検索では ES の `_source.bookmark_count` から入る。上流の抜粋の検索で、一致したページの `bookmark_count` も返して入れるか、画面が「添付ファイル」のときだけ全行を `useSWRxPageInfoForList` に渡すかを決める
-2. **`PageListItemL` の高さ**: 行の中に添付の一致を足すと、行の高さが取得の後に変わる。一覧は描画後に高さを測り直すので並びは崩れないが、スクロール中に行が伸びる見え方を見た目の案で確かめる
-3. **環境変数の固定と保存の API**: 上流の `PUT /config` は、固定されているときも保存を受け付ける (値は使われない)。画面は保存の操作を出さないので利用者は迷わないが、API を直接使う場合の扱いは上流で決める
+1. **`PageListItemL` の高さ**: 行の中に添付の一致を足すと、行の高さが取得の後に変わる。一覧は描画後に高さを測り直すので並びは崩れないが、スクロール中に行が伸びる見え方を見た目の案で確かめる
+2. **環境変数の固定と保存の API**: 上流の `PUT /config` は、固定されているときも保存を受け付ける (値は使われない)。画面は保存の操作を出さないので利用者は迷わないが、API を直接使う場合の扱いは上流で決める

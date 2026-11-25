@@ -26,7 +26,7 @@ _Generated: 2026-04-17 (3-way split から派生)。2026-11-24 に、今の API 
 ## 2. 上流の API の今の契約 (2026-11-25 にコードで確認)
 
 - `GET /_api/v3/search/attachments?q=&pageIds=`: `pageIds` は重複を除いて 1〜20 件。`q` は decode しない。応答 `{ enrichments }`。失敗と 500ms 超過は 500、機能が無効なら 503 `feature_disabled`
-- `GET /_api/search?facet=attachments`: `q` を 1 回 decode する (ページ検索と同じ)。`limit` は 1〜200 (既定 50)。応答の `meta` は `{ facet: 'attachments', total: null, hitsCount, primaryResultIncomplete }`。各項目の `data` はページ検索と同じページ文書 (`tags` は無い)。`meta` は `attachmentHits` と、ページ自身も検索語に一致したときだけページ検索と同じ `elasticSearchResult`。`meta.bookmarkCount` は無い。MongoDB に無いページの項目は落とし、`hitsCount` は落とす前の数 (上流 Req 9.7、PR #12330)
+- `GET /_api/search?facet=attachments`: `q` を 1 回 decode する (ページ検索と同じ)。`limit` は 1〜200 (既定 50)。応答の `meta` は `{ facet: 'attachments', total: null, hitsCount, primaryResultIncomplete }`。各項目の `data` はページ検索と同じページ文書 (`tags` は無い)。`meta` は `attachmentHits` と、ページ自身も検索語に一致したときだけページ検索と同じ `elasticSearchResult`。`meta.bookmarkCount` は抜粋の入った項目にだけ入る (上流 Req 9.8)。MongoDB に無いページの項目は落とし、`hitsCount` は落とす前の数 (上流 Req 9.7、PR #12330)
 - 添付だけの検索の窓 (`collect-visible-attachment-hits.ts`): `from + size` 件のページに届くまで、添付ヒットを点数順に倍々で取り、権限で選り分ける。窓は最大 200 件で、どの `offset` でも同じ範囲で頭打ちになる
 - `POST /_api/v3/attachments/:id/reextract`: ゲストと読み取り専用の利用者は断る。ファイルの抽出が失敗しても 200 で、`outcome.kind` で種類を返す (文は返さない)。429 は本文にコードが無い
 - `GET|PUT /_api/v3/admin/attachment-search/config`: トークンは返さず `hasExtractorToken` だけ。PUT はトークンの項目を省くと保存済みのトークンを変えない。URI は http/https だけを通し、クラウドのメタデータの宛先を断る (400 `invalid_extractor_uri`)。GET の `config.useOnlyEnvVars` が、4 つの設定が環境変数 (`env:useOnlyEnvVars:app:attachmentFullTextSearch`) で固定されているかを返す (上流 Req 5.7)。固定されていても PUT は保存を受け付ける (値は使われない)
