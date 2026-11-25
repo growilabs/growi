@@ -32,7 +32,7 @@ discovery（2026-11-24）で確かめた事実をまとめる。sub-spec の要�
 - **認証情報の流れ**: `req.auth` → `context.mcp.extra.authInfo`。`MCPServer` の設定に `mapAuthInfoToUser` を書くと、戻り値が requestContext の `user` に入る。[src]
 - **ツールの requestContext に入るもの**: `authInfo`、`user`（mapper が返したときだけ）、`traceContext`（クライアントが送ったときだけ）。既存ツールが読む `searchService` は入らない。[src]
 - **複数インスタンスでの注意**: `suspend()` を使うツールは、インスタンス間で共有した `requestState.key` が要る。イベントと購読はプロセス内だけで動く。[src]
-- **`createOAuthMiddleware`**: protected-resource メタデータをルートの well-known にだけ出す（`/mcp` つきのパスには出さない）。401 のチャレンジに `scope` が無い。`validateToken` を省くとどのトークンも通す。`req.auth` を設定しない。[src]
+- **`createOAuthMiddleware`**: protected-resource メタデータをルートの well-known にだけ出す（`/_api/v3/mcp` つきのパスには出さない）。401 のチャレンジに `scope` が無い。`validateToken` を省くとどのトークンも通す。`req.auth` を設定しない。[src]
 
 ## C. プロトコルリビジョン
 
@@ -61,7 +61,7 @@ discovery（2026-11-24）で確かめた事実をまとめる。sub-spec の要�
 
 ## E. MCP の認可仕様（2026-07-28）と CIMD
 
-- **リソースサーバー（`/mcp`）**: RFC 9728 のメタデータが必須。トークンが自分宛てに発行されたことの検証が必須。無効なトークンには 401、スコープ不足には 403。401 のチャレンジに `scope` を入れることが推奨。[doc]
+- **リソースサーバー（`/_api/v3/mcp`）**: RFC 9728 のメタデータが必須。トークンが自分宛てに発行されたことの検証が必須。無効なトークンには 401、スコープ不足には 403。401 のチャレンジに `scope` を入れることが推奨。[doc]
 - **認可サーバー**: OAuth 2.1 が必須。RFC 8414 のメタデータが必須で、`code_challenge_methods_supported` が無いとクライアントが先へ進まない。リダイレクト URI は完全一致。公開クライアントのリフレッシュトークンはローテーション必須。CIMD は推奨、DCR は任意（非推奨）。`iss` の返却は推奨。[doc]
 - **CIMD の取得**（仕様とドラフト `draft-ietf-oauth-client-id-metadata-document-03`）:
   - `client_id` の URL は https で、パスが `/` 以外、フラグメントなし。
@@ -137,10 +137,10 @@ discovery（2026-11-24）で確かめた事実をまとめる。sub-spec の要�
 
 ### Express の配線
 
-- `loginRequired` は、`/_api/` で始まらないパスの未認証リクエストを `/login` へリダイレクトする。`/mcp` には使えない。
+- `loginRequired` は、未認証リクエストを `/_api/` 配下では 403、それ以外では `/login` へのリダイレクトにする。どちらも 401 ではないので、`/_api/v3/mcp` には使えない。
 - グローバルの回数制限（`features/rate-limiter`）は、ルートごとの `accessTokenParser` より前に走る。トークンだけのリクエストは `req.user` が無いので、IP 単位の制限だけが効く。claude.ai の通信は Anthropic の送信元アドレスに集まるので、全利用者が 1 つの枠を分け合うことになる。
 - csurf は `ignoreMethods` に POST を含む設定で、実質的に PATCH しか検査していない。同意画面の POST は自前の CSRF 対策が要る。
-- `CertifyOrigin` は `/_api` にだけかかる。`/mcp` にはかからない。
+- `CertifyOrigin` は `/_api` 全体にかかるので、`/_api/v3/mcp` にもかかる。`Origin` ヘッダーが GROWI のオリジンと違い、クエリにも本文にも `access_token` が無い JSON の POST を拒否する。`Origin` を送らないリクエスト（サーバー間の通信）は通す。
 - ログイン後に戻る先は `req.session.redirectTo`。`pages/login/index.page.tsx` は Referer がページのとき、この値を上書きする。
 - `/.well-known/*` のルートは存在しない。
 - Next のページを Express から描画する前例は `/forgot-password`、`/user-activation/:token`。

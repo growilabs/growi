@@ -12,13 +12,11 @@ umbrella 全体の調査（claude.ai の挙動、MCP の仕様、先行事例）
 
 要件を書いた時点で分かっていなかった事実が 4 つある。設計に入る前に、要件をどう直すかを決める必要がある。
 
-#### 1.1 `/mcp` は wiki のページのパスでもある
+#### 1.1 エンドポイントのパスと、wiki のページのパス（解決済み）
 
-- GROWI のページは `app.get('/*', ...)` で配信される（`server/routes/index.js:433-434`）。`/mcp` というパスのページは、今は作れて、ブラウザで開ける。
-- 要件 3.6 は、GET と DELETE に「対応していない」エラーを返すと定めている。そのとおりに `/mcp` の全メソッドを MCP エンドポイントが受けると、MCP 連携が有効な GROWI では、`/mcp` のページをブラウザで開けなくなる。
-- POST だけを受ける場合、ページは開ける。ただし MCP クライアントが GET を送ったときに、ログイン画面へのリダイレクトか HTML が返る。MCP の仕様では、サーバーからの通知を待つ接続を持たないサーバーは、GET に 405 を返すことになっている。
-- **要件で決めること**: `/mcp` を MCP 連携のために予約するか（有効のとき、同じパスのページは開けなくなる）。予約する場合、`/mcp` 以下のページ（`/mcp/foo`）は影響を受けないことも明記する。
-- **Research Needed**: 既存のページ作成の制限に、予約済みのパスを足す仕組みがあるか（`/vault.git` は拡張子つきなので前例にならない）。`utils/is-next-page-route.ts` の `EXPRESS_EXCLUSIVE_PATH_PATTERNS` には、`/mcp` を足す必要がある。
+- GROWI のページは `app.get('/*', ...)` で配信されるので、`/mcp` のような `/_api` の外のパスは、wiki のページのパスと衝突する。
+- パスを `/_api/v3/mcp` にすると決めたので、衝突は起きない（要件の確定済みの判断 5）。`/_api` 配下は、ページを作れないパスである（`packages/core/src/utils/page-path-utils/index.ts` の `restrictedPatternsToCreate`）。`utils/is-next-page-route.ts` も、`/_api` をすでに Express 専用として扱う。
+- 引き換えに、`/_api` 全体にかかる `CertifyOrigin`（`server/crowi/express-init.js:153`）の検査を受ける。3.9 を参照。
 
 #### 1.2 Activity は、監査ログの設定で記録対象になっているときだけ残る
 
@@ -50,12 +48,12 @@ umbrella 全体の調査（claude.ai の挙動、MCP の仕様、先行事例）
 | 1.4 無効のときは存在しないパスと同じ応答 | 経路の無い POST は Express の既定の 404（HTML）になる。`/vault.git` は無効のとき 404 のテキストを返す | **Constraint**: 無効のときに `next()` を呼んで素通しすれば、存在しないパスと同じ応答になる。ただし GET は wiki のページ配信に落ちる（1.1） |
 | 1.5〜1.6 管理画面 | `pages/admin/vault.page.tsx` と `features/growi-vault/client/admin/VaultAdminSettings.tsx`（`useSiteUrl()` で URL を組み立てて表示する前例）、`AdminNavigation.tsx` | **Missing**: 管理ページ、ナビゲーションの項目、i18n（5 言語） |
 | 1.7 管理者だけ | `routerForAdmin` と `adminRequired`。最小の前例は `customize-setting.js` の PUT `/presentation` | **Missing**: 管理 API。**Unknown**: どの管理用スコープを要求するか（新設しない前提で既存から選ぶ） |
-| 1.8 AI の設定に左右されない | `aiReadyGuard` は mastra のルートにだけかかる | **Reuse**: `/mcp` を `aiReadyGuard` の外にマウントすれば足りる |
+| 1.8 AI の設定に左右されない | `aiReadyGuard` は mastra のルートにだけかかる | **Reuse**: `/_api/v3/mcp` を `aiReadyGuard` の外にマウントすれば足りる |
 | 2.1 Bearer のアクセストークン | `accessTokenParser`、`extractBearerToken`、`AccessToken.findUserIdByToken(token, scopes)` | **Constraint**: 3.1 を参照 |
 | 2.2〜2.4 Bearer 以外は 401 | `extractAccessToken` は Bearer を最優先で読む | **Missing**: 「Bearer が無ければ 401」の判定。parser は変えずに済む |
 | 2.6 旧形式の API トークン | `acceptLegacy` を付けなければ通らない | **Reuse** |
 | 2.7 セッションだけでは 401 | parser は、トークンが無い・不正なとき、セッションの `req.user` を残す | **Constraint**: 3.1 を参照 |
-| 2.9 リダイレクトしない | `loginRequired` は `/_api` 以外を `/login` へ送る | **Missing**: `/mcp` 用の 401 応答 |
+| 2.9 リダイレクトしない | `loginRequired` は `/_api` 配下ではリダイレクトせず 403 を返す。401 にはならない | **Missing**: `/_api/v3/mcp` 用の 401 応答 |
 | 2.11 認証の差し替え | なし | **Missing**: 認証の差し込み口 |
 | 3.1〜3.4、3.7〜3.9 MCP の接続 | なし | **Missing**: `@mastra/mcp` 2.8.0 の追加と `MCPServer` の組み立て。annotation は `createTool` の `mcp.annotations` で書ける |
 | 3.3 2025 年系のクライアント | なし | `legacy: 'stateless'` で受けられる。**Constraint**: 3.2 を参照 |
@@ -65,7 +63,7 @@ umbrella 全体の調査（claude.ai の挙動、MCP の仕様、先行事例）
 | 4.x 全文検索ツール | `full-text-search-tool.ts` | **Extend**: `searchService` の受け取り方、エラー文の漏れ（3.4）。3.3 を参照 |
 | 5.x ページ本文取得ツール | `get-page-content-tool.ts` | **Extend**: エラー文の漏れ（3.4）。「見つからない」と「権限がない」はすでに同じ結果を返す |
 | 6.1〜6.3 利用者単位の回数制限 | `features/rate-limiter` の `consumePoints(method, key, config)` | **Extend**: `consumePoints` は公開されていない（barrel から出ていない）。3.5 を参照 |
-| 6.4 未認証は送信元単位 | グローバルの回数制限が IP 単位で数える | **Reuse**: `/mcp` の設定を足す |
+| 6.4 未認証は送信元単位 | グローバルの回数制限が IP 単位で数える | **Reuse**: `/_api/v3/mcp` の設定を足す |
 | 6.5 上限の変更 | `API_RATE_LIMIT_*` の env（グローバルの制限用） | **Unknown**: ルート内の利用者単位の制限に、同じ env を使えるか |
 | 6.6 全インスタンスの合計 | `RateLimiterMongo`（MongoDB に保存） | **Reuse** |
 | 7.1〜7.2 ツール呼び出しの記録 | `activityService.createActivity`（ミドルウェアなしで直接記録する経路。`server/routes/search.ts` と growi-vault が使っている） | **Missing**: アクションの定義、グループ、カテゴリ、i18n（5 言語）。**Constraint**: 1.2、3.6 を参照 |
@@ -80,9 +78,9 @@ umbrella 全体の調査（claude.ai の挙動、MCP の仕様、先行事例）
 #### 3.1 `accessTokenParser` をそのまま置くと、セッションの利用者が通ってしまう
 
 - parser は、有効なトークンがあれば `req.user` を上書きする。トークンが無い・不正なときは何もせず、セッションが設定した `req.user` を残す（`server/middlewares/access-token-parser/access-token.ts`）。
-- `/mcp` のルートで `req.user` があるかどうかだけを見ると、ブラウザのセッションを持つリクエストが、不正なトークンでも通る。要件 2.5 と 2.7 に反する。
+- `/_api/v3/mcp` のルートで `req.user` があるかどうかだけを見ると、ブラウザのセッションを持つリクエストが、不正なトークンでも通る。要件 2.5 と 2.7 に反する。
 - 対処の候補:
-  - **(a)** `/mcp` をセッションの対象から外す（3.8 と同じ対処）。`req.user` はトークンからしか入らなくなる。
+  - **(a)** `/_api/v3/mcp` をセッションの対象から外す（3.8 と同じ対処）。`req.user` はトークンからしか入らなくなる。
   - **(b)** parser の前に `req.user` を消す。
   - **(c)** parser を使わず、`extractBearerToken` と `AccessToken.findUserIdByToken` を直接呼ぶ。growi-vault の `resolvePatUser` が同じ形をとっている。parser が行う「閲覧専用の利用者を拒否する」判定を、自分で書き直すことになる。
 - 認証は `remote-mcp-server-oauth` が差し替える暫定のものなので、書く量が少ない (a) + parser の組み合わせが有力。
@@ -93,10 +91,10 @@ umbrella 全体の調査（claude.ai の挙動、MCP の仕様、先行事例）
 - 2026-07-28 版のリクエストは、`params._meta` に `io.modelcontextprotocol/protocolVersion` と `io.modelcontextprotocol/clientCapabilities` を必ず持つ。どちらのキーも `.` を含むので、削除される。SDK は、この 2 つが無いリクエストを 400（-32602）で拒否する。
 - つまり、何もしなければ、2026-07-28 版のクライアントは 1 件も通らない。2025 年系のリクエストも、ツールの引数に `.` を含むキーがあれば黙って削られる。
 - 対処の候補:
-  - **(a)** `/mcp` を `mongoSanitize` より前に処理する（`express-init.js` に手を入れる）。
-  - **(b)** `mongoSanitize` に、`/mcp` を除外する条件を足す。
-  - **(c)** `bodyParser.json` の `verify` で生の本文を残し、`/mcp` で解析し直す。
-- どれも `express-init.js` の変更を伴う。`/mcp` の本文は MongoDB のクエリに渡らない（ツールの引数は zod で検証される）ので、除外しても `mongoSanitize` の目的は損なわない。
+  - **(a)** `/_api/v3/mcp` を `mongoSanitize` より前に処理する（`express-init.js` に手を入れる）。
+  - **(b)** `mongoSanitize` に、`/_api/v3/mcp` を除外する条件を足す。
+  - **(c)** `bodyParser.json` の `verify` で生の本文を残し、`/_api/v3/mcp` で解析し直す。
+- どれも `express-init.js` の変更を伴う。`/_api/v3/mcp` の本文は MongoDB のクエリに渡らない（ツールの引数は zod で検証される）ので、除外しても `mongoSanitize` の目的は損なわない。
 - **Research Needed**: 実際に削除されることを、動かして確かめる。
 
 #### 3.3 ツールは、モジュールの読み込み時に作られる定数である
@@ -124,10 +122,10 @@ umbrella 全体の調査（claude.ai の挙動、MCP の仕様、先行事例）
 #### 3.5 回数制限は、認証の前に走る
 
 - グローバルの回数制限（`server/routes/index.js:84`）は、ルートごとの認証より前に走る。Bearer のリクエストには IP 単位の枠しか効かない。
-- `/mcp` に設定を足さない場合、IP 単位の枠は既定の 500 回 × 5 = 1 分あたり 2,500 回になる。claude.ai の通信は Anthropic の送信元アドレスに集まるので、この枠を全利用者で分け合う。要件 6.3（他の利用者を巻き込まない）のためには、IP 単位の枠を十分に大きくし、利用者単位の枠を認証の後に別に数える必要がある。
+- `/_api/v3/mcp` に設定を足さない場合、IP 単位の枠は既定の 500 回 × 5 = 1 分あたり 2,500 回になる。claude.ai の通信は Anthropic の送信元アドレスに集まるので、この枠を全利用者で分け合う。要件 6.3（他の利用者を巻き込まない）のためには、IP 単位の枠を十分に大きくし、利用者単位の枠を認証の後に別に数える必要がある。
 - `consumePoints` は `middleware/consume-points.ts` から export されているが、feature の barrel（`features/rate-limiter/index.ts`）からは出ていない。ルートから使うには、barrel に足す。
 - 利用者単位のキーを、グローバルの制限と同じ形式（`userId_endpoint_method` の md5）にすると、同じ枠を 2 回消費する場合がある。別の形式のキーにする。
-- 正規表現で設定するエンドポイントは、前方一致でしか比べない（`/mcp` は `/mcpfoo` にも一致する）。完全一致の設定（`defaultConfig`）に `/mcp` を足す。
+- 正規表現で設定するエンドポイントは、前方一致でしか比べない（`/_api/v3/mcp` は `/_api/v3/mcpfoo` にも一致する）。完全一致の設定（`defaultConfig`）に `/_api/v3/mcp` を足す。
 
 #### 3.6 ツール呼び出しを外から観測する仕組みが無い
 
@@ -138,15 +136,15 @@ umbrella 全体の調査（claude.ai の挙動、MCP の仕様、先行事例）
 - (a) のほうが、「実際に実行されたツール」と記録が 1 対 1 になる。
 - `activities` には `(user, target, action, createdAt)` の一意の索引がある。同じ利用者が同じミリ秒に同じツールを 2 回呼ぶと、2 件目の保存が失敗する（配列のリクエストで起きうる）。`createActivity` は失敗を握りつぶして `null` を返すので、ツールの実行は止まらないが、記録が 1 件欠ける。
 
-#### 3.7 遅延ロードの検査は、いまの起点では `/mcp` を見張れない
+#### 3.7 遅延ロードの検査は、いまの起点では `/_api/v3/mcp` を見張れない
 
-- `server/routes/index.js` は、`server/crowi/index.ts` から動的に `import` されている。そのため、`BOOT_ENTRYPOINTS` からの静的な追跡の外にある。`/mcp` のルートを `routes/index.js` にマウントし、そこから `@mastra/mcp` を静的に読み込んでも、既存の検査は失敗しない。
-- `/mcp` 用の検査には、ルートの入口のファイルを起点として明示する必要がある（ai-usage が独自の起点リストを持つ前例がある）。
+- `server/routes/index.js` は、`server/crowi/index.ts` から動的に `import` されている。そのため、`BOOT_ENTRYPOINTS` からの静的な追跡の外にある。`/_api/v3/mcp` のルートを `routes/index.js` にマウントし、そこから `@mastra/mcp` を静的に読み込んでも、既存の検査は失敗しない。
+- `/_api/v3/mcp` 用の検査には、ルートの入口のファイルを起点として明示する必要がある（ai-usage が独自の起点リストを持つ前例がある）。
 - 禁止リストの正規表現は `@mastra/` を含むので、`@mastra/mcp` はすでに対象である。
 - 既存の 2 ツールのファイルは、`@mastra/core/tools`、`mdast-util-*`、Mongoose のモデルを静的に読み込む。MCP のツールがこれらを使うなら、ツールを含めて遅延ロードの内側に置く。
 - `@mastra/mcp` の入口は 1 つだけで（約 926 KB）、サーバーだけを読み込む入口は無い。クライアントの部品と `hono` も一緒に読み込まれる。
 
-#### 3.8 `/mcp` のリクエストのたびに、セッションが作られる
+#### 3.8 `/_api/v3/mcp` のリクエストのたびに、セッションが作られる
 
 - セッションは `saveUninitialized: true` で動いている。Cookie を持たないクライアントのリクエストごとに、新しいセッションの記録が作られ、`Set-Cookie` が返る。MCP クライアントは Cookie を保持しないので、リクエストの数だけ記録が増える。
 - 既存の回避策が 2 つある。
@@ -156,7 +154,9 @@ umbrella 全体の調査（claude.ai の挙動、MCP の仕様、先行事例）
 
 #### 3.9 その他
 
-- **本文サイズ**: グローバルの `bodyParser.json` の上限（50 MB）は、ルートに届く前に適用される。SDK 側の 4 MiB の上限は、本文が解析済みのときは効かない。`/mcp` だけ上限を下げるには、`Content-Length` を自分で見るか、`express-init.js` に手を入れる。
+- **`Origin` の検査**: `CertifyOrigin` は `/_api` 全体にかかる。`Origin` ヘッダーが GROWI のオリジンと違い、クエリにも本文にも `access_token` が無い JSON の POST を、ルートに届く前に拒否する（`server/middlewares/certify-origin.ts`）。`Origin` を送らないリクエストは通す。ブラウザの中から直接つなぐ MCP クライアントは拒否される（GROWI は CORS の応答ヘッダーを返さないので、どのみち接続できない）。MCP の仕様が求める `Origin` の検証とは、向きが合う。拒否の応答は apiv3 のエラー形式で、JSON-RPC の形式ではない。
+- **メンテナンスモード**: `/_api/v3` の本体のルーターには `unavailableWhenMaintenanceModeForApi` がかかっている（`server/routes/index.js:215`）。その下か、同じミドルウェアを付けてマウントすれば、要件 8 のメンテナンス中の応答は既存の仕組みで満たせる。
+- **本文サイズ**: グローバルの `bodyParser.json` の上限（50 MB）は、ルートに届く前に適用される。SDK 側の 4 MiB の上限は、本文が解析済みのときは効かない。`/_api/v3/mcp` だけ上限を下げるには、`Content-Length` を自分で見るか、`express-init.js` に手を入れる。
 - **応答の形式**: 2025 年系のリクエストへの応答は、常に SSE（`text/event-stream`）である。JSON に固定するオプションは 2.8.0 に無い。GROWI は全応答に `compression()` をかけており、SSE も圧縮の対象になる。イベントを 1 つ送って接続を閉じるので、応答が失われることはないはずだが、遅れないかは未確認。
 - **`startHTTP` のパスの比較**: `url.pathname` と `httpPath` の完全一致で比べる。末尾のスラッシュが付くと 404 になる。
 - **`startHTTP` は応答を自分で書いて終える**。呼んだあとに `next()` を呼んだり、応答を書いたりしてはいけない。
@@ -169,7 +169,7 @@ umbrella 全体の調査（claude.ai の挙動、MCP の仕様、先行事例）
 
 #### Option A: `features/mastra` を拡張する
 
-- `/mcp` のルート、管理 API、管理画面を `features/mastra` の下に足す。
+- `/_api/v3/mcp` のルート、管理 API、管理画面を `features/mastra` の下に足す。
 - 既存の 2 ツールを、そのまま `MCPServer` に渡す。`searchService` は、`mapAuthInfoToUser` の中で requestContext に入れる（この関数は requestContext を受け取る）。
 - **利点**: 新しいファイルが最も少ない。既存ツールを作り直さない。
 - **欠点**:
@@ -203,7 +203,7 @@ umbrella 全体の調査（claude.ai の挙動、MCP の仕様、先行事例）
 - **工数: L（1〜2 週間）**。新しいライブラリの組み込みに加えて、既存ツールの作り直し、管理画面と i18n、Activity のアクション追加、回数制限、遅延ロードの検査、`express-init.js` の変更と、触る場所が多い。個々は既存の前例に倣える。
 - **リスク: Medium**。
   - `@mastra/mcp` 2.x は新しく（2.0.0 が 2026-09-22）、claude.ai が送るプロトコルは公表されていない。実機で確かめるまで、接続できるかは分からない。
-  - `mongoSanitize`（3.2）とセッション（3.8）は、全リクエストに関わる `express-init.js` の変更を伴う。除外の範囲を `/mcp` に限れば、既存の経路への影響は小さい。
+  - `mongoSanitize`（3.2）とセッション（3.8）は、全リクエストに関わる `express-init.js` の変更を伴う。除外の範囲を `/_api/v3/mcp` に限れば、既存の経路への影響は小さい。
   - 既存ツールの作り直しは、テストが揃っているので退行を検出しやすい。
 
 ### 6. 設計への申し送り
@@ -211,13 +211,13 @@ umbrella 全体の調査（claude.ai の挙動、MCP の仕様、先行事例）
 #### 推奨する方針
 
 - **Option C**。閲覧権限の判定を 1 か所に保ったまま、MCP 向けの定義を分けられる。
-- 認証は、`/mcp` をセッションの対象から外したうえで（3.8）、「Bearer が無ければ 401」の判定と `accessTokenParser` を、差し込み口の暫定の中身にする（3.1 の (a)）。
+- 認証は、`/_api/v3/mcp` をセッションの対象から外したうえで（3.8）、「Bearer が無ければ 401」の判定と `accessTokenParser` を、差し込み口の暫定の中身にする（3.1 の (a)）。
 - Activity は、MCP 用のツールの `execute` の中で `createActivity` を直接呼ぶ（3.6 の (a)）。
-- `mongoSanitize` は、`/mcp` を除外する（3.2）。
+- `mongoSanitize` は、`/_api/v3/mcp` を除外する（3.2）。
 
 #### 設計の前に、要件で決めること
 
-1. `/mcp` のパスを予約するか（1.1）。
+1. ~~パスを予約するか（1.1）。~~ パスを `/_api/v3/mcp` にすると決めて解決した。
 2. Activity のアクションをどのグループに入れるか。要件 7 に「監査ログの設定で記録対象になっているとき」の条件を足すか（1.2）。
 3. 回数を、リクエストで数えるか、ツール呼び出しで数えるか。配列のリクエストを受けるか（1.3）。
 
@@ -231,7 +231,7 @@ umbrella 全体の調査（claude.ai の挙動、MCP の仕様、先行事例）
 6. ビルド後に、`@mastra/mcp` と `@modelcontextprotocol/*` が `.next/node_modules/` に現れるか。
 7. 管理 API に要求する、既存の管理用スコープ。
 8. ルート内の利用者単位の回数制限に、運用者が上限を変える手段をどう持たせるか（既存の `API_RATE_LIMIT_*` の env を使えるか）。
-9. 予約済みのパスへのページ作成を制限する、既存の仕組みの有無。
+9. claude.ai などの MCP クライアントが `Origin` ヘッダーを送るか。送る場合、`CertifyOrigin` に拒否される（3.9）。
 
 ---
-_Updated: 2026-11-24. ギャップ分析を記録。_
+_Updated: 2026-11-25. パスを `/_api/v3/mcp` にする決定を反映した（1.1 を解決済みにし、`CertifyOrigin` の制約を 3.9 に足した）。Prior: 2026-11-24. ギャップ分析を記録。_
