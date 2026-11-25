@@ -12,6 +12,16 @@ import { ensurePageLinkIndexes } from '../models/page-link-indexes';
 import { throwOnWriteErrors } from '../models/throw-on-write-errors';
 import { PageLinkService } from './page-link-service';
 
+// A real minute-boundary tick would race the assertions: the tick after a finished run stops
+// the poll. Due only at New Year's midnight, the poll stays armed but never fires here.
+const { NEVER_DURING_TEST } = vi.hoisted(() => ({
+  NEVER_DURING_TEST: '0 0 1 1 *',
+}));
+vi.mock('./page-link-backfill-cron', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./page-link-backfill-cron')>()),
+  BACKFILL_POLL_CRON_SCHEDULE: NEVER_DURING_TEST,
+}));
+
 // Exclusive project: a run walks the whole `pages` collection, so each test empties it.
 
 const SITE_URL = 'https://wiki.example';
@@ -45,10 +55,7 @@ beforeEach(async () => {
   await prisma.pagelinkbackfilljobs.ensureExists();
 });
 
-// node-cron keeps a ref'd timer per started task; a poll left running would tick against the
-// shared database mid-suite and hold the worker open. The self-stop is tested on
-// PageLinkBackfillCron with a schedule that never fires; here the poll runs on the real
-// one-minute schedule, so each test stops it as soon as it has looked.
+// node-cron keeps a ref'd timer per started task, which would hold the worker open.
 afterEach(() => {
   service?.backfillPoll?.stopCron();
   service = undefined;
@@ -66,14 +73,15 @@ const createService = (): PageLinkService => {
   return service;
 };
 
-/** Runs the boot step and reports whether it left a poll scheduled, and on what schedule. */
+/** Runs the boot step and reports whether it left a poll scheduled. */
 const bootSchedulesPoll = async (): Promise<boolean> => {
   const booted = createService();
   await booted.startBackfillPoll();
   const scheduled = booted.backfillPoll?.isJobRunning() ?? false;
   booted.backfillPoll?.stopCron();
-  if (scheduled)
-    expect(booted.backfillPoll?.getCronSchedule()).toBe('* * * * *');
+  if (scheduled) {
+    expect(booted.backfillPoll?.getCronSchedule()).toBe(NEVER_DURING_TEST);
+  }
   return scheduled;
 };
 
