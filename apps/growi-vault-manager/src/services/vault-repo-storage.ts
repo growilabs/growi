@@ -129,8 +129,7 @@ export function getRepoPath(): string {
 }
 
 /**
- * Initialises the bare repository if it does not already exist, and moves
- * any ref an earlier `git gc` packed back into its own loose file.
+ * Initialises the bare repository if it does not already exist.
  * Idempotent.
  *
  * Corresponds to `git init --bare <repoPath>`.
@@ -152,52 +151,9 @@ export async function init(): Promise<void> {
     });
   }
 
-  await unpackRefs(repoPath);
-}
-
-/**
- * Writes every ref listed in packed-refs to its own loose file, then removes
- * packed-refs.  A loose file that already exists is newer than its packed
- * entry (git reads it first), so it is left as is.
- */
-async function unpackRefs(repoPath: string): Promise<void> {
-  const packedRefsPath = path.join(repoPath, 'packed-refs');
-  let content: string;
-  try {
-    content = await fs.promises.readFile(packedRefsPath, 'utf8');
-  } catch (err: unknown) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
-      return;
-    }
-    throw err;
+  if (await fileExists(packedRefsPath())) {
+    logger.error(PACKED_REFS_MESSAGE);
   }
-
-  // Lines are "<oid> <ref>"; '#' starts the header and '^' a peeled tag.
-  const packed = content
-    .split('\n')
-    .filter((line) => line !== '' && !/^[#^]/.test(line))
-    .map((line) => {
-      const [oid, ref] = line.split(' ');
-      return { oid, ref };
-    });
-
-  for (const { oid, ref } of packed) {
-    // biome-ignore lint/performance/noAwaitInLoops: one-off startup pass; sequential keeps open files bounded
-    const loose = await readLooseRef(ref);
-    if (loose == null) {
-      await updateRef(ref, oid);
-      logger.info({ ref, oid }, 'restored a packed ref as a loose ref');
-    } else if (loose !== oid) {
-      // The packed value is the only remaining pointer to that commit once
-      // packed-refs is removed; log it so it stays recoverable until gc.
-      logger.warn(
-        { ref, packedOid: oid, looseOid: loose },
-        'packed ref differs from its loose ref; keeping the loose one',
-      );
-    }
-  }
-
-  await fs.promises.unlink(packedRefsPath);
 }
 
 /**
@@ -356,16 +312,29 @@ function fileExists(filePath: string): Promise<boolean> {
     .catch(() => false);
 }
 
+const PACKED_REFS_MESSAGE =
+  'packed-refs found in the vault repository; namespace refs cannot be read until the vault is rebuilt. Run "Rebuild Vault" from the GROWI admin page.';
+
+function packedRefsPath(): string {
+  return path.join(getRepoPath(), 'packed-refs');
+}
+
 /**
  * A ref without a loose file may be packed; treating it as missing would
- * rebuild or drop it from nothing. init() unpacks packed refs on restart.
+ * rebuild or drop a namespace from nothing.
  */
 async function assertNoPackedRefs(refPath: string): Promise<void> {
-  if (await fileExists(path.join(getRepoPath(), 'packed-refs'))) {
-    throw new Error(
-      `Cannot resolve ${refPath}: packed-refs exists; restart vault-manager to unpack refs`,
-    );
+  if (await fileExists(packedRefsPath())) {
+    throw new Error(`Cannot resolve ${refPath}: ${PACKED_REFS_MESSAGE}`);
   }
+}
+
+/**
+ * Removes packed-refs and every ref it holds.  Only a full wipe (reset-all)
+ * may call this: it drops whatever the packed entries still point at.
+ */
+export async function deletePackedRefs(): Promise<void> {
+  await fs.promises.rm(packedRefsPath(), { force: true });
 }
 
 async function readLooseRef(refPath: string): Promise<string | null> {

@@ -22,6 +22,7 @@ vi.mock('./vault-repo-storage.js', async (importOriginal) => {
     readRef: vi.fn(),
     updateRef: vi.fn(),
     deleteRef: vi.fn(),
+    deletePackedRefs: vi.fn(),
     readTree: vi.fn(),
     writeTree: vi.fn(),
     writeBlob: vi.fn(),
@@ -136,6 +137,7 @@ beforeEach(() => {
   // Default: updateRef and deleteRef succeed silently.
   asMock(VaultRepoStorage.updateRef).mockResolvedValue(undefined);
   asMock(VaultRepoStorage.deleteRef).mockResolvedValue(undefined);
+  asMock(VaultRepoStorage.deletePackedRefs).mockResolvedValue(undefined);
 
   // Default: hashBlob returns a deterministic OID.
   asMock(VaultBlobHasher.hashBlob).mockResolvedValue('blob-sha1-oid');
@@ -650,6 +652,14 @@ describe('op: reset-all', () => {
       'refs/namespaces/user-u1-only-me/refs/heads/main',
     );
     expect(VaultRepoStorage.deleteRef).toHaveBeenCalledTimes(3);
+
+    // Packed refs are dropped first; deleteRef refuses to run while they exist.
+    expect(VaultRepoStorage.deletePackedRefs).toHaveBeenCalled();
+    expect(
+      asMock(VaultRepoStorage.deletePackedRefs).mock.invocationCallOrder[0],
+    ).toBeLessThan(
+      asMock(VaultRepoStorage.deleteRef).mock.invocationCallOrder[0],
+    );
 
     // State collections must be cleared.
     expect(VaultNamespaceStateModel.deleteAll).toHaveBeenCalled();

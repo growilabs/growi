@@ -11,16 +11,15 @@ import {
   vi,
 } from 'vitest';
 
-const { mockLoggerInfo, mockLoggerWarn } = vi.hoisted(() => ({
-  mockLoggerInfo: vi.fn(),
-  mockLoggerWarn: vi.fn(),
+const { mockLoggerError } = vi.hoisted(() => ({
+  mockLoggerError: vi.fn(),
 }));
 
 vi.mock('@growi/logger', () => ({
   loggerFactory: () => ({
-    info: mockLoggerInfo,
-    warn: mockLoggerWarn,
-    error: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: mockLoggerError,
     debug: vi.fn(),
   }),
 }));
@@ -71,58 +70,29 @@ beforeEach(() => {
   });
 });
 
-describe('init() on a repository with packed-refs', () => {
-  it('restores a packed ref that has no loose file, logs it, and removes packed-refs', async () => {
+describe('a repository with packed-refs', () => {
+  it('init() logs an error that asks for a rebuild and leaves the refs as they are', async () => {
     writePackedRefs([`${OID_A} ${REF_A}`]);
 
     await storage.init();
 
-    expect(looseRef(REF_A)).toBe(OID_A);
-    expect(fs.existsSync(path.join(repoPath, 'packed-refs'))).toBe(false);
-    expect(mockLoggerInfo).toHaveBeenCalledWith(
-      expect.objectContaining({ ref: REF_A, oid: OID_A }),
-      expect.any(String),
+    expect(mockLoggerError).toHaveBeenCalledWith(
+      expect.stringMatching(/Rebuild Vault/),
     );
+    expect(looseRef(REF_A)).toBeNull();
+    expect(fs.existsSync(path.join(repoPath, 'packed-refs'))).toBe(true);
   });
 
-  it('keeps a loose ref over its packed value and logs both values', async () => {
-    await storage.updateRef(REF_A, OID_B);
-    writePackedRefs([`${OID_A} ${REF_A}`]);
-
-    await storage.init();
-
-    expect(looseRef(REF_A)).toBe(OID_B);
-    expect(mockLoggerWarn).toHaveBeenCalledWith(
-      expect.objectContaining({
-        ref: REF_A,
-        packedOid: OID_A,
-        looseOid: OID_B,
-      }),
-      expect.any(String),
-    );
-  });
-
-  it('ignores the header and peeled lines', async () => {
-    writePackedRefs([`${OID_A} ${REF_A}`, `^${OID_C}`, `${OID_B} ${REF_B}`]);
-
-    await storage.init();
-
-    expect(looseRef(REF_A)).toBe(OID_A);
-    expect(looseRef(REF_B)).toBe(OID_B);
-  });
-});
-
-describe('ref access while packed-refs exists', () => {
   it('readRef refuses to report a ref without a loose file as missing', async () => {
     writePackedRefs([`${OID_A} ${REF_A}`]);
 
-    await expect(storage.readRef(REF_A)).rejects.toThrow(/packed-refs/);
+    await expect(storage.readRef(REF_A)).rejects.toThrow(/Rebuild Vault/);
   });
 
   it('deleteRef refuses to treat a ref without a loose file as deleted', async () => {
     writePackedRefs([`${OID_A} ${REF_A}`]);
 
-    await expect(storage.deleteRef(REF_A)).rejects.toThrow(/packed-refs/);
+    await expect(storage.deleteRef(REF_A)).rejects.toThrow(/Rebuild Vault/);
   });
 
   it('reads and deletes a loose ref as usual', async () => {
@@ -133,11 +103,24 @@ describe('ref access while packed-refs exists', () => {
     await storage.deleteRef(REF_A);
     expect(looseRef(REF_A)).toBeNull();
   });
+
+  it('deletePackedRefs() drops every packed ref', async () => {
+    writePackedRefs([`${OID_A} ${REF_A}`, `^${OID_C}`, `${OID_B} ${REF_B}`]);
+
+    await storage.deletePackedRefs();
+
+    expect(await storage.readRef(REF_A)).toBeNull();
+    expect(await storage.readRef(REF_B)).toBeNull();
+  });
 });
 
-describe('ref access without packed-refs', () => {
+describe('a repository without packed-refs', () => {
   it('reports a missing ref as null and deleting it as a no-op', async () => {
     expect(await storage.readRef(REF_A)).toBeNull();
     await expect(storage.deleteRef(REF_A)).resolves.toBeUndefined();
+  });
+
+  it('deletePackedRefs() is a no-op', async () => {
+    await expect(storage.deletePackedRefs()).resolves.toBeUndefined();
   });
 });

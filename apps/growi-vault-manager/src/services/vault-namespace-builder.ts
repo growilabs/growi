@@ -645,6 +645,9 @@ async function applyGrantChangePrefix(
  * vault_namespace_state + vault_user_views.  The object pool is preserved.
  */
 async function applyResetAll(namespaces: readonly string[]): Promise<void> {
+  // Packed refs first: deleteRef refuses to run while packed-refs exists.
+  await VaultRepoStorage.deletePackedRefs();
+
   // Delete every namespace ref from the bare repository.
   await Promise.all(
     namespaces.map((namespace) => VaultRepoStorage.deleteRef(nsRef(namespace))),

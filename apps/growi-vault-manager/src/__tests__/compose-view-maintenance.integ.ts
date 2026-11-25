@@ -29,8 +29,6 @@ import path from 'node:path';
 import { promisify } from 'node:util';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import * as VaultRepoStorage from '../services/vault-repo-storage.js';
-
 const execFileAsync = promisify(execFile);
 
 // ---------------------------------------------------------------------------
@@ -211,6 +209,62 @@ async function upsertNewPages(namespace: string, count: number): Promise<void> {
       bodyText: `# ${pageId}`,
     });
   }
+}
+
+/** Inserts a revision document and returns ids for an upsert payload. */
+async function newRevision(
+  body: string,
+): Promise<{ pageId: string; revisionId: string }> {
+  if (mongoose?.connection.db == null) {
+    throw new Error('Mongoose not connected');
+  }
+  const { ObjectId } = mongoose.mongo;
+  const pageId = new ObjectId();
+  const revisionId = new ObjectId();
+  await mongoose.connection.db
+    .collection('revisions')
+    .insertOne({ _id: revisionId, body, pageId });
+  return {
+    pageId: pageId.toHexString(),
+    revisionId: revisionId.toHexString(),
+  };
+}
+
+/**
+ * Inserts an instruction and waits until it is processed or has failed once.
+ */
+async function insertInstructionAndSettle(
+  op: string,
+  payload: Record<string, unknown>,
+): Promise<{ processed: boolean; lastError: string | null }> {
+  if (mongoose?.connection.db == null) {
+    throw new Error('Mongoose not connected');
+  }
+  const instructions = mongoose.connection.db.collection('vault_instructions');
+  const { insertedId } = await instructions.insertOne({
+    op,
+    payload,
+    issuedAt: new Date(),
+    processedAt: null,
+    attempts: 0,
+    lastError: null,
+  });
+
+  const deadline = Date.now() + 15_000;
+  while (Date.now() < deadline) {
+    // biome-ignore lint/performance/noAwaitInLoops: polling loop — must check state sequentially with delay between attempts
+    const doc = await instructions.findOne({ _id: insertedId });
+    if (doc?.processedAt != null || doc?.lastError != null) {
+      return {
+        processed: doc.processedAt != null,
+        lastError: (doc.lastError as string | null) ?? null,
+      };
+    }
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+  throw new Error(
+    `Instruction ${String(insertedId)} did not settle within 15 s`,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -637,26 +691,8 @@ async function triggerGcAndWait(): Promise<{
       expect(await listNamespaceFiles(ns)).toHaveLength(4);
     });
 
-    it('keeps every page of a namespace whose ref an earlier gc packed, once the repository is initialised again', {
-      timeout: 120_000,
-    }, async () => {
-      const ns = 'integ-pages-after-packed-ref-ns';
-      await upsertNewPages(ns, 3);
-      await execFileAsync('git', [
-        '-C',
-        requireRepoPath(),
-        'pack-refs',
-        '--all',
-        '--prune',
-      ]);
-
-      await VaultRepoStorage.init();
-      await upsertNewPages(ns, 1);
-
-      expect(await listNamespaceFiles(ns)).toHaveLength(4);
-    });
-
-    it('refuses a write to a namespace whose ref got packed while running, instead of replacing its pages', {
+    // Runs last: the reset-all it issues wipes every namespace.
+    it('refuses writes while refs are packed, until a rebuild (reset-all) clears them', {
       timeout: 120_000,
     }, async () => {
       const ns = 'integ-refuse-packed-ref-ns';
@@ -669,54 +705,22 @@ async function triggerGcAndWait(): Promise<{
         '--prune',
       ]);
 
-      if (mongoose == null) {
-        throw new Error('Mongoose not connected');
-      }
-      const db = mongoose.connection.db;
-      if (db == null) {
-        throw new Error('Mongoose connection db is null');
-      }
-      const { ObjectId } = mongoose.mongo;
-      const pageId = new ObjectId();
-      const revisionId = new ObjectId();
-
-      let lastError: unknown = null;
-      try {
-        await db
-          .collection('revisions')
-          .insertOne({ _id: revisionId, body: '# refused', pageId });
-        const { insertedId } = await db
-          .collection('vault_instructions')
-          .insertOne({
-            op: 'upsert',
-            payload: {
-              namespace: ns,
-              pageId: pageId.toHexString(),
-              pagePath: `/${ns}/refused`,
-              revisionId: revisionId.toHexString(),
-            },
-            issuedAt: new Date(),
-            processedAt: null,
-            attempts: 0,
-            lastError: null,
-          });
-
-        const deadline = Date.now() + 15_000;
-        while (lastError == null && Date.now() < deadline) {
-          // biome-ignore lint/performance/noAwaitInLoops: polling loop — must check state sequentially with delay between attempts
-          const doc = await db
-            .collection('vault_instructions')
-            .findOne({ _id: insertedId });
-          lastError = doc?.lastError ?? null;
-          await new Promise((resolve) => setTimeout(resolve, 200));
-        }
-      } finally {
-        // Restore loose refs for the namespaces later tests write to.
-        await VaultRepoStorage.init();
-      }
-
-      expect(lastError).toMatch(/packed-refs/);
+      const refused = await insertInstructionAndSettle('upsert', {
+        namespace: ns,
+        ...(await newRevision('# refused')),
+        pagePath: `/${ns}/refused`,
+      });
+      expect(refused.lastError).toMatch(/Rebuild Vault/);
       expect(await listNamespaceFiles(ns)).toHaveLength(3);
+
+      const rebuild = await insertInstructionAndSettle('reset-all', {});
+      expect(rebuild.lastError).toBeNull();
+      expect(fs.existsSync(path.join(requireRepoPath(), 'packed-refs'))).toBe(
+        false,
+      );
+
+      await upsertNewPages(ns, 1);
+      expect(await listNamespaceFiles(ns)).toHaveLength(1);
     });
   },
 );
