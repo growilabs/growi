@@ -672,9 +672,9 @@ class SearchService implements SearchQueryParser, SearchResolver {
     }
     const pageIds = items.map((item) => String(item.data._id));
 
-    const [{ pages }, highlights] = await Promise.all([
+    const [{ pages }, hits] = await Promise.all([
       this.findPageListByIds(pageIds),
-      this.searchHighlightsOfPages(input, pageIds),
+      this.searchHitsOfPages(input, pageIds),
     ]);
 
     const User = mongoose.model('User');
@@ -690,14 +690,15 @@ class SearchService implements SearchQueryParser, SearchResolver {
         return [];
       }
       toSearchedPageDocument(page, User);
-      const highlight = highlights.get(pageId);
+      const hit = hits.get(pageId);
       const meta =
-        highlight == null
+        hit == null
           ? item.meta
           : {
               ...item.meta,
+              bookmarkCount: hit.bookmarkCount,
               elasticSearchResult: toElasticSearchResult(
-                highlight,
+                hit.highlight,
                 this.canShowSnippet(page, user, userGroups),
               ),
             };
@@ -705,11 +706,14 @@ class SearchService implements SearchQueryParser, SearchResolver {
     });
   }
 
-  /** The highlight of each page that matches the query; empty on failure. */
-  private async searchHighlightsOfPages(
+  /**
+   * The highlight and bookmark count of each page that matches the query;
+   * empty on failure (research.md 14.4).
+   */
+  private async searchHitsOfPages(
     { terms, resolvedFilterData, viewer }: AttachmentSearchInput,
     pageIds: readonly string[],
-  ): Promise<Map<string, unknown>> {
+  ): Promise<Map<string, { highlight: unknown; bookmarkCount: number }>> {
     try {
       const { data } = await withTimeout(
         this.fullTextSearchDelegator.searchWithinPages(
@@ -720,7 +724,15 @@ class SearchService implements SearchQueryParser, SearchResolver {
         ),
         FACET_SNIPPET_TIMEOUT_MS,
       );
-      return new Map(data.map((hit) => [hit._id, hit._highlight]));
+      return new Map(
+        data.map((hit) => [
+          hit._id,
+          {
+            highlight: hit._highlight,
+            bookmarkCount: hit._source.bookmark_count || 0,
+          },
+        ]),
+      );
     } catch (err) {
       logger.warn(
         { err },
