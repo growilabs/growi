@@ -651,7 +651,7 @@ Independent of B4/B5.
   - _Boundary: backlinks-backfill-admin routes_
   - _Depends: B3.1, B3.3_
 
-- [ ] B3.7 Add the admin settings section and the panel's partial-index state
+- [x] B3.7 Add the admin settings section and the panel's partial-index state
   - Add an SWR hook for the job state and a section in the admin settings with a scope picker (all
     pages, newest N, edited after a date), progress (processed of `runTotal`, count and percent, capped at 99% until
     `complete` and with skipped pages as their own count, per design.md's "Counts shown to the admin") over the admin Socket.IO channel, the
