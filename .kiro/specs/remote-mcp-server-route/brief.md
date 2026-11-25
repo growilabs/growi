@@ -107,7 +107,9 @@ GROWI の利用者は、claude.ai などの MCP クライアントから wiki �
 
 ## 未決の論点
 
-1. **取得元を `Authorization: Bearer` に限る方法。** parser にオプションを足すか（`access-token-parser` への書き戻しが要る）、`/_api/v3/mcp` 側で先に判定するか。設計で決める。
-2. **Activity の記録の単位。** 上記の推奨案を要件で確定する。
-3. **単独でリリースしない方法。** 有効化フラグの既定が無効であることだけで足りるとするか、`remote-mcp-server-oauth` が揃うまで管理画面に項目を出さないか。
-4. **`/_api/v3/mcp` と認可サーバーのフラグを分けるか。** この spec のフラグを `remote-mcp-server-oauth` がそのまま使うなら、設定キーの名前を「MCP 連携全体」を表すものにしておく。
+残っていない。discovery の時点の 4 点は、次のとおり決まった。
+
+1. **取得元を `Authorization: Bearer` に限る方法** — `accessTokenParser` を使わず、Bearer のトークンだけを見る認証を MCP のルートに置く。parser は変更しない（[design.md](./design.md) の McpAuth）。
+2. **Activity の記録の単位** — ツール呼び出しの単位（要件 7）。
+3. **単独でリリースしない方法** — 統合ブランチの運用で守る（requirements.md の要件判断 4）。
+4. **フラグを分けるか** — 「MCP 連携全体」で 1 つ（`app:mcpEnabled`）。

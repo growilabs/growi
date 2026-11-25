@@ -214,7 +214,7 @@ umbrella 全体の調査（claude.ai の挙動、MCP の仕様、先行事例）
 - **管理画面は、既存の「AI 連携」の管理ページ（`pages/admin/ai.page.tsx`、`features/mastra/client/admin/`）に MCP の節を足す（2026-11-25、ユーザー確認済み）**。新しい管理ページとナビゲーションの項目は作らない。MCP の節は、GROWI AI の有効・無効や LLM の設定の状態にかかわらず操作できるようにする（要件 1.8・1.9）。既存の AI 設定の画面が、未設定のときに他の項目を隠す・無効にする作りになっていないかを、設計で確かめる。
 - **ツールの構成は Option C のまま**。既存の 2 ツールから処理の中身を関数として取り出し、MCP 用のツール定義を `features/mastra` の中に、エージェント用の定義とは別に置く。閲覧権限の判定を 1 か所に保ったまま、MCP 向けの定義を分けられる。Option A の欠点（`mapAuthInfoToUser` の副作用、定義の混在）は、これで避けられる。
 - **URL は `/_api/v3/mcp` のまま**。`features/mastra` のルーター（`/_api/v3/mastra`）は、全体に `aiReadyGuard` をかけている（`features/mastra/server/routes/index.ts`）。その下に置くと要件 1.8（AI の設定に左右されない）に反するので、MCP のルートは別にマウントする。`features/mastra` の中のコードを別の URL にマウントする前例は、`routes/admin-ai-settings` にある。
-- 認証は、`/_api/v3/mcp` をセッションの対象から外したうえで（3.8）、「Bearer が無ければ 401」の判定と `accessTokenParser` を、差し込み口の暫定の中身にする（3.1 の (a)）。
+- ~~認証は、`/_api/v3/mcp` をセッションの対象から外したうえで（3.8）、「Bearer が無ければ 401」の判定と `accessTokenParser` を、差し込み口の暫定の中身にする（3.1 の (a)）。~~ 設計で取り下げた。セッションの対象から外すと csurf と passport がエラーになる。下の「Design Discovery」の Decision を参照。
 - Activity は、MCP 用のツールの `execute` の中で `createActivity` を直接呼ぶ（3.6 の (a)）。
 - `mongoSanitize` は、`/_api/v3/mcp` を除外する（3.2）。
 
@@ -238,4 +238,103 @@ umbrella 全体の調査（claude.ai の挙動、MCP の仕様、先行事例）
 10. claude.ai が配列のリクエストを送らないこと（1.3）。
 
 ---
-_Updated: 2026-11-25. 置き場所を `features/mastra` にする決定を、設計への申し送りに足した。Prior: 2026-11-25. パスを `/_api/v3/mcp` にする決定を反映した（1.1 を解決済みにし、`CertifyOrigin` の制約を 3.9 に足した）。Prior: 2026-11-24. ギャップ分析を記録。_
+
+## Design Discovery（2026-11-25）
+
+- **Discovery Scope**: Extension（既存の Express と `features/mastra` への組み込み）。ギャップ分析と umbrella の調査が済んでいるので、統合点の確認に絞った。
+- **Key Findings**:
+  - セッションを通さないリクエストは、csurf と passport でエラーになる。`avoid-session-routes` は `/_api/v3/mcp` に使えない。
+  - 既存の回数制限は「利用者 1 人あたり」と「IP 1 つあたり」の 2 つをすでに持っている。足りないのは、認証の後に前者を呼ぶ手段だけである。
+  - 監査ログのカテゴリは、アクション名の接頭辞で決まる。接頭辞に合わないアクションは、絞り込みの一覧に出ない。
+
+### Research Log
+
+#### セッションを通さない経路の可否
+
+- **Context**: ギャップ分析の 3.1 と 3.8 は、`/_api/v3/mcp` をセッションの対象から外すことを勧めていた。
+- **Sources Consulted**: `server/crowi/express-init.js`、`csurf@1.11.0` の `index.js`、`passport@0.6.0` の `lib/strategies/session.js`。
+- **Findings**:
+  - csurf は、メソッドの判定より前に `req.session` から secret を読む。`req.session` が無いと `misconfigured csrf` を投げる。
+  - passport 0.6 の `SessionStrategy` は、`req.session` が無いと `Login sessions require session support` のエラーにする。
+  - `FIXED_SESSION_ID_PATHS`（`server/crowi/session-id.ts`）は、Cookie の無いリクエストに固定のセッション ID を割り当てる。healthcheck と ai-usage が使っている。
+- **Implications**: 固定のセッション ID を使う。この場合、ブラウザのセッションを持つリクエストでは `req.user` が入った状態でルートに届く。認証は `req.user` を見ない作りにする。
+
+#### 既存の回数制限の構造
+
+- **Context**: ギャップ分析の Research Needed 8（利用者単位の上限を、運用者がどう変えるか）。
+- **Sources Consulted**: `features/rate-limiter/middleware/factory.ts`、`consume-points.ts`、`rate-limiter-factory.ts`、`utils/config-generator.ts`、`config/index.ts`。
+- **Findings**:
+  - グローバルの制限は、利用者単位（`maxRequests`）と IP 単位（`maxRequests × usersPerIpProspection`）を、同じエンドポイントの設定から数える。
+  - エンドポイントの設定は、`defaultConfig` と env（`API_RATE_LIMIT_<名前>_ENDPOINT` / `_METHODS` / `_MAX_REQUESTS` / `_USERS_PER_IP`）を合成して作る。合成の結果は `factory.ts` のモジュールの中にあり、外から読めない。
+  - env で `_USERS_PER_IP` を省くと、`Number(undefined)` が `NaN` になり、IP 単位の枠が `NaN` になる。
+- **Implications**: 設定の解決を関数として取り出し、`consumeUserPoints` を公開する。同じ設定を使うので、既存の env がそのまま利用者単位の上限にも効く。Research Needed 8 は解決した。
+
+#### 管理 API のスコープ
+
+- **Context**: ギャップ分析の Research Needed 7。
+- **Findings**: `admin-ai-settings` は `SCOPE.READ.ADMIN.AI` と `SCOPE.WRITE.ADMIN.AI` を使っている。
+- **Implications**: MCP の設定は同じ管理ページに置くので、同じスコープを使う。新しいスコープは作らない。
+
+#### 既存の AI 設定の画面の作り
+
+- **Context**: MCP の節を、AI の設定の状態によらず操作できるようにする（要件 1.9）。
+- **Findings**: `AiSettings` は、1 つの react-hook-form と 1 回の PUT で全体を保存する。設定の読み込みが済むまで何も描画しない。env だけで設定する方式では、有効化のスイッチが無効になる。
+- **Implications**: MCP の節を `AiSettings` のフォームに入れると、これらの影響を受ける。`AiSettings` と並ぶ独立した部品にして、自分の取得と保存を持たせる。
+
+### Design Decisions
+
+#### Decision: 認証は `accessTokenParser` を使わず、独立した関数にする
+
+- **Context**: 要件 2.2〜2.4（Bearer だけ）と 2.7（セッションだけでは 401）。固定のセッション ID を使うので、`req.user` が入った状態で届くことがある。
+- **Alternatives Considered**:
+  1. `accessTokenParser` の前に `req.user` を消し、Bearer の有無を先に見る。
+  2. parser の中身を関数として取り出し、parser と MCP の両方から使う。
+  3. `extractBearerToken` と `AccessToken.findUserIdByToken` を直接使う、独立した認証を書く。
+- **Selected Approach**: 3。
+- **Rationale**: 認証は `remote-mcp-server-oauth` が置き換える。置き換えたあとに残るものを作らないよう、1 ファイルで消せる形にする。2 は、置き換えの後に使われない公開の関数が `access-token-parser` に残る。1 は、打ち消しの処理が parser の内部の動作に依存する。
+- **Trade-offs**: 「閲覧専用の利用者を拒否する」判定が、parser と 2 か所になる。境界のテストで固定する。
+- **Follow-up**: `remote-mcp-server-oauth` が認証を差し替えるときに、`access-token-authenticator.ts` を削除する。
+
+#### Decision: 呼び出し元の情報は `AuthInfo.extra` で運ぶ
+
+- **Context**: ツールは、利用者・IP・エンドポイントを必要とする（閲覧権限の判定と Activity）。
+- **Alternatives Considered**:
+  1. `mapAuthInfoToUser` で利用者を requestContext に入れ、IP とエンドポイントは `authInfo.extra` から読む。
+  2. `AsyncLocalStorage` で運ぶ（Postiz の方法）。
+  3. 3 つとも `authInfo.extra` に入れ、1 つの関数で取り出す。
+- **Selected Approach**: 3。
+- **Rationale**: 取り出す場所が 1 か所になり、型ガードも 1 つで済む。ライブラリが用意した経路だけを使う。
+- **Follow-up**: `extra` の値がそのまま届くことを、実装の最初に確かめる（design.md の Verification Checkpoints 3）。届かなければ 1 にする。
+
+#### Decision: MCP 用のツールは宣言の一覧にして、実行役を 1 つにする
+
+- **Context**: Activity の記録と、例外を固定の出力に置き換える処理は、どのツールでも同じである。
+- **Selected Approach**: ツールごとに宣言（名前、アクション、スキーマ、中身、固定の出力）を書き、`buildMcpTools` が同じ手順で `createTool` のツールにする。
+- **Rationale**: リポジトリの規約（実行役は対象の一覧を引数で受け取る）に沿う。ツールを足すときに、記録や例外の扱いを書き忘れない。`change-proposal` umbrella が将来 MCP のツールを足すときも、宣言を足すだけで済む。
+
+#### Decision: 「全文検索が使えない」は、接続先が設定されていないことを指す
+
+- **Context**: ギャップ分析の 1.4。
+- **Selected Approach**: 共有関数は、既存のツールと同じ `isElasticsearchEnabled === false` を「使えない」とする。接続先が落ちているときは例外になり、「失敗した」として返る。
+- **Rationale**: エージェント用のツールの動作を変えずに、中身を共有できる（要件 8.1）。MCP の利用者には、どちらも「検索できない」ことが伝わる。
+
+#### Decision: 本文サイズの上限は、この spec で扱わない
+
+- **Context**: brief は「`/_api/v3/mcp` に合った上限を設計で決める」としていた。
+- **Selected Approach**: 扱わない（design.md の Non-Goals）。
+- **Rationale**: 本文は、ルートに届く前にグローバルの `bodyParser.json` が読み終える。ルートで上限を見ても、メモリの消費は防げない。上限を下げるには、全 API に関わる `express-init.js` の変更が要る。
+
+### Synthesis
+
+- **Generalization**: 「利用者単位の回数制限を、認証の後に呼ぶ」は MCP に固有ではないので、`features/rate-limiter` の公開の関数にした。`mongoSanitize` の除外も、パスの一覧を受け取る包みにした。どちらも、今の利用者は MCP の 1 つだけである。
+- **Build vs. Adopt**: MCP のプロトコルは `@mastra/mcp` に任せる。回数の計数、Activity、設定、閲覧権限の判定は、既存のものを使う。新しく作るのは、認証の差し込み口と、ツールの宣言と実行役だけである。
+- **Simplification**: `mapAuthInfoToUser` と requestContext、MCP 専用の管理ページ、MCP 専用の管理用スコープ、本文サイズの検査を外した。
+
+### Risks & Mitigations
+
+- claude.ai が送るプロトコルの版・`Origin`・バッチの有無が未確認 — 実装の最初と、実機での確認で確かめる（design.md の Verification Checkpoints 8）。
+- `@mastra/mcp` 2.8.0 の動作のうち、コードを読んだだけのものがある — Verification Checkpoints 1〜5 を、実装の最初のタスクにする。
+- 既存ツールからの取り出しで、AI チャットの結果が変わる — 既存の spec を変えずに通すことを、取り出しのタスクの完了条件にする。
+
+---
+_Updated: 2026-11-25. 設計の調査と判断（Design Discovery）を足した。Prior: 2026-11-25. 置き場所を `features/mastra` にする決定を、設計への申し送りに足した。Prior: 2026-11-25. パスを `/_api/v3/mcp` にする決定を反映した（1.1 を解決済みにし、`CertifyOrigin` の制約を 3.9 に足した）。Prior: 2026-11-24. ギャップ分析を記録。_

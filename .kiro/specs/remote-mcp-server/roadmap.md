@@ -79,7 +79,7 @@ GROWI 本体に MCP サーバーを組み込み、claude.ai（web 版 Claude）�
 1. **DCR（`POST /oauth/register`）に対応するか。** claude.ai・Claude Code・ChatGPT・VS Code は CIMD に対応している。Cursor と Gemini CLI は DCR が必須という第三者の報告がある。手動発行のトークンを受け付けないので、CIMD だけに対応した場合、これらのクライアントは接続する手段が無い。DCR は MCP 仕様 2026-07-28 で非推奨。推奨案は「初回は CIMD のみ。要望が出てから足す」。`remote-mcp-server-oauth` の要件で決める。
 2. **OAuth で発行するアクセストークンの持ち方。** 案 A は既存の AccessToken に「どの連携から発行したか」の参照を足す（`/_api/v3/mcp` では、参照を持つトークンだけを選り分ける。発行トークンは、同じスコープを要求する REST API でも通る）。案 B は OAuth 専用の Prisma モデル（発行トークンを `/_api/v3/mcp` 専用に閉じられる。`/_api/v3/mcp` は `accessTokenParser` を使わなくなるので、同 parser の約束は変わらない）。推奨案は B。「認可サーバーが発行したトークンだけを受け付ける」という決定に、そのまま沿うためである。`remote-mcp-server-oauth` の要件で決める。
 3. **Basic 認証つき環境向けのプロキシ除外設定を、どこに書くか。** リポジトリ内にリバースプロキシの文書は無く、外部の docs.growi.org にある。推奨案は docs.growi.org への追記を `remote-mcp-server-oauth` の成果物に挙げ、管理画面の MCP 設定にも要点を表示すること。
-4. **`remote-mcp-server-route` を単独でリリースしない方法。** 有効化フラグの既定が無効であることだけで足りるとするか、`remote-mcp-server-oauth` が揃うまで管理画面に項目を出さないか。`remote-mcp-server-route` の要件で決める。
+4. ~~`remote-mcp-server-route` を単独でリリースしない方法。~~ 統合ブランチ `feat/remote-mcp-server` の運用で守ると決めた。`remote-mcp-server-oauth` が揃うまで master へ入れない。管理画面の項目を隠す仕組みは作らない。
 
 ---
 _Updated: 2026-11-25. MCP エンドポイントのパスを `/mcp` から `/_api/v3/mcp` に変えた（wiki のページのパスと衝突しないため）。Prior: 2026-11-24. リリース時の `/_api/v3/mcp` は認可サーバーが発行したトークンだけを受け付ける、と決めた。手動発行のトークンを代替手段として残す決定を取り消し、2 spec の接点と未決 1・2 を合わせて直した。Prior: 2026-11-24. discovery で作成。_
