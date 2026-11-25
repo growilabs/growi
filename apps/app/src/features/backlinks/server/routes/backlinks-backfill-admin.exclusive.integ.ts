@@ -667,6 +667,21 @@ describe('backlinks backfill admin routes', () => {
       expect((await post('resume')).status).toBe(200);
     });
 
+    it('cancels a resume of a failed run not yet claimed to stopped, keeping its progress', async () => {
+      await patchJob(FAILED_NOT_RETRIED);
+      await post('resume');
+
+      const res = await post('stop');
+
+      expect(res.status).toBe(200);
+      expect(await readJob()).toMatchObject({
+        status: 'stopped',
+        runTotal: 50,
+        processed: 20,
+        progressMarker: '0000000000000000000000aa',
+      });
+    });
+
     it('flags a run under a live lease, leaving its claim for the loop to settle', async () => {
       await claimRunning('owner-live');
 
@@ -799,6 +814,7 @@ describe('backlinks backfill admin routes', () => {
         status: 'requested',
         failedAttempts: 0,
         retryAt: null,
+        lastError: null,
         runTotal: 50,
         progressMarker: '0000000000000000000000aa',
         processed: 20,
