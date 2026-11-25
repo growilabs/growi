@@ -757,17 +757,37 @@ async function triggerGcAndWait(): Promise<{
       expect(await listNamespaceFiles(ns)).toHaveLength(4);
     });
 
-    // Runs last: every reset-all issued here wipes every namespace.
-    describe('while refs are packed', () => {
-      async function rebuildVault(issuedAt?: Date): Promise<void> {
-        const rebuild = await insertInstructionAndSettle(
-          'reset-all',
-          {},
-          issuedAt,
-        );
-        expect(rebuild.lastError).toBeNull();
-      }
+    // The tests below run last: every reset-all they issue wipes every namespace.
+    async function rebuildVault(issuedAt?: Date): Promise<void> {
+      const rebuild = await insertInstructionAndSettle(
+        'reset-all',
+        {},
+        issuedAt,
+      );
+      expect(rebuild.lastError).toBeNull();
+    }
 
+    it('a rebuild (reset-all) wipes every namespace ref, its state and the composed views', {
+      timeout: 120_000,
+    }, async () => {
+      const ns = 'integ-rebuild-ns';
+      await upsertNewPages(ns, 2);
+      await callComposeView('cafebabedeadbeef00000006', [ns]);
+
+      await rebuildVault();
+
+      const db = mongoose?.connection.db;
+      expect(await resolveRef(namespaceRef(ns))).toBeNull();
+      expect(
+        await db?.collection('vault_namespace_state').countDocuments(),
+      ).toBe(0);
+      expect(await db?.collection('vault_user_views').countDocuments()).toBe(0);
+
+      await upsertNewPages(ns, 1);
+      expect(await listNamespaceFiles(ns)).toHaveLength(1);
+    });
+
+    describe('while refs are packed', () => {
       afterEach(async () => {
         if (packedRefsExist()) {
           await rebuildVault();
