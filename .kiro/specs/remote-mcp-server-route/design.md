@@ -217,9 +217,11 @@ server/middlewares/
 
 ```mermaid
 flowchart TD
-    Start[Request to api v3 mcp] --> Maint{Maintenance mode}
+    Start[Request under api v3 mcp] --> Maint{Maintenance mode}
     Maint -->|yes| R503[503]
-    Maint -->|no| Enabled{isMcpAvailable}
+    Maint -->|no| Exact{Path is exactly the endpoint}
+    Exact -->|no| Fall
+    Exact -->|yes| Enabled{isMcpAvailable}
     Enabled -->|no| Fall[Fall through as unknown path]
     Enabled -->|yes| AuthQ{authenticate}
     AuthQ -->|not authenticated| R401[respondAuthFailure]
@@ -370,7 +372,10 @@ export const factory: (crowi: Crowi) => express.Router;
 | POST | `/_api/v3/mcp` | JSON-RPC 2.0 のメッセージ 1 件。`Authorization: Bearer <token>` | MCP の応答（2025 年の各版は SSE、2026-07-28 版は JSON） | 400（バッチ）、401、429、500、503 |
 | GET / DELETE | `/_api/v3/mcp` | — | — | 401（未認証）、405（認証済み） |
 
-- マウント: `app.use(MCP_ENDPOINT_PATH, unavailableWhenMaintenanceModeForApi, mcpRouteFactory(crowi))` を、`/_api/v3` の本体のルーターの直前に置く。ルーターは `/` だけを受ける。`/_api/v3/mcp/xxx` は素通しする。
+- マウント: `app.use(MCP_ENDPOINT_PATH, unavailableWhenMaintenanceModeForApi, mcpRouteFactory(crowi))` を、`/_api/v3` の本体のルーターの直前に置く。`app.use` は前方一致で、大文字と小文字や末尾のスラッシュも区別しないので、`/_api/v3/mcp/`、`/_api/v3/MCP`、`/_api/v3/mcp/xxx` もルーターに届く。
+- **パスの一致の規則**: MCP エンドポイントは、パスが `MCP_ENDPOINT_PATH` と 1 文字も違わずに一致するリクエストだけである。ルーターは、最初に `req.originalUrl` のパスの部分（クエリを除く）を `MCP_ENDPOINT_PATH` と比べ、一致しなければ `next()` を呼ぶ。末尾のスラッシュつきや大文字の違いは、存在しないパスと同じ応答になる。認証・利用者単位の計数・ハンドラの読み込みには進まない。
+  - `mongoSanitize` の除外と固定のセッション ID も、同じ定数との完全一致で決まる。そのため「MCP エンドポイントとして扱われるリクエスト」と「除外と固定のセッション ID が効くリクエスト」は、常に同じ集合になる。`startHTTP` の比較（`httpPath` との完全一致）とも一致する。
+  - グローバルの回数制限だけは、パスを小文字にし、末尾のスラッシュを取ってから設定を探す。表記の違うパスへのリクエストも、`/_api/v3/mcp` の IP 単位の枠で数えられる。存在しないパスへのリクエストを同じ枠で数えるだけなので、害は無い。
 - `isMcpAvailable()` が偽のときは `next()` を呼ぶ。後続のルーターに一致する経路が無いので、存在しない `/_api/v3/*` のパスと同じ応答になる（1.4、1.10）。判定はリクエストごとに行うので、設定の変更は再起動なしで効く（1.2、1.3、1.11）。
 - 401・429・400・500 の本文は、`json-rpc-error-response.ts` が書く固定の JSON-RPC エラーである（`id` は `null`）。内部の情報を含めない。
 
@@ -857,6 +862,7 @@ HTTP の層のエラーと、ツールの結果としてのエラーを分ける
 
 - **認証の境界**（`access-token-authenticator.integ.ts`、MongoDB を使う）: 有効なトークン、期限切れ、スコープ不足、存在しないトークン、閲覧専用の利用者、`X-GROWI-ACCESS-TOKEN` だけ、クエリだけ、本文だけ、旧形式の API トークン（2.1〜2.6）。
 - **ルーターの処理の順序**（`routes/mcp/index.integ.ts`、`McpRequestHandler` は差し替える）:
+  - `/_api/v3/mcp/`、`/_api/v3/MCP`、`/_api/v3/mcp/xxx` は、有効で正しいトークンがあっても、存在しないパスと同じ応答になり、認証もハンドラも呼ばれない。
   - 無効のとき、存在しないパスと同じ応答になる（1.4）。有効でもサイト URL が未設定なら、同じ応答になる（1.10）。
   - `req.user` が入っていても、Bearer が無ければ 401 になる（2.7）。401 に `WWW-Authenticate` と `Location` が無い（2.9）。
   - 401 の応答が、失敗の理由（`missing_token`、`invalid_token`）によらず同じである（2.10）。
