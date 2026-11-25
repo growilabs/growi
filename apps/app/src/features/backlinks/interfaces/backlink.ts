@@ -8,6 +8,18 @@ export interface IBacklinkResponse {
   // null: the forward-link lookup failed (backlinks are still returned)
   // []: the lookup succeeded and there are no problematic links
   linkTargets: ILinkTarget[] | null;
+  // null: the job read failed (backlinks are still returned); the panel then flags nothing
+  indexState: IBacklinksIndexState | null;
+}
+
+/**
+ * What every reader of the panel may know about the backfill: whether backlinks from older
+ * pages can be missing. Run details (errors, counts, the claim) stay on the admin endpoint.
+ */
+export interface IBacklinksIndexState {
+  coverage: 'none' | 'partial' | 'all';
+  // ISO 8601; set exactly when coverage is 'partial'
+  coveredSince: string | null;
 }
 
 export interface ILinkTarget {

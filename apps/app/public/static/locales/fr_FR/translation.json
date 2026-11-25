@@ -1,6 +1,8 @@
 {
   "backlinks": {
     "failed_to_fetch": "Échec de la récupération des rétroliens.",
+    "index_building": "L'index des rétroliens est encore en construction ; les rétroliens des pages non modifiées depuis l'activation de cette fonctionnalité peuvent manquer.",
+    "index_partial": "Les rétroliens des pages non modifiées depuis le {{coveredSince}} ne sont pas inclus.",
     "link_status_unavailable": "Impossible de vérifier l'état des liens.",
     "no_backlinks": "Il n'y a pas encore de rétroliens.",
     "outgoing_needing_attention": "Liens sortants nécessitant votre attention",
