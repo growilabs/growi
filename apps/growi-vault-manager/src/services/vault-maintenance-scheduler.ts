@@ -240,6 +240,8 @@ export function createVaultMaintenanceScheduler(): VaultMaintenanceScheduler {
   // queue them again.
   const inflightSquash = new Set<string>();
 
+  let tickInProgress = false;
+
   // ---------------------------------------------------------------------------
   // Squash logic
   // ---------------------------------------------------------------------------
@@ -344,8 +346,13 @@ export function createVaultMaintenanceScheduler(): VaultMaintenanceScheduler {
       })
       .map((state) => squashNamespaceLocked(state.namespace));
 
-    // Run all eligible squashes concurrently; errors are non-fatal per namespace.
-    await Promise.all(tasks);
+    // Errors are non-fatal per namespace; wait for every squash to settle.
+    const results = await Promise.allSettled(tasks);
+    for (const result of results) {
+      if (result.status === 'rejected') {
+        logger.error({ err: result.reason }, 'squash failed');
+      }
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -425,6 +432,19 @@ export function createVaultMaintenanceScheduler(): VaultMaintenanceScheduler {
    * Errors in one track are caught independently so the other can still run.
    */
   async function tick(): Promise<void> {
+    // A squash can wait on a long instruction; never let ticks overlap.
+    if (tickInProgress) {
+      return;
+    }
+    tickInProgress = true;
+    try {
+      await runMaintenance();
+    } finally {
+      tickInProgress = false;
+    }
+  }
+
+  async function runMaintenance(): Promise<void> {
     try {
       await runSquashCheck();
     } catch (err) {

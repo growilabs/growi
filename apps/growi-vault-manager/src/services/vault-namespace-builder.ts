@@ -21,6 +21,7 @@ import type { VaultInstructionDoc } from '@growi/core/dist/interfaces/vault';
 import { loggerFactory } from '@growi/logger';
 
 import { RevisionModel } from '../models/revision.js';
+import { VaultInstructionModel } from '../models/vault-instruction.js';
 import { VaultNamespaceStateModel } from '../models/vault-namespace-state.js';
 import { VaultUserViewModel } from '../models/vault-user-view.js';
 import * as VaultBlobHasher from './vault-blob-hasher.js';
@@ -643,10 +644,14 @@ async function applyGrantChangePrefix(
 /**
  * Handles op === 'reset-all': delete every namespace ref and clear
  * vault_namespace_state + vault_user_views.  The object pool is preserved.
+ * Instructions still pending from before the wipe are superseded by it: the
+ * rebuild that follows re-derives their effect from the database.
  */
-async function applyResetAll(namespaces: readonly string[]): Promise<void> {
-  // Packed refs first: deleteRef refuses to run while packed-refs exists.
-  await VaultRepoStorage.deletePackedRefs();
+async function applyResetAll(
+  instruction: VaultInstructionDoc,
+  namespaces: readonly string[],
+): Promise<void> {
+  await VaultRepoStorage.dropPackedNamespaceRefs();
 
   // Delete every namespace ref from the bare repository.
   await Promise.all(
@@ -656,6 +661,7 @@ async function applyResetAll(namespaces: readonly string[]): Promise<void> {
   // Clear MongoDB state collections.
   await VaultNamespaceStateModel.deleteAll();
   await VaultUserViewModel.deleteAll();
+  await VaultInstructionModel.supersedeUnprocessedBefore(instruction.issuedAt);
 }
 
 // ---------------------------------------------------------------------------
@@ -722,7 +728,7 @@ async function dispatchOp(
       await applyGrantChangePrefix(instruction);
       break;
     case 'reset-all':
-      await applyResetAll(namespaces);
+      await applyResetAll(instruction, namespaces);
       break;
     default: {
       // TypeScript exhaustiveness check

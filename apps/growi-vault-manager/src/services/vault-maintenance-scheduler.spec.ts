@@ -78,7 +78,6 @@ const ONE_TICK_MS = 5 * 60 * 1000;
 /** Snapshot of IVaultNamespaceState shape used by scheduler queries. */
 interface NamespaceStateRow {
   namespace: string;
-  commitOid: string;
   version: number;
   updatedAt: Date;
 }
@@ -207,6 +206,16 @@ async function runOneTick(): Promise<void> {
   await vi.advanceTimersByTimeAsync(ONE_TICK_MS);
 }
 
+/** Finds every execFile call that runs the given git sub-command. */
+function findExecFileCalls(subCommand: string): unknown[][] {
+  return vi
+    .mocked(childProcess.execFile)
+    .mock.calls.filter(
+      (args) =>
+        Array.isArray(args[1]) && (args[1] as string[]).includes(subCommand),
+    );
+}
+
 /**
  * Finds an execFile call that matches the given git sub-command (e.g. 'gc').
  */
@@ -281,7 +290,6 @@ describe('VaultMaintenanceScheduler', () => {
       mockFind([
         {
           namespace: 'public',
-          commitOid: 'abc123',
           version: 1001,
           updatedAt: now,
         },
@@ -317,7 +325,6 @@ describe('VaultMaintenanceScheduler', () => {
       mockFind([
         {
           namespace: 'public',
-          commitOid: 'abc123',
           version: 1000,
           updatedAt: now,
         },
@@ -340,7 +347,6 @@ describe('VaultMaintenanceScheduler', () => {
       mockFind([
         {
           namespace: 'public',
-          commitOid: 'abc123',
           version: 5,
           updatedAt: twoHoursAgo,
         },
@@ -363,7 +369,6 @@ describe('VaultMaintenanceScheduler', () => {
       mockFind([
         {
           namespace: 'public',
-          commitOid: 'abc123',
           version: 5,
           updatedAt: thirtyMinutesAgo,
         },
@@ -451,7 +456,6 @@ describe('VaultMaintenanceScheduler', () => {
       mockFind([
         {
           namespace: 'public',
-          commitOid: 'abc123',
           version: 11,
           updatedAt: now,
         },
@@ -476,7 +480,6 @@ describe('VaultMaintenanceScheduler', () => {
       mockFind([
         {
           namespace: 'public',
-          commitOid: 'abc123',
           version: 0,
           updatedAt: tenMinutesAgo,
         },
@@ -544,7 +547,6 @@ describe('VaultMaintenanceScheduler', () => {
       mockFind([
         {
           namespace: 'public',
-          commitOid: 'abc123',
           version: 2000,
           updatedAt: now,
         },
@@ -617,7 +619,6 @@ describe('VaultMaintenanceScheduler', () => {
       mockFind([
         {
           namespace: 'public',
-          commitOid: 'abc123',
           version: 2000,
           updatedAt: now,
         },
@@ -682,12 +683,9 @@ describe('VaultMaintenanceScheduler', () => {
         return Promise.resolve();
       });
       mockFindOneAndUpdate();
-      // The state row still points at c1: it was read before the instruction
-      // below advanced the ref.
       mockFind([
         {
           namespace: 'public',
-          commitOid: 'c1',
           version: 1001,
           updatedAt: new Date(),
         },
@@ -737,6 +735,75 @@ describe('VaultMaintenanceScheduler', () => {
       expect(VaultRepoStorage.updateRef).not.toHaveBeenCalled();
       expect(VaultNamespaceStateModel.findOneAndUpdate).not.toHaveBeenCalled();
       expect(scheduler.getLastSquashAt()).toBeNull();
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Tick robustness
+  // ---------------------------------------------------------------------------
+
+  describe('tick robustness', () => {
+    const PUBLIC_REF = 'refs/namespaces/public/refs/heads/main';
+    const GROUP_REF = 'refs/namespaces/group-g1/refs/heads/main';
+    let releaseWrites: () => void = () => {};
+
+    beforeEach(() => {
+      const writesGate = new Promise<void>((r) => {
+        releaseWrites = r;
+      });
+      vi.mocked(VaultRepoStorage.readTree).mockResolvedValue([]);
+      vi.mocked(VaultRepoStorage.writeTree).mockResolvedValue('tree-oid');
+      vi.mocked(VaultRepoStorage.writeCommit).mockImplementation(async () => {
+        await writesGate;
+        return 'squashed-oid';
+      });
+      vi.mocked(VaultRepoStorage.updateRef).mockResolvedValue(undefined);
+      mockFindOneAndUpdate();
+    });
+
+    afterEach(() => {
+      releaseWrites();
+    });
+
+    it('lets every squash settle before the gc check, even when one of them fails', async () => {
+      mockFind([
+        { namespace: 'public', version: 2000, updatedAt: new Date() },
+        { namespace: 'group-g1', version: 2000, updatedAt: new Date() },
+      ]);
+      vi.mocked(VaultRepoStorage.readRef).mockImplementation((ref) =>
+        ref === PUBLIC_REF
+          ? Promise.reject(new Error('unreadable'))
+          : Promise.resolve('abc123'),
+      );
+      let gcChecked = false;
+      const gcCheck = whenGcCheckRuns().then(() => {
+        gcChecked = true;
+      });
+
+      scheduler.start();
+      await runOneTick();
+      expect(gcChecked).toBe(false);
+
+      releaseWrites();
+      await gcCheck;
+      expect(VaultRepoStorage.updateRef).toHaveBeenCalledWith(
+        GROUP_REF,
+        'squashed-oid',
+      );
+    });
+
+    it('skips a tick while the previous one is still running', async () => {
+      mockFind([{ namespace: 'public', version: 2000, updatedAt: new Date() }]);
+      vi.mocked(VaultRepoStorage.readRef).mockResolvedValue('abc123');
+      mockCountObjects(0);
+
+      scheduler.start();
+      await runOneTick();
+      await runOneTick();
+      releaseWrites();
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(findExecFileCalls('count-objects')).toHaveLength(1);
     });
   });
 });

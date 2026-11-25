@@ -295,14 +295,11 @@ export async function updateRef(
  *
  * @param refPath - Ref path relative to the git directory.
  * @returns 40-character OID, or null if the ref does not exist.
- * @throws when the ref has no loose file and packed-refs exists.
+ * @throws while packed-refs exists.
  */
 export async function readRef(refPath: string): Promise<string | null> {
-  const oid = await readLooseRef(refPath);
-  if (oid == null) {
-    await assertNoPackedRefs(refPath);
-  }
-  return oid;
+  await assertNoPackedRefs(refPath);
+  return readLooseRef(refPath);
 }
 
 function fileExists(filePath: string): Promise<boolean> {
@@ -320,8 +317,8 @@ function packedRefsPath(): string {
 }
 
 /**
- * A ref without a loose file may be packed; treating it as missing would
- * rebuild or drop a namespace from nothing.
+ * Neither a missing nor a loose ref can be trusted while packed-refs exists
+ * (see design.md, VaultMaintenanceScheduler).
  */
 async function assertNoPackedRefs(refPath: string): Promise<void> {
   if (await fileExists(packedRefsPath())) {
@@ -330,11 +327,36 @@ async function assertNoPackedRefs(refPath: string): Promise<void> {
 }
 
 /**
- * Removes packed-refs and every ref it holds.  Only a full wipe (reset-all)
- * may call this: it drops whatever the packed entries still point at.
+ * Removes packed-refs, dropping every packed namespace ref and keeping any
+ * other packed ref (e.g. sparse-filter anchors) as a loose file.  Only a full
+ * wipe (reset-all) may call this.
  */
-export async function deletePackedRefs(): Promise<void> {
-  await fs.promises.rm(packedRefsPath(), { force: true });
+export async function dropPackedNamespaceRefs(): Promise<void> {
+  let content: string;
+  try {
+    content = await fs.promises.readFile(packedRefsPath(), 'utf8');
+  } catch (err: unknown) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+      return;
+    }
+    throw err;
+  }
+
+  // Lines are "<oid> <ref>"; '#' starts the header and '^' a peeled tag.
+  const kept = content
+    .split('\n')
+    .filter((line) => line !== '' && !/^[#^]/.test(line))
+    .map((line) => line.split(' '))
+    .filter(([, ref]) => !ref.startsWith('refs/namespaces/'));
+
+  for (const [oid, ref] of kept) {
+    // biome-ignore lint/performance/noAwaitInLoops: a handful of refs; sequential keeps it simple
+    if ((await readLooseRef(ref)) == null) {
+      await updateRef(ref, oid);
+    }
+  }
+
+  await fs.promises.unlink(packedRefsPath());
 }
 
 async function readLooseRef(refPath: string): Promise<string | null> {
@@ -355,7 +377,6 @@ async function readLooseRef(refPath: string): Promise<string | null> {
  * If the ref does not exist, this is a no-op (idempotent).
  *
  * @param refPath - Ref path relative to the git directory.
- * @throws when the ref has no loose file and packed-refs exists.
  */
 export async function deleteRef(refPath: string): Promise<void> {
   const target = refFilePath(refPath);
@@ -363,7 +384,7 @@ export async function deleteRef(refPath: string): Promise<void> {
     await fs.promises.unlink(target);
   } catch (err: unknown) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
-      await assertNoPackedRefs(refPath);
+      // Already gone — treat as success.
       return;
     }
     throw err;

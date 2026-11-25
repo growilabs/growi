@@ -236,7 +236,7 @@ async function newRevision(
 async function insertInstructionAndSettle(
   op: string,
   payload: Record<string, unknown>,
-): Promise<{ processed: boolean; lastError: string | null }> {
+): Promise<{ id: unknown; processed: boolean; lastError: string | null }> {
   if (mongoose?.connection.db == null) {
     throw new Error('Mongoose not connected');
   }
@@ -256,6 +256,7 @@ async function insertInstructionAndSettle(
     const doc = await instructions.findOne({ _id: insertedId });
     if (doc?.processedAt != null || doc?.lastError != null) {
       return {
+        id: insertedId,
         processed: doc.processedAt != null,
         lastError: (doc.lastError as string | null) ?? null,
       };
@@ -718,6 +719,13 @@ async function triggerGcAndWait(): Promise<{
       expect(fs.existsSync(path.join(requireRepoPath(), 'packed-refs'))).toBe(
         false,
       );
+
+      // The refused write is superseded by the rebuild, so no later drain
+      // replays it on top of the rebuilt namespace.
+      const refusedAfterRebuild = await mongoose?.connection.db
+        ?.collection('vault_instructions')
+        .findOne({ _id: refused.id });
+      expect(refusedAfterRebuild?.processedAt).not.toBeNull();
 
       await upsertNewPages(ns, 1);
       expect(await listNamespaceFiles(ns)).toHaveLength(1);

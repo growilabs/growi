@@ -22,7 +22,7 @@ vi.mock('./vault-repo-storage.js', async (importOriginal) => {
     readRef: vi.fn(),
     updateRef: vi.fn(),
     deleteRef: vi.fn(),
-    deletePackedRefs: vi.fn(),
+    dropPackedNamespaceRefs: vi.fn(),
     readTree: vi.fn(),
     writeTree: vi.fn(),
     writeBlob: vi.fn(),
@@ -55,6 +55,12 @@ vi.mock('../models/vault-namespace-state.js', () => ({
   },
 }));
 
+vi.mock('../models/vault-instruction.js', () => ({
+  VaultInstructionModel: {
+    supersedeUnprocessedBefore: vi.fn(),
+  },
+}));
+
 vi.mock('../models/vault-user-view.js', () => ({
   VaultUserViewModel: {
     deleteAll: vi.fn(),
@@ -79,6 +85,7 @@ vi.mock('@growi/logger', () => ({
 // ---------------------------------------------------------------------------
 
 import { RevisionModel } from '../models/revision.js';
+import { VaultInstructionModel } from '../models/vault-instruction.js';
 import { VaultNamespaceStateModel } from '../models/vault-namespace-state.js';
 import { VaultUserViewModel } from '../models/vault-user-view.js';
 import * as VaultBlobHasher from './vault-blob-hasher.js';
@@ -137,7 +144,10 @@ beforeEach(() => {
   // Default: updateRef and deleteRef succeed silently.
   asMock(VaultRepoStorage.updateRef).mockResolvedValue(undefined);
   asMock(VaultRepoStorage.deleteRef).mockResolvedValue(undefined);
-  asMock(VaultRepoStorage.deletePackedRefs).mockResolvedValue(undefined);
+  asMock(VaultRepoStorage.dropPackedNamespaceRefs).mockResolvedValue(undefined);
+  asMock(VaultInstructionModel.supersedeUnprocessedBefore).mockResolvedValue(
+    undefined,
+  );
 
   // Default: hashBlob returns a deterministic OID.
   asMock(VaultBlobHasher.hashBlob).mockResolvedValue('blob-sha1-oid');
@@ -653,13 +663,13 @@ describe('op: reset-all', () => {
     );
     expect(VaultRepoStorage.deleteRef).toHaveBeenCalledTimes(3);
 
-    // Packed refs are dropped first; deleteRef refuses to run while they exist.
-    expect(VaultRepoStorage.deletePackedRefs).toHaveBeenCalled();
+    // Packed namespace refs go with the wipe as well.
+    expect(VaultRepoStorage.dropPackedNamespaceRefs).toHaveBeenCalled();
+
+    // Instructions still pending from before the wipe are superseded by it.
     expect(
-      asMock(VaultRepoStorage.deletePackedRefs).mock.invocationCallOrder[0],
-    ).toBeLessThan(
-      asMock(VaultRepoStorage.deleteRef).mock.invocationCallOrder[0],
-    );
+      VaultInstructionModel.supersedeUnprocessedBefore,
+    ).toHaveBeenCalledWith(instruction.issuedAt);
 
     // State collections must be cleared.
     expect(VaultNamespaceStateModel.deleteAll).toHaveBeenCalled();

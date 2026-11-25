@@ -29,6 +29,7 @@ const OID_B = 'b'.repeat(40);
 const OID_C = 'c'.repeat(40);
 const REF_A = 'refs/namespaces/public/refs/heads/main';
 const REF_B = 'refs/namespaces/group-g1/refs/heads/main';
+const REF_FILTER = 'refs/vault/sparse-filters/pages-only';
 
 let repoPath: string;
 let storage: typeof import('./vault-repo-storage.js');
@@ -64,10 +65,12 @@ afterAll(() => {
 beforeEach(() => {
   vi.clearAllMocks();
   fs.rmSync(path.join(repoPath, 'packed-refs'), { force: true });
-  fs.rmSync(path.join(repoPath, 'refs', 'namespaces'), {
-    recursive: true,
-    force: true,
-  });
+  for (const dir of ['namespaces', 'vault']) {
+    fs.rmSync(path.join(repoPath, 'refs', dir), {
+      recursive: true,
+      force: true,
+    });
+  }
 });
 
 describe('a repository with packed-refs', () => {
@@ -83,34 +86,43 @@ describe('a repository with packed-refs', () => {
     expect(fs.existsSync(path.join(repoPath, 'packed-refs'))).toBe(true);
   });
 
-  it('readRef refuses to report a ref without a loose file as missing', async () => {
+  it('readRef refuses to read a ref that has no loose file', async () => {
     writePackedRefs([`${OID_A} ${REF_A}`]);
 
     await expect(storage.readRef(REF_A)).rejects.toThrow(/Rebuild Vault/);
   });
 
-  it('deleteRef refuses to treat a ref without a loose file as deleted', async () => {
-    writePackedRefs([`${OID_A} ${REF_A}`]);
-
-    await expect(storage.deleteRef(REF_A)).rejects.toThrow(/Rebuild Vault/);
-  });
-
-  it('reads and deletes a loose ref as usual', async () => {
+  it('readRef refuses to read a ref even when it has a loose file', async () => {
+    // A write after an old gc may have left a loose ref holding a truncated
+    // namespace next to its packed entry; only a rebuild repairs it.
     await storage.updateRef(REF_A, OID_A);
-    writePackedRefs([`${OID_B} ${REF_B}`]);
+    writePackedRefs([`${OID_B} ${REF_A}`]);
 
-    expect(await storage.readRef(REF_A)).toBe(OID_A);
-    await storage.deleteRef(REF_A);
-    expect(looseRef(REF_A)).toBeNull();
+    await expect(storage.readRef(REF_A)).rejects.toThrow(/Rebuild Vault/);
   });
 
-  it('deletePackedRefs() drops every packed ref', async () => {
-    writePackedRefs([`${OID_A} ${REF_A}`, `^${OID_C}`, `${OID_B} ${REF_B}`]);
+  it('dropPackedNamespaceRefs() drops packed namespace refs and keeps the others loose', async () => {
+    writePackedRefs([
+      `${OID_A} ${REF_A}`,
+      `^${OID_C}`,
+      `${OID_B} ${REF_B}`,
+      `${OID_C} ${REF_FILTER}`,
+    ]);
 
-    await storage.deletePackedRefs();
+    await storage.dropPackedNamespaceRefs();
 
     expect(await storage.readRef(REF_A)).toBeNull();
     expect(await storage.readRef(REF_B)).toBeNull();
+    expect(await storage.readRef(REF_FILTER)).toBe(OID_C);
+  });
+
+  it('dropPackedNamespaceRefs() keeps a loose ref outside namespaces as it is', async () => {
+    await storage.updateRef(REF_FILTER, OID_A);
+    writePackedRefs([`${OID_C} ${REF_FILTER}`]);
+
+    await storage.dropPackedNamespaceRefs();
+
+    expect(await storage.readRef(REF_FILTER)).toBe(OID_A);
   });
 });
 
@@ -120,7 +132,15 @@ describe('a repository without packed-refs', () => {
     await expect(storage.deleteRef(REF_A)).resolves.toBeUndefined();
   });
 
-  it('deletePackedRefs() is a no-op', async () => {
-    await expect(storage.deletePackedRefs()).resolves.toBeUndefined();
+  it('reads and deletes a loose ref', async () => {
+    await storage.updateRef(REF_A, OID_A);
+
+    expect(await storage.readRef(REF_A)).toBe(OID_A);
+    await storage.deleteRef(REF_A);
+    expect(looseRef(REF_A)).toBeNull();
+  });
+
+  it('dropPackedNamespaceRefs() is a no-op', async () => {
+    await expect(storage.dropPackedNamespaceRefs()).resolves.toBeUndefined();
   });
 });
