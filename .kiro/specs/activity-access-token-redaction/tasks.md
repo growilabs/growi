@@ -35,9 +35,10 @@
 
 - [ ] 2.4 (P) 既存の activity の endpoint を伏せ字にするデータ移行を追加する
   - クエリ文字列を持つ activity を `_id` 順に 1,000 件ずつ読み、値が変わる文書だけを、元の endpoint を条件に含めて endpoint だけ書き換える。`_id` インデックスを使わせる
-  - 書き換えた件数をログに出す。巻き戻しは何もしない（元のトークンは戻せない旨をログに出す）
+  - 1 バッチ分の読み出しのカーソルを作る関数を migration から export し、データ移行の本体はそれを使って読む
+  - 開始時と、終わったときに書き換えた件数の合計をログに出す。巻き戻しは何もしない（元のトークンは戻せない旨をログに出す）
   - 統合テストで、トークンあり・エンコードされたキー・クエリなし・トークンなしのクエリ・伏せ字済みの行を seed して流し、トークンを含む行だけが伏せ字になること、他の行は値もバージョン番号も変わらないこと、endpoint 以外の項目が変わらないこと、2 回目を流したあとも全行の endpoint・バージョン番号・他の項目が 1 回目のあとと同じであること、1,000 件を超える行でも全件直ることを確かめる。伏せ字になった行の期待値は伏せ字の関数の戻り値で書き、トークンの文字列が残らず `[REDACTED]` が入っていることも確かめる
-  - 同じ統合テストで、データ移行と同じ問い合わせの実行計画を取り、`_id` インデックスの IXSCAN が選ばれ、SORT ステージがないことを assert する
+  - 同じ統合テストで、export した関数が返すカーソルの実行計画を取り（問い合わせはテストに書き写さない）、`_id` インデックスの IXSCAN が選ばれ、SORT ステージがないことを assert する
   - 完了時: データ移行の統合テスト（実行計画の assert を含む）が通る
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 8.1_
   - _Boundary: RedactionMigration_
@@ -59,17 +60,18 @@
   - 完了時: 伏せ字済みの行を含む候補表示のケースが通り、lint・テスト・ビルドがすべて成功する
   - _Requirements: 9.1, 9.2, 9.3_
 
-- [ ] 4. 変更を activity-log spec に書き戻し、この spec を削除する
+- [ ] 4. 変更を activity-log spec と activity-log-snapshot spec に書き戻し、この spec を削除する
 - [ ] 4.1 activity-log の requirements.md と design.md を書き換える
   - requirements.md の末尾に Requirement 5〜9 を追加し（既存の 1〜4 は番号を変えない）、Boundary Context（Adjacent expectations を含む）を design.md の Amend target の表のとおりに直す
-  - design.md を Amend target の表の全行のとおりに直す（Non-Goals、This Spec Owns、Out of Boundary、Allowed Dependencies、Revalidation Triggers、Existing Architecture Analysis、Architecture Pattern & Boundary Map、Technology Stack、File Structure Plan、System Flows、Requirements Traceability、Components and Interfaces、add-activity middleware、保存口、Data Models、Error Handling、Performance & Scalability、Migration Strategy、Testing Strategy、Security Considerations）
+  - design.md を Amend target の表の全行のとおりに直す（Non-Goals、This Spec Owns、Out of Boundary、Allowed Dependencies、Revalidation Triggers、Existing Architecture Analysis、Architecture Pattern & Boundary Map、Technology Stack、File Structure Plan、System Flows、Requirements Traceability、Components and Interfaces、add-activity middleware、保存口、settleActivityRecord、Data Models、Error Handling、Performance & Scalability、Migration Strategy、Testing Strategy、Security Considerations）
+  - activity-log-snapshot の design.md を、Amend target の activity-log-snapshot の表のとおりに直す（`IActivityUpdateParameters` が `endpoint` を含まないこと）
   - 本文は amend がなかったかのように現在の事実だけで書き、経緯の語りを残さない
-  - 完了時: activity-log の requirements.md と design.md に、Amend target の表の全行の変更が入っている
+  - 完了時: activity-log の requirements.md と design.md、activity-log-snapshot の design.md に、Amend target の両方の表の全行の変更が入っている
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 6.1, 6.2, 6.3, 6.4, 6.5, 7.1, 7.2, 8.1, 8.2, 9.1, 9.2, 9.3_
 
 - [ ] 4.2 設計判断を移し、この spec を削除する
   - この spec の research.md の Decision をすべて activity-log の research.md に移す
-  - activity-log の spec.json の `updated_at` を更新する（`phase` / `approvals` は変えない）
+  - activity-log と activity-log-snapshot の spec.json の `updated_at` を更新する（`phase` / `approvals` は変えない）
   - roadmap.md と steering にこの spec への言及があれば外すか、移した先に向け直す
   - このディレクトリを削除する
   - 完了時: `.kiro/specs/activity-access-token-redaction/` が存在せず、リポジトリ内にこの spec への参照が残っていない

@@ -4,7 +4,7 @@
 - **Feature**: `activity-access-token-redaction`（`activity-log` の amend spec）
 - **Discovery Scope**: Extension（既存の activity 記録・インポート・migration への組み込み）
 - **Key Findings**:
-  - activity の endpoint を実際に書くのは `createByParameters` だけ。`updateByParameters` の本番の呼び出し元はなく、`emit('update')` の payload にも endpoint を渡す箇所はない。ただし型（`IActivityUpdateParameters`）は endpoint を受け付ける。
+  - activity の endpoint を実際に書くのは `createByParameters` だけ。`updateByParameters` の本番の呼び出し元はなく、`emit('update')` の payload にも endpoint を渡す箇所はない。ただし型（`IActivityUpdateParameters`）は endpoint を受け付ける。この型は settleActivityRecord の入力 `activityParameters` でもあり、settle は文脈の `endpoint` のあとにそれを展開するので、型の上では payload が文脈の endpoint を上書きできる。
   - migration は migrate-mongo（`src/migrations/*.js`、`db` を受け取る素の driver）で書かれ、`server` スクリプトの前（`preserver`）に流れる。umzug 側（`prisma/migrations/`）は空。
   - 監査ログの索引への同期（change stream）は update イベントを読み飛ばすので、migration で endpoint を書き換えても ES への書き込みは起きない。
 
@@ -46,8 +46,9 @@
   - change stream には `$match` がなく、update イベントも受け取る。ただし `flushBuffer` は insert と delete だけを拾い、update は捨てる。
   - `bulkSyncAuditlogs` は本文が空なら何もせずに返る。
   - 残るのは、イベントを読む負荷と、100 件ごとの resume token の書き込みだけ。
+  - change stream は `app:auditLogEnabled` が有効な各インスタンスが開く（リーダー選出などの絞り込みはない）。ローリングアップデートでは、migration の間も古いバージョンのインスタンスがイベントを読み続ける。change stream を読むインスタンスが 1 つもない間に、resume token の位置が oplog から消えると、再開時に HistoryLost になり、resume token を消して unsynced を立てる（`auditlog-changestream.ts`）。起動時に索引を作り直した場合は、resume token を捨ててから始めるのでこれは起きない。
   - ES の索引の `endpoint` は `sanitizeEndpointForIndex` でクエリ文字列を落としている。`es-sync-decision` / `anonymous-sync-counter` が持つ endpoint も索引用の値で、TTL は 150 秒。
-- **Implications**: migration で書き換えても、ES への書き込みは起きない。負荷は、実際に書き換えた件数ぶんのイベントを読むことと、resume token を書くことに限られる。書き換えるのは値が変わる文書だけにして、この量を平文トークンを含む件数に抑える。`auditlog-mapping-sync.ts` のコメントにある「ES が持つ項目は作成時に確定し、変わらない」という前提は、ES に見えている値（パス部分）が変わらないので崩れない。
+- **Implications**: migration で書き換えても、ES への書き込みは起きない。負荷は、実際に書き換えた件数ぶんのイベントを読むことと、resume token を書くことに限られる。ただし書き換えが oplog の保持範囲を超えると、起動後に索引の再構築が必要になる。書き換えるのは値が変わる文書だけにして、この量を平文トークンを含む件数に抑える。`auditlog-mapping-sync.ts` のコメントにある「ES が持つ項目は作成時に確定し、変わらない」という前提は、ES に見えている値（パス部分）が変わらないので崩れない。
 
 ### endpoint 検索・候補表示への影響
 - **Sources Consulted**: `server/interfaces/auditlog-suggestion-field-specs.ts`、`models/activity.ts`（`findEndpointsByEndpointRegex`）
@@ -98,8 +99,11 @@
   - 2 は、キーが自由にパーセントエンコードされうる（`%61ccess_token` など）ため、MongoDB の正規表現では伏せ字の関数と同じ判定ができない。要件 8.1 に反する。
   - 3 は伏せ字の関数をそのまま使うので、記録時と同じ結果になる。書くのは値が変わる文書だけなので、冪等で（6.4）、中断しても再実行すれば続きから直せる（6.5）。oplog と change stream に流れる量も、平文トークンを含む件数に限られる。
   - `_id` の範囲で区切るので、長時間開きっぱなしのカーソルを持たない。
-- **Trade-offs**: `?` を含む文書はすべて一度アプリ側に読む。activity は既定で 30 日で消え、読むのは `endpoint` の 1 項目だけなので、許容できる。
-- **Follow-up**: `endpoint_1` が選ばれると、`_id` の範囲で区切っていてもバッチのたびに endpoint のインデックスを全走査し、`_id` 順の並べ替えも挟まる（バッチ数×全件の負荷になる）。そのため `hint({ _id: 1 })` で `_id` インデックスに固定する。実装時に explain で、`_id_` の IXSCAN で SORT ステージがないことを確かめる。
+- **Trade-offs**:
+  - DB 側は `_id` インデックスを先頭から走査し、`?` の条件を文書ごとに判定するので、コレクション全体を読む。アプリ側に返るのは `?` を含む文書の `endpoint` だけ。読む量は保持期間（`app:activityExpirationSeconds`、既定 30 日）で決まる。保持期間を延ばした環境では、その分だけ起動が延びる。
+  - 途中で落ちると、次の起動では先頭から走査し直す。書き換え済みの文書は書かないが、読む量は減らない。走査の途中では進捗のログを出さない。`?` を含む行が少ないと、1 回の問い合わせが 1,000 件に届くまで長い範囲を走査して何も返さないので、件数で進捗を出しても走査の位置は分からない。走査の位置を出すには `_id` の範囲の上限で区切る必要があるが、走査を最初からやり直すことは変わらず、一度しか流れない migration に境目の取りこぼしの余地を足すことになる。activities を全件読む `20261111120000-add-endpoint-index-to-activities` のインデックス作成も進捗を出していない。
+  - change stream を読むインスタンスが 1 つもない間に書き換えが oplog の保持範囲を超えると、change stream の再開が HistoryLost になり、索引の再構築が必要になる。
+- **Follow-up**: `endpoint_1` が選ばれると、`_id` の範囲で区切っていてもバッチのたびに endpoint のインデックスを全走査し、`_id` 順の並べ替えも挟まる（バッチ数×全件の負荷になる）。そのため `hint({ _id: 1 })` で `_id` インデックスに固定する。実装時に explain で、`_id_` の IXSCAN で SORT ステージがないことを確かめる。explain の対象は migration が export する `findRedactionBatch` のカーソルにして、テストに問い合わせを書き写さない（写しだと、migration の問い合わせを変えてもテストが古い写しを見て通り続ける）。
 - **Note**: migrate-mongo は適用済みの migration を `migrations` コレクションに記録し、以後は流さない。ローリングアップデート中やロールバック中に、古いバージョンのコードが migration のあとに書いた平文の行は、この migration では直せず、TTL で消えるまで残る（要件の範囲外）。
 
 ### Decision: migration の `down` は何もしない
@@ -120,7 +124,8 @@
 
 ## Risks & Mitigations
 - Mongoose の `Activity` モデルが廃止されると、インポートの変換表から `activities.endpoint` が黙って消える → `construct-convert-map.integ.ts` で表に変換関数があることを確かめ、activity-log の Revalidation Trigger に書く。
-- 平文トークンを含む activity が多い環境では、起動が延びる → 書くのは値が変わる文書だけ、読むのは `endpoint` だけ、`_id` の範囲で区切る。件数をログに出す。
+- activity が多い環境（保持期間を延ばした環境）では、全件の走査で起動が延びる → 書くのは値が変わる文書だけ、アプリに返すのは `endpoint` だけ、`_id` の範囲で区切る。終わったら書き換えた件数をログに出す。
+- change stream を読むインスタンスが 1 つもない間に書き換えが oplog の保持範囲を超えると、索引の再構築が必要になる → design.md の Migration Strategy に条件と対処を書く。
 - 将来、文脈（`PendingActivityContext`）をログに出すと平文が漏れる → activity-log の Revalidation Trigger に書く。
 - 作成済みのエクスポートファイルと、TTL で消えた行は直せない → 要件の範囲外として明記済み。
 

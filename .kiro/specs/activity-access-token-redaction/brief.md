@@ -2,11 +2,14 @@
 
 ## Amend target
 
-- **対象 spec**: `activity-log`
-- **変わる約束**: activity の記録内容。保存される `endpoint` から access_token を必ず伏せ字にすることを、記録経路（middleware 経由 / `createActivity` 直接呼び出し）を問わない約束として activity-log に加える。伏せ字にする場所は middleware からモデルの保存処理に移る。
-- **Revalidation Triggers**: activity-log の Revalidation Triggers に触れる。追加する項目は design.md の Revalidation Triggers を参照。
+- **対象 spec 1**: `activity-log`
+  - **変わる約束**: activity の記録内容。保存される `endpoint` から access_token を必ず伏せ字にすることを、記録経路（middleware 経由 / `createActivity` 直接呼び出し）を問わない約束として activity-log に加える。伏せ字にする場所は middleware からモデルの保存処理に移る。
+  - **Revalidation Triggers**: activity-log の Revalidation Triggers に触れる。追加する項目は design.md の Revalidation Triggers を参照。
+- **対象 spec 2**: `activity-log-snapshot`
+  - **変わる約束**: 書き込み口のパラメータ型。`updateByParameters` と settleActivityRecord の入力型 `IActivityUpdateParameters` から `endpoint` を外す。snapshot の受け取り方（素の `ISnapshot` を受けて内部で envelope 化する）は変えない。
+  - **Revalidation Triggers**: activity-log-snapshot の Revalidation Trigger「`createByParameters` / `updateByParameters` のシグネチャを変えた場合」に触れる。変わるのは `endpoint` を受け付けなくなることだけなので、snapshot の保存の約束は崩れない。
 
-この spec は一時的なもので、tasks.md の最後のタスクで activity-log に変更を書き戻し、このディレクトリを削除する。
+この spec は一時的なもので、tasks.md の最後のタスクで両 spec に変更を書き戻し、このディレクトリを削除する。
 
 ## Problem
 

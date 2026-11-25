@@ -23,7 +23,9 @@
 
 ## Amend target
 
-この spec は `activity-log` の amend spec。最後のタスクで以下を activity-log に書き戻し、このディレクトリを削除する（`.claude/rules/spec-lifecycle.md`）。
+この spec は `activity-log` と `activity-log-snapshot` の amend spec。最後のタスクで以下を両 spec に書き戻し、このディレクトリを削除する（`.claude/rules/spec-lifecycle.md`）。
+
+### activity-log
 
 | activity-log のファイル | 節 | 変わる内容 |
 |---|---|---|
@@ -44,13 +46,24 @@
 | design.md | Components and Interfaces | 表に redactAccessTokenFromEndpoint・ImportEndpointConverter・RedactionMigration の行を追加し、ActivityExtension.createByParameters の Req Coverage に 5.1, 5.2 を足す |
 | design.md | add-activity middleware（変更） | 文脈の `endpoint` は `req.originalUrl` をそのまま持つ（伏せ字は保存口で行う） |
 | design.md | Data / 保存口 `createByParameters` | 保存前に endpoint を伏せ字にすることを追加する。`updateByParameters` が endpoint を型でも実行時でも受け付けないことも書く |
+| design.md | Service / 記録ライフサイクル > settleActivityRecord（Responsibilities と Service Interface） | 入力の `activityParameters`（`IActivityUpdateParameters`）が `endpoint` を含まなくなることを書く。マージの順番（文脈のあとに `activityParameters` を展開する）は変えず、endpoint は文脈からだけ入ることを書く |
 | design.md | Data Models | 「スキーマ変更なし」の説明に endpoint の値の約束を加え、本 spec の Invariant を追加する |
 | design.md | Error Handling | 伏せ字の関数が例外を投げないこと、migration の失敗時の扱い、インポートの変換の扱いを追加する |
-| design.md | Performance & Scalability | 伏せ字の migration の負荷（平文トークンを含む行が多いと起動が延びること、書き換えた件数ぶんの更新イベントを索引への同期処理が読むこと）を追加する |
+| design.md | Performance & Scalability | 伏せ字の migration の負荷（全件を `_id` 順に走査するので、保持期間を延ばした環境では起動が延びること、書き換えた件数ぶんの更新イベントを索引への同期処理が読むこと、change stream を読むインスタンスが 1 つもない間に書き換えが oplog の保持範囲を超えると索引の再構築が必要になること）を追加する |
 | design.md | Migration Strategy | 「データ移行なし」を、伏せ字の migration の説明に書き換える |
 | design.md | Testing Strategy | 本 spec のテスト項目を追加する |
 | design.md | Security Considerations | 節を新設し、本 spec の Security Considerations を移す |
 | research.md | Design Decisions | 本 spec の research.md の Decision をすべて移す |
+| spec.json | `updated_at` | 更新する（`phase` / `approvals` は変えない） |
+
+### activity-log-snapshot
+
+**activity-log-snapshot の Revalidation Trigger に触れる変更**: 「`createByParameters` / `updateByParameters` のシグネチャを変えた場合」に当たる。変わるのは `IActivityUpdateParameters` が `endpoint` を受け付けなくなることだけで、`snapshot` の型（`ISnapshot`）と内部での envelope 化は変えない。そのため activity-log-snapshot の保存の約束は崩れない。
+
+| activity-log-snapshot のファイル | 節 | 変わる内容 |
+|---|---|---|
+| design.md | This Spec Owns > 書き込み口のパラメータ型の拡張 | `IActivityUpdateParameters` は `endpoint` を含まない（`Omit<Prisma.activitiesUncheckedUpdateInput, 'snapshot' \| 'endpoint'> & { snapshot?: ISnapshot }`）ことを書く。`endpoint` を外す約束は activity-log が持つ |
+| design.md | File Structure Plan > `models/activity.ts` | `IActivityUpdateParameters` の拡張の説明に、`endpoint` を外した型であることを加える |
 | spec.json | `updated_at` | 更新する（`phase` / `approvals` は変えない） |
 
 ## Boundary Commitments
@@ -84,7 +97,7 @@
 
 ### Existing Architecture Analysis
 - activity の行はすべて `prisma.activities.createByParameters` で作られる。呼ぶのは記録の 3 経路（settle、fail-safe、`ActivityService.createActivity`）と、それ以外に直接呼ぶ箇所（inline-comment のサービスなど。リクエストの文脈がないので endpoint は渡さない）。
-- `updateByParameters` は本番コードから呼ばれていないが、型は endpoint を受け付ける。
+- `IActivityUpdateParameters` は endpoint を受け付ける。この型を使うのは `updateByParameters`（本番コードから呼ばれていない）と、settleActivityRecord の入力 `activityParameters`（`emit('update')` の payload）。settle は文脈の `endpoint` のあとに `activityParameters` を展開して `createByParameters` に渡すので、型の上では payload が文脈の endpoint を上書きできる。
 - データのインポートは `import.ts` で変換表を通したあと、モデルを通らずに bulk 書き込みする。
 - migration は migrate-mongo で、`server` スクリプトの前（`preserver`）に流れる。
 
@@ -127,7 +140,7 @@ graph TB
 ## File Structure Plan
 
 ### New Files
-- `apps/app/src/migrations/20261120120000-redact-access-token-in-activity-endpoint.js` — 既存の activity の endpoint を伏せ字にする migration。`up` は `_id` の範囲で区切って処理し、`down` は何もしない。
+- `apps/app/src/migrations/20261120120000-redact-access-token-in-activity-endpoint.js` — 既存の activity の endpoint を伏せ字にする migration。`up` は `_id` の範囲で区切って処理し、`down` は何もしない。1 バッチ分の読み出しのカーソルを作る `findRedactionBatch` も export し、`up` と統合テストの両方がこれを使う。
 - `apps/app/src/migrations/20261120120000-redact-access-token-in-activity-endpoint.integ.ts` — migration の統合テスト。
 
 ### Moved Files
@@ -236,7 +249,7 @@ export const redactAccessTokenFromEndpoint: (originalUrl: string) => string;
 **Responsibilities & Constraints**
 - `createByParameters`: `endpoint` が渡されたら、Prisma の `create` に渡す前に `redactAccessTokenFromEndpoint` を通す。渡されなければ、今までどおり `''` を保存する。
 - `updateByParameters`: 更新で endpoint を書く手段をなくす（本番コードの呼び出し元はなく、`emit('update')` の payload にも endpoint はない）。
-  - 型: `IActivityUpdateParameters` から `endpoint` を外す。
+  - 型: `IActivityUpdateParameters` から `endpoint` を外す。この型は settleActivityRecord の入力 `activityParameters` でもあるので、settle に渡す payload も endpoint を持てなくなり、settle が保存する endpoint は文脈から来るものだけになる。settle の展開の順番は変えない（payload に endpoint が紛れても、保存口で伏せ字になる）。
   - 実行時: `parameters` から `endpoint` を取り除いてから `update` に渡す。型の除外はオブジェクトリテラルで渡したときしか効かず、`endpoint` を持つ変数はそのまま代入できてしまうため。
 - 伏せ字は `create` の前に行うので、Prisma の validation error のメッセージ（引数を含む）にも平文は出ない。
 
@@ -303,15 +316,17 @@ const SPECIAL_CONVERT_FUNCTIONS: Record<string, Record<string, OverwriteFunction
 
 ##### Batch / Job Contract
 - **Trigger**: migrate-mongo の `up(db)`。`server` スクリプトの前（`preserver`）と `dev:migrate` で流れる。
-- **Input / validation**: `activities` から `{ _id: { $gt: lastId }, endpoint: { $regex: '\\?' } }` を `_id` 昇順、`endpoint` だけを射影して 1,000 件ずつ読む。`hint({ _id: 1 })` で `_id` インデックスを使わせる（`endpoint_1` が選ばれると、バッチのたびに endpoint のインデックスを全走査し、並べ替えも挟まるため）。
-- **Output / destination**: 値が変わる文書だけを `bulkWrite`（`ordered: false`）で `updateOne({ _id, endpoint: 元の値 }, { $set: { endpoint: 新しい値 } })` する。他の項目と `__v` は変えない。書き換えた件数をログに出す。
+- **Input / validation**: `activities` から `{ _id: { $gt: lastId }, endpoint: { $regex: '\\?' } }` を `_id` 昇順、`endpoint` だけを射影して 1,000 件ずつ読む。`hint({ _id: 1 })` で `_id` インデックスを使わせる（`endpoint_1` が選ばれると、バッチのたびに endpoint のインデックスを全走査し、並べ替えも挟まるため）。この問い合わせ（filter・sort・hint・projection・limit）は `findRedactionBatch(collection, lastId)` が組み立てて `FindCursor` を返し、`up` はそれを `toArray()` で読む。
+- **Output / destination**: 値が変わる文書だけを `bulkWrite`（`ordered: false`）で `updateOne({ _id, endpoint: 元の値 }, { $set: { endpoint: 新しい値 } })` する。他の項目と `__v` は変えない。開始時と、終わったときに書き換えた件数の合計をログに出す。
 - **Idempotency & recovery**: 伏せ字の関数が冪等で、書くのは値が変わる文書だけ。途中で落ちたら migrate-mongo は未適用のまま残すので、次の起動で頭から再実行され、すでに直した文書は書かない。正常に終わったあとは適用済みとして記録され、二度と流れない。
 - **down**: 何もしない。伏せ字から元のトークンは戻せない（ログに出す）。
 
 **Implementation Notes**
-- Integration: ESM、named export の `up` / `down`（`apps/app/.claude/rules/esm-authoring.md`）。伏せ字の関数は `~/server/util/redact-access-token-from-endpoint` から import する。
-- Validation: explain で実行計画を確かめる。合格条件は、`_id_` インデックスの IXSCAN であること、SORT ステージがないこと。
-- Risks: 平文トークンを含む activity が多い環境では起動が延びる。activity は既定で 30 日で消えるので、対象は直近の分に限られる。
+- Integration: ESM、named export の `up` / `down` / `findRedactionBatch`（`apps/app/.claude/rules/esm-authoring.md`）。伏せ字の関数は `~/server/util/redact-access-token-from-endpoint` から import する。
+- Validation: 統合テストで `findRedactionBatch` が返すカーソルの `explain()` を取り、実行計画を確かめる。合格条件は、`_id_` インデックスの IXSCAN であること、SORT ステージがないこと。テストが問い合わせを書き写さないので、migration の問い合わせを変えるとテストもそれを見る。
+- Risks:
+  - `_id` インデックスを先頭から走査し、`?` の条件は文書ごとに DB 側で判定するので、`?` を含まない文書も含めてコレクション全体を読む。読む量は残っている activity の件数で決まり、それは保持期間（`app:activityExpirationSeconds`、既定 30 日）で決まる。保持期間を延ばした環境では、その分だけ起動が延びる。
+  - 途中で落ちると、次の起動では先頭から走査し直す（書き換え済みの文書は書かないが、読む量は減らない）。走査が起動プローブの猶予より長いと、再起動のたびに最初からやり直して起動が終わらない。走査の途中では進捗のログを出さないので、アプリのログからは走査が進んでいるかを見分けられない（activities を全件読む `20261111120000-add-endpoint-index-to-activities` のインデックス作成と同じ）。
 
 ## Data Models
 
@@ -343,6 +358,7 @@ const SPECIAL_CONVERT_FUNCTIONS: Record<string, Record<string, OverwriteFunction
   - endpoint 以外の項目が変わらない
   - 2 回目の `up` のあとも、全行の endpoint・`__v`・他の項目が 1 回目のあとと同じ
   - 1,000 件を超える行（バッチの境目）でも全件直る
+  - `findRedactionBatch` が返すカーソルの実行計画が、`_id_` の IXSCAN で SORT ステージを含まない
 - `construct-convert-map.integ.ts`: `activities.endpoint` の変換関数が表にあり、トークンを含む値を伏せ字にし、文字列でない値は変えない（7.1, 7.2）。Mongoose の `Activity` モデルが外れたときに落ちるドリフト検知を兼ねる。
 - 同じ endpoint の文字列を、保存口・migration・インポートの変換に通した結果が一致する（8.1）。上の各テストの期待値を `redactAccessTokenFromEndpoint` の戻り値で書く。あわせて各テストで、保存・変換された値にトークンの文字列そのものが残らず、`[REDACTED]` が入っていることも直接確かめる（伏せ字の関数が壊れたときに、期待値も一緒に変わって見逃さないため）。
 
@@ -363,3 +379,4 @@ const SPECIAL_CONVERT_FUNCTIONS: Record<string, Record<string, OverwriteFunction
 - **Phase 2（ローリングアップデート中）**: 古いバージョンのインスタンスが平文の行を書くことがある。古いバージョンが伏せ字の処理を持たなければすべての経路で、middleware の伏せ字だけを持つなら `createActivity` の直接呼び出しの経路で書く。migrate-mongo は適用済みの migration を `migrations` コレクションに記録し、以後の `up` では流さないので、これらの行を migration で直す手段はなく、TTL で消えるまで残る（要件の範囲外）。
 - **ロールバック**: コードを戻しても、伏せ字にした値は戻らない。戻している間は、Phase 2 と同じ条件で古いコードが平文の行を書く。再びアップグレードしても migration は流れないので、これらの行も TTL で消えるまで残る（要件の範囲外）。
 - **索引への同期への影響**: change stream は update イベントを読み飛ばし、ES には書かない。負荷は、書き換えた件数ぶんのイベントを読むことと、100 件ごとの resume token の書き込みだけ。
+- **oplog が押し流された場合**: change stream は `app:auditLogEnabled` が有効な各インスタンスが開く。migration はそのインスタンス自身のサーバ起動前に流れるが、ローリングアップデートでは古いバージョンのインスタンスが動き続けて更新イベントを読み、resume token を進める。問題になるのは、change stream を読むインスタンスが 1 つもない間（全インスタンスを止めてからアップグレードする場合など）に、書き換えの件数が oplog の保持範囲を超えたときだけ。このとき保存済みの resume token の位置が oplog から消え、起動後の再開が HistoryLost で失敗する。このとき auditlog-es-sync は resume token を消して unsynced を立てるので、監査ログの索引の再構築が必要になる。起動時に索引を作り直す設定（reindex-on-boot）なら、resume token は使われないので起きない。
