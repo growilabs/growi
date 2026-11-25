@@ -114,7 +114,7 @@
 #### 受け入れ基準
 
 1. vault-manager が起動したとき、VaultMaintenanceScheduler は 5 分間隔で namespace ref の commit 数と経過時間を確認する
-2. namespace ref の commit 数が閾値（デフォルト 1000）を超えたとき、または最終 squash から経過時間が閾値（デフォルト 1 時間）を超えたとき、VaultMaintenanceScheduler は対象 namespace を squash する
+2. namespace ref の commit 数が閾値（デフォルト 1000）を超えたとき、または最終 squash から経過時間が閾値（デフォルト 1 時間）を超えたとき、VaultMaintenanceScheduler は対象 namespace を squash する。ただし、namespace ref がすでに親のない commit 1 つを指している場合は squash しない
 3. squash を実行したとき、VaultMaintenanceScheduler は現在の tree OID を取得し、`parents: []` で新しい commit を作成し、namespace ref を上書きし、`vault_namespace_state.version` をインクリメントする
 4. loose object 数が閾値（デフォルト 50,000）を超えたとき、または前回 gc から 24 時間が経過したとき、VaultMaintenanceScheduler は `git gc --prune=2.weeks.ago` を spawn する。このとき ref を `packed-refs` にまとめず、loose ファイルのまま保つ
 5. 環境変数 `VAULT_SQUASH_COMMIT_THRESHOLD` / `VAULT_SQUASH_AGE_HOURS` / `VAULT_GC_INTERVAL_HOURS` / `VAULT_GC_LOOSE_OBJECT_THRESHOLD` を設定したとき、VaultMaintenanceScheduler はそれらの値でデフォルト閾値を上書きする

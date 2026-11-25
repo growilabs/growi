@@ -394,7 +394,7 @@ interface VaultNamespaceBuilder {
 - **upsert / remove**: `VaultPathMapper.map` で filePath を求め、blob write（content-addressed・既存 OID は no-op）→ tree を root まで再計算 → commit → `updateRef` → `vault_namespace_state.upsert({ version++ })`
 - **bulk-upsert**: revisions を `$in` 1 クエリで取得し、blob hash/write を並列（concurrency 16）化。全 entry を 1 度の tree rebuild・1 commit・1 ref update に集約する（N entries でも state は 1 step）
 - **rename-prefix / grant-change-prefix**: subtree を抽出し移動先 prefix / namespace に mount する。blob は再書き込み不要（content-addressing で OID 不変）。grant-change-prefix は両 namespace で namespace 単位 atomic に commit + updateRef
-- **reset-all**: `payload.namespace` は **undefined**（特定 namespace を対象としない全体操作）。全 namespace ref と `vault_namespace_state` / `vault_user_views` を wipe するが、**object pool は保持**し後続 upsert で content-addressing により再利用する
+- **reset-all**: `payload.namespace` は **undefined**（特定 namespace を対象としない全体操作）。`refs/namespaces/` の下を丸ごと消し、`vault_namespace_state` / `vault_user_views` を wipe するが、**object pool は保持**し後続 upsert で content-addressing により再利用する。消す対象を `vault_namespace_state` の記録から決めないのは、`updateRef` と state の記録の間で失敗した namespace の ref が残り、再構築後の書き込みがその古い tree の上に積まれて、削除済みのページが残るため。view の ref と HEAD も同じく消える（`vault_user_views` も消すので、次の合成で作り直される）。`refs/vault/sparse-filters/` は `refs/namespaces/` の外にあるので残る。ロックは、ディスク上にある namespace と `vault_namespace_state` にある namespace の両方を押さえる
 
 **Commit message フォーマット**（要件 2.8）
 
@@ -470,11 +470,15 @@ interface VaultRepoStorage {
   writeTree(entries: ReadonlyArray<TreeEntry>): Promise<string>;
   writeCommit(opts: CommitOptions): Promise<string>;
   readTree(oid: string): Promise<ReadonlyArray<TreeEntry>>;
+  readCommitParents(oid: string): Promise<ReadonlyArray<string>>;   // 親なし commit は []
 
   // ref 操作（POSIX atomic rename ベース）
   updateRef(refPath: string, newOid: string): Promise<void>;
   readRef(refPath: string): Promise<string | null>;
-  deleteRef(refPath: string): Promise<void>;
+
+  // namespace 全体の操作（reset-all 専用）
+  listNamespaces(): Promise<ReadonlyArray<string>>;   // refs/namespaces/ の下にディレクトリがある namespace
+  deleteAllNamespaceRefs(): Promise<void>;            // refs/namespaces/ の下を丸ごと消す
 
   // upload-pack 用 path
   getRepoPath(): string;
@@ -610,10 +614,14 @@ interface MaintenanceStatus {
 
 | ジョブ | トリガ | 動作 |
 |--------|--------|------|
-| **Squash** | commit 数 > N（デフォルト 1000）**または** 経過時間 > T（デフォルト 1h）。5 分間隔チェック | 現 tree OID を取得 → `parents: []` の新 commit → `updateRef` → `vault_namespace_state.version++` |
+| **Squash** | commit 数 > N（デフォルト 1000）**または** 経過時間 > T（デフォルト 1h）。5 分間隔チェック。ただし HEAD がすでに親なし commit 1 つなら何もしない | 現 tree OID を取得 → `parents: []` の新 commit → `updateRef` → `vault_namespace_state.version++` |
 | **GC** | 24h ごと **または** loose object 数 > L（デフォルト 50,000） | `git -c gc.packRefs=false gc --prune=2.weeks.ago` を spawn |
 
-**ref は常に loose ファイルで保つ**: `VaultRepoStorage` の `readRef` / `updateRef` / `deleteRef` は ref ファイルを直接読み書きし、`packed-refs` を見ない。gc が ref を `packed-refs` にまとめると namespace の HEAD が「無い」と読まれ、次の instruction がその 1 ページだけの root commit で namespace を置き換えてしまう。そのため gc は `gc.packRefs=false` で実行する。それでも `packed-refs` がある場合（過去の gc や手作業の gc）は、ref を戻さずに再構築を求める。`init()` は再構築を促す error ログを出し、`readRef` は例外を投げる（instruction・view の合成・squash が失敗する）。`packed-refs` があるかどうかを確かめられないとき（ファイルが無いことを示す ENOENT 以外のエラー。NFS の一時的な I/O エラーなど）も、同じく読ませずにそのエラーを投げる。squash は名前空間ごとに失敗させず、tick の最初に `packed-refs` の有無を確かめて、squash の確認全体を 1 回だけ失敗させる（error ログは tick ごとに 1 件。名前空間の数だけログが出るのを避ける）。gc の確認はそのまま続ける。view の合成は、合成済みの view をそのまま返せる場合（ref を読まない場合）でも同じ例外を投げる。合成済みの view が、すでに 1 ページに置き換わった名前空間から作られている可能性があるため。loose ファイルがある ref も読ませないのは、過去の gc の後の書き込みで、その名前空間がそのページ 1 件に置き換わっている可能性があるため。`packed-refs` の ref を起動時に loose へ戻さないのは、再構築（`reset-all`）で消したはずの namespace ref も `packed-refs` に残ることがあり、ref だけでは生きている ref と区別できないため。再構築の `reset-all` は `packed-refs` の namespace ref を消し（sparse filter の ref などそれ以外は loose ファイルとして残す）、DB から作り直す。`packed-refs` を消すのは `reset-all` の最後にする。loose ファイルの ref・state・view の記録の削除や、未処理 instruction の処理済み化が途中で失敗したときに、`packed-refs` が残って ref が読めないままになるようにするため（先に消すと、1 ページに置き換わった loose ファイルの ref が読める状態で残る）。再構築より前に出されて未処理のまま残った instruction は、`reset-all` が処理済みにする。残すと、再構築の後の起動時に古い instruction が再実行され、ページが古い版に戻ったり、削除・権限変更が取り消されたりする
+**ref は常に loose ファイルで保つ**: `VaultRepoStorage` の `readRef` / `updateRef` は ref ファイルを直接読み書きし、`packed-refs` を見ない。gc が ref を `packed-refs` にまとめると namespace の HEAD が「無い」と読まれ、次の instruction がその 1 ページだけの root commit で namespace を置き換えてしまう。そのため gc は `gc.packRefs=false` で実行する。それでも `packed-refs` がある場合（過去の gc や手作業の gc）は、ref を戻さずに再構築を求める。`init()` は再構築を促す error ログを出し、`readRef` は例外を投げる（instruction・view の合成・squash が失敗する）。`packed-refs` があるかどうかを確かめられないとき（ファイルが無いことを示す ENOENT 以外のエラー。NFS の一時的な I/O エラーなど）も、同じく読ませずにそのエラーを投げる。squash は名前空間ごとに失敗させず、tick の最初に `packed-refs` の有無を確かめて、squash の確認全体を 1 回だけ失敗させる（error ログは tick ごとに 1 件。名前空間の数だけログが出るのを避ける）。gc の確認はそのまま続ける。view の合成は、合成済みの view をそのまま返せる場合（ref を読まない場合）でも同じ例外を投げる。合成済みの view が、すでに 1 ページに置き換わった名前空間から作られている可能性があるため。loose ファイルがある ref も読ませないのは、過去の gc の後の書き込みで、その名前空間がそのページ 1 件に置き換わっている可能性があるため。`packed-refs` の ref を起動時に loose へ戻さないのは、再構築（`reset-all`）で消したはずの namespace ref も `packed-refs` に残ることがあり、ref だけでは生きている ref と区別できないため。再構築の `reset-all` は `packed-refs` の namespace ref を消し（sparse filter の ref などそれ以外は loose ファイルとして残す）、DB から作り直す。`packed-refs` を消すのは `reset-all` の最後にする。loose ファイルの ref・state・view の記録の削除や、未処理 instruction の処理済み化が途中で失敗したときに、`packed-refs` が残って ref が読めないままになるようにするため（先に消すと、1 ページに置き換わった loose ファイルの ref が読める状態で残る）。再構築より前に出されて未処理のまま残った instruction は、`reset-all` が処理済みにする。残すと、再構築の後の起動時に古い instruction が再実行され、ページが古い版に戻ったり、削除・権限変更が取り消されたりする
+
+**書き込みのない namespace は squash し直さない**: squash は、ロックの中で HEAD の commit を読み、親がなく、かつ `vault_namespace_state.commitOid` がその commit を指していれば何もしない。経過時間の条件は `updatedAt` で判定するので、書き込みのない namespace は毎回この条件に当たる。そのたびに squash すると、tree は同じなのに commit OID だけが変わり、その namespace を含む view がすべて作り直される。`vault_namespace_state.version` が 1 かどうかで判定しないのは、state の記録が ref より遅れている場合（`updateRef` の後で state の更新に失敗した場合）に、履歴が残っている namespace を飛ばしてしまうため。HEAD が親なし commit でも state が別の commit を指しているときは squash する（ref と state のずれがここで直る）
+
+**再利用する object は更新時刻を新しくする**: `writeBlob` / `writeTree` / `writeCommit` は、書き込みの後でその loose object の更新時刻を現在時刻にする。isomorphic-git は同じ object の loose ファイルがすでにあると書き込みを省き、更新時刻も変えない。そのままだと、2 週間より古く、どの ref からもたどれない object を書き込みが再利用した後、ref がそれを指す前に `gc --prune=2.weeks.ago` が走ると、その object が消される（bulk-upsert は blob をすべて書き終えてから tree と commit を作るので、この間隔は長くなりうる）。git 自身も既存の object を再利用するときに更新時刻を新しくしている。更新時刻を変えようとした時点で loose ファイルが無ければ（prune が直前に消した場合）、もう一度書き込む。pack の中にしかない object は、isomorphic-git が loose ファイルを新しく書くので、追加の処理は要らない（実測は research.md）
 
 **env var override**: `VAULT_SQUASH_COMMIT_THRESHOLD` / `VAULT_SQUASH_AGE_HOURS` / `VAULT_GC_INTERVAL_HOURS` / `VAULT_GC_LOOSE_OBJECT_THRESHOLD`
 
