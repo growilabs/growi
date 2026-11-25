@@ -101,6 +101,14 @@ describe('a repository with packed-refs', () => {
     await expect(storage.readRef(REF_A)).rejects.toThrow(/Rebuild Vault/);
   });
 
+  it('readRef refuses to read a ref when it cannot tell whether packed-refs exists', async () => {
+    await storage.updateRef(REF_A, OID_A);
+    // A self-referencing symlink fails every lookup with ELOOP, not ENOENT.
+    fs.symlinkSync('packed-refs', path.join(repoPath, 'packed-refs'));
+
+    await expect(storage.readRef(REF_A)).rejects.toThrow(/ELOOP/);
+  });
+
   it('dropPackedNamespaceRefs() drops packed namespace refs and keeps the others loose', async () => {
     writePackedRefs([
       `${OID_A} ${REF_A}`,

@@ -302,11 +302,18 @@ export async function readRef(refPath: string): Promise<string | null> {
   return readLooseRef(refPath);
 }
 
-function fileExists(filePath: string): Promise<boolean> {
-  return fs.promises
-    .access(filePath)
-    .then(() => true)
-    .catch(() => false);
+// Only ENOENT means "absent": the packed-refs check must not pass because of
+// an I/O error (e.g. ESTALE on NFS).
+async function fileExists(filePath: string): Promise<boolean> {
+  try {
+    await fs.promises.access(filePath);
+    return true;
+  } catch (err: unknown) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+      return false;
+    }
+    throw err;
+  }
 }
 
 const PACKED_REFS_MESSAGE =
