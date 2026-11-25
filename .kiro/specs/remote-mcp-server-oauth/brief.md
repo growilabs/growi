@@ -76,7 +76,7 @@ GROWI 本体が OAuth 2.1 の認可サーバーを兼ねる。MCP 仕様は、�
 ## Upstream / Downstream
 
 - **Upstream**:
-  - `remote-mcp-server-route`: `/_api/v3/mcp`、要求スコープの宣言、有効化フラグ、認証と 401 応答の差し込み口
+  - `remote-mcp-server-route`: `/_api/v3/mcp`、要求スコープの宣言、有効化フラグ（`app:mcpEnabled`。認可サーバーのエンドポイントも、このフラグで切り替える。別のフラグは作らない）、認証と 401 応答の差し込み口
   - `accessTokenParser` と AccessToken モデル（spec: `access-token-parser`）
   - 既存のログインとセッション、`app:siteUrl`、Prisma、`features/rate-limiter`、Activity の仕組み
 - **Downstream**:

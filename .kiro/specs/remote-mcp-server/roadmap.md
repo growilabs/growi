@@ -59,7 +59,7 @@ GROWI 本体に MCP サーバーを組み込み、claude.ai（web 版 Claude）�
   - **未認証時の 401 応答**: `remote-mcp-server-route` は `WWW-Authenticate` チャレンジを出さない 401 を返す。`remote-mcp-server-oauth` はここに `resource_metadata` と `scope` を足す。ハンドラを書き換えずに足せるよう、`remote-mcp-server-route` の設計で 401 応答の差し込み口を用意する。
   - **discovery を出すタイミング**: claude.ai は接続のたびに well-known を確認し、認可サーバーのメタデータを見つけたのに CIMD も DCR も無いと接続を拒否する。well-known と 401 のチャレンジは `remote-mcp-server-oauth` が全部そろった状態でだけ出す。
   - **要求スコープ**: `/_api/v3/mcp` が要求するスコープは、`remote-mcp-server-oauth` の protected-resource メタデータ・同意画面・401 のチャレンジが同じ値を使う。値は 1 か所で宣言する。
-  - **有効化フラグ**: `/_api/v3/mcp` と認可サーバーのエンドポイントを 1 つのフラグで一緒に切り替えるか、`remote-mcp-server-oauth` の要件で決める。
+  - **有効化フラグ**: `/_api/v3/mcp` と認可サーバーのエンドポイントは、1 つのフラグ（`app:mcpEnabled`。「MCP 連携全体」を表す）で一緒に切り替える。`remote-mcp-server-route` がキーを定義し、`remote-mcp-server-oauth` は同じキーを読む。別のフラグは作らない。管理画面のスイッチも 1 つである。
   - **AccessToken モデル**: 発行トークンを既存の AccessToken に載せるかは未決（下記）。載せる場合、個人設定の一覧・全削除・期限切れ削除のジョブに影響し、`/_api/v3/mcp` では「連携から発行したトークン」だけを選り分ける必要がある。
   - **Basic 認証つきの環境**: プロキシで `/_api/v3/mcp`、well-known、`/oauth/token` を Basic 認証の対象から外すことが必須になる。代替手段は無い。
 
