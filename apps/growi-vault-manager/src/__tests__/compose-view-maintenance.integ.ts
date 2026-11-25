@@ -75,7 +75,7 @@ async function disconnectMongo(): Promise<void> {
 // ---------------------------------------------------------------------------
 
 async function callComposeView(
-  userId: string | null,
+  userId: string,
   namespaces: string[],
 ): Promise<{ viewRef: string; commitOid: string }> {
   const res = await fetch(`${BASE_URL}/internal/compose-view`, {

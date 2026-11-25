@@ -129,8 +129,8 @@ async function assertGatewayReady(
  * The standard loginRequired fallback redirects an unauthenticated browser to
  * `/login`. A git client cannot follow that — so this fallback returns the
  * git-native challenge `401 + WWW-Authenticate: Basic realm="GROWI Vault"` and
- * records a VAULT_AUTH_FAILURE audit event (req 10.4). Every request without a
- * valid credential reaches this fallback, regardless of the guest-read setting.
+ * records a VAULT_AUTH_FAILURE audit event (req 10.4). A request without any
+ * credential reaches this fallback.
  *
  * The response body intentionally carries no page content / list / existence
  * information (req 2.3).

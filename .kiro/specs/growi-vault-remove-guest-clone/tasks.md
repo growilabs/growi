@@ -39,7 +39,7 @@
   - _Requirements: 1.5, 2.1_
   - _Depends: 1.2, 2.1_
 - [ ] 4. 機能を取り除いた後の形を整える
-- [ ] 4.1 残骸を洗い出して消す
+- [x] 4.1 残骸を洗い出して消す
   - `apps/app/src/features/growi-vault`・`apps/growi-vault-manager`・`packages/core/src/interfaces/vault` を、`anonymous`・`guest`・`userId: null`・`isGuestAllowed` で検索する
   - 残ってよいのは、設計書の「取り除いた後に確かめる形」の 1 に挙げた 3 つだけである。それ以外（コメント、テストの名前、使われなくなった引数・補助関数・fixture・mock）を消す
   - 完了の目安: 検索の結果と、残した各行の理由を、タスクの報告に書いてある

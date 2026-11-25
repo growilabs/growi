@@ -84,8 +84,8 @@ export interface IVaultUserViewModel extends Model<IVaultUserViewDocument> {
   deleteAll(): Promise<void>;
 
   /**
-   * Removes the record an earlier version kept for the shared anonymous view
-   * (`userId: null`). A no-op when it does not exist.
+   * Removes the shared anonymous-view record (`userId: null`) that
+   * credential-less clones created. A no-op when it does not exist.
    */
   deleteAnonymous(): Promise<void>;
 }

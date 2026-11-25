@@ -453,7 +453,7 @@ export async function deleteAllNamespaceRefs(): Promise<void> {
  * Without this file, `git clone` does not know which branch to check out
  * and emits "warning: remote HEAD refers to nonexistent ref".
  *
- * @param namespace - Namespace name (e.g. 'anonymous-view', 'user-<id>-view').
+ * @param namespace - Namespace name (e.g. 'user-<id>-view').
  */
 export async function ensureNamespaceHead(namespace: string): Promise<void> {
   const headPath = path.join(
