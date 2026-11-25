@@ -6,8 +6,13 @@ import express, {
   type Router,
 } from 'express';
 
+import {
+  SupportedAction,
+  type SupportedActionType,
+} from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
 import adminRequiredFactory from '~/server/middlewares/admin-required';
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
@@ -265,6 +270,20 @@ export const createBacklinksBackfillAdminRouter = (crowi: Crowi): Router => {
     loginRequiredFactory(crowi),
     adminRequiredFactory(crowi),
   ];
+  // After the auth chain, before the handler's own checks: a refused or invalid request by an
+  // admin is audited as an attempt (rules/activity-recording.md).
+  const audited = (): RequestHandler[] => [
+    ...adminOnly(SCOPE.WRITE.ADMIN.APP),
+    generateAddActivityMiddleware(),
+  ];
+
+  // Emit before res.apiv3(): see rules/activity-recording.md.
+  const recordActivity = (
+    res: ApiV3Response,
+    action: SupportedActionType,
+  ): void => {
+    crowi.events.activity.emit('update', res.locals.activity._id, { action });
+  };
 
   const respondWithState = async (res: ApiV3Response) =>
     res.apiv3({ state: await readBacklinksBackfillState() });
@@ -286,62 +305,59 @@ export const createBacklinksBackfillAdminRouter = (crowi: Crowi): Router => {
     },
   );
 
-  router.post(
-    '/start',
-    adminOnly(SCOPE.WRITE.ADMIN.APP),
-    async (req: Request, res: ApiV3Response) => {
-      const parsed = parseBackfillStartRequest(req.body, new Date());
-      if (!parsed.ok) {
-        return res.apiv3Err(new ErrorV3(parsed.reason, 'invalid_scope'), 400);
+  router.post('/start', audited(), async (req: Request, res: ApiV3Response) => {
+    const parsed = parseBackfillStartRequest(req.body, new Date());
+    if (!parsed.ok) {
+      return res.apiv3Err(new ErrorV3(parsed.reason, 'invalid_scope'), 400);
+    }
+    try {
+      await jobs.ensureExists();
+      if (!(await jobs.requestStart(parsed.scope))) {
+        // Read after the refusal only to name its reason; the write's filter was the check.
+        const job = await jobs.findFirst({});
+        return job?.coverage === 'all'
+          ? conflict(
+              res,
+              'Backlinks are already indexed for all pages',
+              'backfill_already_complete',
+            )
+          : conflict(
+              res,
+              'A backlinks backfill run is already requested, running or waiting to retry',
+              'backfill_run_active',
+            );
       }
-      try {
-        await jobs.ensureExists();
-        if (!(await jobs.requestStart(parsed.scope))) {
-          // Read after the refusal only to name its reason; the write's filter was the check.
-          const job = await jobs.findFirst({});
-          return job?.coverage === 'all'
-            ? conflict(
-                res,
-                'Backlinks are already indexed for all pages',
-                'backfill_already_complete',
-              )
-            : conflict(
-                res,
-                'A backlinks backfill run is already requested, running or waiting to retry',
-                'backfill_run_active',
-              );
-        }
-        claimNow();
-        return await respondWithState(res);
-      } catch (err) {
-        return internalError(res, err, 'start');
-      }
-    },
-  );
+      recordActivity(
+        res,
+        SupportedAction.ACTION_ADMIN_BACKLINKS_BACKFILL_START,
+      );
+      claimNow();
+      return await respondWithState(res);
+    } catch (err) {
+      return internalError(res, err, 'start');
+    }
+  });
 
-  router.post(
-    '/stop',
-    adminOnly(SCOPE.WRITE.ADMIN.APP),
-    async (_req: Request, res: ApiV3Response) => {
-      try {
-        await jobs.ensureExists();
-        if (!(await jobs.requestStop())) {
-          return conflict(
-            res,
-            'No backlinks backfill run is requested, running or waiting to retry',
-            'backfill_not_stoppable',
-          );
-        }
-        return await respondWithState(res);
-      } catch (err) {
-        return internalError(res, err, 'stop');
+  router.post('/stop', audited(), async (_req: Request, res: ApiV3Response) => {
+    try {
+      await jobs.ensureExists();
+      if (!(await jobs.requestStop())) {
+        return conflict(
+          res,
+          'No backlinks backfill run is requested, running or waiting to retry',
+          'backfill_not_stoppable',
+        );
       }
-    },
-  );
+      recordActivity(res, SupportedAction.ACTION_ADMIN_BACKLINKS_BACKFILL_STOP);
+      return await respondWithState(res);
+    } catch (err) {
+      return internalError(res, err, 'stop');
+    }
+  });
 
   router.post(
     '/resume',
-    adminOnly(SCOPE.WRITE.ADMIN.APP),
+    audited(),
     async (_req: Request, res: ApiV3Response) => {
       try {
         await jobs.ensureExists();
@@ -352,6 +368,10 @@ export const createBacklinksBackfillAdminRouter = (crowi: Crowi): Router => {
             'backfill_not_resumable',
           );
         }
+        recordActivity(
+          res,
+          SupportedAction.ACTION_ADMIN_BACKLINKS_BACKFILL_RESUME,
+        );
         claimNow();
         return await respondWithState(res);
       } catch (err) {

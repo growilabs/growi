@@ -1275,6 +1275,9 @@
     "ADMIN_SEARCH_CONNECTION": "Elasticsearch에 다시 연결 시도",
     "ADMIN_SEARCH_INDICES_NORMALIZE": "Elasticsearch 인덱스 정규화",
     "ADMIN_SEARCH_INDICES_REBUILD": "Elasticsearch 인덱스 재구축",
+    "ADMIN_BACKLINKS_BACKFILL_START": "백링크 백필 시작",
+    "ADMIN_BACKLINKS_BACKFILL_STOP": "백링크 백필 중지",
+    "ADMIN_BACKLINKS_BACKFILL_RESUME": "백링크 백필 재개",
     "ADMIN_PAGE_BULK_EXPORT_SETTINGS_UPDATE": "페이지 대량 내보내기 설정 업데이트"
   },
   "g2g": {
