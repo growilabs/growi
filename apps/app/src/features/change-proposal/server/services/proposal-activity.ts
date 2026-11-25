@@ -1,6 +1,7 @@
 import type { IUserHasId } from '@growi/core';
 
 import {
+  type ChangeProposalReviewSnapshot,
   type SupportedAction,
   SupportedTargetModel,
 } from '~/interfaces/activity';
@@ -11,24 +12,45 @@ import {
 } from '~/server/service/activity/index';
 import loggerFactory from '~/utils/logger';
 
-import type { ApplyTrigger } from '../../interfaces';
+import type { ApplyTrigger, ReviewChannel } from '../../interfaces';
 
 const logger = loggerFactory(
   'growi:features:change-proposal:services:proposal-activity',
 );
 
-export type ChangeProposalAction =
+type ProposalLifecycleAction =
   | typeof SupportedAction.ACTION_CHANGE_PROPOSAL_CREATE
   | typeof SupportedAction.ACTION_CHANGE_PROPOSAL_APPLY
   | typeof SupportedAction.ACTION_CHANGE_PROPOSAL_REVERT;
 
+export type ProposalReviewAction =
+  | typeof SupportedAction.ACTION_CHANGE_PROPOSAL_APPROVE
+  | typeof SupportedAction.ACTION_CHANGE_PROPOSAL_REJECT
+  | typeof SupportedAction.ACTION_CHANGE_PROPOSAL_ABSTAIN
+  | typeof SupportedAction.ACTION_CHANGE_PROPOSAL_REVIEWER_ADD
+  | typeof SupportedAction.ACTION_CHANGE_PROPOSAL_REVIEWER_REMOVE;
+
+export type ChangeProposalAction =
+  | ProposalLifecycleAction
+  | ProposalReviewAction;
+
 export type RecordProposalActivityArgs = {
-  readonly action: ChangeProposalAction;
   readonly proposalId: string;
   readonly operator: IUserHasId;
   readonly trigger: ApplyTrigger;
   readonly request?: { readonly ip?: string; readonly endpoint?: string };
-};
+} & (
+  | { readonly action: ProposalLifecycleAction; readonly channel?: never }
+  | { readonly action: ProposalReviewAction; readonly channel: ReviewChannel }
+);
+
+const toReviewSnapshot = (
+  channel: ReviewChannel,
+): ChangeProposalReviewSnapshot => ({
+  // username is left to the settle step, which takes it from the operator's
+  // stashed context.
+  reviewChannel: channel,
+});
 
 /**
  * Records the activity synchronously: on the request path it must run before the
@@ -43,6 +65,7 @@ export const recordProposalActivity = (
     operator,
     trigger,
     request,
+    channel,
   }: RecordProposalActivityArgs,
 ): { activityId: string } => {
   const ownsContext = trigger.kind === 'background';
@@ -64,6 +87,7 @@ export const recordProposalActivity = (
       action,
       targetModel: SupportedTargetModel.MODEL_CHANGE_PROPOSAL,
       target: proposalId,
+      ...(channel == null ? {} : { snapshot: toReviewSnapshot(channel) }),
     });
   } catch (err) {
     logger.error(

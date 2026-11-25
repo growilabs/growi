@@ -26,6 +26,8 @@ import type { PageOperationDocument } from '~/server/models/page-operation';
 import type { UserGroupDocument } from '~/server/models/user-group';
 import type { ActivityActor } from '~/server/service/attachment/attachment-removal-snapshot';
 
+import type { DuplicateDeps, DuplicatedPage } from './duplicate';
+
 export type DeletionOptions = {
   isCompletely: boolean;
   isRecursively: boolean;
@@ -132,10 +134,26 @@ export interface IPageService {
     pageId: string,
     revisionBody?: string,
   ): Promise<CurrentPageYjsData>;
-  updateDescendantCountOfPagesWithPaths(paths: string[]): Promise<void>;
+  // onBatchStart: called before each batch; throwing aborts the run with that error
+  normalizeParentRecursively(
+    paths: string[],
+    user,
+    isDuplicateOperation?: boolean,
+    shouldEmitProgress?: boolean,
+    onBatchStart?: () => Promise<void>,
+  ): Promise<number>;
+  updateDescendantCountOfSelfAndDescendants(
+    path: string,
+    onBatchStart?: () => Promise<void>,
+  ): Promise<void>;
+  updateDescendantCountOfPagesWithPaths(
+    paths: string[],
+    onBatchStart?: () => Promise<void>,
+  ): Promise<void>;
   recountAndUpdateDescendantCountOfPages(
     pageCursor: Cursor<unknown>,
     batchSize: number,
+    onBatchStart?: () => Promise<void>,
   ): Promise<void>;
   revertRecursivelyMainOperation(
     page,
@@ -198,20 +216,15 @@ export interface IPageService {
     activityParameters,
   ): Promise<PageDocument[]>;
   emptyTrash(user: IUserHasId, activityParameters): Promise<EmptyTrashResult>;
-  duplicateRecursivelyMainOperation(
-    page: PageDocument,
-    newPagePath: string,
-    user,
-    pageOpId: ObjectIdLike,
-    onlyDuplicateUserRelatedResources: boolean,
-  ): Promise<void>;
   duplicate(
-    page: PageDocument,
+    page: HydratedDocument<PageDocument>,
     newPagePath: string,
-    user,
+    user: IUserHasId,
     isRecursively: boolean,
     onlyDuplicateUserRelatedResources: boolean,
-  );
+  ): Promise<DuplicatedPage>;
+  /** The collaborators the duplicate module runs with, assembled from this service's own. */
+  duplicateDeps(): DuplicateDeps;
   renameSubOperation(
     page,
     newPagePath: string,

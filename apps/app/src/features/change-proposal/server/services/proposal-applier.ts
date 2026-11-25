@@ -163,7 +163,7 @@ type WriteGate =
   | { readonly blocked: RecordedOutcome }
   | { readonly requester: IUserHasId };
 
-// findExistingResult comes first (design 反映の流れ): it may finish an interrupted
+// findExistingResult comes first (design 適用の流れ): it may finish an interrupted
 // write's cleanup, and a write that already happened is recorded as applied even if
 // the settings, the requester or the page state changed since.
 const writeOperation = async <T extends OperationRecord>(

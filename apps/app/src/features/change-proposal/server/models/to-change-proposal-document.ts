@@ -1,6 +1,8 @@
 import type {
   ChangeproposalsBasedOn,
   ChangeproposalsOperations,
+  ChangeproposalsReviewers,
+  ChangeproposalsReviews,
   changeproposals,
 } from '~/generated/prisma/client';
 
@@ -15,6 +17,11 @@ import type {
   OperationType,
   ProposalEntry,
   ProposalLifecycle,
+  ReviewChannel,
+  ReviewerKind,
+  ReviewerRef,
+  ReviewKind,
+  ReviewRecord,
 } from '../../interfaces';
 
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown
@@ -93,6 +100,18 @@ const RELATIONS: Record<BasedOnRelation, true> = {
   rework: true,
 };
 
+const REVIEWER_KINDS: Record<ReviewerKind, true> = {
+  user: true,
+  'user-group': true,
+  'external-user-group': true,
+};
+const REVIEW_KINDS: Record<ReviewKind, true> = { reject: true, abstain: true };
+const REVIEW_CHANNELS: Record<ReviewChannel, true> = {
+  ui: true,
+  api: true,
+  'ai-tool': true,
+};
+
 const toMember = <T extends string>(
   members: Record<T, true>,
   value: string,
@@ -104,7 +123,7 @@ const toMember = <T extends string>(
   return value as T;
 };
 
-const required = <T>(
+export const required = <T>(
   value: T | null | undefined,
   field: string,
   type: string,
@@ -164,6 +183,17 @@ const toOperationState = (row: OperationRowWithoutBody) => ({
     ? {}
     : { reason: toMember(OPERATION_REASONS, row.reason, 'operation reason') }),
   ...optional('approvedAt', row.approvedAt),
+  ...optional('approvedBy', row.approvedBy),
+  ...(row.approvedChannel == null
+    ? {}
+    : {
+        approvedChannel: toMember(
+          REVIEW_CHANNELS,
+          row.approvedChannel,
+          'approval channel',
+        ),
+      }),
+  ...optional('decisionToken', row.decisionToken),
   ...optional('appliedAt', row.appliedAt),
   ...optional('resultPageId', row.resultPageId),
   ...optional('resultRevisionId', row.resultRevisionId),
@@ -200,6 +230,24 @@ export const toBasedOn = (row: ChangeproposalsBasedOn): BasedOn => ({
   operationKeys: [...row.operationKeys],
 });
 
+export const toReviewerRef = (row: ChangeproposalsReviewers): ReviewerRef => ({
+  kind: toMember(REVIEWER_KINDS, row.kind, 'reviewer kind'),
+  id: row.id,
+  addedBy: row.addedBy,
+  addedAt: row.addedAt,
+  ...optional('removedBy', row.removedBy),
+  ...optional('removedAt', row.removedAt),
+});
+
+const toReviewRecord = (row: ChangeproposalsReviews): ReviewRecord => ({
+  kind: toMember(REVIEW_KINDS, row.kind, 'review kind'),
+  ...optional('operationKey', row.operationKey),
+  by: row.by,
+  at: row.at,
+  ...optional('comment', row.comment),
+  channel: toMember(REVIEW_CHANNELS, row.channel, 'review channel'),
+});
+
 const toProposalFields = (row: ProposalRowWithoutBodies) => ({
   _id: row.id,
   requester: row.requester,
@@ -220,6 +268,9 @@ const toProposalFields = (row: ProposalRowWithoutBodies) => ({
       }),
   ...optional('expiresAt', row.expiresAt),
   perPageNotifications: row.perPageNotifications,
+  ...optional('purpose', row.purpose),
+  reviewers: row.reviewers.map(toReviewerRef),
+  reviews: row.reviews.map(toReviewRecord),
   createdAt: row.createdAt,
   updatedAt: row.updatedAt,
 });

@@ -119,10 +119,10 @@ each with its own `.meta.md` saying which it is and why:
 |---|---|---|
 | `ci-app-test-100952911197-excerpt.txt` | real | ESC bytes and timestamps; three `FAIL `-prefixed lines that are **not** vitest failures; vitest's own totals, which must not be read as a Playwright summary |
 | `11752-setup-hook-timeout-excerpt.txt` | real | file-level FAIL lines (no test title); the `test/setup/` frame printed once, under the last of three |
-| `11903-playwright-flaky-excerpt.txt` | real | one mid-line `::error` annotation; `0 failed / 1 flaky` |
+| `11903-playwright-flaky-excerpt.txt` | real | `0 failed / 1 flaky` counts with no test line under `1 flaky` (the list is unreadable, `count-mismatch`) |
 | `11914-playwright-flaky-excerpt.txt` | real | the shard summary echoed a second time under `##[notice]` — counting it twice would report `2 flaky` |
 | `constructed-97-failures-one-infra-noise-excerpt.txt` | constructed | 97 failures, exactly one infrastructure-noise hit, `scope: "failure"` — the per-failure-not-per-job rule |
-| `constructed-playwright-1-failed-0-flaky-excerpt.txt` | constructed | the mirror of #11903: a captured summary whose absent line reads as `0` |
+| `constructed-playwright-1-failed-0-flaky-excerpt.txt` | constructed | the mirror of #11903: a run's counts whose absent line reads as `0`, with the listed test under `failed` |
 | `constructed-setup-hook-infra-noise-excerpt.txt` | constructed | a denylist string inside a `test/setup/` hook → `scope: "job"` |
 
 The searches that established "no real example exists" for the three

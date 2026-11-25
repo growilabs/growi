@@ -19,6 +19,9 @@ on:
       # this file, which is where they are defined.
       - .github/scripts/flaky-repro/run-repro.sh
       - .github/workflows/flaky-repro.yml
+      # bin/release/decide-release.spec.ts runs this script, which the release
+      # workflows use to decide whether a version is already published.
+      - .github/scripts/decide-release.sh
   pull_request:
     types: [opened, reopened, synchronize]
     paths:
@@ -28,6 +31,7 @@ on:
       - .claude/commands/flaky-ci-routine.md
       - .github/scripts/flaky-repro/run-repro.sh
       - .github/workflows/flaky-repro.yml
+      - .github/scripts/decide-release.sh
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

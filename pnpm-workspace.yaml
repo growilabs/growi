@@ -48,6 +48,12 @@ overrides:
   '@lezer/common': ^1.5.2
   '@lezer/lr': ^1.4.10
   '@codemirror/language': ^6.12.3
+  # Match the katex.css bundled by apps/app (0.18 prefixed CSS classes).
+  # Remove once rehype-katex allows katex ^0.18 (remarkjs/remark-math#121).
+  'rehype-katex>katex': ^0.18.2
+  # streamdown shares the rehype-katex above but lazy-loads katex.min.css from
+  # its own katex, so it must follow the same version.
+  'streamdown>katex': ^0.18.2
 
 packageExtensions:
   # @orval/core bundles @stoplight/json-ref-resolver which requires lodash/get at runtime,
