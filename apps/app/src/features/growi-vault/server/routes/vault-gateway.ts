@@ -1,11 +1,5 @@
 import { pipeline } from 'node:stream/promises';
-import type {
-  NextFunction,
-  Request,
-  RequestHandler,
-  Response,
-  Router,
-} from 'express';
+import type { Request, RequestHandler, Response, Router } from 'express';
 import express from 'express';
 
 import { SupportedAction } from '~/interfaces/activity';
@@ -13,6 +7,10 @@ import loginRequiredFactory from '~/server/middlewares/login-required';
 import { generateUnavailableWhenMaintenanceModeMiddlewareForApi } from '~/server/middlewares/unavailable-when-maintenance-mode';
 import loggerFactory from '~/utils/logger';
 
+import {
+  createVaultAuthChallenge,
+  type VaultActivityRecorder,
+} from '../middlewares/vault-auth-challenge';
 import {
   createVaultCredentialAdapter,
   type VaultAuthenticatedReq,
@@ -27,15 +25,6 @@ const logger = loggerFactory('growi:features:growi-vault:routes:vault-gateway');
 // ============================================================================
 // Types
 // ============================================================================
-
-/** Activity-logger callback shape (see VaultGatewayRouterDeps.createActivity). */
-type CreateActivity = (params: {
-  ip: string | undefined;
-  endpoint: string;
-  action: string;
-  user: string | undefined;
-  snapshot: { username?: string };
-}) => Promise<void>;
 
 /**
  * Dependencies injected into the VaultGatewayRouter factory.
@@ -56,14 +45,13 @@ export interface VaultGatewayRouterDeps {
   readonly vaultPatAuth?: RequestHandler;
   /**
    * Optional activity logger callback. Called fire-and-forget after a
-   * successful git operation, and on auth failures (via the credential
-   * adapter / git fallback). Accepts the same shape as
-   * activityService.createActivity().
+   * successful git operation, and on auth failures (via the 401 challenge).
+   * Accepts the same shape as activityService.createActivity().
    *
    * Keeping this as an optional callback (rather than accepting the full Crowi
    * object) limits coupling to the audit log interface alone.
    */
-  readonly createActivity?: CreateActivity;
+  readonly createActivity?: VaultActivityRecorder;
 }
 
 // ============================================================================
@@ -124,39 +112,6 @@ async function assertGatewayReady(
 }
 
 /**
- * git-compatible fallback (seam #2) for `loginRequiredFactory`.
- *
- * The standard loginRequired fallback redirects an unauthenticated browser to
- * `/login`. A git client cannot follow that — so this fallback returns the
- * git-native challenge `401 + WWW-Authenticate: Basic realm="GROWI Vault"` and
- * records a VAULT_AUTH_FAILURE audit event (req 10.4). A request without any
- * credential reaches this fallback.
- *
- * The response body intentionally carries no page content / list / existence
- * information (req 2.3).
- */
-function createGitFallback(createActivity: CreateActivity | undefined) {
-  return (req: Request, res: Response, _next: NextFunction): void => {
-    if (!res.headersSent) {
-      res.setHeader('WWW-Authenticate', 'Basic realm="GROWI Vault"');
-      res.status(401).end();
-    } else {
-      res.end();
-    }
-
-    createActivity?.({
-      ip: req.ip,
-      endpoint: req.originalUrl,
-      action: SupportedAction.ACTION_VAULT_AUTH_FAILURE,
-      user: undefined,
-      snapshot: {},
-    }).catch((err) =>
-      logger.warn({ err }, 'Failed to record auth-failure activity'),
-    );
-  };
-}
-
-/**
  * Read the authenticated identity off the request.
  *
  * The credential adapter (seam #1) populated `req.user` with a securely
@@ -193,7 +148,7 @@ function readIdentity(req: Request): {
  * of re-implementing authz (req 11):
  *
  *   [maintenanceMode] → credentialAdapter (seam #1)
- *     → loginRequiredFactory(crowi, isGuestAllowed=false, gitFallback) → handler
+ *     → loginRequiredFactory(crowi, isGuestAllowed=false, rejectWithChallenge) → handler
  *
  * The rate limiter is applied at the mount point (server/routes/index.js,
  * req 10.3) so it is intentionally NOT added here.
@@ -212,7 +167,9 @@ export const createVaultGatewayRouter = (
   const credentialAdapter =
     deps.vaultPatAuth ?? createVaultCredentialAdapter(createActivity);
 
-  const gitFallback = createGitFallback(createActivity);
+  // Also the loginRequired fallback (seam #2): a git client cannot follow the
+  // standard redirect to /login.
+  const rejectWithChallenge = createVaultAuthChallenge(createActivity);
   const router = express.Router();
 
   // --------------------------------------------------------------------------
@@ -227,7 +184,7 @@ export const createVaultGatewayRouter = (
       ? [
           generateUnavailableWhenMaintenanceModeMiddlewareForApi(crowi),
           credentialAdapter,
-          loginRequiredFactory(crowi, false, gitFallback),
+          loginRequiredFactory(crowi, false, rejectWithChallenge),
         ]
       : [credentialAdapter];
 
@@ -247,7 +204,7 @@ export const createVaultGatewayRouter = (
   router.get(
     '/info/refs',
     ...authMiddlewares,
-    async (req: Request, res: Response, next: NextFunction) => {
+    async (req: Request, res: Response) => {
       // Feature flag + bootstrap gate (req 1.4, 1.5)
       const ready = await assertGatewayReady(req, res);
       if (!ready) return;
@@ -262,7 +219,7 @@ export const createVaultGatewayRouter = (
       // Identity resolved by the credential adapter + loginRequired chain.
       const identity = readIdentity(req);
       if (identity == null) {
-        gitFallback(req, res, next);
+        rejectWithChallenge(req, res);
         return;
       }
       const { userId, scopes } = identity;
@@ -361,7 +318,7 @@ export const createVaultGatewayRouter = (
   router.post(
     '/git-upload-pack',
     ...authMiddlewares,
-    async (req: Request, res: Response, next: NextFunction) => {
+    async (req: Request, res: Response) => {
       // Feature flag + bootstrap gate (req 1.4, 1.5)
       const ready = await assertGatewayReady(req, res);
       if (!ready) return;
@@ -369,7 +326,7 @@ export const createVaultGatewayRouter = (
       // Identity resolved by the credential adapter + loginRequired chain.
       const identity = readIdentity(req);
       if (identity == null) {
-        gitFallback(req, res, next);
+        rejectWithChallenge(req, res);
         return;
       }
       const { userId, scopes } = identity;

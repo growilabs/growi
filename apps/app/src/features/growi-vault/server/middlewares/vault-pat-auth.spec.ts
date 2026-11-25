@@ -1,4 +1,6 @@
 import type { NextFunction, Response } from 'express';
+import express from 'express';
+import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AccessToken } from '~/server/models/access-token';
@@ -409,6 +411,34 @@ describe('vault credential adapter (seam #1)', () => {
       // The challenge body is empty (.end() with no payload); only the
       // WWW-Authenticate header is emitted.
       expect(res.headers['WWW-Authenticate']).toBe('Basic realm="GROWI Vault"');
+    });
+
+    it('answers over HTTP with an empty-body 401 and records the auth-failure audit record', async () => {
+      vi.mocked(AccessToken.findUserIdByToken).mockResolvedValue(null);
+      const createActivity = vi.fn().mockResolvedValue(undefined);
+      const app = express();
+      app.get(
+        '/vault.git/info/refs',
+        createVaultCredentialAdapter(createActivity),
+        (_req, res) => {
+          res.status(200).send('handler reached');
+        },
+      );
+
+      const res = await request(app)
+        .get('/vault.git/info/refs?service=git-upload-pack')
+        .set('Authorization', encodeBasic('anyuser', INVALID_PAT));
+
+      expect(res.status).toBe(401);
+      expect(res.headers['www-authenticate']).toBe('Basic realm="GROWI Vault"');
+      expect(res.text).toBe('');
+      expect(createActivity).toHaveBeenCalledExactlyOnceWith({
+        ip: expect.any(String),
+        endpoint: '/vault.git/info/refs?service=git-upload-pack',
+        action: 'VAULT_AUTH_FAILURE',
+        user: undefined,
+        snapshot: {},
+      });
     });
   });
 

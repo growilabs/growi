@@ -3,12 +3,16 @@ import type { IUserSerializedSecurely } from '@growi/core/dist/models/serializer
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import type { NextFunction, Request, Response } from 'express';
 
-import { SupportedAction } from '~/interfaces/activity';
 // extractAccessToken / X_GROWI_ACCESS_TOKEN_HEADER_NAME are NOT re-exported by the
 // access-token-parser barrel — import them directly from the file (PR #11244).
 import { extractAccessToken } from '~/server/middlewares/access-token-parser/extract-access-token';
 import { AccessToken } from '~/server/models/access-token';
 import loggerFactory from '~/utils/logger';
+
+import {
+  createVaultAuthChallenge,
+  type VaultActivityRecorder,
+} from './vault-auth-challenge';
 
 const logger = loggerFactory(
   'growi:features:growi-vault:middleware:vault-pat-auth',
@@ -17,19 +21,6 @@ const logger = loggerFactory(
 // ============================================================================
 // Types
 // ============================================================================
-
-/**
- * Audit-logger callback shape (subset of activityService.createActivity).
- * Wired by the router so the credential adapter can record auth-failure events
- * without depending on the full Crowi object.
- */
-export type VaultCredentialAdapterAudit = (params: {
-  ip: string | undefined;
-  endpoint: string;
-  action: string;
-  user: string | undefined;
-  snapshot: { username?: string };
-}) => Promise<void>;
 
 /**
  * The Express request shape the credential adapter populates on success.
@@ -128,35 +119,6 @@ const resolvePatUser = async (
   return { user, scopes };
 };
 
-/**
- * Send the git-compatible 401 challenge, end the response, and record an
- * auth-failure activity. The body intentionally carries no page content / list
- * / existence information (req 2.3). Recorded as VAULT_AUTH_FAILURE for
- * brute-force detection (req 10.4).
- */
-const rejectWithChallenge = (
-  req: Request,
-  res: Response,
-  audit: VaultCredentialAdapterAudit | undefined,
-): void => {
-  if (!res.headersSent) {
-    res.setHeader('WWW-Authenticate', 'Basic realm="GROWI Vault"');
-    res.status(401).end();
-  } else {
-    res.end();
-  }
-
-  audit?.({
-    ip: req.ip,
-    endpoint: req.originalUrl,
-    action: SupportedAction.ACTION_VAULT_AUTH_FAILURE,
-    user: undefined,
-    snapshot: {},
-  }).catch((err) =>
-    logger.warn({ err }, 'Failed to record auth-failure activity'),
-  );
-};
-
 // ============================================================================
 // Credential adapter (seam #1)
 // ============================================================================
@@ -187,9 +149,9 @@ const rejectWithChallenge = (
  *    stash `req.vaultScopes`, then call next(). Read-only users are allowed
  *    (intentional deviation — see resolvePatUser).
  */
-export const createVaultCredentialAdapter = (
-  audit?: VaultCredentialAdapterAudit,
-) => {
+export const createVaultCredentialAdapter = (audit?: VaultActivityRecorder) => {
+  const rejectWithChallenge = createVaultAuthChallenge(audit);
+
   return async (
     req: VaultAuthenticatedReq,
     res: Response,
@@ -231,7 +193,7 @@ export const createVaultCredentialAdapter = (
       resolved = await resolvePatUser(pat);
     } catch (err) {
       logger.warn({ err }, 'Vault PAT resolution failed unexpectedly');
-      rejectWithChallenge(req, res, audit);
+      rejectWithChallenge(req, res);
       return;
     }
 
@@ -239,7 +201,7 @@ export const createVaultCredentialAdapter = (
       logger.debug(
         'Vault PAT authentication failed: token not found, expired, or revoked',
       );
-      rejectWithChallenge(req, res, audit);
+      rejectWithChallenge(req, res);
       return;
     }
 

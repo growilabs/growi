@@ -415,9 +415,13 @@ describe('VaultGatewayRouter', () => {
         expect(vaultManagerClient.composeView).not.toHaveBeenCalled();
         expect(vaultManagerClient.proxyGitRequest).not.toHaveBeenCalled();
 
-        expect(createActivity).toHaveBeenCalledWith(
-          expect.objectContaining({ action: 'VAULT_AUTH_FAILURE' }),
-        );
+        expect(createActivity).toHaveBeenCalledExactlyOnceWith({
+          ip: expect.any(String),
+          endpoint: '/vault.git/info/refs?service=git-upload-pack',
+          action: 'VAULT_AUTH_FAILURE',
+          user: undefined,
+          snapshot: {},
+        });
       });
 
       it('POST /git-upload-pack returns 401 + WWW-Authenticate and exposes no page info', async () => {
@@ -442,9 +446,13 @@ describe('VaultGatewayRouter', () => {
 
         expect(vaultManagerClient.composeView).not.toHaveBeenCalled();
         expect(vaultManagerClient.proxyGitRequest).not.toHaveBeenCalled();
-        expect(createActivity).toHaveBeenCalledWith(
-          expect.objectContaining({ action: 'VAULT_AUTH_FAILURE' }),
-        );
+        expect(createActivity).toHaveBeenCalledExactlyOnceWith({
+          ip: expect.any(String),
+          endpoint: '/vault.git/git-upload-pack',
+          action: 'VAULT_AUTH_FAILURE',
+          user: undefined,
+          snapshot: {},
+        });
       });
     });
   });
@@ -699,9 +707,19 @@ describe('VaultGatewayRouter', () => {
       ).not.toHaveBeenCalled();
       expect(vaultManagerClient.composeView).not.toHaveBeenCalled();
       expect(vaultManagerClient.proxyGitRequest).not.toHaveBeenCalled();
-      expect(createActivity).toHaveBeenCalledTimes(2);
-      expect(createActivity).toHaveBeenCalledWith(
-        expect.objectContaining({ action: 'VAULT_AUTH_FAILURE' }),
+      expect(createActivity.mock.calls).toEqual(
+        [
+          '/vault.git/info/refs?service=git-upload-pack',
+          '/vault.git/git-upload-pack',
+        ].map((endpoint) => [
+          {
+            ip: expect.any(String),
+            endpoint,
+            action: 'VAULT_AUTH_FAILURE',
+            user: undefined,
+            snapshot: {},
+          },
+        ]),
       );
     });
 
