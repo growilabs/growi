@@ -21,20 +21,21 @@
  *   VAULT_GC_INTERVAL_HOURS have elapsed since the last gc, spawns
  *   `git gc --prune=2.weeks.ago` against the bare repository.
  *
- * In-flight serialization:
- *   A Set<string> tracks namespaces currently being squashed.  The
- *   VaultNamespaceBuilder is expected to check isNamespaceInflight() before
- *   starting an instruction and to wait until the namespace is clear, or
- *   alternatively the scheduler skips in-flight namespaces on its side.
- *   The scheduler simply skips a namespace when it is already in the Set,
- *   ensuring that squash and instruction processing never race on the same
- *   namespace.
+ * Serialization with instruction processing:
+ *   Each squash runs inside withNamespaceLock(), the same per-namespace lock
+ *   VaultNamespaceBuilder holds while applying an instruction, and reads the
+ *   namespace HEAD only once its turn comes. A tick waits for every squash
+ *   it queued, and ticks never overlap, so a namespace is never queued twice.
  */
 
 import * as childProcess from 'node:child_process';
+import { loggerFactory } from '@growi/logger';
 
 import { VaultNamespaceStateModel } from '../models/vault-namespace-state.js';
+import { withNamespaceLock } from './vault-namespace-lock.js';
 import * as VaultRepoStorage from './vault-repo-storage.js';
+
+const logger = loggerFactory('growi:vault-manager:vault-maintenance-scheduler');
 
 // ---------------------------------------------------------------------------
 // Environment-variable thresholds (with defaults)
@@ -183,7 +184,15 @@ function runGitGc(repoPath: string): Promise<void> {
   return new Promise((resolve, reject) => {
     childProcess.execFile(
       'git',
-      ['--git-dir', repoPath, 'gc', '--prune=2.weeks.ago'],
+      // Refs must stay loose (see design.md, VaultMaintenanceScheduler).
+      [
+        '-c',
+        'gc.packRefs=false',
+        '--git-dir',
+        repoPath,
+        'gc',
+        '--prune=2.weeks.ago',
+      ],
       (err) => {
         if (err != null) {
           reject(err);
@@ -226,9 +235,7 @@ export function createVaultMaintenanceScheduler(): VaultMaintenanceScheduler {
   let lastSquashAt: Date | null = null;
   let lastGcAt: Date | null = null;
 
-  // Namespaces currently being squashed — used to prevent concurrent squash
-  // and upsert instruction processing on the same namespace.
-  const inflightSquash = new Set<string>();
+  let tickInProgress = false;
 
   // ---------------------------------------------------------------------------
   // Squash logic
@@ -236,6 +243,7 @@ export function createVaultMaintenanceScheduler(): VaultMaintenanceScheduler {
 
   /**
    * Squashes the commit history of a single namespace.
+   * Must run inside withNamespaceLock() for that namespace.
    *
    * Steps:
    *  1. Read the current HEAD commit OID.
@@ -244,10 +252,14 @@ export function createVaultMaintenanceScheduler(): VaultMaintenanceScheduler {
    *  4. Atomically update the namespace ref.
    *  5. Reset vault_namespace_state.version to 1 (the squash commit).
    */
-  async function squashNamespace(
-    namespace: string,
-    currentCommitOid: string,
-  ): Promise<void> {
+  async function squashNamespace(namespace: string): Promise<void> {
+    const currentCommitOid = await VaultRepoStorage.readRef(nsRef(namespace));
+    if (currentCommitOid == null) {
+      // The ref was deleted (reset-all) while this squash was queued;
+      // writing it back would resurrect the namespace.
+      return;
+    }
+
     // Obtain the root tree OID from the current HEAD commit.
     const treeOid = await getTreeOidFromCommit(currentCommitOid);
 
@@ -275,32 +287,17 @@ export function createVaultMaintenanceScheduler(): VaultMaintenanceScheduler {
   }
 
   /**
-   * Acquires the in-flight lock for a namespace, runs squashNamespace, then
-   * releases the lock.  Extracted so that runSquashCheck can dispatch all
-   * eligible namespaces with Promise.all() instead of a sequential await-in-loop.
-   */
-  async function squashNamespaceLocked(
-    namespace: string,
-    commitOid: string,
-  ): Promise<void> {
-    inflightSquash.add(namespace);
-    try {
-      await squashNamespace(namespace, commitOid);
-    } finally {
-      inflightSquash.delete(namespace);
-    }
-  }
-
-  /**
    * Iterates all namespace state documents and squashes any namespace that
-   * exceeds the commit-count or age threshold.  Skips namespaces that are
-   * currently in-flight (being processed by VaultNamespaceBuilder).
+   * exceeds the commit-count or age threshold.
    *
-   * Eligible namespaces are squashed concurrently (Promise.all) because each
-   * namespace holds its own independent git ref and DB document.  The
-   * inflightSquash Set prevents two concurrent squashes of the same namespace.
+   * Eligible namespaces are squashed concurrently because each namespace
+   * holds its own independent git ref and DB document.
    */
   async function runSquashCheck(): Promise<void> {
+    // Every squash would fail the same way; fail the check once instead of
+    // once per namespace on every tick.
+    await VaultRepoStorage.assertRefsReadable();
+
     const squashCommitThreshold = getEnvInt(
       'VAULT_SQUASH_COMMIT_THRESHOLD',
       DEFAULT_SQUASH_COMMIT_THRESHOLD,
@@ -315,26 +312,34 @@ export function createVaultMaintenanceScheduler(): VaultMaintenanceScheduler {
     // Load all namespace state documents in one query.
     const allStates = await VaultNamespaceStateModel.find(
       {},
-      { namespace: 1, commitOid: 1, version: 1, updatedAt: 1 },
+      { namespace: 1, version: 1, updatedAt: 1 },
     )
       .lean()
       .exec();
 
-    // Filter to namespaces that need squashing and are not already in-flight.
-    const tasks = allStates
+    const namespaces = allStates
       .filter((state) => {
-        if (inflightSquash.has(state.namespace)) {
-          return false;
-        }
         const exceedsCommitThreshold = state.version > squashCommitThreshold;
         const ageMs = now - state.updatedAt.getTime();
         const exceedsAge = ageMs > squashAgeMs;
         return exceedsCommitThreshold || exceedsAge;
       })
-      .map((state) => squashNamespaceLocked(state.namespace, state.commitOid));
+      .map((state) => state.namespace);
 
-    // Run all eligible squashes concurrently; errors are non-fatal per namespace.
-    await Promise.all(tasks);
+    // Errors are non-fatal per namespace; wait for every squash to settle.
+    const results = await Promise.allSettled(
+      namespaces.map((namespace) =>
+        withNamespaceLock([namespace], () => squashNamespace(namespace)),
+      ),
+    );
+    results.forEach((result, index) => {
+      if (result.status === 'rejected') {
+        logger.error(
+          { err: result.reason, namespace: namespaces[index] },
+          'squash failed',
+        );
+      }
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -414,16 +419,31 @@ export function createVaultMaintenanceScheduler(): VaultMaintenanceScheduler {
    * Errors in one track are caught independently so the other can still run.
    */
   async function tick(): Promise<void> {
+    // A squash can wait on a long instruction; never let ticks overlap.
+    if (tickInProgress) {
+      return;
+    }
+    tickInProgress = true;
+    try {
+      await runMaintenance();
+    } finally {
+      tickInProgress = false;
+    }
+  }
+
+  async function runMaintenance(): Promise<void> {
     try {
       await runSquashCheck();
-    } catch (_squashErr) {
-      // Squash errors are non-fatal; the next tick will retry.
+    } catch (err) {
+      // Non-fatal; the next tick retries.
+      logger.error({ err }, 'squash check failed');
     }
 
     try {
       await runGcCheck();
-    } catch (_gcErr) {
-      // GC errors are non-fatal; the next tick will retry.
+    } catch (err) {
+      // Non-fatal; the next tick retries.
+      logger.error({ err }, 'gc check failed');
     }
   }
 

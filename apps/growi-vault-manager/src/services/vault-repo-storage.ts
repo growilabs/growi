@@ -7,7 +7,8 @@
  *
  * Object I/O delegates to isomorphic-git; ref management uses plain Node.js
  * fs calls with an atomic tmpfile-then-rename pattern so that concurrent
- * readers always see a consistent ref value.
+ * readers always see a consistent ref value.  Those calls only see loose ref
+ * files, so refs are kept loose (see design.md, VaultMaintenanceScheduler).
  *
  * GCSFuse and similar object-storage FUSE mounts are explicitly NOT supported
  * because they do not guarantee atomic rename semantics (requirement 9.5).
@@ -15,8 +16,11 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { loggerFactory } from '@growi/logger';
 import type { TreeEntry as GitTreeEntry } from 'isomorphic-git';
 import git from 'isomorphic-git';
+
+const logger = loggerFactory('growi:vault-manager:vault-repo-storage');
 
 // ---------------------------------------------------------------------------
 // Type re-exports (kept local to avoid coupling to isomorphic-git's types)
@@ -126,7 +130,7 @@ export function getRepoPath(): string {
 
 /**
  * Initialises the bare repository if it does not already exist.
- * Idempotent: calling this when the repo exists is a no-op.
+ * Idempotent.
  *
  * Corresponds to `git init --bare <repoPath>`.
  */
@@ -135,26 +139,21 @@ export async function init(): Promise<void> {
 
   // Check whether the repo already looks initialised by testing for the
   // presence of the 'HEAD' file, which git init always creates.
-  const headFile = path.join(repoPath, 'HEAD');
-  if (
-    await fs.promises
-      .access(headFile)
-      .then(() => true)
-      .catch(() => false)
-  ) {
-    // Already initialised — nothing to do.
-    return;
+  if (!(await fileExists(path.join(repoPath, 'HEAD')))) {
+    // Ensure the parent directory exists before initialising.
+    await fs.promises.mkdir(repoPath, { recursive: true });
+
+    await git.init({
+      fs,
+      gitdir: repoPath,
+      bare: true,
+      defaultBranch: 'main',
+    });
   }
 
-  // Ensure the parent directory exists before initialising.
-  await fs.promises.mkdir(repoPath, { recursive: true });
-
-  await git.init({
-    fs,
-    gitdir: repoPath,
-    bare: true,
-    defaultBranch: 'main',
-  });
+  if (await fileExists(packedRefsPath())) {
+    logger.error(PACKED_REFS_MESSAGE);
+  }
 }
 
 /**
@@ -296,8 +295,80 @@ export async function updateRef(
  *
  * @param refPath - Ref path relative to the git directory.
  * @returns 40-character OID, or null if the ref does not exist.
+ * @throws while packed-refs exists.
  */
 export async function readRef(refPath: string): Promise<string | null> {
+  await assertRefsReadable();
+  return readLooseRef(refPath);
+}
+
+// Only ENOENT means "absent": the packed-refs check must not pass because of
+// an I/O error (e.g. ESTALE on NFS).
+async function fileExists(filePath: string): Promise<boolean> {
+  try {
+    await fs.promises.access(filePath);
+    return true;
+  } catch (err: unknown) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+      return false;
+    }
+    throw err;
+  }
+}
+
+const PACKED_REFS_MESSAGE =
+  'packed-refs found in the vault repository; namespace refs cannot be read until the vault is rebuilt. Run "Rebuild Vault" from the GROWI admin page.';
+
+function packedRefsPath(): string {
+  return path.join(getRepoPath(), 'packed-refs');
+}
+
+/**
+ * Neither a missing nor a loose ref can be trusted while packed-refs exists
+ * (see design.md, VaultMaintenanceScheduler).
+ *
+ * @throws while packed-refs exists.
+ */
+export async function assertRefsReadable(): Promise<void> {
+  if (await fileExists(packedRefsPath())) {
+    throw new Error(PACKED_REFS_MESSAGE);
+  }
+}
+
+/**
+ * Removes packed-refs, dropping every packed namespace ref and keeping any
+ * other packed ref (e.g. sparse-filter anchors) as a loose file.  Only a full
+ * wipe (reset-all) may call this.
+ */
+export async function dropPackedNamespaceRefs(): Promise<void> {
+  let content: string;
+  try {
+    content = await fs.promises.readFile(packedRefsPath(), 'utf8');
+  } catch (err: unknown) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+      return;
+    }
+    throw err;
+  }
+
+  // Lines are "<oid> <ref>"; '#' starts the header and '^' a peeled tag.
+  const kept = content
+    .split('\n')
+    .filter((line) => line !== '' && !/^[#^]/.test(line))
+    .map((line) => line.split(' '))
+    .filter(([, ref]) => !ref.startsWith('refs/namespaces/'));
+
+  for (const [oid, ref] of kept) {
+    // biome-ignore lint/performance/noAwaitInLoops: a handful of refs; sequential keeps it simple
+    if ((await readLooseRef(ref)) == null) {
+      await updateRef(ref, oid);
+    }
+  }
+
+  await fs.promises.unlink(packedRefsPath());
+}
+
+async function readLooseRef(refPath: string): Promise<string | null> {
   const target = refFilePath(refPath);
   try {
     const content = await fs.promises.readFile(target, 'utf8');
