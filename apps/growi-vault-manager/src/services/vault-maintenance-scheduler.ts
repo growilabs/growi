@@ -294,6 +294,10 @@ export function createVaultMaintenanceScheduler(): VaultMaintenanceScheduler {
    * holds its own independent git ref and DB document.
    */
   async function runSquashCheck(): Promise<void> {
+    // Every squash would fail the same way; fail the check once instead of
+    // once per namespace on every tick.
+    await VaultRepoStorage.assertRefsReadable();
+
     const squashCommitThreshold = getEnvInt(
       'VAULT_SQUASH_COMMIT_THRESHOLD',
       DEFAULT_SQUASH_COMMIT_THRESHOLD,

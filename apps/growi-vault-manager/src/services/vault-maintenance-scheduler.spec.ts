@@ -26,12 +26,26 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // Mocks — declared before importing the module under test
 // ---------------------------------------------------------------------------
 
+const { mockLoggerError } = vi.hoisted(() => ({
+  mockLoggerError: vi.fn(),
+}));
+
+vi.mock('@growi/logger', () => ({
+  loggerFactory: () => ({
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: mockLoggerError,
+    debug: vi.fn(),
+  }),
+}));
+
 vi.mock('./vault-repo-storage.js', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('./vault-repo-storage.js')>();
   return {
     ...actual,
     getRepoPath: vi.fn(() => '/data/vault-repo.git'),
+    assertRefsReadable: vi.fn(),
     readRef: vi.fn(),
     readTree: vi.fn(),
     writeTree: vi.fn(),
@@ -740,6 +754,31 @@ describe('VaultMaintenanceScheduler', () => {
       expect(VaultRepoStorage.updateRef).toHaveBeenCalledWith(
         GROUP_REF,
         'squashed-oid',
+      );
+    });
+
+    it('reports unreadable refs once per tick, not once per namespace, and still runs the gc check', async () => {
+      mockLoggerError.mockClear();
+      const unreadable = new Error('packed-refs found');
+      vi.mocked(VaultRepoStorage.assertRefsReadable).mockRejectedValue(
+        unreadable,
+      );
+      vi.mocked(VaultRepoStorage.readRef).mockRejectedValue(unreadable);
+      mockFind([
+        { namespace: 'public', version: 2000, updatedAt: new Date() },
+        { namespace: 'group-g1', version: 2000, updatedAt: new Date() },
+        { namespace: 'group-g2', version: 2000, updatedAt: new Date() },
+      ]);
+      const gcCheck = whenGcCheckRuns();
+
+      scheduler.start();
+      await runOneTick();
+      await gcCheck;
+
+      expect(mockLoggerError).toHaveBeenCalledTimes(1);
+      expect(mockLoggerError).toHaveBeenCalledWith(
+        { err: unreadable },
+        expect.any(String),
       );
     });
 
