@@ -290,6 +290,7 @@ describe('AttachmentSearchConfig', () => {
       maxFileSizeBytes: 52428800,
       isAttachmentFullTextSearchEnabled: true,
       requiresReindex: false,
+      useOnlyEnvVars: false,
     };
     expect(config.extractorUri).toBe('http://localhost:8000');
   });
@@ -302,6 +303,7 @@ describe('AttachmentSearchConfig', () => {
       maxFileSizeBytes: 52428800,
       isAttachmentFullTextSearchEnabled: false,
       requiresReindex: false,
+      useOnlyEnvVars: false,
     };
     expect(config.extractorUri).toBeNull();
   });

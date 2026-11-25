@@ -2,6 +2,7 @@
  * Admin API endpoints for attachment full-text search configuration.
  *
  * GET  /_api/v3/admin/attachment-search/config    — read current config values
+ *      (`useOnlyEnvVars`: true when the 4 keys are pinned by environment variables)
  * PUT  /_api/v3/admin/attachment-search/config    — update config values
  * GET  /_api/v3/admin/attachment-search/failures  — list recent extraction failures
  *
@@ -245,6 +246,10 @@ export const attachmentSearchAdminFactory = (crowi: Crowi): express.Router => {
           'app:attachmentFullTextSearch:maxFileSizeBytes',
         );
 
+        const useOnlyEnvVars = configManager.getConfig(
+          'env:useOnlyEnvVars:app:attachmentFullTextSearch',
+        );
+
         const isEnabled = isAttachmentFullTextSearchEnabled(
           crowi.searchService?.isConfigured === true,
         );
@@ -258,6 +263,7 @@ export const attachmentSearchAdminFactory = (crowi: Crowi): express.Router => {
           maxFileSizeBytes,
           isAttachmentFullTextSearchEnabled: isEnabled,
           requiresReindex,
+          useOnlyEnvVars,
         };
 
         return res.apiv3({ config });

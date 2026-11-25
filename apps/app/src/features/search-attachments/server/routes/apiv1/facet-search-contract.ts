@@ -1,4 +1,8 @@
-import type { IFacetedSearchResult, SearchFacet } from '~/interfaces/search';
+import type {
+  IFacetedSearchResult,
+  IPageWithSearchMeta,
+  SearchFacet,
+} from '~/interfaces/search';
 
 import type { IPrimarySearchResult } from '../../services/attachment-search-result-aggregator';
 
@@ -83,15 +87,21 @@ export const parseFacetPagination = (
   };
 };
 
-export const toFacetedSearchResult = ({
-  items,
-  meta,
-}: IPrimarySearchResult): IFacetedSearchResult => ({
+/**
+ * `items` are the primary items with their page documents (items whose page
+ * is gone from MongoDB dropped); `hitsCount` stays the count before that
+ * drop, so a client reading `hitsCount < limit` as the end is not stopped
+ * early by a deleted page (research.md 14.1).
+ */
+export const toFacetedSearchResult = (
+  primary: IPrimarySearchResult,
+  items: IPageWithSearchMeta[],
+): IFacetedSearchResult => ({
   data: items,
   meta: {
     facet: 'attachments',
     total: null,
-    hitsCount: items.length,
-    primaryResultIncomplete: meta.primaryResultIncomplete,
+    hitsCount: primary.items.length,
+    primaryResultIncomplete: primary.meta.primaryResultIncomplete,
   },
 });
