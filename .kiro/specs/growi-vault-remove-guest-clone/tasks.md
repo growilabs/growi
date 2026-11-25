@@ -89,3 +89,7 @@
   - 削除の前に、`.claude/rules/spec-lifecycle.md` の Checklist を上から確かめる（brief.md と design.md に「Amend target」があること、元の spec の本文に改訂の注記を書き込んでいないこと、を含む）
   - 完了の目安: `.kiro/` と `.claude/` を `growi-vault-remove-guest-clone` で検索して、何も見つからない
   - _Requirements: 1.1_
+
+## Implementation Notes
+
+- vault-manager の結合テストのうち、squash のテスト（`namespace history is squashed to depth=1 ...`）は、この spec の変更と無関係に `expected 1 to be greater than or equal to 1001` で落ちることがある。テスト側の競争で、修正は PR #12334 にあり、このブランチの元の master にはまだ入っていない。この 1 件だけが落ちた場合は、この spec の不具合として扱わない。
