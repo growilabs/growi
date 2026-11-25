@@ -50,16 +50,13 @@
 ### Allowed Dependencies
 
 - 上流 `attachment-search-indexing` が提供する次の契約:
-  - `GET /_api/search` (apiv1): `facet` なしは従来のページ検索。`facet=attachments` は添付だけを対象にした検索 (`IFacetedSearchResult`、`meta.total` は null、`meta.hitsCount`、`meta.primaryResultIncomplete`)。`limit` は 1〜200
+  - `GET /_api/search` (apiv1): `facet` なしは従来のページ検索。`facet=attachments` は添付だけを対象にした検索 (`IFacetedSearchResult`、`meta.total` は null、`meta.hitsCount`、`meta.primaryResultIncomplete`)。`limit` は 1〜200。各項目の `data` はページ検索と同じページ文書 (`lastUpdateUser` は秘匿化済み。`tags` は入らない)。`meta` は `attachmentHits` と、ページ自身 (パス・本文・コメント) も検索語に一致したときだけ、ページ検索と同じ `elasticSearchResult` (抜粋の検索が失敗・500ms 超過なら入らない)。`meta.bookmarkCount` は入らない。MongoDB に無いページの項目は落とし、`meta.hitsCount` は落とす前の項目数 (上流 Req 9.7)
   - `GET /_api/v3/search/attachments?q=&pageIds=`: 重複を除いて 1〜20 件のページ ID。応答 `{ enrichments: Record<pageId, { attachmentHits?: IAttachmentHit[] }> }`。失敗と 500ms 超過は 500、機能が無効なら 503 `feature_disabled`
   - `POST /_api/v3/attachments/:id/reextract`: 応答 `{ outcome: { kind } }`。エラーは 404 `notfound_or_forbidden`、429 (コードなし)、500 `reextract_failed` / `internal_server_error`、503 `feature_disabled` / `reextract_timeout`
-  - `GET|PUT /_api/v3/admin/attachment-search/config`、`GET /_api/v3/admin/attachment-search/failures`、`PUT /_api/v3/search/indices` の `includeAttachments` (409 `rebuild_in_progress`)
+  - `GET|PUT /_api/v3/admin/attachment-search/config` (GET の `config.useOnlyEnvVars` は 4 つの設定が環境変数で固定されているか。上流 Req 5.7)、`GET /_api/v3/admin/attachment-search/failures`、`PUT /_api/v3/search/indices` の `includeAttachments` (409 `rebuild_in_progress`)
   - Socket.io の `AddAttachmentProgress` / `FinishAddAttachment` (`{ totalCount, count }`)、`AttachmentRebuildingFailed` (`{ error: string }`)。既存の `AddPageProgress` / `FinishAddPage` / `RebuildingFailed`
   - SSR prop `searchConfig.isAttachmentFullTextSearchEnabled?: boolean`
   - 型: `IAttachmentHit` / `ISnippetSegment` / `ReextractResponse` / `AttachmentSearchConfig` / `AttachmentSearchConfigUpdate` / `ExtractionFailureEntry` (`features/search-attachments/interfaces/attachment-search.ts`)、`IFacetedSearchResult` (`interfaces/search.ts`)
-- **上流に追加する契約** (上流の tasks.md 13 として依頼する。本 spec の実装はこれを前提にする):
-  - U1. `GET /_api/search?facet=attachments` の各項目の `data` に、ページ検索と同じページ文書 (`findPageListByIds` で読んだもの。`lastUpdateUser` は `serializeUserSecurely` 済み) を入れる。MongoDB に無いページの項目は落とす。`meta.hitsCount` は落とす前の項目数のままにする (ページ検索の `hitsCount` と同じ数え方。続きの読み込みの判定に使う)
-  - U2. `GET /_api/v3/admin/attachment-search/config` の `config` に `useOnlyEnvVars: boolean` (4 つの設定が環境変数で固定されているか。上流の `env:useOnlyEnvVars:app:attachmentFullTextSearch`) を足す
 - 既存の apps/app の部品と仕組み: `useSWRINFxSearch` と `stores/search.tsx` の関数、`InfiniteScroll`、`apiGet` (apiv1) / `apiv3Get` / `apiv3Put` / `apiv3Post`、`toastSuccess` / `toastError` / `toastWarning`、`useAdminSocket`、`useIndexManagement`、`IndexManagementSection` の `extraContent`
 - Jotai、SWR、next-i18next、Bootstrap 5、Material Symbols
 - 依存の向き: `features/search-attachments/client` を import してよいのは、差し込み口の中身を組み立てる画面 `SearchPage`・`PageAttachment`・`ElasticsearchManagement`・`ElasticsearchManagementPage` だけである。差し込み口を持つ部品 `SearchPageBase`・`SearchResultList`・`SearchResultContent`・`PageListItemL`・`PageAttachmentList`・`@growi/ui` の `Attachment` は import しない (添付の検索を知らない)。`features/search-attachments/client` はサーバ専用のモジュール (`features/search-attachments/server`、`packages/attachment-text-extractor-client`) を import しない
@@ -70,9 +67,9 @@
 
 - `IAttachmentHit` / `ISnippetSegment` の項目の変更。`meta.attachmentHits[]` の並び (いまはページの中で点数の高い順) の意味の変更。本 spec は並べ替えずにサーバの順を使う
 - `GET /_api/v3/search/attachments` の上限 (20 件)、応答の形、エラーの返し方 (失敗を空の結果で隠す形に戻るなど)
-- `GET /_api/search?facet=attachments` の項目の形 (U1)、`hitsCount` の数え方、`limit` の上限、権限確認の窓 (上位 200 件) の考え方
+- `GET /_api/search?facet=attachments` の項目の形 (ページ文書・抜粋・入らない項目)、`hitsCount` の数え方、`limit` の上限、権限確認の窓 (上位 200 件) の考え方
 - 検索語の受け取り方。いまは apiv1 の `/_api/search` が `q` を 1 回 decode し、apiv3 の `/search/attachments` は decode しない
-- 管理用 API の項目 (U2 を含む)、`ReextractResponse` の `kind` の種類、抽出失敗の理由コードの種類
+- 管理用 API の項目 (`useOnlyEnvVars` を含む)、`ReextractResponse` の `kind` の種類、抽出失敗の理由コードの種類
 - Socket.io のイベント名・中身、ページと添付の作り直しの順 (いまはページの後に添付)
 - SSR prop `searchConfig.isAttachmentFullTextSearchEnabled` の有無と算出式
 
@@ -158,7 +155,7 @@ graph TB
 **Architecture Integration**:
 - **選んだ形**: 既存部品には差し込み口だけを足し、中身は feature module が持つ。差し込み口に何を渡すかは、ページ単位の画面 (`SearchPage` など) が決める。こうすると既存部品は添付の検索を知らずに済み、機能が無効のときは差し込み口に何も渡さないだけで導入前と同じになる
 - **ページ検索の添付ヒット**: 添付ヒットはページ検索のまとまり (`useSWRInfinite` のデータ) に書き込まず、20 ページの組ごとの SWR の値として別に持ち、描画のときにページ ID で引く。改名・削除の書き換え (`mutateSearchInfiniteChunks`) や読み直しと干渉させないためである
-- **「添付ファイル」を対象にした検索**: ページ検索と同じ一覧部品・同じプレビューを使う。上流の U1 により項目の `data` がページ検索と同じ形になるので、行もプレビューもそのまま描ける。添付ヒットは項目の `meta.attachmentHits` に入っているので、別に取得しない
+- **「添付ファイル」を対象にした検索**: ページ検索と同じ一覧部品・同じプレビューを使う。項目の `data` がページ検索と同じ形なので、行もプレビューもそのまま描ける。ページ自身も一致した行には、ページ検索と同じ本文の抜粋が出る。添付ヒットは項目の `meta.attachmentHits` に入っているので、別に取得しない
 - **管理画面の作り直し**: 添付を含む作り直しの状態は `useAttachmentRebuild` が持つ。既存の `useIndexManagement` は変えない (ページの段階の進み具合と完了はこれまでどおり表示する)
 - **steering との整合**: feature module に置く、名前付き export、Jotai は画面の状態・SWR はサーバの状態、純粋関数を部品から切り出す、テストは隣に置く
 
@@ -304,7 +301,7 @@ sequenceDiagram
 ```
 
 **Key decisions**:
-- **続きの読み込みの判定 (上流の未決事項 1)**: 前のまとまりの `meta.hitsCount` が `limit` に満たなければ終わりとする。上流の権限確認の窓は、どの `offset` でも添付ヒットの上位 200 件までで頭打ちになり、各要求が同じ範囲を見る (`collect-visible-attachment-hits.ts`)。そのため、短い応答の後に続きが出ることは無い。200 件より下位の添付ヒットには届かないが、これは上流の契約どおりである
+- **続きの読み込みの判定 (上流 research.md 14.1)**: 前のまとまりの `meta.hitsCount` が `limit` に満たなければ終わりとする。上流の権限確認の窓は、どの `offset` でも添付ヒットの上位 200 件までで頭打ちになり、各要求が同じ範囲を見る (`collect-visible-attachment-hits.ts`)。そのため、短い応答の後に続きが出ることは無い。200 件より下位の添付ヒットには届かないが、これは上流の契約どおりである
 - **失敗の扱い**: `meta.primaryResultIncomplete` が true の応答は、fetcher が例外にする。データとして返すと SWR がそのまとまりを保存してしまい、`setSize(size)` による読み直しで取り直されないためである。apiv1 の `{ ok: false }` (HTTP 200) は `apiGet` が例外にするので、同じ経路になる
 - **1 回に読む件数**: `min(customize:showPageLimitationL, 200)`。上流が `limit` 201 以上を 400 で断るためである
 - **検索語の渡し方**: apiv1 の `/_api/search` は `q` を 1 回 decode するので、ページ検索と同じく `encodeURIComponent(送る検索語)` を渡す
@@ -336,7 +333,7 @@ stateDiagram-v2
 - 作り直しの操作は、既存の条件 (`isRebuildEnabled`) を満たし、かつ添付の作り直しが進行中 (`requested` / `pagePhase` / `attachmentPhase` / `busyElsewhere`) でないときだけ押せる。既存の hook は `FinishAddPage` で完了とするので、添付の段階が続く間に押せてしまうのを、この条件で防ぐ
 - ページの段階が失敗すると、上流は `RebuildingFailed` に続けて、同じ文の `AttachmentRebuildingFailed` を送る。`RebuildingFailed` は既存の hook が通知するので、`useAttachmentRebuild` は `pagePhase` から `failed` に移るときに通知せず、その後に届く `AttachmentRebuildingFailed` も通知しない
 - 409 `rebuild_in_progress` は、エラーではなく「作り直しが進行中です」を `toastWarning` で出し、`busyElsewhere` にする。進行中の作り直しの終わりのイベントは管理者用の socket で届くので、それを受けたら押せる状態に戻す
-- 作り直しの失敗の理由 (上流の未決事項 4): `AttachmentRebuildingFailed.error` は英語の文のまま、翻訳した前置き (「添付ファイルの作り直しに失敗しました」) の後に出す。理由コードへの変更は上流に求めない。管理者向けの表示で、文のままでも原因を追える
+- 作り直しの失敗の理由: `AttachmentRebuildingFailed.error` は英語の文のまま、翻訳した前置き (「添付ファイルの作り直しに失敗しました」) の後に出す。理由コードへの変更は上流に求めない。管理者向けの表示で、文のままでも原因を追える
 - 画面を読み込み直すと、進行中かどうかは分からない (上流に問い合わせる API が無い)。押したときの 409 で分かるので、追加の API は求めない
 
 ## Requirements Traceability
@@ -359,7 +356,7 @@ stateDiagram-v2
 | 3.1 | 検索対象の切り替えを出す | SearchTargetSwitch | `SearchTarget` | 2 |
 | 3.2 | 既定は「ページ」 | SearchPage (state の初期値) | `SearchTarget` | — |
 | 3.3 | 「ページ」は従来の検索に添付ヒットを補足 | SearchPage, useSWRINFxSearch (既存), useAttachmentHits | — | 1 |
-| 3.4 | 「添付ファイル」は添付ヒットを親ページ情報と位置付きで出す | useSWRINFxAttachmentSearch, AttachmentHitsInRow, 上流 U1 | `IFacetedSearchResult` | 2 |
+| 3.4 | 「添付ファイル」は添付ヒットを親ページ情報と位置付きで出す | useSWRINFxAttachmentSearch, AttachmentHitsInRow | `IFacetedSearchResult` | 2 |
 | 3.5 | 機能が無効なら切り替えも取得もしない | SearchPage, isAttachmentFullTextSearchEnabledAtom | — | — |
 | 4.1 | 機能が有効なら再抽出ボタンを出す | ReextractButton, PageAttachmentList, ui Attachment の `additionalActions` | — | — |
 | 4.2 | 結果を toast で知らせる | ReextractButton, useAttachmentReextract | `ReextractResult` | — |
@@ -370,7 +367,7 @@ stateDiagram-v2
 | 5.3 | 形式の誤りを欄に示し保存を止める | AttachmentSearchSettings, validateConfigForm | `ConfigFormErrors` | — |
 | 5.4 | 管理者以外を遮断 | 既存の管理画面の権限制御、上流の `adminRequired` | — | — |
 | 5.5 | トークンの値を出さない、空なら変えない、削除は別操作 | AttachmentSearchSettings, buildConfigUpdate | `AttachmentSearchConfigUpdate` | — |
-| 5.6 | 環境変数で固定なら読み取り専用 | AttachmentSearchSettings, 上流 U2 | `useOnlyEnvVars` | — |
+| 5.6 | 環境変数で固定なら読み取り専用 | AttachmentSearchSettings | `useOnlyEnvVars` | — |
 | 6.1 | 「添付も対象にする」を既定 ON で出す | AttachmentRebuildOption, ElasticsearchManagement | — | 3 |
 | 6.2 | 処理済み件数と総件数を出す | 既存の進み具合 (ページ), AttachmentRebuildOption (添付) | `AttachmentRebuildState` | 3 |
 | 6.3 | 機能が無効なら選択を出さない | ElasticsearchManagement, useSWRxAttachmentSearchConfig | `isAttachmentFullTextSearchEnabled` | — |
@@ -389,14 +386,14 @@ stateDiagram-v2
 | isAttachmentFullTextSearchEnabledAtom | State | 機能が有効かどうか (管理画面の外) | 3.5, 4.1, 4.4 | SSR prop (P0) | State |
 | useAttachmentHits | Hook | 1 行分の添付ヒットの状態 | 1.2, 1.6, 1.7, 1.8, 2.1 | GET search attachments (P0) | Service, State |
 | groupPageIdsForAttachmentHits | Util | 20 ページの組 | 1.6, 1.7 | — | Service |
-| useSWRINFxAttachmentSearch | Hook | 添付だけの検索の無限読み込み | 1.5, 3.4 | GET search facet=attachments (P0), 上流 U1 (P0) | Service |
+| useSWRINFxAttachmentSearch | Hook | 添付だけの検索の無限読み込み | 1.5, 3.4 | GET search facet=attachments (P0) | Service |
 | mergeInfiniteAttachmentSearchResult | Util | 添付だけの検索のまとまりを 1 つに | 1.5, 3.4 | — | Service |
 | SearchTargetSwitch | UI | 検索対象の切り替え | 3.1, 3.2 | — | — |
 | AttachmentHitsInRow | UI | 行の中の添付の一致 | 1.2, 1.3, 1.4, 1.5, 1.8 | useAttachmentHits (P0) | — |
 | AttachmentHitsInPreview | UI | プレビューの添付の一致 | 1.3, 2.1, 2.4, 2.5, 1.8 | useAttachmentHits (P0) | — |
 | AttachmentHitItem / SnippetSegments | UI | 添付ヒット 1 件 | 2.2, 2.3 | — | — |
 | ReextractButton / useAttachmentReextract | UI / Hook | 再抽出と結果の通知 | 4.1, 4.2, 4.3 | POST reextract (P0) | Service |
-| AttachmentSearchSettings / useSWRxAttachmentSearchConfig | UI / Hook | 設定の欄 | 5.1, 5.2, 5.3, 5.5, 5.6 | admin config (P0), 上流 U2 (P0) | Service |
+| AttachmentSearchSettings / useSWRxAttachmentSearchConfig | UI / Hook | 設定の欄 | 5.1, 5.2, 5.3, 5.5, 5.6 | admin config (P0) | Service |
 | AttachmentExtractionFailures | UI | 抽出の失敗の表 | 7.1, 7.2, 7.3 | admin failures (P0) | — |
 | AttachmentRebuildOption / useAttachmentRebuild | UI / Hook | 添付を含む作り直し | 6.1, 6.2, 6.4, 6.5 | PUT search indices (P0), admin socket (P0) | Service, Event, State |
 
@@ -530,7 +527,7 @@ export function mergeInfiniteAttachmentSearchResult(
 - 統合は `mergeInfiniteSearchResult` を使わない。`total` が null で、そのまま使うと終わりと判定されてしまうためである。重複するページは最初に出たほうだけを残す
 
 **Dependencies**
-- Outbound: `GET /_api/search?facet=attachments` (P0)。上流 U1 で `data` がページ文書になっていること (P0)
+- Outbound: `GET /_api/search?facet=attachments` (P0)
 
 **Contracts**: Service [x]
 
@@ -647,7 +644,7 @@ type ReextractButtonProps = { readonly attachmentId: string };
 
 ```typescript
 export function useSWRxAttachmentSearchConfig(): {
-  readonly data: AttachmentSearchConfig | undefined; // includes useOnlyEnvVars (upstream U2)
+  readonly data: AttachmentSearchConfig | undefined; // includes useOnlyEnvVars
   readonly error: unknown;
   readonly update: (body: AttachmentSearchConfigUpdate) => Promise<void>; // PUT, then mutate
 };
@@ -837,10 +834,10 @@ type AttachmentRebuildOptionProps = {
 - ページ検索の表示は添付ヒットの取得を待たない。添付ヒットは 20 ページ分で p95 36.5〜42.3ms (上流 research.md 8.7)
 - 要求の数: 描画された行の組の数だけ。読み込みのまとまり 1 つ (50 件) を最後までスクロールしても 3 回。回数の上限 (ログイン利用者は 1 分 500 回) に、スクロールで届くことは無い
 - 行が描画し直されても、SWR の値を使い回して取り直さない (`revalidateIfStale: false`)
-- 「添付ファイル」のときは、本文の抜粋が無い行のために既存の `useSWRxPageInfoForList` が本文の冒頭を取る。読み込んだページが増えるたびに、その一覧で要求が出るので、件数が多いときの重さを実装時に確かめる
+- 「添付ファイル」のときは、ページ自身が一致しなかった行 (抜粋が無い行) のために、既存の `useSWRxPageInfoForList` が本文の冒頭を取る。ページ自身も一致した行は抜粋がサーバから届くので要求しない。読み込んだページが増えるたびにその一覧で要求が出るので、件数が多いときの重さを実装時に確かめる
 
 ## Open Questions / Risks
 
-1. **上流への依頼 (U1・U2)**: 上流の tasks.md 13 として追加する。本 spec の検索結果画面の「添付ファイル」と設定の区画の環境変数の固定は、これが終わるまで結合して確かめられない
+1. **「添付ファイル」の行のブックマーク数**: 項目に `meta.bookmarkCount` が入らない。`PageListItemL` は `meta.bookmarkCount` を初期値にし、`useSWRxPageInfoForList` の結果で上書きするが、その一覧に入るのは抜粋の無い行だけである。そのため、ページ自身も一致した (抜粋のある) 行は、ブックマーク数が 0 のまま直らない。ページ検索では ES の `_source.bookmark_count` から入る。上流の抜粋の検索で、一致したページの `bookmark_count` も返して入れるか、画面が「添付ファイル」のときだけ全行を `useSWRxPageInfoForList` に渡すかを決める
 2. **`PageListItemL` の高さ**: 行の中に添付の一致を足すと、行の高さが取得の後に変わる。一覧は描画後に高さを測り直すので並びは崩れないが、スクロール中に行が伸びる見え方を見た目の案で確かめる
 3. **環境変数の固定と保存の API**: 上流の `PUT /config` は、固定されているときも保存を受け付ける (値は使われない)。画面は保存の操作を出さないので利用者は迷わないが、API を直接使う場合の扱いは上流で決める

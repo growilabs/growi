@@ -23,13 +23,13 @@ _Generated: 2026-04-17 (3-way split から派生)。2026-11-24 に、今の API 
 - 選ばれたページは `SearchPageBase` が `IPageWithSearchMeta` のまま持ち、`SearchResultContent` に渡す。プレビューは `data.revision` で本文を読み、`PagePathNav` でパスを出す
 - 本文の抜粋 (`elasticSearchResult.snippet`) が無い行は、`useSWRxPageInfoForList` (`GET /_api/v3/page-listing/info`) で本文の冒頭を取る
 
-## 2. 上流の API の今の契約 (2026-11-24 にコードで確認)
+## 2. 上流の API の今の契約 (2026-11-25 にコードで確認)
 
 - `GET /_api/v3/search/attachments?q=&pageIds=`: `pageIds` は重複を除いて 1〜20 件。`q` は decode しない。応答 `{ enrichments }`。失敗と 500ms 超過は 500、機能が無効なら 503 `feature_disabled`
-- `GET /_api/search?facet=attachments`: `q` を 1 回 decode する (ページ検索と同じ)。`limit` は 1〜200 (既定 50)。応答の `meta` は `{ facet: 'attachments', total: null, hitsCount, primaryResultIncomplete }`。各項目は `{ data: { _id }, meta: { attachmentHits } }`
+- `GET /_api/search?facet=attachments`: `q` を 1 回 decode する (ページ検索と同じ)。`limit` は 1〜200 (既定 50)。応答の `meta` は `{ facet: 'attachments', total: null, hitsCount, primaryResultIncomplete }`。各項目の `data` はページ検索と同じページ文書 (`tags` は無い)。`meta` は `attachmentHits` と、ページ自身も検索語に一致したときだけページ検索と同じ `elasticSearchResult`。`meta.bookmarkCount` は無い。MongoDB に無いページの項目は落とし、`hitsCount` は落とす前の数 (上流 Req 9.7、PR #12330)
 - 添付だけの検索の窓 (`collect-visible-attachment-hits.ts`): `from + size` 件のページに届くまで、添付ヒットを点数順に倍々で取り、権限で選り分ける。窓は最大 200 件で、どの `offset` でも同じ範囲で頭打ちになる
 - `POST /_api/v3/attachments/:id/reextract`: ゲストと読み取り専用の利用者は断る。ファイルの抽出が失敗しても 200 で、`outcome.kind` で種類を返す (文は返さない)。429 は本文にコードが無い
-- `GET|PUT /_api/v3/admin/attachment-search/config`: トークンは返さず `hasExtractorToken` だけ。PUT はトークンの項目を省くと保存済みのトークンを変えない。URI は http/https だけを通し、クラウドのメタデータの宛先を断る (400 `invalid_extractor_uri`)。`env:useOnlyEnvVars:app:attachmentFullTextSearch` で 4 つの設定が環境変数に固定されていても、GET はそれを返さない
+- `GET|PUT /_api/v3/admin/attachment-search/config`: トークンは返さず `hasExtractorToken` だけ。PUT はトークンの項目を省くと保存済みのトークンを変えない。URI は http/https だけを通し、クラウドのメタデータの宛先を断る (400 `invalid_extractor_uri`)。GET の `config.useOnlyEnvVars` が、4 つの設定が環境変数 (`env:useOnlyEnvVars:app:attachmentFullTextSearch`) で固定されているかを返す (上流 Req 5.7)。固定されていても PUT は保存を受け付ける (値は使われない)
 - `GET /_api/v3/admin/attachment-search/failures`: `{ items, total }`。理由コードは 8 種類。同じ添付・同じ理由は 1 時間に 1 行にまとまり、90 日で消える
 - `PUT /_api/v3/search/indices` の `includeAttachments: true`: 完了を待たずに応答し、実行中なら 409 `rebuild_in_progress`。ページの作り直しの後に添付を作り直す。ページの段階が失敗すると `RebuildingFailed` と、同じ文の `AttachmentRebuildingFailed` の両方が届く。進行中かどうかを問い合わせる API は無い
 - SSR prop `searchConfig.isAttachmentFullTextSearchEnabled` は、基本レイアウトのページと管理画面の検索ページに届く。クライアントの atom はまだ無い
@@ -63,13 +63,13 @@ _Generated: 2026-04-17 (3-way split から派生)。2026-11-24 に、今の API 
 - 理由: 失敗の単位は要求の単位 (組) と同じにするのがいちばん単純で、再試行もその組のキーの取り直しだけで済む。失敗はまれ (ES の障害か時間切れ) なので、行ごとの表示が並ぶ場面は少ない
 - 取得中: 行には何も出さない (多くの行は添付ヒットが無いので、読み込み中の表示がちらつく)。プレビューには小さな読み込み中の表示を出す
 
-### 4.3 「添付ファイル」を対象にした検索は、続きの読み込みを `hitsCount < limit` で終える (上流の未決事項 1)
+### 4.3 「添付ファイル」を対象にした検索は、続きの読み込みを `hitsCount < limit` で終える (上流 research.md 14.1)
 
 - 判断: 前のまとまりの `hitsCount` が `limit` に満たなければ終わり。`primaryResultIncomplete` は fetcher で例外にする
 - 理由: 窓はどの `offset` でも上位 200 件で頭打ちになり、各要求が同じ範囲を見るので、短い応答の後に続きは出ない (2 を参照)。失敗をデータとして返すと SWR がまとまりを保存し、読み直しで取り直されない
 - `mergeInfiniteSearchResult` は使わない: `total` が null だと `fetchedCount >= total` が成り立ち、最初のまとまりで終わりと判定される
 
-### 4.4 添付だけの検索の項目には、サーバがページ文書を入れる (上流の未決事項 2、上流への依頼 U1)
+### 4.4 添付だけの検索の項目には、サーバがページ文書と抜粋を入れる (上流 Req 9.7)
 
 - 判断: 上流の `GET /_api/search?facet=attachments` が、ページ検索と同じ `findPageListByIds` でページ文書を `data` に入れる。MongoDB に無いページは落とし、`hitsCount` は落とす前の数にする
 - 理由:
@@ -77,6 +77,7 @@ _Generated: 2026-04-17 (3-way split から派生)。2026-11-24 に、今の API 
   - 複数のページ ID からページ文書 (`path`・`revision`・`lastUpdateUser`・`updatedAt`) をまとめて返す API は無い。`/page-listing/info` は付随情報だけ、`/page-listing/item` と `/page` は 1 回に 1 ページ
   - サーバはページ検索で同じ関数を使っており、1 回呼ぶだけで済む。新しい API も、画面からの追加の要求も要らない
   - 項目の形がページ検索と同じになるので、一覧とプレビューの部品をそのまま使える
+- ページ自身も検索語に一致した項目には、ページ検索と同じ抜粋も入れる。添付で見つけたページでも、本文の一致した箇所を見て中身を判断できる (上流 research.md 14.3)
 - 採らなかった案: 画面がページ ID の一覧から別の要求でページ文書を取る。新しい API が要り、要求も増える (2026-11-24 に利用者と検討)
 
 ### 4.5 検索対象の切り替えは `SearchPage` の state にする
@@ -90,12 +91,12 @@ _Generated: 2026-04-17 (3-way split から派生)。2026-11-24 に、今の API 
 - 判断: `useAttachmentRebuild` が PUT と socket のイベントから添付の段階の状態を持つ。作り直しの操作は `isRebuildEnabled && !isRunning` のときだけ押せる
 - 理由: 既存の `useIndexManagement` は監査ログの索引の管理でも使われている。添付の段階を入れると、両方の画面の動きに影響する。ページの段階の進み具合と完了はこれまでどおり既存の hook が出せばよい
 - ページの段階の失敗では、既存の hook が `RebuildingFailed` を通知するので、続いて届く `AttachmentRebuildingFailed` は通知しない (同じ文の通知が 2 回出るのを防ぐ)
-- 失敗の理由は、`AttachmentRebuildingFailed.error` (英語の文) をそのまま出す (上流の未決事項 4)。管理者向けで、文のままでも原因を追える
+- 失敗の理由は、`AttachmentRebuildingFailed.error` (英語の文) をそのまま出す 。管理者向けで、文のままでも原因を追える
 
-### 4.7 設定の区画は、環境変数で固定されているときは読み取り専用にする (上流への依頼 U2)
+### 4.7 設定の区画は、環境変数で固定されているときは読み取り専用にする (上流 Req 5.7)
 
-- 判断: 上流の GET `/config` に `useOnlyEnvVars` を足してもらい、true なら 4 つの設定を読み取り専用で出し、保存の操作を出さない。トークンの入力欄を足す (要件 5.1 / 5.5)
-- 理由: GROWI.cloud では運用側が 4 つの設定を環境変数で固定し、利用組織の管理者に上書きさせない。いまの GET はそれを返さないので、画面が保存できたように見えてしまう。トークンは機能が有効になる条件の 1 つなので、入力欄が無いと自前の運用では画面から機能を有効にできない (2026-11-20 に利用者と決定)
+- 判断: 上流の GET `/config` の `useOnlyEnvVars` が true なら 4 つの設定を読み取り専用で出し、保存の操作を出さない。トークンの入力欄を足す (要件 5.1 / 5.5)
+- 理由: GROWI.cloud では運用側が 4 つの設定を環境変数で固定し、利用組織の管理者に上書きさせない。固定されているかが分からないと、保存しても値が使われないのに、画面が保存できたように見えてしまう。トークンは機能が有効になる条件の 1 つなので、入力欄が無いと自前の運用では画面から機能を有効にできない (2026-11-20 に利用者と決定)
 
 ### 4.8 管理画面の外の機能の判定は SSR の値、管理画面の中は設定の API の値を使う
 
