@@ -19,6 +19,18 @@ import { PageLinkBackfillCron } from '../services/page-link-backfill-cron';
 import { PageLinkService } from '../services/page-link-service';
 import { createBacklinksBackfillAdminRouter } from './backlinks-backfill-admin';
 
+// A real minute-boundary tick would race the assertions: the tick after a finished run stops
+// the poll. Due only at New Year's midnight, the poll stays armed but never fires here.
+const { NEVER_DURING_TEST } = vi.hoisted(() => ({
+  NEVER_DURING_TEST: '0 0 1 1 *',
+}));
+vi.mock('../services/page-link-backfill-cron', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../services/page-link-backfill-cron')
+  >()),
+  BACKFILL_POLL_CRON_SCHEDULE: NEVER_DURING_TEST,
+}));
+
 // Exclusive project: the job document is a singleton and the page counts span the whole
 // `pages` collection, so each test empties both.
 
@@ -767,8 +779,7 @@ describe('backlinks backfill admin routes', () => {
 });
 
 describe('backlinks backfill admin routes, with the real PageLinkService', () => {
-  // Paced to finish a handful of pages at once; the poll runs on its real schedule, so each
-  // test stops it as soon as it has looked.
+  // Paced to finish a handful of pages at once.
   const CONFIG: Record<string, string | number> = {
     'app:siteUrl': 'https://wiki.example',
     'backlinks:drainIntervalMs': 1000,
