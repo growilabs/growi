@@ -93,7 +93,7 @@ GROWI 本体が OAuth 2.1 の認可サーバーを兼ねる。MCP 仕様は、�
 
 ## Constraints
 
-- **`app:siteUrl` が必須**: `issuer`、`resource`、各エンドポイントの URL は `app:siteUrl` から作る。未設定のときは認可サーバーを動かさない。メタデータの `resource` は、利用者が入力した URL とパスまで一致しなければならない。
+- **`app:siteUrl` が必須**: `issuer`、`resource`、各エンドポイントの URL は `app:siteUrl` から作る。未設定のときは認可サーバーを動かさない。この判定は、`remote-mcp-server-route` の `isMcpAvailable`（MCP 連携が有効で、かつサイト URL が設定済み）をそのまま使う。同じ条件で `/_api/v3/mcp` も応答しなくなるので、「MCP エンドポイントだけが 401 を返し、認可サーバーの案内が作れない」という状態は起きない。メタデータの `resource` は、利用者が入力した URL とパスまで一致しなければならない。
 - **CIMD が選ばれる条件**: 認可サーバーのメタデータに `client_id_metadata_document_supported: true` と、`token_endpoint_auth_methods_supported` の `"none"` の両方が要る。欠けると claude.ai は DCR に切り替え、DCR も無ければ接続を拒否する。
 - **claude.ai の動作に合わせること**:
   - コールバックは `https://claude.ai/api/mcp/auth_callback`。Claude Code はループバックで、ポートを問わない一致が要る。

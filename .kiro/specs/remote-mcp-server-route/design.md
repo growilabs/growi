@@ -26,7 +26,7 @@
 
 ### This Spec Owns
 
-- `/_api/v3/mcp` のリクエストの処理の流れ: 有効・無効の判定、認証の呼び出し、利用者単位の回数制限、バッチの拒否、`MCPServer` への受け渡し。
+- `/_api/v3/mcp` のリクエストの処理の流れ: MCP 連携が動く状態かどうかの判定（`isMcpAvailable`）、認証の呼び出し、利用者単位の回数制限、バッチの拒否、`MCPServer` への受け渡し。
 - **認証の差し込み口の型**（`McpAuth`）と、その暫定の中身（アクセストークンでの認証、チャレンジなしの 401）。
 - MCP 用のツール定義（名前・説明・annotation・出力の形）と、ツール呼び出しの Activity の記録。
 - 既存の 2 ツールから取り出した共有関数 `searchPages` と `readPageContent`。
@@ -57,6 +57,7 @@
 - `McpAuth` の型（`authenticate` の戻り値、`respondUnauthorized` の引数）の変更。
 - `MCP_ENDPOINT_PATH` または `MCP_REQUIRED_SCOPES` の値の変更。認可サーバーのメタデータ・同意画面・トークンの宛先が同じ値を使う。
 - `app:mcpEnabled` の意味の変更（「MCP 連携全体」を 1 つで切り替える前提）。
+- `isMcpAvailable` の条件の変更（有効で、かつサイト URL が設定済み）。認可サーバーのエンドポイントも、同じ関数で応答するかどうかを決める。
 - ルートの処理の順序の変更（認証より前に利用者単位の処理を置く、など）。
 
 次の変更は、`ai-agentic-search` と `change-proposal-ai-agent` の再確認を要する。
@@ -167,6 +168,7 @@ features/mastra/
 │   │       └── put-mcp-settings.ts
 │   └── services/
 │       ├── mcp/                         # Express に依存しない
+│       │   ├── is-mcp-available.ts      # isMcpAvailable（有効で、かつサイト URL が設定済み）
 │       │   ├── required-scopes.ts       # MCP_REQUIRED_SCOPES（1 か所の宣言）
 │       │   ├── caller-context.ts        # McpCallerContext と、AuthInfo との相互変換
 │       │   ├── mcp-tools/
@@ -217,7 +219,7 @@ server/middlewares/
 flowchart TD
     Start[Request to api v3 mcp] --> Maint{Maintenance mode}
     Maint -->|yes| R503[503]
-    Maint -->|no| Enabled{mcpEnabled}
+    Maint -->|no| Enabled{isMcpAvailable}
     Enabled -->|no| Fall[Fall through as unknown path]
     Enabled -->|yes| AuthQ{authenticate}
     AuthQ -->|not authenticated| R401[respondUnauthorized]
@@ -267,11 +269,13 @@ sequenceDiagram
 |-------------|---------|------------|------------|-------|
 | 1.1 | 既定で無効 | McpConfig | `app:mcpEnabled` の既定値 | — |
 | 1.2, 1.3 | 再起動なしで切り替え | McpRouter、AdminMcpSettingsApi | リクエストごとに `configManager.getConfig` | 処理の流れ |
-| 1.4 | 無効のときは存在しないパスと同じ応答 | McpRouter | 無効なら `next()` で素通し | 処理の流れ |
+| 1.4 | 無効のときは存在しないパスと同じ応答 | McpRouter、isMcpAvailable | 動く状態でなければ `next()` で素通し | 処理の流れ |
 | 1.5, 1.6 | URL の表示、サイト URL 未設定の案内 | McpSettingsSection | `useSiteUrl()` と `MCP_ENDPOINT_PATH` | — |
 | 1.7 | 管理者だけ | AdminMcpSettingsApi | `adminRequired`、管理用スコープ | — |
 | 1.8 | AI の設定に左右されない | McpRouter、AdminMcpSettingsApi | `aiReadyGuard` の外にマウント | — |
 | 1.9 | AI が未設定でも操作できる | McpSettingsSection | `AiSettings` と独立した節 | — |
+| 1.10, 1.11 | サイト URL が未設定のあいだは応答しない、設定されたら再起動なしで応答 | McpRouter、isMcpAvailable | リクエストごとに `app:siteUrl` を読む | 処理の流れ |
+| 1.12 | サイト URL が未設定でも切り替えを受け付ける | AdminMcpSettingsApi、McpSettingsSection | PUT はサイト URL を条件にしない | — |
 | 2.1 | Bearer のアクセストークン | AccessTokenAuthenticator | `McpAuthenticator` | 処理の流れ |
 | 2.2, 2.3, 2.4 | Bearer 以外は 401 | AccessTokenAuthenticator | `extractBearerToken` だけを見る | 処理の流れ |
 | 2.5 | 無効なトークンは 401 | AccessTokenAuthenticator | `AccessToken.findUserIdByToken` | 処理の流れ |
@@ -319,7 +323,7 @@ sequenceDiagram
 
 | Component | Layer | Intent | Req Coverage | Key Dependencies | Contracts |
 |-----------|-------|--------|--------------|------------------|-----------|
-| McpRouter | Route（軽い層） | 処理の流れを組み立てる | 1.2, 1.3, 1.4, 1.8, 2.7, 2.8, 3.4, 3.5, 3.10, 3.11, 6.1, 6.2, 6.3, 6.7, 7.4, 8.3, 8.5, 8.6 | McpAuth (P0)、consumeUserPoints (P0)、McpRequestHandler (P0) | API |
+| McpRouter | Route（軽い層） | 処理の流れを組み立てる | 1.2, 1.3, 1.4, 1.8, 1.10, 1.11, 2.7, 2.8, 3.4, 3.5, 3.10, 3.11, 6.1, 6.2, 6.3, 6.7, 7.4, 8.3, 8.5, 8.6 | McpAuth (P0)、consumeUserPoints (P0)、McpRequestHandler (P0) | API |
 | McpAuth | Route（軽い層） | 認証の差し込み口 | 2.1〜2.11, 8.4 | AccessToken モデル (P0) | Service |
 | McpRequestHandler | Route（重い層） | `MCPServer` への受け渡し | 3.6 | GrowiMcpServer (P0) | Service |
 | GrowiMcpServer | Service | `MCPServer` の組み立て | 3.1, 3.2, 3.3, 3.4, 3.5 | `@mastra/mcp` (P0)、buildMcpTools (P0) | Service |
@@ -329,7 +333,7 @@ sequenceDiagram
 | MongoSanitizeWithExemptions | Infra | 除外パスつきの sanitize | 3.3 | `express-mongo-sanitize` (P0) | Service |
 | ActivityActions | Infra | アクションとカテゴリの定義 | 7.2, 7.7, 7.8 | — | State |
 | AdminMcpSettingsApi | Route | 設定の読み書き | 1.2, 1.3, 1.7, 1.8, 7.5 | configManager (P0) | API |
-| McpSettingsSection | UI | 管理画面の MCP の節 | 1.5, 1.6, 1.9 | AdminMcpSettingsApi (P0) | State |
+| McpSettingsSection | UI | 管理画面の MCP の節 | 1.5, 1.6, 1.9, 1.12 | AdminMcpSettingsApi (P0) | State |
 | McpConfig | Config | 設定キー | 1.1 | — | State |
 
 ### Route layer
@@ -339,7 +343,7 @@ sequenceDiagram
 | Field | Detail |
 |-------|--------|
 | Intent | `/_api/v3/mcp` のリクエストを、決まった順序で処理する |
-| Requirements | 1.2, 1.3, 1.4, 1.8, 2.7, 2.8, 3.4, 3.5, 3.10, 3.11, 6.1, 6.2, 6.3, 6.7, 7.4, 8.3, 8.5, 8.6 |
+| Requirements | 1.2, 1.3, 1.4, 1.8, 1.10, 1.11, 2.7, 2.8, 3.4, 3.5, 3.10, 3.11, 6.1, 6.2, 6.3, 6.7, 7.4, 8.3, 8.5, 8.6 |
 
 **Responsibilities & Constraints**
 
@@ -351,7 +355,7 @@ sequenceDiagram
 **Dependencies**
 
 - Inbound: `server/routes/index.js` — マウント (P0)
-- Outbound: `mcpAuth` — 認証 (P0)、`consumeUserPoints` — 利用者単位の計数 (P0)、`mcp-request-handler` — 受け渡し (P0)、`configManager` — `app:mcpEnabled` (P0)
+- Outbound: `mcpAuth` — 認証 (P0)、`consumeUserPoints` — 利用者単位の計数 (P0)、`mcp-request-handler` — 受け渡し (P0)、`isMcpAvailable` — 動く状態かどうかの判定 (P0)
 
 **Contracts**: API [x]
 
@@ -367,7 +371,7 @@ export const factory: (crowi: Crowi) => express.Router;
 | GET / DELETE | `/_api/v3/mcp` | — | — | 401（未認証）、405（認証済み） |
 
 - マウント: `app.use(MCP_ENDPOINT_PATH, unavailableWhenMaintenanceModeForApi, mcpRouteFactory(crowi))` を、`/_api/v3` の本体のルーターの直前に置く。ルーターは `/` だけを受ける。`/_api/v3/mcp/xxx` は素通しする。
-- 無効のときは `next()` を呼ぶ。後続のルーターに一致する経路が無いので、存在しない `/_api/v3/*` のパスと同じ応答になる（1.4）。
+- `isMcpAvailable()` が偽のときは `next()` を呼ぶ。後続のルーターに一致する経路が無いので、存在しない `/_api/v3/*` のパスと同じ応答になる（1.4、1.10）。判定はリクエストごとに行うので、設定の変更は再起動なしで効く（1.2、1.3、1.11）。
 - 401・429・400・500 の本文は、`json-rpc-error-response.ts` が書く固定の JSON-RPC エラーである（`id` は `null`）。内部の情報を含めない。
 
 **Implementation Notes**
@@ -769,13 +773,25 @@ export type McpSettingsUpdateRequest = { readonly mcpEnabled: boolean };
 - 表示するもの:
   - MCP 連携のスイッチと、更新のボタン。
   - 保存済みの値が有効のとき: MCP エンドポイントの URL（`useSiteUrl()` の値と `MCP_ENDPOINT_PATH` をつなぐ）と、コピーのボタン（1.5）。
-  - サイト URL が未設定のとき: URL の代わりに、サイト URL の設定が必要であることの案内（1.6）。
+  - サイト URL が未設定のとき: URL の代わりに、サイト URL を設定するまで MCP 連携が動かないことの警告と、アプリ設定ページへのリンク（1.6）。スイッチの有効・無効にかかわらず出す。外部認証の設定画面（OIDC など）が、サイト URL が未設定のときに出す警告と同じ形にする。
+  - スイッチと更新のボタンは、サイト URL が未設定でも操作できる（1.12）。
 - 保存に成功したらトーストを出して再取得する。失敗したら、入力を保ったままトーストを出す。
 
 #### McpConfig
 
 - `'app:mcpEnabled': defineConfig<boolean>({ envVarName: 'MCP_ENABLED', defaultValue: false })`（1.1）。
 - 「MCP 連携全体」を表すキーである。`remote-mcp-server-oauth` が足す認可サーバーも、同じキーで切り替える前提にする。
+
+#### isMcpAvailable
+
+```typescript
+// features/mastra/server/services/mcp/is-mcp-available.ts
+export const isMcpAvailable: () => boolean;
+```
+
+- `app:mcpEnabled` が真で、かつ `app:siteUrl` が設定されている（空でない）ときだけ真を返す（1.10）。
+- 「MCP 連携が動いている」の唯一の判定である。McpRouter が使い、`remote-mcp-server-oauth` の認可サーバーのエンドポイントも同じ関数を使う。スイッチ（`app:mcpEnabled`）は管理者の意思を表し、この関数は実際に応答するかどうかを表す。
+- `@mastra/*` を読み込まない。
 
 ## Error Handling
 
@@ -817,13 +833,14 @@ HTTP の層のエラーと、ツールの結果としてのエラーを分ける
 - MCP 用のツール: `failed` と `not_found_or_forbidden` が、同じ出力になること（5.6、5.9）。
 - `MCP_TOOL_DECLARATIONS`: 名前が重複しないこと。すべてに `readOnlyHint: true` が付くこと（3.7）。
 - `createMongoSanitizeMiddleware`: 除外パスでは本文を変えないこと。それ以外では、`.` を含むキーを削除すること。
-- `McpSettings`: 有効で URL が表示される、サイト URL が未設定で案内が出る、無効で URL が出ない（1.5、1.6）。
+- `McpSettings`: 有効で URL が表示される、無効で URL が出ない、サイト URL が未設定のときは有効・無効のどちらでも警告が出てスイッチは操作できる（1.5、1.6、1.12）。
+- `isMcpAvailable`: 有効とサイト URL の 4 通りの組み合わせ（1.10）。
 
 ### Integration Tests
 
 - **認証の境界**（`access-token-authenticator.integ.ts`、MongoDB を使う）: 有効なトークン、期限切れ、スコープ不足、存在しないトークン、閲覧専用の利用者、`X-GROWI-ACCESS-TOKEN` だけ、クエリだけ、本文だけ、旧形式の API トークン（2.1〜2.6）。
 - **ルーターの処理の順序**（`routes/mcp/index.integ.ts`、`McpRequestHandler` は差し替える）:
-  - 無効のとき、存在しないパスと同じ応答になる（1.4）。
+  - 無効のとき、存在しないパスと同じ応答になる（1.4）。有効でもサイト URL が未設定なら、同じ応答になる（1.10）。
   - `req.user` が入っていても、Bearer が無ければ 401 になる（2.7）。401 に `WWW-Authenticate` と `Location` が無い（2.9）。
   - 401 の本文が、拒否の理由によらず同じである（2.10）。
   - 利用者単位の上限を超えると 429 になり、別の利用者は通る（6.2、6.3）。
@@ -868,7 +885,7 @@ HTTP の層のエラーと、ツールの結果としてのエラーを分ける
 - **`mongoSanitize` の除外**: 除外は 1 パスに限る。ツールの入力は zod で検証し、MongoDB には文字列の ID とパスだけが渡る。
 - **トークンの値**: 呼び出し元の情報（`McpCallerContext`）に、トークンを含めない。Activity とログに出る経路が無い。
 - **`Origin`**: 既存の `CertifyOrigin` が、別のオリジンからのブラウザのリクエストを拒否する。MCP の仕様が求める `Origin` の検証と、向きが合う。
-- **無効のときの露出**: 無効な GROWI は、MCP の入口があることを応答で示さない。
+- **無効のときの露出**: 無効な GROWI と、サイト URL が未設定の GROWI は、MCP の入口があることを応答で示さない。
 
 ## Performance & Scalability
 
