@@ -301,6 +301,203 @@ describe('ElasticsearchDelegator', () => {
     });
   });
 
+  describe('search()', () => {
+    it('sends page search query for the keyword, the operators and the viewer', async () => {
+      vi.mocked(configManager.getConfig).mockImplementation((key) => {
+        if (key === 'app:elasticsearchVersion') return 8;
+        return key.startsWith('security:list-policy:');
+      });
+      vi.spyOn(mongoose, 'model').mockImplementation(((name: string) =>
+        name === 'Page'
+          ? {
+              GRANT_PUBLIC: 1,
+              GRANT_SPECIFIED: 3,
+              GRANT_OWNER: 4,
+              GRANT_USER_GROUP: 5,
+            }
+          : { count: async () => 4 }) as never);
+      const searchKeyword = vi
+        .spyOn(delegator, 'searchKeyword')
+        .mockResolvedValue({ data: [], meta: { total: 0, hitsCount: 0 } });
+      const userId = new mongoose.Types.ObjectId('6b0000000000000000000001');
+      const groupId = new mongoose.Types.ObjectId('6b0000000000000000000002');
+
+      await delegator.search(
+        {
+          queryString: 'word -other group:dev',
+          terms: createMockESQueryTerms({
+            match: ['word'],
+            not_match: ['other'],
+            group: ['dev'],
+          }),
+          resolvedFilterData: { groupIds: ['g1'], notGroupIds: [] },
+        },
+        { _id: userId },
+        [groupId],
+        { offset: 10, limit: 5, sort: 'updatedAt', order: 'asc' },
+      );
+
+      expect(searchKeyword.mock.calls[0][0]).toMatchInlineSnapshot(`
+        {
+          "_source": [
+            "path",
+            "bookmark_count",
+            "comment_count",
+            "seenUsers_count",
+            "updated_at",
+            "tag_names",
+            "comments",
+          ],
+          "body": {
+            "highlight": {
+              "fields": {
+                "*": {
+                  "fragment_size": 40,
+                },
+                "path.*": {
+                  "number_of_fragments": 0,
+                },
+              },
+              "fragmenter": "simple",
+              "max_analyzed_offset": 999999,
+              "post_tags": [
+                "</em>",
+              ],
+              "pre_tags": [
+                "<em class='highlighted-keyword'>",
+              ],
+            },
+            "query": {
+              "function_score": {
+                "boost_mode": "sum",
+                "field_value_factor": {
+                  "factor": 2500,
+                  "field": "bookmark_count",
+                  "missing": 0,
+                  "modifier": "log1p",
+                },
+                "query": {
+                  "bool": {
+                    "filter": [
+                      {
+                        "terms": {
+                          "granted_groups": [
+                            "g1",
+                          ],
+                        },
+                      },
+                      {
+                        "bool": {
+                          "should": [
+                            {
+                              "term": {
+                                "grant": 1,
+                              },
+                            },
+                            {
+                              "bool": {
+                                "must": [
+                                  {
+                                    "term": {
+                                      "grant": 3,
+                                    },
+                                  },
+                                  {
+                                    "term": {
+                                      "granted_users": "6b0000000000000000000001",
+                                    },
+                                  },
+                                ],
+                              },
+                            },
+                            {
+                              "bool": {
+                                "must": [
+                                  {
+                                    "term": {
+                                      "grant": 4,
+                                    },
+                                  },
+                                  {
+                                    "term": {
+                                      "granted_users": "6b0000000000000000000001",
+                                    },
+                                  },
+                                ],
+                              },
+                            },
+                            {
+                              "bool": {
+                                "must": [
+                                  {
+                                    "term": {
+                                      "grant": 5,
+                                    },
+                                  },
+                                  {
+                                    "terms": {
+                                      "granted_groups": [
+                                        "6b0000000000000000000002",
+                                      ],
+                                    },
+                                  },
+                                ],
+                              },
+                            },
+                          ],
+                        },
+                      },
+                    ],
+                    "must": [
+                      {
+                        "multi_match": {
+                          "fields": [
+                            "path.ja^2",
+                            "path.en^2",
+                            "body.ja",
+                            "body.en",
+                            "comments.ja",
+                            "comments.en",
+                          ],
+                          "query": "word",
+                          "type": "most_fields",
+                        },
+                      },
+                    ],
+                    "must_not": [
+                      {
+                        "multi_match": {
+                          "fields": [
+                            "path.ja",
+                            "path.en",
+                            "body.ja",
+                            "body.en",
+                            "comments.ja",
+                            "comments.en",
+                          ],
+                          "operator": "or",
+                          "query": "other",
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+            },
+            "sort": {
+              "updated_at": {
+                "order": "asc",
+              },
+            },
+          },
+          "from": 10,
+          "index": "undefined-alias",
+          "size": 5,
+        }
+      `);
+    });
+  });
+
   // Contract of dropping Elasticsearch 7 support: the delegator must be
   // constructable only for the supported versions (8, 9) and must reject any
   // other value of ELASTICSEARCH_VERSION with a clear error instead of silently

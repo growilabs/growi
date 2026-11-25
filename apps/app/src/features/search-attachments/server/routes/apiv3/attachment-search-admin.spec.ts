@@ -500,6 +500,23 @@ describe('GET /config', () => {
     expect(res.status).toBe(200);
     expect(res.body.config.hasExtractorToken).toBe(false);
   });
+
+  it.each([
+    true,
+    false,
+  ])('reports useOnlyEnvVars as %s from env:useOnlyEnvVars:app:attachmentFullTextSearch', async (configValue) => {
+    vi.mocked(configManager.getConfig).mockImplementation(((key: string) =>
+      key === 'env:useOnlyEnvVars:app:attachmentFullTextSearch'
+        ? configValue
+        : undefined) as never);
+
+    const res = await supertest(buildTestApp(true)).get(
+      '/admin/attachment-search/config',
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.body.config.useOnlyEnvVars).toBe(configValue);
+  });
 });
 
 describe('PUT /config validation', () => {

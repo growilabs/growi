@@ -54,6 +54,8 @@ const RUN =
     (d) => 'abcdefghij'[Number(d)],
   );
 const TOKEN = `zzattroute${RUN}`;
+// Only in the attachments, never in a page's path or body.
+const ATTACHMENT_ONLY_TOKEN = `zzattonly${RUN}`;
 const PAGE_INDEX = `fix_attroute_pages_${RUN}`;
 const ATTACHMENT_NAMES = attachmentIndexNames(PAGE_INDEX);
 const ATTACHMENT_INDEX = ATTACHMENT_NAMES.alias;
@@ -83,7 +85,7 @@ type SearchBody = {
   ok: boolean;
   code?: number;
   data?: Array<{
-    data: { _id: string };
+    data: { _id: string; path?: string };
     meta?: {
       elasticSearchResult?: { snippet?: string | null };
       attachmentHits?: unknown[];
@@ -296,7 +298,7 @@ describe.skipIf(esUri == null)(
               fileFormat: 'pdf',
               fileSize: 100,
               attachmentType: 'WIKI_PAGE',
-              content: `attached file for ${TOKEN}`,
+              content: `attached file for ${TOKEN} and ${ATTACHMENT_ONLY_TOKEN}`,
               created_at: now,
               updated_at: now,
             },
@@ -516,6 +518,45 @@ describe.skipIf(esUri == null)(
 
         expect(res.status).toBe(200);
         expect(kinds(Object.keys(res.body.enrichments))).toEqual(expected);
+      });
+    });
+
+    describe('facet=attachments items carry what the page search shows', () => {
+      it('the page document, and the snippet of a page whose body also matches', async () => {
+        const body: SearchBody = (
+          await search('creator', { q: TOKEN, facet: 'attachments' })
+        ).body;
+
+        expect(kinds((body.data ?? []).map((i) => i.data._id))).toEqual([
+          'owner',
+          'public',
+        ]);
+        for (const item of body.data ?? []) {
+          expect(item.data.path).toBe(
+            `/attroute/${RUN}/${kindOf.get(item.data._id)}`,
+          );
+          expect(item.meta?.elasticSearchResult?.snippet).toContain(
+            `<em class="highlighted-keyword">${TOKEN}</em>`,
+          );
+        }
+      });
+
+      it('no snippet for a page that matches only through its attachment', async () => {
+        const body: SearchBody = (
+          await search('creator', {
+            q: ATTACHMENT_ONLY_TOKEN,
+            facet: 'attachments',
+          })
+        ).body;
+
+        expect(kinds((body.data ?? []).map((i) => i.data._id))).toEqual([
+          'owner',
+          'public',
+        ]);
+        for (const item of body.data ?? []) {
+          expect(item.meta).not.toHaveProperty('elasticSearchResult');
+          expect(item.meta?.attachmentHits).not.toHaveLength(0);
+        }
       });
     });
 
