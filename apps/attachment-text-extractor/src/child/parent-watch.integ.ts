@@ -4,7 +4,7 @@ import {
   spawnDirect,
 } from './spec-support/direct-child';
 
-// The parent watch (Req 3.11, research.md 15.1 / 15.3): a thread of its own
+// The parent watch (research.md 15.1 / 15.3): a thread of its own
 // reads fd 4 and ends the child at EOF, even while the main thread is stuck in
 // synchronous code; and it must never keep the child from ending by itself.
 // Python test_child_entry.py test_child_exits_within_2s_once_the_requesting_worker_drops_the_liveness_pipe

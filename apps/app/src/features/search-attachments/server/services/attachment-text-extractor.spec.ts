@@ -315,6 +315,82 @@ describe('AttachmentTextExtractorService', () => {
     expect(options.timeout).toBe(60000);
   });
 
+  describe('X-Growi-App-Id header (app:growiAppIdForCloud)', () => {
+    const setAppId = (appId: string | number | undefined) => {
+      vi.mocked(configManager.getConfig).mockImplementation((key: string) => {
+        if (key === 'app:attachmentFullTextSearch:extractorUri')
+          return 'http://localhost:8000';
+        if (key === 'app:attachmentFullTextSearch:extractorToken')
+          return 'test-token';
+        if (key === 'app:attachmentFullTextSearch:timeoutMs') return 60000;
+        if (key === 'app:attachmentFullTextSearch:maxFileSizeBytes')
+          return 52428800;
+        if (key === 'app:growiAppIdForCloud') return appId;
+        return undefined;
+      });
+    };
+
+    const okResponse = {
+      data: {
+        mimeType: 'text/plain',
+        extractedCharacters: 5,
+        pages: [{ pageNumber: null, label: null, content: 'hello' }],
+      },
+    };
+
+    it.each([
+      ['a string', '4242'],
+      ['a number', 4242],
+    ])('sends the id with the Authorization header when it is %s', async (_label, appId) => {
+      setAppId(appId);
+      postExtract.mockResolvedValue(okResponse);
+
+      const service = await getService();
+      await service.extractAttachment('attachment-id-1');
+
+      const [, options] = postExtract.mock.calls[0];
+      expect(options.headers).toEqual({
+        Authorization: 'Bearer test-token',
+        'X-Growi-App-Id': '4242',
+      });
+    });
+
+    it.each([
+      ['not configured', undefined],
+      ['an empty string', ''],
+      ['a value with a space', 'a b'],
+      ['a value with a newline', 'a\nb'],
+      ['a value with a non-ASCII character', '日本'],
+    ])('omits the header and still extracts when the id is %s', async (_label, appId) => {
+      setAppId(appId);
+      postExtract.mockResolvedValue(okResponse);
+
+      const service = await getService();
+      const outcome = await service.extractAttachment('attachment-id-1');
+
+      const [, options] = postExtract.mock.calls[0];
+      expect(options.headers).toEqual({ Authorization: 'Bearer test-token' });
+      expect(outcome.kind).toBe('success');
+    });
+
+    it('reads the setting again on every call', async () => {
+      postExtract.mockResolvedValue(okResponse);
+      const service = await getService();
+
+      setAppId('111');
+      await service.extractAttachment('attachment-id-1');
+      setAppId('222');
+      await service.extractAttachment('attachment-id-1');
+
+      expect(postExtract.mock.calls[0][1].headers['X-Growi-App-Id']).toBe(
+        '111',
+      );
+      expect(postExtract.mock.calls[1][1].headers['X-Growi-App-Id']).toBe(
+        '222',
+      );
+    });
+  });
+
   it('sends the token without its surrounding whitespace', async () => {
     vi.mocked(configManager.getConfig).mockImplementation((key: string) => {
       if (key === 'app:attachmentFullTextSearch:extractorUri')

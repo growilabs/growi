@@ -1,4 +1,5 @@
 import { SCOPE } from '@growi/core/dist/interfaces';
+import { ErrorV3 } from '@growi/core/dist/models';
 import {
   isUserPage,
   isUsersTopPage,
@@ -94,6 +95,13 @@ const router = express.Router();
  *              $ref: '#/components/schemas/User'
  */
 export const setup = (crowi: Crowi): Router => {
+  // Bookmarks are Prisma-backed, but the viewer/grant filters still live on the
+  // (not yet migrated) mongoose Page model.
+  const Page: PageModel = mongoose.model<
+    HydratedDocument<PageDocument>,
+    PageModel
+  >('Page');
+
   const loginRequiredStrictly = loginRequiredFactory(crowi);
   const loginRequired = loginRequiredFactory(crowi, true);
   const addActivity = generateAddActivityMiddleware();
@@ -130,6 +138,8 @@ export const setup = (crowi: Crowi): Router => {
    *              application/json:
    *                schema:
    *                  $ref: '#/components/schemas/BookmarkInfo'
+   *          404:
+   *            description: Page is not found or forbidden.
    */
   router.get(
     '/info',
@@ -154,6 +164,23 @@ export const setup = (crowi: Crowi): Router => {
       };
 
       try {
+        const viewablePageCount = await Page.countByIdAndViewer(
+          pageId,
+          user,
+          null,
+          true,
+        );
+        // Uniform 404 for forbidden and nonexistent pages — see rules/page-write-action-403-404.md
+        if (viewablePageCount === 0) {
+          return res.apiv3Err(
+            new ErrorV3(
+              `Page '${pageId}' is not found or forbidden`,
+              'notfound_or_forbidden',
+            ),
+            404,
+          );
+        }
+
         const bookmarks = await prisma.bookmarks.findMany({
           where: { pageId: pageId },
           include: { user: true },
@@ -170,7 +197,6 @@ export const setup = (crowi: Crowi): Router => {
         return res.apiv3Err(err, 500);
       }
 
-      // guest user only get bookmark count
       if (user == null) {
         return res.apiv3(responsesParams);
       }
@@ -225,13 +251,6 @@ export const setup = (crowi: Crowi): Router => {
       if (userId == null) {
         return res.apiv3Err('User id is not found or forbidden', 400);
       }
-
-      // Bookmarks are Prisma-backed, but the viewer/grant filter below still
-      // lives on the (not yet migrated) mongoose Page model.
-      const Page: PageModel = mongoose.model<
-        HydratedDocument<PageDocument>,
-        PageModel
-      >('Page');
 
       try {
         const userFolders = await prisma.bookmarkfolders.findMany({
@@ -366,11 +385,6 @@ export const setup = (crowi: Crowi): Router => {
       if (userId == null) {
         return res.apiv3Err('A logged in user is required.');
       }
-
-      const Page: PageModel = mongoose.model<
-        HydratedDocument<PageDocument>,
-        PageModel
-      >('Page');
 
       let page: HydratedDocument<PageDocument> | null;
       let bookmark: bookmarks | null;

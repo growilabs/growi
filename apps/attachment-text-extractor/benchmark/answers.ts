@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 // The schema of answers.json: what the search-quality benchmark expects each
-// corpus document to yield (requirements Req 2.7-2.9). run-benchmark reads it
+// corpus document to yield. run-benchmark reads it
 // through loadBenchmarkAnswers, so the types here are its contract.
 
 export const BENCHMARK_CORPUS_DIR = fileURLToPath(
@@ -42,7 +42,7 @@ export const BENCHMARK_ENCODINGS = [
 ] as const;
 export type BenchmarkEncoding = (typeof BENCHMARK_ENCODINGS)[number];
 
-/** Traits a report can group results by (Req 2.4). */
+/** Traits a report can group results by. */
 export const BENCHMARK_FEATURES = [
   'horizontal-writing',
   'vertical-writing',

@@ -1,6 +1,6 @@
 import { buildDocx, buildTextPdf } from '../../test/fixtures';
 
-// The two documents the image check sends through POST /extract (Req 8.2),
+// The two documents the image check sends through POST /extract,
 // each with a marker the extracted text must hold.
 
 export interface Sample {

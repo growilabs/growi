@@ -93,6 +93,10 @@
       "reverted": "Change Proposal을 되돌렸습니다",
       "revert_requested": "Change Proposal을 되돌려 달라고 요청했습니다",
       "other_pages": "다른 페이지도 있습니다"
+    },
+    "page_duplicate_interrupted": {
+      "summary": "{{toPath}}의 복사본이 불완전합니다. {{fromPath}}의 {{sourcePageCount}}개 페이지 중 {{copiedPageCount}}개만 복사되었습니다.",
+      "advice": "불완전한 복사본을 삭제하거나 다른 이름으로 다시 복제할 수 있습니다."
     }
   },
   "personal_dropdown": {

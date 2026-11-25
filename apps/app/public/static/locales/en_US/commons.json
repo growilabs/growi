@@ -93,6 +93,10 @@
       "reverted": "reverted a Change Proposal",
       "revert_requested": "asked you to revert a Change Proposal",
       "other_pages": "and other pages"
+    },
+    "page_duplicate_interrupted": {
+      "summary": "The copy at {{toPath}} is incomplete: {{copiedPageCount}} of {{sourcePageCount}} pages were copied from {{fromPath}}.",
+      "advice": "You can delete the incomplete copy, or duplicate again under a different name."
     }
   },
   "personal_dropdown": {

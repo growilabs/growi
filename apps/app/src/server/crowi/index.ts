@@ -540,6 +540,16 @@ class Crowi {
       '~/features/change-proposal/server'
     );
     startChangeProposalMaintenanceCronIfEnabled(this);
+
+    // Recovery of duplicates interrupted by a crash or restart (disabled only by an
+    // empty app:interruptedDuplicateRecoveryCronSchedule)
+    const { startInterruptedDuplicateRecoveryCronIfEnabled } = await import(
+      '~/server/service/page/duplicate'
+    );
+    startInterruptedDuplicateRecoveryCronIfEnabled({
+      duplicateDeps: this.pageService.duplicateDeps(),
+      appService: this.appService,
+    });
   }
 
   getSlack(): unknown {

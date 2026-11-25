@@ -92,6 +92,10 @@
       "reverted": "が Change Proposal を取り消しました",
       "revert_requested": "が Change Proposal を戻すよう依頼しました",
       "other_pages": "ほかのページもあります"
+    },
+    "page_duplicate_interrupted": {
+      "summary": "{{fromPath}} の複製が途中で止まりました。{{toPath}} に複製できたのは、{{sourcePageCount}} ページのうち {{copiedPageCount}} ページだけです。",
+      "advice": "不完全な複製を削除するか、別の名前で複製し直してください。"
     }
   },
   "personal_dropdown": {

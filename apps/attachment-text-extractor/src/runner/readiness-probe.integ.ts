@@ -11,7 +11,7 @@ import {
   within,
 } from './spec-support';
 
-// Req 8.8: what a probe answer must contain, and how many probe children may
+// What a probe answer must contain, and how many probe children may
 // run at once. /readyz needs no token, so its callers must not be able to
 // start probe children without bound.
 

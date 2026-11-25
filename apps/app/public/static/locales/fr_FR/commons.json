@@ -92,6 +92,10 @@
       "reverted": "a annulé un Change Proposal",
       "revert_requested": "vous a demandé d'annuler un Change Proposal",
       "other_pages": "et d'autres pages"
+    },
+    "page_duplicate_interrupted": {
+      "summary": "La copie située à {{toPath}} est incomplète : {{copiedPageCount}} pages sur {{sourcePageCount}} ont été copiées depuis {{fromPath}}.",
+      "advice": "Vous pouvez supprimer cette copie incomplète ou dupliquer à nouveau sous un autre nom."
     }
   },
   "personal_dropdown": {

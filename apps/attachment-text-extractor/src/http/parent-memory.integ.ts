@@ -14,7 +14,7 @@ import {
 import { requestHead } from './spec-support/raw-http';
 
 // The parent's peak RSS under the heaviest loads the HTTP layer meets
-// (research.md 16.9 (d), 20.10, 20.12; Req 3.14): three 50 MiB uploads at
+// (research.md 16.9 (d), 20.10, 20.12): three 50 MiB uploads at
 // once, bodies that arrive a byte at a time or alternate 16 KiB and 1 byte
 // pieces, and three ~33 MB results at once (5.5 million control characters,
 // six bytes each in JSON). The service is the built production parent with
@@ -201,78 +201,75 @@ const answered = (socket: Socket, timeoutMs: number): Promise<void> =>
 const CONTROL_TEXT = Buffer.alloc(5_500_000, 0x01);
 const ALTERNATING = [Buffer.alloc(16 * 1024, 0x61), Buffer.from('b')];
 
-describe.skipIf(process.platform !== 'linux')(
-  "the parent's peak RSS (Req 3.14)",
-  () => {
-    it('three 50 MiB uploads at once, three times', async () => {
-      const target = await startServer();
+describe.skipIf(process.platform !== 'linux')("the parent's peak RSS", () => {
+  it('three 50 MiB uploads at once, three times', async () => {
+    const target = await startServer();
 
-      const statuses = await uploadRounds(
-        target,
-        'a.bin',
-        Buffer.alloc(50 * MIB, 0x61),
-        3,
-      );
+    const statuses = await uploadRounds(
+      target,
+      'a.bin',
+      Buffer.alloc(50 * MIB, 0x61),
+      3,
+    );
 
-      expect(statuses).toEqual(Array(9).fill(400));
-      expect(target.peakRssMib()).toBeLessThanOrEqual(UPLOADS_CEILING_MIB);
-    });
+    expect(statuses).toEqual(Array(9).fill(400));
+    expect(target.peakRssMib()).toBeLessThanOrEqual(UPLOADS_CEILING_MIB);
+  });
 
-    it('three ~33 MB results at once, three times', async () => {
-      const target = await startServer();
+  it('three ~33 MB results at once, three times', async () => {
+    const target = await startServer();
 
-      const statuses = await uploadRounds(target, 'a.txt', CONTROL_TEXT, 3);
+    const statuses = await uploadRounds(target, 'a.txt', CONTROL_TEXT, 3);
 
-      expect(statuses).toEqual(Array(9).fill(200));
-      expect(target.peakRssMib()).toBeLessThanOrEqual(RESULTS_CEILING_MIB);
-    });
+    expect(statuses).toEqual(Array(9).fill(200));
+    expect(target.peakRssMib()).toBeLessThanOrEqual(RESULTS_CEILING_MIB);
+  });
 
-    it('50 MiB uploads and ~33 MB results, alternating', async () => {
-      const target = await startServer();
+  it('50 MiB uploads and ~33 MB results, alternating', async () => {
+    const target = await startServer();
 
-      for (let round = 0; round < 2; round++) {
-        await uploadRounds(target, 'a.bin', Buffer.alloc(50 * MIB, 0x61), 1);
-        await uploadRounds(target, 'a.txt', CONTROL_TEXT, 1);
-      }
+    for (let round = 0; round < 2; round++) {
+      await uploadRounds(target, 'a.bin', Buffer.alloc(50 * MIB, 0x61), 1);
+      await uploadRounds(target, 'a.txt', CONTROL_TEXT, 1);
+    }
 
-      expect(target.peakRssMib()).toBeLessThanOrEqual(MIXED_CEILING_MIB);
-    });
+    expect(target.peakRssMib()).toBeLessThanOrEqual(MIXED_CEILING_MIB);
+  });
 
-    it('three bodies arriving a byte at a time', async () => {
-      // A fixed number of bytes, not a fixed time: how many one-byte writes
-      // fit in a few seconds depends on what else the machine is running.
-      const target = await startServer({ UPLOAD_TIMEOUT_S: '60' });
-      const idle = target.peakRssMib();
+  it('three bodies arriving a byte at a time', async () => {
+    // A fixed number of bytes, not a fixed time: how many one-byte writes
+    // fit in a few seconds depends on what else the machine is running.
+    const target = await startServer({ UPLOAD_TIMEOUT_S: '60' });
+    const idle = target.peakRssMib();
 
-      const sent = await Promise.all(
-        [1, 2, 3].map(() =>
-          sendInPieces(target, TRICKLED_BYTES, [Buffer.from('x')], {
-            forMs: 60_000,
-            paceMs: 0,
-          }),
-        ),
-      );
+    const sent = await Promise.all(
+      [1, 2, 3].map(() =>
+        sendInPieces(target, TRICKLED_BYTES, [Buffer.from('x')], {
+          forMs: 60_000,
+          paceMs: 0,
+        }),
+      ),
+    );
 
-      expect(sent).toEqual(Array(3).fill(TRICKLED_BYTES));
-      expect(target.peakRssMib() - idle).toBeLessThanOrEqual(
-        TRICKLE_GROWTH_CEILING_MIB,
-      );
-    });
+    expect(sent).toEqual(Array(3).fill(TRICKLED_BYTES));
+    expect(target.peakRssMib() - idle).toBeLessThanOrEqual(
+      TRICKLE_GROWTH_CEILING_MIB,
+    );
+  });
 
-    it('three 32 MiB bodies alternating 16 KiB and 1 byte pieces', async () => {
-      const target = await startServer();
+  it('three 32 MiB bodies alternating 16 KiB and 1 byte pieces', async () => {
+    const target = await startServer();
 
-      const sent = await Promise.all(
-        [1, 2, 3].map(() =>
-          sendInPieces(target, 32 * MIB, ALTERNATING, {
-            forMs: 60_000,
-            paceMs: 1,
-          }),
-        ),
-      );
+    const sent = await Promise.all(
+      [1, 2, 3].map(() =>
+        sendInPieces(target, 32 * MIB, ALTERNATING, {
+          forMs: 60_000,
+          paceMs: 1,
+        }),
+      ),
+    );
 
-      expect(sent).toEqual(Array(3).fill(32 * MIB));
-      expect(target.peakRssMib()).toBeLessThanOrEqual(ALTERNATING_CEILING_MIB);
-    });
-  },
-);
+    expect(sent).toEqual(Array(3).fill(32 * MIB));
+    expect(target.peakRssMib()).toBeLessThanOrEqual(ALTERNATING_CEILING_MIB);
+  });
+});

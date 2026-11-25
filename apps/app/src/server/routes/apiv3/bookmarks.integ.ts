@@ -11,7 +11,7 @@ import type { PageDocument, PageModel } from '~/server/models/page';
 import { configManager } from '~/server/service/config-manager';
 import { prisma } from '~/utils/prisma';
 
-import type { ApiV3Response } from './interfaces/apiv3-response';
+import addCustomFunctionToResponse from './response';
 
 // bookmarks / bookmarkfolders are Prisma-backed since v8, so fixtures go through
 // Prisma. Pages, users and groups stay on mongoose (not yet migrated).
@@ -31,6 +31,8 @@ interface SeedPageOptions {
   grant?: PageGrant;
   grantedUsers?: HydratedDocument<IUser>[];
   grantedGroups?: { item: Types.ObjectId; type: 'UserGroup' }[];
+  isEmpty?: boolean;
+  status?: string;
 }
 
 const seedPage = async (
@@ -47,6 +49,8 @@ const seedPage = async (
       creator: creator._id,
       grantedUsers: options.grantedUsers?.map((u) => u._id),
       grantedGroups: options.grantedGroups,
+      isEmpty: options.isEmpty,
+      status: options.status,
     },
   ]);
   return page;
@@ -87,6 +91,9 @@ const addUserToGroup = async (
 const bookmarkedPageIds = (res: SupertestResponse): string[] =>
   res.body.userRootBookmarks.map((b: { page: { _id: string } }) => b.page._id);
 
+const bookmarkedUserIds = (res: SupertestResponse): string[] =>
+  res.body.bookmarkedUsers.map((u: { _id: string }) => u._id);
+
 interface TestRequest extends Request {
   user?: HydratedDocument<IUser>;
   crowi?: Crowi;
@@ -107,74 +114,66 @@ vi.mock('~/server/middlewares/login-required', () => ({
   default: () => passthroughMiddleware,
 }));
 
+let app: express.Application;
+let crowi: Crowi;
+
+// Injected into req.user by middleware below.
+let currentUser: HydratedDocument<IUser> | undefined;
+
+beforeAll(async () => {
+  crowi = await getInstance();
+});
+
+beforeEach(async () => {
+  currentUser = undefined;
+
+  app = express();
+  app.use(express.json());
+
+  const responseHelpers: { response: Record<string, unknown> } = {
+    response: {},
+  };
+  addCustomFunctionToResponse(responseHelpers);
+  app.use((_req, res, next) => {
+    Object.assign(res, responseHelpers.response);
+    next();
+  });
+
+  // Inject crowi and user into request.
+  app.use((req: TestRequest, _res, next) => {
+    req.crowi = crowi;
+    req.user = currentUser;
+    next();
+  });
+
+  // Mount the real router (same factory the production server mounts).
+  const { setup } = await import('./bookmarks');
+  app.use('/', setup(crowi));
+});
+
+afterEach(async () => {
+  await Promise.all([
+    prisma.bookmarks.deleteMany({}),
+    prisma.bookmarkfolders.deleteMany({}),
+    mongoose.model('Page').deleteMany({}),
+    mongoose.model('User').deleteMany({}),
+    mongoose.model('UserGroup').deleteMany({}),
+    mongoose.model('UserGroupRelation').deleteMany({}),
+  ]);
+
+  // Config docs live in a separate collection that survives the deletes above,
+  // so reset the policies these tests toggle back to their defaults (false).
+  await configManager.updateConfigs(
+    {
+      'security:list-policy:hideRestrictedByOwner': false,
+      'security:list-policy:hideRestrictedByGroup': false,
+      'security:disableUserPages': false,
+    },
+    { skipPubsub: true },
+  );
+});
+
 describe('GET /bookmarks/:userId', () => {
-  let app: express.Application;
-  let crowi: Crowi;
-
-  // Injected into req.user by middleware below.
-  let currentUser: HydratedDocument<IUser> | undefined;
-
-  beforeAll(async () => {
-    crowi = await getInstance();
-  });
-
-  beforeEach(async () => {
-    currentUser = undefined;
-
-    app = express();
-    app.use(express.json());
-
-    // Re-create the apiv3 response helpers.
-    app.use((_req, res: ApiV3Response, next) => {
-      res.apiv3 = (data: unknown) => res.json(data);
-      res.apiv3Err = (error: unknown, statusCode?: number) => {
-        const status = statusCode ?? (Array.isArray(error) ? 400 : 500);
-        const message =
-          typeof error === 'object' &&
-          error !== null &&
-          'message' in error &&
-          typeof error.message === 'string'
-            ? error.message
-            : String(error);
-        return res.status(status).json({ error: message });
-      };
-      next();
-    });
-
-    // Inject crowi and user into request.
-    app.use((req: TestRequest, _res, next) => {
-      req.crowi = crowi;
-      req.user = currentUser;
-      next();
-    });
-
-    // Mount the real router (same factory the production server mounts).
-    const { setup } = await import('./bookmarks');
-    app.use('/', setup(crowi));
-  });
-
-  afterEach(async () => {
-    await Promise.all([
-      prisma.bookmarks.deleteMany({}),
-      prisma.bookmarkfolders.deleteMany({}),
-      mongoose.model('Page').deleteMany({}),
-      mongoose.model('User').deleteMany({}),
-      mongoose.model('UserGroup').deleteMany({}),
-      mongoose.model('UserGroupRelation').deleteMany({}),
-    ]);
-
-    // Config docs live in a separate collection that survives the deletes above,
-    // so reset the policies these tests toggle back to their defaults (false).
-    await configManager.updateConfigs(
-      {
-        'security:list-policy:hideRestrictedByOwner': false,
-        'security:list-policy:hideRestrictedByGroup': false,
-        'security:disableUserPages': false,
-      },
-      { skipPubsub: true },
-    );
-  });
-
   describe('general behavior and edge cases', () => {
     it('returns 400 when userId is not a valid ObjectId', async () => {
       const res = await request(app).get('/not-a-valid-object-id');
@@ -418,5 +417,176 @@ describe('GET /bookmarks/:userId', () => {
       expect(ids).not.toContain(userPage._id.toString());
       expect(ids).not.toContain(usersTopPage._id.toString());
     });
+  });
+});
+
+describe('GET /bookmarks/info', () => {
+  const seedOwnerOnlyPage = (
+    owner: HydratedDocument<IUser>,
+  ): Promise<HydratedDocument<PageDocument>> => {
+    return seedPage({
+      path: '/owner-only-page',
+      creator: owner,
+      grant: PageGrant.GRANT_OWNER,
+      grantedUsers: [owner],
+    });
+  };
+
+  // The whole body, so a 404 that still carried bookmark info would fail.
+  const notFoundOrForbiddenBody = {
+    errors: [expect.objectContaining({ code: 'notfound_or_forbidden' })],
+  };
+
+  it('returns 404 without bookmark info for a page the viewer cannot see', async () => {
+    const owner = await seedUser('owner');
+    const outsider = await seedUser('outsider');
+    const page = await seedOwnerOnlyPage(owner);
+    await seedBookmark(owner, page);
+    currentUser = outsider;
+
+    const res = await request(app).get(`/info?pageId=${page._id.toString()}`);
+
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual(notFoundOrForbiddenBody);
+  });
+
+  it('returns 404 without bookmark info for a guest on a non-public page', async () => {
+    const owner = await seedUser('owner');
+    const page = await seedOwnerOnlyPage(owner);
+    await seedBookmark(owner, page);
+    currentUser = undefined;
+
+    const res = await request(app).get(`/info?pageId=${page._id.toString()}`);
+
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual(notFoundOrForbiddenBody);
+  });
+
+  it('responds to a nonexistent page the same way as to a forbidden one', async () => {
+    const outsider = await seedUser('outsider');
+    currentUser = outsider;
+
+    const res = await request(app).get(
+      `/info?pageId=${new mongoose.Types.ObjectId().toString()}`,
+    );
+
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual(notFoundOrForbiddenBody);
+  });
+
+  it('returns bookmark info for a non-public page the viewer can see', async () => {
+    const owner = await seedUser('owner');
+    const page = await seedOwnerOnlyPage(owner);
+    await seedBookmark(owner, page);
+    currentUser = owner;
+
+    const res = await request(app).get(`/info?pageId=${page._id.toString()}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.sumOfBookmarks).toBe(1);
+    expect(res.body.isBookmarked).toBe(true);
+    expect(bookmarkedUserIds(res)).toEqual([owner._id.toString()]);
+  });
+
+  it('returns bookmark info for an empty page, which can be bookmarked', async () => {
+    const owner = await seedUser('owner');
+    const viewer = await seedUser('viewer');
+    const page = await seedPage({
+      path: '/empty-parent',
+      creator: owner,
+      isEmpty: true,
+    });
+    await seedBookmark(owner, page);
+    currentUser = viewer;
+
+    const res = await request(app).get(`/info?pageId=${page._id.toString()}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.sumOfBookmarks).toBe(1);
+    expect(bookmarkedUserIds(res)).toEqual([owner._id.toString()]);
+  });
+
+  it('returns bookmark info for a public page to another user', async () => {
+    const owner = await seedUser('owner');
+    const viewer = await seedUser('viewer');
+    const page = await seedPage({ path: '/public-page', creator: owner });
+    await seedBookmark(owner, page);
+    currentUser = viewer;
+
+    const res = await request(app).get(`/info?pageId=${page._id.toString()}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.sumOfBookmarks).toBe(1);
+    expect(res.body.isBookmarked).toBe(false);
+    expect(bookmarkedUserIds(res)).toEqual([owner._id.toString()]);
+  });
+
+  it('returns bookmark info for a public page to a guest', async () => {
+    const owner = await seedUser('owner');
+    const page = await seedPage({ path: '/public-page', creator: owner });
+    await seedBookmark(owner, page);
+    currentUser = undefined;
+
+    const res = await request(app).get(`/info?pageId=${page._id.toString()}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.sumOfBookmarks).toBe(1);
+    expect(res.body.isBookmarked).toBe(false);
+    expect(bookmarkedUserIds(res)).toEqual([owner._id.toString()]);
+  });
+
+  it('returns bookmark info for a page in the trash', async () => {
+    const owner = await seedUser('owner');
+    const viewer = await seedUser('viewer');
+    const page = await seedPage({
+      path: '/trash/deleted-page',
+      creator: owner,
+      status: 'deleted',
+    });
+    await seedBookmark(owner, page);
+    currentUser = viewer;
+
+    const res = await request(app).get(`/info?pageId=${page._id.toString()}`);
+
+    expect(res.status).toBe(200);
+    expect(bookmarkedUserIds(res)).toEqual([owner._id.toString()]);
+  });
+
+  it('returns bookmark info for a group-restricted page to a fellow member', async () => {
+    const owner = await seedUser('owner');
+    const member = await seedUser('member');
+    const group = await seedGroup('team');
+    await addUserToGroup(group, owner);
+    await addUserToGroup(group, member);
+    const page = await seedPage({
+      path: '/group/secret',
+      creator: owner,
+      grant: PageGrant.GRANT_USER_GROUP,
+      grantedGroups: [{ item: group._id, type: 'UserGroup' }],
+    });
+    await seedBookmark(owner, page);
+    currentUser = member;
+
+    const res = await request(app).get(`/info?pageId=${page._id.toString()}`);
+
+    expect(res.status).toBe(200);
+    expect(bookmarkedUserIds(res)).toEqual([owner._id.toString()]);
+  });
+
+  it('returns bookmark info for an "anyone with the link" page to another user', async () => {
+    const owner = await seedUser('owner');
+    const viewer = await seedUser('viewer');
+    const page = await seedPage({
+      path: '/link-only',
+      creator: owner,
+      grant: PageGrant.GRANT_RESTRICTED,
+    });
+    await seedBookmark(owner, page);
+    currentUser = viewer;
+
+    const res = await request(app).get(`/info?pageId=${page._id.toString()}`);
+
+    expect(res.status).toBe(200);
+    expect(bookmarkedUserIds(res)).toEqual([owner._id.toString()]);
   });
 });

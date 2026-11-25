@@ -81,7 +81,7 @@ const exitDetail = (
   return 'conversion process closed its result pipe without a result';
 };
 
-/** Decoded as JSON data only; anything that breaks the protocol is a crash (Req 3.9). */
+/** Decoded as JSON data only; anything that breaks the protocol is a crash. */
 const readResult = (body: Buffer, peakRssKib: number): RunReading => {
   let outcome: ConversionOutcome;
   try {

@@ -1,7 +1,7 @@
 import { errorOf, postFile } from '../../src/http/spec-support/extract-client';
 import { useBlackboxService } from './blackbox-service';
 
-// Black box (research.md 22.7 `hygiene`): Req 1.8, an error answer carries
+// Black box (research.md 22.7 `hygiene`): an error answer carries
 // neither the file's content nor its name. Python test_e2e_http.py
 // TestHygieneOverHttp, response side; the log side of the same tests needs the
 // service's log and is in src/http/request-log.integ.ts.

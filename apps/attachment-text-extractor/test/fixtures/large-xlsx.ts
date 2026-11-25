@@ -62,7 +62,7 @@ const ONE_DATA_COLUMN: readonly CellGrid[] = [
   { name: 'Data', rows: MAX_XLSX_CELLS, cols: 1 },
 ];
 
-/** 70,000 cells in one sheet: the shape of Req 11.2's RSS baseline workbook. */
+/** 70,000 cells in one sheet: the shape of the RSS baseline workbook. */
 export const buildOneSheetAtCellLimitXlsx = (): Buffer =>
   buildXlsxCells(ONE_DATA_COLUMN);
 

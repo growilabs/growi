@@ -1,6 +1,6 @@
 import { openApiDrift } from '../../scripts/check-openapi-drift';
 
-// Req 7.3: the comparison the drift check runs between the document the
+// The comparison the drift check runs between the document the
 // service writes and the committed client document (research.md 17.7 1,
 // 17.13). A full JSON comparison: object keys in any order, arrays in order,
 // every difference reported as a JSON Pointer. The committed document is the
