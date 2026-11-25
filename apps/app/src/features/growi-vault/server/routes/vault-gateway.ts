@@ -161,19 +161,19 @@ function createGitFallback(createActivity: CreateActivity | undefined) {
  *
  * The credential adapter (seam #1) populated `req.user` with a securely
  * serialized user (when a valid PAT was presented) and stashed the PAT scopes
- * on `req.vaultScopes`. An anonymous-but-allowed request (guest read permitted)
- * reaches the handler with `req.user` unset → userId resolves to null and only
- * the 'public' namespace is accessible (req 3.2).
+ * on `req.vaultScopes`. Returns null when no user is present, which happens on
+ * the crowi-less path where `loginRequiredFactory` does not run.
  */
 function readIdentity(req: Request): {
-  userId: string | null;
+  userId: string;
   scopes: ReadonlyArray<string> | undefined;
-} {
+} | null {
   const authedReq = req as VaultAuthenticatedReq;
   const rawUser = authedReq.user as
     | { _id?: { toString(): string } }
     | undefined;
-  const userId = rawUser?._id?.toString() ?? null;
+  const userId = rawUser?._id?.toString();
+  if (userId == null) return null;
   return { userId, scopes: authedReq.vaultScopes };
 }
 
@@ -212,6 +212,7 @@ export const createVaultGatewayRouter = (
   const credentialAdapter =
     deps.vaultPatAuth ?? createVaultCredentialAdapter(createActivity);
 
+  const gitFallback = createGitFallback(createActivity);
   const router = express.Router();
 
   // --------------------------------------------------------------------------
@@ -226,7 +227,7 @@ export const createVaultGatewayRouter = (
       ? [
           generateUnavailableWhenMaintenanceModeMiddlewareForApi(crowi),
           credentialAdapter,
-          loginRequiredFactory(crowi, false, createGitFallback(createActivity)),
+          loginRequiredFactory(crowi, false, gitFallback),
         ]
       : [credentialAdapter];
 
@@ -246,7 +247,7 @@ export const createVaultGatewayRouter = (
   router.get(
     '/info/refs',
     ...authMiddlewares,
-    async (req: Request, res: Response) => {
+    async (req: Request, res: Response, next: NextFunction) => {
       // Feature flag + bootstrap gate (req 1.4, 1.5)
       const ready = await assertGatewayReady(req, res);
       if (!ready) return;
@@ -259,7 +260,12 @@ export const createVaultGatewayRouter = (
       }
 
       // Identity resolved by the credential adapter + loginRequired chain.
-      const { userId, scopes } = readIdentity(req);
+      const identity = readIdentity(req);
+      if (identity == null) {
+        gitFallback(req, res, next);
+        return;
+      }
+      const { userId, scopes } = identity;
 
       // Compute accessible namespaces (req 3, req 2.5)
       let namespaces: ReadonlyArray<string>;
@@ -299,7 +305,7 @@ export const createVaultGatewayRouter = (
         ip: req.ip,
         endpoint: req.originalUrl,
         action: SupportedAction.ACTION_VAULT_CLONE_PREPARE,
-        user: userId ?? undefined,
+        user: userId,
         snapshot: {},
       }).catch((err) =>
         logger.warn({ err }, 'Failed to record clone-prepare activity'),
@@ -355,13 +361,18 @@ export const createVaultGatewayRouter = (
   router.post(
     '/git-upload-pack',
     ...authMiddlewares,
-    async (req: Request, res: Response) => {
+    async (req: Request, res: Response, next: NextFunction) => {
       // Feature flag + bootstrap gate (req 1.4, 1.5)
       const ready = await assertGatewayReady(req, res);
       if (!ready) return;
 
       // Identity resolved by the credential adapter + loginRequired chain.
-      const { userId, scopes } = readIdentity(req);
+      const identity = readIdentity(req);
+      if (identity == null) {
+        gitFallback(req, res, next);
+        return;
+      }
+      const { userId, scopes } = identity;
 
       // Compute accessible namespaces (req 3, req 2.5)
       let namespaces: ReadonlyArray<string>;
@@ -434,7 +445,7 @@ export const createVaultGatewayRouter = (
         ip: req.ip,
         endpoint: req.originalUrl,
         action: SupportedAction.ACTION_VAULT_CLONE_COMPLETE,
-        user: userId ?? undefined,
+        user: userId,
         snapshot: {},
       }).catch((err) =>
         logger.warn({ err }, 'Failed to record clone-complete activity'),

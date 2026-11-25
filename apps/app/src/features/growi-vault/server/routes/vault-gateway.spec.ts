@@ -125,7 +125,7 @@ function authedAdapter(userId: string, scopes: ReadonlyArray<string> = []) {
   };
 }
 
-/** A credential-adapter middleware stub that resolves no user (anonymous). */
+/** A credential-adapter middleware stub that resolves no user (no credential presented). */
 // biome-ignore lint/suspicious/noExplicitAny: minimal Express middleware stub
 function anonymousAdapter(req: any, _res: any, next: any) {
   req.vaultScopes = undefined;
@@ -361,10 +361,10 @@ describe('VaultGatewayRouter', () => {
   });
 
   // -------------------------------------------------------------------------
-  // Guest / anonymous gate via the REAL loginRequiredFactory (req 2.4 / 2.4a / 11)
+  // Credential-less request via the REAL loginRequiredFactory (req 1 / 11)
   // -------------------------------------------------------------------------
 
-  describe('standard middleware chain: guest gate (no credential)', () => {
+  describe('standard middleware chain: request without a credential', () => {
     beforeEach(() => {
       (
         vaultSettingsService.getSettings as ReturnType<typeof vi.fn>
@@ -408,7 +408,7 @@ describe('VaultGatewayRouter', () => {
         expect(res.headers['www-authenticate']).toBe(
           'Basic realm="GROWI Vault"',
         );
-        expect(res.text).not.toMatch(/\/|page|path|exist/i);
+        expect(res.text).toBe('');
 
         // Denied BEFORE namespace computation / view composition / proxying.
         expect(
@@ -440,7 +440,7 @@ describe('VaultGatewayRouter', () => {
         expect(res.headers['www-authenticate']).toBe(
           'Basic realm="GROWI Vault"',
         );
-        expect(res.text).not.toMatch(/\/|page|path|exist/i);
+        expect(res.text).toBe('');
 
         expect(vaultManagerClient.composeView).not.toHaveBeenCalled();
         expect(vaultManagerClient.proxyGitRequest).not.toHaveBeenCalled();
@@ -463,10 +463,13 @@ describe('VaultGatewayRouter', () => {
       mockSyncStateDone();
     });
 
-    it('resolves the user and computes namespaces even when guests are denied (PAT bypasses guest gate)', async () => {
-      // Guests are denied — a valid PAT must still clone successfully because
-      // loginRequiredFactory lets an ACTIVE req.user through before the guest check.
-      const crowi = buildCrowi({ isGuestAllowedToRead: false });
+    it.each([
+      { isGuestAllowedToRead: false },
+      { isGuestAllowedToRead: true },
+    ])('resolves the user and computes namespaces when isGuestAllowedToRead() === $isGuestAllowedToRead', async ({
+      isGuestAllowedToRead,
+    }) => {
+      const crowi = buildCrowi({ isGuestAllowedToRead });
       (
         vaultNamespaceMapper.computeAccessibleNamespaces as ReturnType<
           typeof vi.fn
@@ -499,7 +502,7 @@ describe('VaultGatewayRouter', () => {
         userId: 'user-1',
         namespaces: ['public', 'group-eng'],
       });
-      // Guest gate is not the deciding factor for an authenticated user.
+      // The guest setting is not consulted for an authenticated user.
       expect(crowi.aclService.isGuestAllowedToRead).not.toHaveBeenCalled();
     });
   });
@@ -674,6 +677,40 @@ describe('VaultGatewayRouter', () => {
   // -------------------------------------------------------------------------
 
   describe('test mode (crowi omitted): auth middleware is skipped', () => {
+    it('refuses a request without a credential with 401 and never reaches namespace computation', async () => {
+      (
+        vaultSettingsService.getSettings as ReturnType<typeof vi.fn>
+      ).mockResolvedValue(enabledSettings);
+      mockSyncStateDone();
+      const createActivity = vi.fn().mockResolvedValue(undefined);
+
+      const app = buildApp({ vaultPatAuth: anonymousAdapter, createActivity });
+      const infoRefs = await request(app).get(
+        '/vault.git/info/refs?service=git-upload-pack',
+      );
+      const uploadPack = await request(app)
+        .post('/vault.git/git-upload-pack')
+        .set('Content-Type', 'application/x-git-upload-pack-request')
+        .send(Buffer.from('0011want abc\n0000'));
+
+      for (const res of [infoRefs, uploadPack]) {
+        expect(res.status).toBe(401);
+        expect(res.headers['www-authenticate']).toBe(
+          'Basic realm="GROWI Vault"',
+        );
+        expect(res.text).toBe('');
+      }
+      expect(
+        vaultNamespaceMapper.computeAccessibleNamespaces,
+      ).not.toHaveBeenCalled();
+      expect(vaultManagerClient.composeView).not.toHaveBeenCalled();
+      expect(vaultManagerClient.proxyGitRequest).not.toHaveBeenCalled();
+      expect(createActivity).toHaveBeenCalledTimes(2);
+      expect(createActivity).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'VAULT_AUTH_FAILURE' }),
+      );
+    });
+
     it('GET /info/refs proceeds without maintenance/loginRequired when crowi is not provided', async () => {
       (
         vaultSettingsService.getSettings as ReturnType<typeof vi.fn>

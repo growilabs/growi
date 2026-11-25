@@ -8,7 +8,7 @@
   - `loginRequiredFactory` の第 2 引数を `false` にする
   - 完了の目安: 追加したテストが修正前に落ち、修正後に通る。ゲスト閲覧の設定ごとに「通る／通らない」を分けていた既存のテストは、「どの設定でも 401」を確かめる形に直っている
   - _Requirements: 1.1, 1.2, 1.3, 1.4_
-- [ ] 1.2 gateway のハンドラと namespace の計算から、「利用者なし」を消す
+- [x] 1.2 gateway のハンドラと namespace の計算から、「利用者なし」を消す
   - 先にテストを書く。`crowi` を渡さない経路でも、認証情報のない要求が 401 になり、namespace の計算と compose-view の依頼が呼ばれないことを確かめる
   - `readIdentity` は、利用者がいなければ `null` を返す。ハンドラは、そのとき 401 を返して終わる
   - `computeAccessibleNamespaces` の `userId` を `string` にし、`null` の分岐と、そのテストを消す

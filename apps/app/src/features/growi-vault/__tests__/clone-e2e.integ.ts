@@ -43,16 +43,11 @@ const vaultRepoUrl = (): string => `${VAULT_E2E_CONFIG.baseUrl}/vault.git`;
 /**
  * Clone the vault repo with an explicit Authorization header.
  *
- * git's default behaviour is to issue the first `/info/refs` request WITHOUT
- * credentials and only retry with credentials if the server returns 401.
- * Because our gateway intentionally allows anonymous access to the public
- * namespace, an unauthenticated probe succeeds — and git never sends the
- * credentials embedded in the URL.
- *
- * For the integration test we need every request to carry the PAT so the
- * gateway resolves the user, ACL filters the view, and the clone includes
- * the user's GRANT_OWNER pages. We inject the header via `http.extraheader`
- * which applies to every HTTP request issued by `git clone`.
+ * git issues the first `/info/refs` request WITHOUT credentials and only
+ * retries with the credentials embedded in the URL after a 401. Injecting the
+ * header via `http.extraheader` makes every HTTP request issued by
+ * `git clone` carry the PAT, so the gateway resolves the user and ACL filters
+ * the view (including the user's GRANT_OWNER pages) from the first request.
  */
 async function cloneAuthenticated(pat: string): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), 'growi-vault-clone-'));
@@ -64,12 +59,6 @@ async function cloneAuthenticated(pat: string): Promise<string> {
     vaultRepoUrl(),
     dir,
   ]);
-  return dir;
-}
-
-async function cloneAnonymous(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), 'growi-vault-clone-'));
-  await execFileAsync('git', ['clone', vaultRepoUrl(), dir]);
   return dir;
 }
 
@@ -171,20 +160,6 @@ describe('GROWI Vault — clone E2E contract', () => {
   });
 
   // ----------------------------------------------------------------------
-  // Contract: an anonymous clone returns the public namespace only —
-  // never any page that requires authentication.
-  // ----------------------------------------------------------------------
-  it('anonymous clone includes public pages and excludes admin-only page', async () => {
-    const dir = await cloneAnonymous();
-    tmpDirs.push(dir);
-
-    const files = new Set(await listFiles(dir));
-    expect(files.has(VAULT_E2E_PAGES.publicRoot.mappedFile)).toBe(true);
-    expect(files.has(VAULT_E2E_PAGES.publicDeep.mappedFile)).toBe(true);
-    expect(files.has(VAULT_E2E_PAGES.adminOnly.mappedFile)).toBe(false);
-  });
-
-  // ----------------------------------------------------------------------
   // Contract: a single-page rename relocates the page's blob — the OLD
   // mapped file disappears and the NEW mapped file appears in the clone.
   //
@@ -235,7 +210,7 @@ describe('GROWI Vault — clone E2E contract', () => {
     // The old file must exist before the rename (guards against a false
     // positive where the assertion below passes only because nothing was
     // ever materialised).
-    const beforeDir = await cloneAnonymous();
+    const beforeDir = await cloneAuthenticated(VAULT_E2E_CONFIG.admin.pat);
     tmpDirs.push(beforeDir);
     const beforeFiles = new Set(await listFiles(beforeDir));
     expect(beforeFiles.has(oldFile)).toBe(true);
@@ -263,7 +238,7 @@ describe('GROWI Vault — clone E2E contract', () => {
     await new Promise((r) => setTimeout(r, 500));
 
     // Step 3: clone again and assert the relocation took effect.
-    const afterDir = await cloneAnonymous();
+    const afterDir = await cloneAuthenticated(VAULT_E2E_CONFIG.admin.pat);
     tmpDirs.push(afterDir);
     const afterFiles = new Set(await listFiles(afterDir));
 
@@ -329,16 +304,15 @@ describe('GROWI Vault — clone E2E contract', () => {
         grantedGroups: [],
         ...grantState,
       });
-    const cloneHasFile = async (pat: string | null): Promise<boolean> => {
-      const dir =
-        pat == null ? await cloneAnonymous() : await cloneAuthenticated(pat);
+    const cloneHasFile = async (pat: string): Promise<boolean> => {
+      const dir = await cloneAuthenticated(pat);
       tmpDirs.push(dir);
       return (await listFiles(dir)).includes(file);
     };
     // vault-manager applies instructions asynchronously (and plain upserts
     // first sit in the coalesce buffer), so clone until the state is reached.
     const expectCloneEventually = async (
-      pat: string | null,
+      pat: string,
       expected: 'has the file' | 'lacks the file',
     ): Promise<void> => {
       await expect
@@ -350,7 +324,6 @@ describe('GROWI Vault — clone E2E contract', () => {
       pageWith({ grant: PageGrant.GRANT_PUBLIC, grantedUsers: [] }),
     );
 
-    await expectCloneEventually(null, 'has the file');
     await expectCloneEventually(VAULT_E2E_CONFIG.admin.pat, 'has the file');
 
     await handlePageUpdate(pageWith(onlyMeGrantState), {
@@ -359,7 +332,6 @@ describe('GROWI Vault — clone E2E contract', () => {
       previousGrantedUsers: [],
     });
 
-    await expectCloneEventually(null, 'lacks the file');
     await expectCloneEventually(VAULT_E2E_CONFIG.admin.pat, 'lacks the file');
     await expectCloneEventually(VAULT_E2E_CONFIG.member.pat, 'has the file');
   });

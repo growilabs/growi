@@ -105,30 +105,6 @@ describe('VaultNamespaceMapper.computeAccessibleNamespaces', () => {
     vi.mocked(eugr.findAllUserGroupIdsRelatedToUser).mockResolvedValue([]);
   });
 
-  describe('anonymous user (userId === null)', () => {
-    it('returns only ["public"]', async () => {
-      const namespaces = await mapper.computeAccessibleNamespaces(null);
-      expect(namespaces).toEqual(['public']);
-    });
-
-    it('does not call group relation models for anonymous users', async () => {
-      await mapper.computeAccessibleNamespaces(null);
-
-      const ugr = await getUserGroupRelation();
-      const eugr = await getExternalUserGroupRelation();
-      expect(ugr.findAllUserGroupIdsRelatedToUser).not.toHaveBeenCalled();
-      expect(eugr.findAllUserGroupIdsRelatedToUser).not.toHaveBeenCalled();
-    });
-
-    it('accepts a scopes argument without changing the result (req 2.5 MVP)', async () => {
-      // MVP: scopes are accepted but do not restrict anonymous access further
-      const namespaces = await mapper.computeAccessibleNamespaces(null, [
-        'read:features:page',
-      ]);
-      expect(namespaces).toEqual(['public']);
-    });
-  });
-
   describe('authenticated user with no group memberships', () => {
     it('returns public, restricted-link, and user-only-me namespace', async () => {
       const userId = 'user-abc-123';
