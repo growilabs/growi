@@ -108,6 +108,8 @@ export interface AttachmentSearchConfig {
   readonly maxFileSizeBytes: number;
   readonly isAttachmentFullTextSearchEnabled: boolean;
   readonly requiresReindex: boolean;
+  /** True when the config keys are pinned by environment variables. */
+  readonly useOnlyEnvVars: boolean;
 }
 
 export interface AttachmentSearchConfigUpdate {

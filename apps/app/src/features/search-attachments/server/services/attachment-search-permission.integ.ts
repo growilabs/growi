@@ -556,11 +556,11 @@ describe.skipIf(esUri == null)(
           const viewer = await viewerOf(name);
           const expected = await pagesWithSnippet(name, query);
 
-          const onlyAttachments = await searchService.searchByFacet(
-            query,
-            viewer,
-            { from: 0, size: 20 },
-          );
+          const { primary: onlyAttachments } =
+            await searchService.searchByFacet(query, viewer, {
+              from: 0,
+              size: 20,
+            });
           const secondary = await searchService.resolveAttachmentSecondary(
             query,
             viewer,
@@ -647,7 +647,9 @@ describe.skipIf(esUri == null)(
         size: number,
       ) => {
         const viewer = await viewerOf(name);
-        return searchService.searchByFacet(query, viewer, { from, size });
+        return (
+          await searchService.searchByFacet(query, viewer, { from, size })
+        ).primary;
       };
 
       describe.each([
@@ -766,11 +768,11 @@ describe.skipIf(esUri == null)(
           for (const query of queries()) {
             // biome-ignore lint/performance/noAwaitInLoops: one query at a time keeps failures readable
             const expected = await pagesWithSnippet(name, query);
-            const onlyAttachments = await searchService.searchByFacet(
-              query,
-              viewer,
-              { from: 0, size: 20 },
-            );
+            const { primary: onlyAttachments } =
+              await searchService.searchByFacet(query, viewer, {
+                from: 0,
+                size: 20,
+              });
             const secondary = await searchService.resolveAttachmentSecondary(
               query,
               viewer,
@@ -834,7 +836,7 @@ describe.skipIf(esUri == null)(
       }) => {
         const viewer = await viewerOf(name);
 
-        const onlyAttachments = await searchService.searchByFacet(
+        const { primary: onlyAttachments } = await searchService.searchByFacet(
           DRIFT_TOKEN,
           viewer,
           { from: 0, size: 20 },

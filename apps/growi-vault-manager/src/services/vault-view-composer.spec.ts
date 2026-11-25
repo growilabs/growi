@@ -33,6 +33,7 @@ vi.mock('./vault-repo-storage.js', async (importOriginal) => {
     await importOriginal<typeof import('./vault-repo-storage.js')>();
   return {
     ...actual,
+    assertRefsReadable: vi.fn(),
     readRef: vi.fn(),
     readTree: vi.fn(),
     writeTree: vi.fn(),
@@ -206,6 +207,18 @@ describe('compose — cache hit', () => {
     // Should be a cache hit — sourceVersions match
     expect(result.commitOid).toBe(COMMIT_OID_VIEW);
     expect(mockWriteCommit).not.toHaveBeenCalled();
+  });
+});
+
+describe('compose — refs that cannot be read', () => {
+  it('rejects instead of returning the cached view', async () => {
+    const unreadable = new Error('packed-refs found');
+    vi.mocked(VaultRepoStorage.assertRefsReadable).mockRejectedValueOnce(
+      unreadable,
+    );
+    mockFindByUserId.mockResolvedValue(makeUserView());
+
+    await expect(compose(USER_ID, NAMESPACES)).rejects.toThrow(unreadable);
   });
 });
 

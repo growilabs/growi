@@ -85,12 +85,12 @@ export const setup = (crowi: Crowi, app) => {
     let result: IFacetedSearchResult;
     try {
       const viewer = await resolveAttachmentSearchViewer(req.user);
-      const primary = await crowi.searchService.searchByFacet(
+      const { primary, items } = await crowi.searchService.searchByFacet(
         decodeURIComponent(q),
         viewer,
         { from: pagination.from, size: pagination.size },
       );
-      result = toFacetedSearchResult(primary);
+      result = toFacetedSearchResult(primary, items);
     } catch (err) {
       logger.error('Failed to search attachments', err);
 
@@ -141,8 +141,16 @@ export const setup = (crowi: Crowi, app) => {
    *           description: |
    *             Optional. `attachments` searches attachment content only while
    *             attachment full-text search is enabled; the data then lists
-   *             the parent pages of the hits in relevance order and the meta
-   *             carries `facet`, `total` (always null), `hitsCount` and
+   *             the parent pages of the hits in relevance order. Each item's
+   *             `data` is the same page document the page search returns,
+   *             and its `meta` carries `attachmentHits` and, only when the
+   *             page itself (path, body or comments) also matches the query,
+   *             the page search's `elasticSearchResult` (left out when that
+   *             snippet search fails or times out). Items whose page no
+   *             longer exists are left out. The response meta carries
+   *             `facet`, `total` (always null), `hitsCount` (the number of
+   *             items before pages that no longer exist were left out; fewer
+   *             than `limit` means no more items) and
    *             `primaryResultIncomplete`; `limit` must then be an integer
    *             from 1 to 200 and `offset` a non-negative integer. While the
    *             feature is enabled, any other value than `pages` /

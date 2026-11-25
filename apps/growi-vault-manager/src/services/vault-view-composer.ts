@@ -436,11 +436,16 @@ function sourceVersionsEqual(
  * @param userId     - GROWI user ObjectId string.
  * @param namespaces - Ordered list of namespaces the user has access to.
  * @returns viewRef and the commitOid at its tip.
+ * @throws while packed-refs exists.
  */
 export async function compose(
   userId: string,
   namespaces: ReadonlyArray<Namespace>,
 ): Promise<ComposeViewResponse> {
+  // A cache hit reads no ref, so it would otherwise keep serving a view
+  // composed from refs that can no longer be trusted.
+  await VaultRepoStorage.assertRefsReadable();
+
   // Step 1: Determine viewRef name.
   const viewRef = `user-${userId}-view`;
 
