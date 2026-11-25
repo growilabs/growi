@@ -307,7 +307,8 @@ export const createPageLinkBackfillJobModel = (
     /**
      * The admin's Resume of a `stopped` or `failed` run: request it again, keeping its scope,
      * cutoff, total, marker and counts, so the next claim continues where it stopped. A failed
-     * run gets its retries again; one with a retry due is retried now instead of at `retryAt`.
+     * run gets its retries again, and its old error is cleared; one with a retry due is retried
+     * now instead of at `retryAt`.
      *
      * @returns whether the job was `stopped` or `failed` and is now requested
      */
@@ -320,6 +321,7 @@ export const createPageLinkBackfillJobModel = (
             status: 'requested',
             stopRequested: false,
             ...noFailureFields,
+            lastError: null,
           },
           $currentDate: { requestedAt: true },
         },
