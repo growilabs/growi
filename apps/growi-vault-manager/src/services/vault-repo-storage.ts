@@ -17,8 +17,11 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { loggerFactory } from '@growi/logger';
 import type { TreeEntry as GitTreeEntry } from 'isomorphic-git';
 import git from 'isomorphic-git';
+
+const logger = loggerFactory('growi:vault-manager:vault-repo-storage');
 
 // ---------------------------------------------------------------------------
 // Type re-exports (kept local to avoid coupling to isomorphic-git's types)
@@ -185,13 +188,20 @@ async function unpackRefs(repoPath: string): Promise<void> {
       return { oid, ref };
     });
 
-  await Promise.all(
-    packed.map(async ({ oid, ref }) => {
-      if ((await readRef(ref)) == null) {
-        await updateRef(ref, oid);
-      }
-    }),
-  );
+  for (const { oid, ref } of packed) {
+    // biome-ignore lint/performance/noAwaitInLoops: one-off startup pass; sequential keeps open files bounded
+    const loose = await readLooseRef(ref);
+    if (loose == null) {
+      await updateRef(ref, oid);
+    } else if (loose !== oid) {
+      // The packed value is the only remaining pointer to that commit once
+      // packed-refs is removed; log it so it stays recoverable until gc.
+      logger.warn(
+        { ref, packedOid: oid, looseOid: loose },
+        'packed ref differs from its loose ref; keeping the loose one',
+      );
+    }
+  }
 
   await fs.promises.unlink(packedRefsPath);
 }
@@ -335,8 +345,28 @@ export async function updateRef(
  *
  * @param refPath - Ref path relative to the git directory.
  * @returns 40-character OID, or null if the ref does not exist.
+ * @throws when the ref has no loose file and packed-refs exists.
  */
 export async function readRef(refPath: string): Promise<string | null> {
+  const oid = await readLooseRef(refPath);
+  if (oid == null && (await packedRefsExists())) {
+    // The ref may be packed; reporting it as missing would make the caller
+    // rebuild the namespace from nothing. init() unpacks it on restart.
+    throw new Error(
+      `Cannot read ${refPath}: packed-refs exists; restart vault-manager to unpack refs`,
+    );
+  }
+  return oid;
+}
+
+function packedRefsExists(): Promise<boolean> {
+  return fs.promises
+    .access(path.join(getRepoPath(), 'packed-refs'))
+    .then(() => true)
+    .catch(() => false);
+}
+
+async function readLooseRef(refPath: string): Promise<string | null> {
   const target = refFilePath(refPath);
   try {
     const content = await fs.promises.readFile(target, 'utf8');

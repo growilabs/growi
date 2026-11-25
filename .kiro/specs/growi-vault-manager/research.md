@@ -53,7 +53,7 @@
 | view ref を 5,000 本にしたときの検査 1 回 | 1 ms（変化なし） |
 | 同条件の `upload-pack --advertise-refs`（既存経路） | 1 ms（変化なし） |
 
-**規模が増えても悪化しない理由**: `merge-base` が読むのは commit だけで、tree も blob も開かない。したがってページ数は無関係。commit chain の長さは squash で有界（既定 1 時間 or 1000 commit、要件 6）。ビューの数（＝利用者数）は ref 名の解決だけに関わり、`packed-refs` の二分探索なので 5,000 本でも変わらない。長期運用で伸びるのは object の総数だが、commit の解決は pack index の探索 1 回で済む（loose object 蓄積による劣化は既存の gc が受け持つ）。
+**規模が増えても悪化しない理由**: `merge-base` が読むのは commit だけで、tree も blob も開かない。したがってページ数は無関係。commit chain の長さは squash で有界（既定 1 時間 or 1000 commit、要件 6）。ビューの数（＝利用者数）は ref 名の解決だけに関わり、解決は loose ref のファイルを 1 つ読むだけなので 5,000 本でも変わらない（ref は常に loose で保つ。design.md の VaultMaintenanceScheduler を参照）。長期運用で伸びるのは object の総数だが、commit の解決は pack index の探索 1 回で済む（loose object 蓄積による劣化は既存の gc が受け持つ）。
 
 **未計測**: 同時 clone が多数走るときのスループット、GB 規模の object store（計測に用いた pack は 1.85 MiB）。前者は追加コストが POST 1 回あたり直列 1 プロセス（約 2 ms）で、同経路の `upload-pack` 本体（clone 1 回あたり数百 ms）より小さいという推論にとどまる。
 

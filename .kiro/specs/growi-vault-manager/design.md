@@ -613,7 +613,7 @@ interface MaintenanceStatus {
 | **Squash** | commit 数 > N（デフォルト 1000）**または** 経過時間 > T（デフォルト 1h）。5 分間隔チェック | 現 tree OID を取得 → `parents: []` の新 commit → `updateRef` → `vault_namespace_state.version++` |
 | **GC** | 24h ごと **または** loose object 数 > L（デフォルト 50,000） | `git -c gc.packRefs=false gc --prune=2.weeks.ago` を spawn |
 
-**ref は常に loose ファイルで保つ**: `VaultRepoStorage` の `readRef` / `updateRef` / `deleteRef` は ref ファイルを直接読み書きし、`packed-refs` を見ない。gc が ref を `packed-refs` にまとめると namespace の HEAD が「無い」と読まれ、次の instruction がその 1 ページだけの root commit で namespace を置き換えてしまう。そのため gc は `gc.packRefs=false` で実行し、過去の gc でまとめられた ref は起動時の `init()` で loose ファイルに戻す
+**ref は常に loose ファイルで保つ**: `VaultRepoStorage` の `readRef` / `updateRef` / `deleteRef` は ref ファイルを直接読み書きし、`packed-refs` を見ない。gc が ref を `packed-refs` にまとめると namespace の HEAD が「無い」と読まれ、次の instruction がその 1 ページだけの root commit で namespace を置き換えてしまう。そのため gc は `gc.packRefs=false` で実行し、過去の gc でまとめられた ref は起動時の `init()` で loose ファイルに戻す（loose と値が食い違う ref は warn ログに残す）。運用中に手作業の gc などで `packed-refs` ができた場合、`readRef` は ref を「無い」と返さずに例外を投げる。その instruction は失敗として記録され、再起動後に再試行される
 
 **env var override**: `VAULT_SQUASH_COMMIT_THRESHOLD` / `VAULT_SQUASH_AGE_HOURS` / `VAULT_GC_INTERVAL_HOURS` / `VAULT_GC_LOOSE_OBJECT_THRESHOLD`
 

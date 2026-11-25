@@ -666,5 +666,68 @@ async function triggerGcAndWait(): Promise<{
 
       expect(await listNamespaceFiles(ns)).toHaveLength(4);
     });
+
+    it('refuses a write to a namespace whose ref got packed while running, instead of replacing its pages', {
+      timeout: 120_000,
+    }, async () => {
+      const ns = 'integ-refuse-packed-ref-ns';
+      await upsertNewPages(ns, 3);
+      await execFileAsync('git', [
+        '-C',
+        requireRepoPath(),
+        'pack-refs',
+        '--all',
+        '--prune',
+      ]);
+
+      if (mongoose == null) {
+        throw new Error('Mongoose not connected');
+      }
+      const db = mongoose.connection.db;
+      if (db == null) {
+        throw new Error('Mongoose connection db is null');
+      }
+      const { ObjectId } = mongoose.mongo;
+      const pageId = new ObjectId();
+      const revisionId = new ObjectId();
+
+      let lastError: unknown = null;
+      try {
+        await db
+          .collection('revisions')
+          .insertOne({ _id: revisionId, body: '# refused', pageId });
+        const { insertedId } = await db
+          .collection('vault_instructions')
+          .insertOne({
+            op: 'upsert',
+            payload: {
+              namespace: ns,
+              pageId: pageId.toHexString(),
+              pagePath: `/${ns}/refused`,
+              revisionId: revisionId.toHexString(),
+            },
+            issuedAt: new Date(),
+            processedAt: null,
+            attempts: 0,
+            lastError: null,
+          });
+
+        const deadline = Date.now() + 15_000;
+        while (lastError == null && Date.now() < deadline) {
+          // biome-ignore lint/performance/noAwaitInLoops: polling loop — must check state sequentially with delay between attempts
+          const doc = await db
+            .collection('vault_instructions')
+            .findOne({ _id: insertedId });
+          lastError = doc?.lastError ?? null;
+          await new Promise((resolve) => setTimeout(resolve, 200));
+        }
+      } finally {
+        // Restore loose refs for the namespaces later tests write to.
+        await VaultRepoStorage.init();
+      }
+
+      expect(lastError).toMatch(/packed-refs/);
+      expect(await listNamespaceFiles(ns)).toHaveLength(3);
+    });
   },
 );
