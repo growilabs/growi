@@ -211,6 +211,7 @@ umbrella 全体の調査（claude.ai の挙動、MCP の仕様、先行事例）
 #### 推奨する方針
 
 - **置き場所は `features/mastra`（2026-11-25、ユーザー確認済み）**。MCP サーバーは Mastra を使う前提なので、ルート、認証の差し込み口、`MCPServer` の組み立て、管理 API、管理画面を `features/mastra` の下に置く。新しい feature は作らない。
+- **管理画面は、既存の「AI 連携」の管理ページ（`pages/admin/ai.page.tsx`、`features/mastra/client/admin/`）に MCP の節を足す（2026-11-25、ユーザー確認済み）**。新しい管理ページとナビゲーションの項目は作らない。MCP の節は、GROWI AI の有効・無効や LLM の設定の状態にかかわらず操作できるようにする（要件 1.8・1.9）。既存の AI 設定の画面が、未設定のときに他の項目を隠す・無効にする作りになっていないかを、設計で確かめる。
 - **ツールの構成は Option C のまま**。既存の 2 ツールから処理の中身を関数として取り出し、MCP 用のツール定義を `features/mastra` の中に、エージェント用の定義とは別に置く。閲覧権限の判定を 1 か所に保ったまま、MCP 向けの定義を分けられる。Option A の欠点（`mapAuthInfoToUser` の副作用、定義の混在）は、これで避けられる。
 - **URL は `/_api/v3/mcp` のまま**。`features/mastra` のルーター（`/_api/v3/mastra`）は、全体に `aiReadyGuard` をかけている（`features/mastra/server/routes/index.ts`）。その下に置くと要件 1.8（AI の設定に左右されない）に反するので、MCP のルートは別にマウントする。`features/mastra` の中のコードを別の URL にマウントする前例は、`routes/admin-ai-settings` にある。
 - 認証は、`/_api/v3/mcp` をセッションの対象から外したうえで（3.8）、「Bearer が無ければ 401」の判定と `accessTokenParser` を、差し込み口の暫定の中身にする（3.1 の (a)）。

@@ -99,6 +99,7 @@ brief の未決の論点と、起草中に出てきた論点について、次�
 6. If GROWI のサイト URL が設定されていないとき, the 管理画面 shall MCP エンドポイントの URL の代わりに、サイト URL の設定が必要であることを表示する。
 7. If 管理者でない利用者が MCP 連携の設定を読もうとした、または変えようとしたとき, the GROWI shall その操作を拒否する。
 8. The GROWI shall GROWI AI が無効、または LLM が未設定の状態でも、MCP 連携の有効化を受け付ける。
+9. While GROWI AI が無効、または LLM が未設定のあいだ, the 管理画面 shall MCP 連携の設定を、操作できる状態で表示する。
 
 ### Requirement 2: アクセストークンによる認証（暫定）
 
