@@ -45,6 +45,7 @@ describe('PUT /page/subscribe', () => {
   let owner: HydratedDocument<IUserHasId>;
   let publicPage: HydratedDocument<PageDocument>;
   let ownerOnlyPage: HydratedDocument<PageDocument>;
+  let emptyPage: HydratedDocument<PageDocument>;
 
   const subscriptionStatusOf = async (
     pageId: Types.ObjectId,
@@ -86,6 +87,12 @@ describe('PUT /page/subscribe', () => {
       lastUpdateUser: owner._id,
     });
 
+    emptyPage = await Page.create({
+      path: `${PREFIX}/empty`,
+      grant: PageGrant.GRANT_PUBLIC,
+      isEmpty: true,
+    });
+
     const responseHelpers: { response: Record<string, unknown> } = {
       response: {},
     };
@@ -118,14 +125,19 @@ describe('PUT /page/subscribe', () => {
     });
   });
 
-  it('subscribes to a page the requester can view', async () => {
+  it.each([
+    ['a page the requester can view', () => publicPage._id],
+    ['an empty page the requester can view', () => emptyPage._id],
+  ])('subscribes to %s', async (_label, getPageId) => {
+    const pageId = getPageId();
+
     const response = await request(app).put('/subscribe').send({
-      pageId: publicPage._id.toString(),
+      pageId: pageId.toString(),
       status: SubscriptionStatusType.SUBSCRIBE,
     });
 
     expect(response.status).toBe(200);
-    expect(await subscriptionStatusOf(publicPage._id)).toBe(
+    expect(await subscriptionStatusOf(pageId)).toBe(
       SubscriptionStatusType.SUBSCRIBE,
     );
   });
