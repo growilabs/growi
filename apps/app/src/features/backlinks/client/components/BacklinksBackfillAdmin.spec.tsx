@@ -245,7 +245,7 @@ describe('BacklinksBackfillAdmin', () => {
       expect(button(STOP)).not.toBeInTheDocument();
     });
 
-    it('partial coverage: names the boundary and about how many older pages are not included, and keeps Start', async () => {
+    it('partial coverage: names the boundary and about how many of all pages are not included, and keeps Start', async () => {
       mocks.apiv3Get.mockResolvedValue(
         respondWith(
           stateOf({
@@ -253,6 +253,7 @@ describe('BacklinksBackfillAdmin', () => {
             coverage: 'partial',
             coveredSince: COVERED_SINCE,
             notIncludedCount: 321,
+            totalPageCount: 1234,
           }),
         ),
       );
@@ -265,6 +266,7 @@ describe('BacklinksBackfillAdmin', () => {
         within(status).getAllByRole('definition');
       expect(coveredSince).toHaveTextContent('2026-03-01');
       expect(notIncluded).toHaveTextContent('"pages":321');
+      expect(notIncluded).toHaveTextContent('"total":1234');
       expect(button(START)).toBeEnabled();
       expect(screen.getByLabelText(`${K}.scope_all`)).toBeInTheDocument();
     });
