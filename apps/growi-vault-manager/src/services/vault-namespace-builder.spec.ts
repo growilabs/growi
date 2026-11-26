@@ -8,7 +8,7 @@
  */
 
 import type { VaultInstructionDoc } from '@growi/core/dist/interfaces/vault';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ---------------------------------------------------------------------------
 // Mocks — must be declared before importing the module under test
@@ -21,7 +21,8 @@ vi.mock('./vault-repo-storage.js', async (importOriginal) => {
     ...actual,
     readRef: vi.fn(),
     updateRef: vi.fn(),
-    deleteRef: vi.fn(),
+    deleteAllNamespaceRefs: vi.fn(),
+    dropPackedNamespaceRefs: vi.fn(),
     readTree: vi.fn(),
     writeTree: vi.fn(),
     writeBlob: vi.fn(),
@@ -54,6 +55,12 @@ vi.mock('../models/vault-namespace-state.js', () => ({
   },
 }));
 
+vi.mock('../models/vault-instruction.js', () => ({
+  VaultInstructionModel: {
+    supersedeUnprocessedBefore: vi.fn(),
+  },
+}));
+
 vi.mock('../models/vault-user-view.js', () => ({
   VaultUserViewModel: {
     deleteAll: vi.fn(),
@@ -78,10 +85,12 @@ vi.mock('@growi/logger', () => ({
 // ---------------------------------------------------------------------------
 
 import { RevisionModel } from '../models/revision.js';
+import { VaultInstructionModel } from '../models/vault-instruction.js';
 import { VaultNamespaceStateModel } from '../models/vault-namespace-state.js';
 import { VaultUserViewModel } from '../models/vault-user-view.js';
 import * as VaultBlobHasher from './vault-blob-hasher.js';
 import { applyInstruction } from './vault-namespace-builder.js';
+import { withNamespaceLock } from './vault-namespace-lock.js';
 import * as VaultPathMapper from './vault-path-mapper.js';
 import * as VaultRepoStorage from './vault-repo-storage.js';
 
@@ -132,9 +141,14 @@ beforeEach(() => {
   asMock(VaultRepoStorage.writeCommit).mockResolvedValue('commit-oid');
   // Default: readTree returns empty entries.
   asMock(VaultRepoStorage.readTree).mockResolvedValue([]);
-  // Default: updateRef and deleteRef succeed silently.
+  // Default: updateRef succeeds silently.
   asMock(VaultRepoStorage.updateRef).mockResolvedValue(undefined);
-  asMock(VaultRepoStorage.deleteRef).mockResolvedValue(undefined);
+  // Default: the wipe succeeds.
+  asMock(VaultRepoStorage.deleteAllNamespaceRefs).mockResolvedValue(undefined);
+  asMock(VaultRepoStorage.dropPackedNamespaceRefs).mockResolvedValue(undefined);
+  asMock(VaultInstructionModel.supersedeUnprocessedBefore).mockResolvedValue(
+    undefined,
+  );
 
   // Default: hashBlob returns a deterministic OID.
   asMock(VaultBlobHasher.hashBlob).mockResolvedValue('blob-sha1-oid');
@@ -638,17 +652,16 @@ describe('op: reset-all', () => {
 
     await applyInstruction(instruction);
 
-    // deleteRef must be called for every namespace.
-    expect(VaultRepoStorage.deleteRef).toHaveBeenCalledWith(
-      'refs/namespaces/public/refs/heads/main',
-    );
-    expect(VaultRepoStorage.deleteRef).toHaveBeenCalledWith(
-      'refs/namespaces/group-g1/refs/heads/main',
-    );
-    expect(VaultRepoStorage.deleteRef).toHaveBeenCalledWith(
-      'refs/namespaces/user-u1-only-me/refs/heads/main',
-    );
-    expect(VaultRepoStorage.deleteRef).toHaveBeenCalledTimes(3);
+    // Every namespace ref on disk goes, not only those the state knows.
+    expect(VaultRepoStorage.deleteAllNamespaceRefs).toHaveBeenCalled();
+
+    // Packed namespace refs go with the wipe as well.
+    expect(VaultRepoStorage.dropPackedNamespaceRefs).toHaveBeenCalled();
+
+    // Instructions still pending from before the wipe are superseded by it.
+    expect(
+      VaultInstructionModel.supersedeUnprocessedBefore,
+    ).toHaveBeenCalledWith(instruction.issuedAt);
 
     // State collections must be cleared.
     expect(VaultNamespaceStateModel.deleteAll).toHaveBeenCalled();
@@ -673,9 +686,44 @@ describe('op: reset-all', () => {
 
     await applyInstruction(instruction);
 
-    expect(VaultRepoStorage.deleteRef).not.toHaveBeenCalled();
+    expect(VaultRepoStorage.deleteAllNamespaceRefs).toHaveBeenCalled();
     expect(VaultNamespaceStateModel.deleteAll).toHaveBeenCalled();
     expect(VaultUserViewModel.deleteAll).toHaveBeenCalled();
+  });
+
+  describe('when a step of the wipe fails', () => {
+    const failure = new Error('wipe step failed');
+
+    beforeEach(() => {
+      asMock(VaultNamespaceStateModel.find).mockReturnValue({
+        lean: () => Promise.resolve([{ namespace: 'public' }]),
+      });
+      asMock(VaultNamespaceStateModel.deleteAll).mockResolvedValue(undefined);
+    });
+
+    it.each([
+      [
+        'deleting the namespace refs',
+        () => asMock(VaultRepoStorage.deleteAllNamespaceRefs),
+      ],
+      [
+        'clearing the namespace state',
+        () => asMock(VaultNamespaceStateModel.deleteAll),
+      ],
+      ['clearing the views', () => asMock(VaultUserViewModel.deleteAll)],
+      [
+        'superseding the pending instructions',
+        () => asMock(VaultInstructionModel.supersedeUnprocessedBefore),
+      ],
+    ])('leaves packed-refs in place when %s fails', async (_step, failingStep) => {
+      failingStep().mockRejectedValue(failure);
+
+      await expect(
+        applyInstruction(makeInstruction({ op: 'reset-all', payload: {} })),
+      ).rejects.toThrow(failure);
+
+      expect(VaultRepoStorage.dropPackedNamespaceRefs).not.toHaveBeenCalled();
+    });
   });
 });
 
@@ -783,5 +831,152 @@ describe('isExcludedFromVault filtering', () => {
     expect(VaultRepoStorage.writeCommit).not.toHaveBeenCalled();
     expect(VaultRepoStorage.updateRef).not.toHaveBeenCalled();
     expect(VaultNamespaceStateModel.upsertNamespace).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Per-namespace lock shared with the squash
+// ---------------------------------------------------------------------------
+
+describe('namespace lock', () => {
+  // The lock is module-wide state; a holder left open by a failed assertion
+  // would stall every later test on the same namespace.
+  const openHolders: Array<() => void> = [];
+
+  afterEach(() => {
+    for (const release of openHolders.splice(0)) {
+      release();
+    }
+  });
+
+  /** Holds the lock on the given namespaces until the returned release runs. */
+  function holdNamespaces(namespaces: string[]): {
+    release: () => void;
+    held: Promise<void>;
+  } {
+    let release: () => void = () => {};
+    const held = withNamespaceLock(
+      namespaces,
+      () =>
+        new Promise<void>((r) => {
+          release = r;
+        }),
+    );
+    openHolders.push(() => release());
+    return { release: () => release(), held };
+  }
+
+  /** Lets every already-settled promise continuation run. */
+  async function flush(): Promise<void> {
+    await new Promise((r) => setImmediate(r));
+  }
+
+  beforeEach(() => {
+    asMock(RevisionModel.findBodyById).mockResolvedValue({
+      _id: 'rev-001',
+      body: '# Page body',
+    });
+  });
+
+  const upsertOn = (namespace: string): VaultInstructionDoc =>
+    makeInstruction({
+      op: 'upsert',
+      payload: {
+        namespace,
+        pageId: 'page-001',
+        pagePath: '/docs/page',
+        revisionId: 'rev-001',
+      },
+    });
+
+  it('does not write the namespace ref while another writer holds that namespace', async () => {
+    const holder = holdNamespaces(['public']);
+
+    const applying = applyInstruction(upsertOn('public'));
+    await flush();
+    expect(VaultRepoStorage.updateRef).not.toHaveBeenCalled();
+
+    holder.release();
+    await Promise.all([holder.held, applying]);
+    expect(VaultRepoStorage.updateRef).toHaveBeenCalledWith(
+      'refs/namespaces/public/refs/heads/main',
+      'commit-oid',
+    );
+  });
+
+  it('builds on the HEAD left by the writer that held the namespace before it', async () => {
+    const heads = new Map([['refs/namespaces/public/refs/heads/main', 'c1']]);
+    asMock(VaultRepoStorage.readRef).mockImplementation((ref: string) =>
+      Promise.resolve(heads.get(ref) ?? null),
+    );
+    let releaseHolder: () => void = () => {};
+    const holder = withNamespaceLock(['public'], async () => {
+      await new Promise<void>((r) => {
+        releaseHolder = r;
+      });
+      heads.set('refs/namespaces/public/refs/heads/main', 'c2');
+    });
+
+    const applying = applyInstruction(upsertOn('public'));
+    await flush();
+    releaseHolder();
+    await Promise.all([holder, applying]);
+
+    expect(VaultRepoStorage.writeCommit).toHaveBeenCalledWith(
+      expect.objectContaining({ parents: ['c2'] }),
+    );
+  });
+
+  it('does not wait for a writer that holds a different namespace', async () => {
+    const holder = holdNamespaces(['group-g1']);
+
+    await applyInstruction(upsertOn('public'));
+
+    expect(VaultRepoStorage.updateRef).toHaveBeenCalledWith(
+      'refs/namespaces/public/refs/heads/main',
+      'commit-oid',
+    );
+    holder.release();
+    await holder.held;
+  });
+
+  it('grant-change-prefix waits while its source namespace is held', async () => {
+    const holder = holdNamespaces(['group-g1']);
+
+    const applying = applyInstruction(
+      makeInstruction({
+        op: 'grant-change-prefix',
+        payload: {
+          namespace: 'public',
+          fromNamespace: 'group-g1',
+          oldPrefix: '/docs',
+        },
+      }),
+    );
+    await flush();
+    expect(VaultRepoStorage.updateRef).not.toHaveBeenCalled();
+
+    holder.release();
+    await Promise.all([holder.held, applying]);
+    expect(VaultRepoStorage.updateRef).toHaveBeenCalledTimes(2);
+  });
+
+  it('reset-all waits while any known namespace is held', async () => {
+    asMock(VaultNamespaceStateModel.find).mockReturnValue({
+      lean: () =>
+        Promise.resolve([{ namespace: 'public' }, { namespace: 'group-g1' }]),
+    });
+    asMock(VaultNamespaceStateModel.deleteAll).mockResolvedValue(undefined);
+    const holder = holdNamespaces(['group-g1']);
+
+    const applying = applyInstruction(
+      makeInstruction({ op: 'reset-all', payload: {} }),
+    );
+    await flush();
+    expect(VaultRepoStorage.deleteAllNamespaceRefs).not.toHaveBeenCalled();
+
+    holder.release();
+    await Promise.all([holder.held, applying]);
+    expect(VaultRepoStorage.deleteAllNamespaceRefs).toHaveBeenCalledTimes(1);
   });
 });

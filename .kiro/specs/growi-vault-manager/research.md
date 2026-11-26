@@ -53,7 +53,7 @@
 | view ref を 5,000 本にしたときの検査 1 回 | 1 ms（変化なし） |
 | 同条件の `upload-pack --advertise-refs`（既存経路） | 1 ms（変化なし） |
 
-**規模が増えても悪化しない理由**: `merge-base` が読むのは commit だけで、tree も blob も開かない。したがってページ数は無関係。commit chain の長さは squash で有界（既定 1 時間 or 1000 commit、要件 6）。ビューの数（＝利用者数）は ref 名の解決だけに関わり、`packed-refs` の二分探索なので 5,000 本でも変わらない。長期運用で伸びるのは object の総数だが、commit の解決は pack index の探索 1 回で済む（loose object 蓄積による劣化は既存の gc が受け持つ）。
+**規模が増えても悪化しない理由**: `merge-base` が読むのは commit だけで、tree も blob も開かない。したがってページ数は無関係。commit chain の長さは squash で有界（既定 1 時間 or 1000 commit、要件 6）。ビューの数（＝利用者数）は ref 名の解決だけに関わり、解決は loose ref のファイルを 1 つ読むだけなので 5,000 本でも変わらない（ref は常に loose で保つ。design.md の VaultMaintenanceScheduler を参照）。長期運用で伸びるのは object の総数だが、commit の解決は pack index の探索 1 回で済む（loose object 蓄積による劣化は既存の gc が受け持つ）。
 
 **未計測**: 同時 clone が多数走るときのスループット、GB 規模の object store（計測に用いた pack は 1.85 MiB）。前者は追加コストが POST 1 回あたり直列 1 プロセス（約 2 ms）で、同経路の `upload-pack` 本体（clone 1 回あたり数百 ms）より小さいという推論にとどまる。
 
@@ -92,6 +92,25 @@
 
 - `--filter=sparse:oid` に他人のページの blob を指定すると応答サイズが変わる（正規のパターン 4,815,099 B / 他人のページを指定 488,217 B / 何にも一致しないパターン 488,167 B）。object の ID を知っている相手に、その内容についてのわずかな手がかりを与える。
 - `sparse:path`（サーバ上のパスをクライアントが指定する形式）は git 側で削除済み（`fatal: sparse:path filters support has been dropped`）。同じ理由（クライアントがサーバ上の任意のファイルを名指しできる）による。
+
+---
+
+### gc と object の再利用（2026-11-25 実測 / git 2.55.0 / isomorphic-git 1.38.6）
+
+**調べたこと**: 書き込みが既存の object を再利用した後、ref がそれを指す前に `git gc --prune=2.weeks.ago` が走ると、その object が消されるか。
+
+**方法**: bare repo に blob を書き、loose ファイルの更新時刻を 3 週間前にしてから、同じ内容をもう一度 `writeBlob` し、どの ref からも参照しないまま gc を実行した。
+
+| 場合 | gc の後 |
+|---|---|
+| loose ファイルがあり、書き込みが再利用した（修正前） | **消えた** |
+| pack の中にだけあり（`gc --prune=never` で cruft pack に入れた）、書き込みが再利用した | 残った |
+| loose ファイルがあり、どの書き込みも再利用しなかった（対照） | 消えた |
+
+**分かったこと**:
+- isomorphic-git の `writeObjectLoose` は、loose ファイルがあれば書き込みを省き、更新時刻も変えない。gc は更新時刻だけで古さを判定するので、再利用された object を「2 週間使われていない」と扱う
+- pack の中にしかない object は、isomorphic-git が pack を見ずに loose ファイルを新しく書く。git は loose ファイルと cruft pack の記録のうち新しい方の時刻を使うので、消されない
+- git は、新しい object からたどれる object も残す。そのため、tree と commit（毎回新しく作られる）を書いた後に gc が走る場合は、再利用した blob も残る。消えるのは、再利用の確認から commit の書き込みまでの間に gc の判定が入った場合に限られる
 
 ---
 
