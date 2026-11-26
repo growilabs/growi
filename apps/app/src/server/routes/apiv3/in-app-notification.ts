@@ -165,7 +165,7 @@ export const setup = (crowi: Crowi): Router => {
 
       const paginationResult =
         await inAppNotificationService.getLatestNotificationsByUser(
-          user._id,
+          user,
           queryOptions,
         );
 

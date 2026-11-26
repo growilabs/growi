@@ -1,8 +1,15 @@
-import type { HasObjectId, IPage, IPageHasId, IUser } from '@growi/core';
+import type {
+  HasObjectId,
+  IPage,
+  IPageHasId,
+  IUser,
+  IUserHasId,
+} from '@growi/core';
 import { SubscriptionStatusType } from '@growi/core';
 import { toLegacyAttachmentShape } from '@growi/core/dist/models/serializers';
 import { subDays } from 'date-fns/subDays';
 import type { FilterQuery, Types, UpdateQuery } from 'mongoose';
+import mongoose from 'mongoose';
 
 import type {
   auditlogbulkexportjobs,
@@ -22,6 +29,7 @@ import type { ActivityDocument } from '~/server/models/activity';
 import type { InAppNotificationDocument } from '~/server/models/in-app-notification';
 import { InAppNotification } from '~/server/models/in-app-notification';
 import InAppNotificationSettings from '~/server/models/in-app-notification-settings';
+import type { PageModel } from '~/server/models/page';
 import Subscription from '~/server/models/subscription';
 import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
@@ -151,8 +159,29 @@ export class InAppNotificationService {
     return;
   };
 
+  private findViewablePageTargetIds = async (
+    user: IUserHasId,
+    notifications: readonly InAppNotificationDocument[],
+  ): Promise<ReadonlySet<string>> => {
+    const pageIds = notifications
+      .filter((n) => n.targetModel === SupportedTargetModel.MODEL_PAGE)
+      .map((n) => n.target);
+    if (pageIds.length === 0) {
+      return new Set();
+    }
+    const Page = mongoose.model<IPage, PageModel>('Page');
+    const viewablePages = await Page.findByIdsAndViewer(
+      pageIds,
+      user,
+      null,
+      true,
+      true,
+    );
+    return new Set(viewablePages.map((page) => page._id.toString()));
+  };
+
   getLatestNotificationsByUser = async (
-    userId: Types.ObjectId,
+    user: IUserHasId,
     queryOptions: {
       offset: number;
       limit: number;
@@ -162,7 +191,7 @@ export class InAppNotificationService {
     const { limit, offset, status } = queryOptions;
 
     try {
-      const paginateOptions = { user: userId };
+      const paginateOptions = { user: user._id };
       if (status != null) {
         Object.assign(paginateOptions, { status });
       }
@@ -184,11 +213,16 @@ export class InAppNotificationService {
       // prisma row assigned to a ref path back to an ObjectId, dropping
       // `downloadPathProxied`.
       // A change proposal is never loaded: it holds every operation (paths and
-      // bodies), while a recipient may only see its own snapshot.
+      // bodies), while a recipient may only see its own snapshot. A page the
+      // user cannot view now is not loaded either: the loaded page is its
+      // current state (path, grant), not the one the notification was about.
+      const docs: InAppNotificationDocument[] = paginationResult.docs;
+      const viewablePageIds = await this.findViewablePageTargetIds(user, docs);
       await InAppNotification.populate(
-        paginationResult.docs.filter(
-          (doc) =>
-            doc.targetModel !== SupportedTargetModel.MODEL_CHANGE_PROPOSAL,
+        docs.filter((doc) =>
+          doc.targetModel === SupportedTargetModel.MODEL_PAGE
+            ? viewablePageIds.has(doc.target.toString())
+            : doc.targetModel !== SupportedTargetModel.MODEL_CHANGE_PROPOSAL,
         ),
         { path: 'target' },
       );
