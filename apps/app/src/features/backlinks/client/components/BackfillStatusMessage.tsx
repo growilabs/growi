@@ -84,12 +84,29 @@ export const BackfillStatusMessage = ({ kind, state }: Props): JSX.Element => {
       }
       case 'partial':
         return (
-          <p>
-            {t('admin:backlinks_backfill.partial', {
-              coveredSince: formatDate(state.coveredSince),
-              pages: state.notIncludedCount,
-            })}
-          </p>
+          <>
+            <p className="mb-2">{t('admin:backlinks_backfill.partial')}</p>
+            <dl className="mb-0">
+              <div className="d-flex gap-2">
+                <dt className="fw-normal">
+                  {t('admin:backlinks_backfill.covered_since')}
+                </dt>
+                <dd className="fw-bold mb-1">
+                  {formatDate(state.coveredSince)}
+                </dd>
+              </div>
+              <div className="d-flex gap-2">
+                <dt className="fw-normal">
+                  {t('admin:backlinks_backfill.not_included')}
+                </dt>
+                <dd className="fw-bold mb-1">
+                  {t('admin:backlinks_backfill.not_included_pages', {
+                    pages: state.notIncludedCount,
+                  })}
+                </dd>
+              </div>
+            </dl>
+          </>
         );
       case 'all':
         return (

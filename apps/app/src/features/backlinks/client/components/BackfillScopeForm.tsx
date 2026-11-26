@@ -89,10 +89,14 @@ export const BackfillScopeForm = ({
             min={1}
             step={1}
             id={`${id}-maxPages-value`}
+            aria-describedby={`${id}-maxPages-hint`}
             value={form.maxPages}
             disabled={form.kind !== BackfillScopeKind.MAX_PAGES}
             onChange={(e) => update({ maxPages: e.target.value })}
           />
+          <div className="form-text" id={`${id}-maxPages-hint`}>
+            {t('admin:backlinks_backfill.max_pages_hint')}
+          </div>
         </div>
         {radio(BackfillScopeKind.SINCE)}
         <div className="ms-4 mb-2">
