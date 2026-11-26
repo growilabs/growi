@@ -1,5 +1,5 @@
 import { EventEmitter } from 'node:events';
-import { GroupType, type IUserHasId, PageGrant } from '@growi/core';
+import type { IUserHasId } from '@growi/core';
 import type { HydratedDocument } from 'mongoose';
 import { Types } from 'mongoose';
 import { mock } from 'vitest-mock-extended';
@@ -33,17 +33,11 @@ describe('emitPageUpdateActivity', () => {
   const userId = new Types.ObjectId();
   const creatorId = new Types.ObjectId();
   const user = mock<IUserHasId>({ _id: userId.toString() });
-  const groupId = new Types.ObjectId();
-  // A plain stub: a vitest-mock-extended proxy adds spies to the nested ids,
-  // which breaks the deep equality on the emitted target.
-  const page = {
+  const page = mock<HydratedDocument<PageDocument>>({
     _id: pageId,
     path: '/page-notifications-integ',
     creator: creatorId,
-    grant: PageGrant.GRANT_USER_GROUP,
-    grantedUsers: [],
-    grantedGroups: [{ item: groupId, type: GroupType.userGroup }],
-  } as unknown as HydratedDocument<PageDocument>;
+  });
 
   const seedLastActivity = async (byUserId: Types.ObjectId): Promise<void> => {
     await prisma.activities.createMany({
@@ -94,15 +88,7 @@ describe('emitPageUpdateActivity', () => {
       action: SupportedAction.ACTION_PAGE_UPDATE,
       contributor: user,
     });
-    // The grant is what the notification listener uses to drop subscribers who
-    // cannot view the page.
-    expect(target).toEqual({
-      path: page.path,
-      creator: creatorId,
-      grant: PageGrant.GRANT_USER_GROUP,
-      grantedUsers: [],
-      grantedGroups: [{ item: groupId, type: GroupType.userGroup }],
-    });
+    expect(target).toEqual({ path: page.path, creator: creatorId });
     expect(generatePreNotify).toBe(preNotifyService.generatePreNotify);
   });
 

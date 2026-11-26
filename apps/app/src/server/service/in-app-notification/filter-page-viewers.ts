@@ -1,12 +1,20 @@
-import type { IGrantedGroup, IUser, PageGrant, Ref } from '@growi/core';
+import type { IGrantedGroup, IPage, IUser, PageGrant, Ref } from '@growi/core';
 import { getIdForRef, PageGrant as PageGrantValues } from '@growi/core';
+import mongoose from 'mongoose';
 
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
+import type { PageModel } from '~/server/models/page';
 import UserGroupRelation from '~/server/models/user-group-relation';
 
-export type PageGrantFields = {
-  // undefined means the caller did not pass the grant, which is not the same as
-  // a stored null (treated as public, like generateGrantCondition does).
+type PageGrantFields = {
+  // null for a page stored without a grant, which generateGrantCondition treats as public
+  readonly grant: PageGrant | null;
+  readonly grantedUsers: readonly Ref<IUser>[];
+  readonly grantedGroups: readonly IGrantedGroup[];
+};
+
+/** The grant the activity event carried; activity events are not type-checked. */
+export type LastKnownPageGrant = {
   readonly grant?: PageGrant | null;
   readonly grantedUsers?: readonly Ref<IUser>[];
   readonly grantedGroups?: readonly IGrantedGroup[];
@@ -17,6 +25,38 @@ type PageViewers =
   | { readonly scope: 'only'; readonly userIds: ReadonlySet<string> };
 
 const NOBODY: PageViewers = { scope: 'only', userIds: new Set() };
+
+const findStoredGrant = async (
+  pageId: Ref<IPage> | null | undefined,
+): Promise<PageGrantFields | null> => {
+  if (pageId == null) {
+    return null;
+  }
+  const Page = mongoose.model<IPage, PageModel>('Page');
+  const page = await Page.findById(getIdForRef(pageId), {
+    grant: 1,
+    grantedUsers: 1,
+    grantedGroups: 1,
+  }).lean();
+  if (page == null) {
+    return null;
+  }
+  return {
+    grant: page.grant ?? null,
+    grantedUsers: page.grantedUsers ?? [],
+    grantedGroups: page.grantedGroups ?? [],
+  };
+};
+
+// A copy without a grant cannot be judged, so it reaches no one.
+const grantOfLastKnown = (page: LastKnownPageGrant): PageGrantFields | null =>
+  page.grant === undefined
+    ? null
+    : {
+        grant: page.grant,
+        grantedUsers: page.grantedUsers ?? [],
+        grantedGroups: page.grantedGroups ?? [],
+      };
 
 const findGroupMemberIds = async (
   grantedGroups: readonly IGrantedGroup[],
@@ -43,13 +83,13 @@ const findPageViewers = async (page: PageGrantFields): Promise<PageViewers> => {
       return {
         scope: 'only',
         userIds: new Set(
-          (page.grantedUsers ?? []).map((u) => getIdForRef(u).toString()),
+          page.grantedUsers.map((u) => getIdForRef(u).toString()),
         ),
       };
     case PageGrantValues.GRANT_USER_GROUP:
       return {
         scope: 'only',
-        userIds: await findGroupMemberIds(page.grantedGroups ?? []),
+        userIds: await findGroupMemberIds(page.grantedGroups),
       };
     default:
       return NOBODY;
@@ -57,14 +97,16 @@ const findPageViewers = async (page: PageGrantFields): Promise<PageViewers> => {
 };
 
 /**
- * Judged from the given page object rather than a DB lookup, so a page that
- * has already been deleted completely is still evaluated by its last grant.
+ * Judged by the page as stored; only a page that is no longer stored (deleted
+ * completely) is judged by the grant the activity event carried.
  */
 export const filterUsersWhoCanViewPage = async (
-  page: PageGrantFields,
+  pageId: Ref<IPage> | null | undefined,
+  lastKnown: LastKnownPageGrant,
   userIds: readonly Ref<IUser>[],
 ): Promise<Ref<IUser>[]> => {
-  const viewers = await findPageViewers(page);
+  const grant = (await findStoredGrant(pageId)) ?? grantOfLastKnown(lastKnown);
+  const viewers = grant == null ? NOBODY : await findPageViewers(grant);
   if (viewers.scope === 'anyone') {
     return [...userIds];
   }

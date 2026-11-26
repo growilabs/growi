@@ -1,5 +1,5 @@
 import { GroupType, type IUserHasId, PageGrant } from '@growi/core';
-import mongoose, { type HydratedDocument, type Types } from 'mongoose';
+import mongoose, { type HydratedDocument, Types } from 'mongoose';
 
 import { getInstance } from '^/test/setup/crowi';
 
@@ -114,7 +114,8 @@ describe('filterUsersWhoCanViewPage', () => {
   ])('keeps exactly the users who can open the %s page', async (key, expected) => {
     const page = pages[key];
 
-    const kept = await filterUsersWhoCanViewPage(page, allUserIds());
+    // The event carried no grant: the stored page alone decides.
+    const kept = await filterUsersWhoCanViewPage(page._id, {}, allUserIds());
 
     expect(namesOf(kept)).toEqual(expected);
     // Same verdict as the page view itself, so the two cannot drift apart.
@@ -128,19 +129,40 @@ describe('filterUsersWhoCanViewPage', () => {
     expect(namesOf(kept)).toEqual(viewable);
   });
 
-  it('judges a completely deleted page by the grant it had', async () => {
-    const deleted = {
-      grant: PageGrant.GRANT_OWNER,
-      grantedUsers: [users.owner._id],
-    };
-
-    const kept = await filterUsersWhoCanViewPage(deleted, allUserIds());
+  it('judges by the stored grant even when the event carried an older one', async () => {
+    const kept = await filterUsersWhoCanViewPage(
+      pages.owner._id,
+      { grant: PageGrant.GRANT_PUBLIC },
+      allUserIds(),
+    );
 
     expect(namesOf(kept)).toEqual(['owner']);
   });
 
-  it('keeps nobody when the grant was not passed', async () => {
+  it('treats a page stored without a grant as public, like the page view does', async () => {
+    const { insertedId } = await Page.collection.insertOne({
+      path: `${PREFIX}/legacy-without-grant`,
+      creator: users.owner._id,
+    });
+
+    const kept = await filterUsersWhoCanViewPage(insertedId, {}, allUserIds());
+
+    expect(namesOf(kept)).toEqual(USER_NAMES);
+  });
+
+  it('judges a completely deleted page by the grant the event carried', async () => {
     const kept = await filterUsersWhoCanViewPage(
+      new Types.ObjectId(),
+      { grant: PageGrant.GRANT_OWNER, grantedUsers: [users.owner._id] },
+      allUserIds(),
+    );
+
+    expect(namesOf(kept)).toEqual(['owner']);
+  });
+
+  it('keeps nobody for a completely deleted page whose event carried no grant', async () => {
+    const kept = await filterUsersWhoCanViewPage(
+      new Types.ObjectId(),
       { grantedUsers: [users.owner._id] },
       allUserIds(),
     );

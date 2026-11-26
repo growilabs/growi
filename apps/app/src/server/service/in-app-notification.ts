@@ -414,6 +414,7 @@ export class InAppNotificationService {
 
       const recipients = isIPage(targetModel, target)
         ? await filterUsersWhoCanViewPage(
+            activity.target,
             target,
             props.notificationTargetUsers ?? [],
           )
