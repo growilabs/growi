@@ -1,7 +1,92 @@
+import { mock } from 'vitest-mock-extended';
+
+import type { IPageWithSearchMeta } from '~/interfaces/search';
+
 import {
   FACET_SEARCH_MAX_LIMIT,
   parseFacetPagination,
+  parseFacetSearchParams,
+  toFacetedSearchResult,
 } from './facet-search-contract';
+
+describe('parseFacetSearchParams', () => {
+  it.each([
+    [{}, null],
+    [{ facet: 'pages' }, 'pages'],
+    [{ facet: 'attachments' }, 'attachments'],
+  ])('accepts %o as facet %s', (query, facet) => {
+    expect(parseFacetSearchParams(query)).toEqual({ ok: true, facet });
+  });
+
+  it.each([
+    { resolve: 'full' },
+    { resolve: 'secret<b>' },
+  ])('does not read resolve (%o)', (extra) => {
+    expect(parseFacetSearchParams({ facet: 'attachments', ...extra })).toEqual({
+      ok: true,
+      facet: 'attachments',
+    });
+  });
+
+  it.each<Record<string, unknown>>([
+    { facet: 'all' },
+    { facet: 'secret<b>' },
+    { facet: '' },
+    { facet: ['attachments', 'pages'] },
+    { facet: { $ne: 'pages' } },
+  ])('rejects %o with a fixed message', (query) => {
+    expect(parseFacetSearchParams(query)).toEqual({
+      ok: false,
+      message: 'The param "facet" must be one of pages, attachments.',
+    });
+  });
+});
+
+describe('toFacetedSearchResult', () => {
+  const primaryItem = (pageId: string): IPageWithSearchMeta => ({
+    data: mock<IPageWithSearchMeta['data']>({ _id: pageId }),
+    meta: { attachmentHits: [] },
+  });
+
+  it.each([
+    false,
+    true,
+  ])('answers the given items with a null total and primaryResultIncomplete=%s', (primaryResultIncomplete) => {
+    const items = [primaryItem('page-1-with-document')];
+
+    expect(
+      toFacetedSearchResult(
+        { items: [primaryItem('page-1')], meta: { primaryResultIncomplete } },
+        items,
+      ),
+    ).toEqual({
+      data: items,
+      meta: {
+        facet: 'attachments',
+        total: null,
+        hitsCount: 1,
+        primaryResultIncomplete,
+      },
+    });
+  });
+
+  it('counts hitsCount before the items whose page is gone were dropped', () => {
+    const primary = {
+      items: [
+        primaryItem('page-1'),
+        primaryItem('page-2'),
+        primaryItem('page-3'),
+      ],
+      meta: { primaryResultIncomplete: false },
+    };
+    const remaining = [primaryItem('page-1')];
+
+    const result = toFacetedSearchResult(primary, remaining);
+
+    expect(result.data).toEqual(remaining);
+    expect(result.meta.hitsCount).toBe(3);
+  });
+});
 
 describe('parseFacetPagination', () => {
   it.each([
@@ -39,7 +124,7 @@ describe('parseFacetPagination', () => {
 
     expect(result).toEqual({
       ok: false,
-      message: `The param "limit" must be an integer between 1 and ${FACET_SEARCH_MAX_LIMIT} when "facet" is all or attachments.`,
+      message: `The param "limit" must be an integer between 1 and ${FACET_SEARCH_MAX_LIMIT} when "facet" is attachments.`,
     });
   });
 
@@ -56,7 +141,7 @@ describe('parseFacetPagination', () => {
     expect(result).toEqual({
       ok: false,
       message:
-        'The param "offset" must be a non-negative integer when "facet" is all or attachments.',
+        'The param "offset" must be a non-negative integer when "facet" is attachments.',
     });
   });
 

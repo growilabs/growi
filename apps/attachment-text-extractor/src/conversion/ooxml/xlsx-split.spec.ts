@@ -604,7 +604,7 @@ describe('whole-output fallback: only for output the markers cannot explain', ()
   });
 });
 
-describe('packages that do not pass the ZIP pre-check go to anydoc whole', () => {
+describe('input that is not a ZIP goes to anydoc whole', () => {
   it('hands a legacy XLS over whole under the xlsx format', async () => {
     const xls = PLAIN_DOCUMENTS.xls.build();
 
@@ -631,20 +631,18 @@ describe('packages that do not pass the ZIP pre-check go to anydoc whole', () =>
     expect(sameBytes(sentPackages()[0], workbook)).toBe(true);
     expect(sentFormats()).toEqual([XLSX]);
   });
-
-  it('hands a ZIP without a workbook over whole', async () => {
-    const zip = buildZip([{ name: 'other.xml', data: '<x/>' }]);
-    anydoc.mockImplementationOnce(
-      async (bytes, format) => `whole ${format} ${bytes.length}`,
-    );
-
-    expect(await convertXlsx(zip, limits())).toEqual([
-      { pageNumber: null, label: null, content: `whole xlsx ${zip.length}` },
-    ]);
-  });
 });
 
 describe('limits and malformed workbooks are decided before anydoc runs', () => {
+  it('refuses a ZIP without a workbook as malformed before anydoc runs', async () => {
+    const zip = buildZip([{ name: 'other.xml', data: '<x/>' }]);
+
+    const error = await conversionErrorOf(() => convertXlsx(zip, limits()));
+
+    expect(error.kind).toBe('malformed');
+    expect(sentPackages()).toEqual([]);
+  });
+
   it('runs the cell pre-check before anydoc', async () => {
     const error = await conversionErrorOf(() =>
       convertXlsx(buildOverCellLimitXlsx(), limits()),

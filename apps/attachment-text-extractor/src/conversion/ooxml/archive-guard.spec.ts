@@ -11,6 +11,7 @@ import {
   buildEncryptedDocx,
   buildEncryptedFlagZip,
   buildEncryptedPptx,
+  buildEncryptedWithFarEndRecord,
   buildEncryptedXlsx,
   buildLyingSizesZip,
   buildTruncatedZip,
@@ -23,7 +24,10 @@ import {
   buildZipBombDocx,
   buildZipWithoutCentralDirectory,
   CRAFTED_ZIP_PART,
+  docxParts,
   PLAIN_DOCUMENTS,
+  pptxParts,
+  xlsxParts,
   type ZipInput,
 } from '../../../test/fixtures';
 import { createRandomBytes } from '../../../test/fixtures/seeded-random';
@@ -34,7 +38,9 @@ const MIB = 1024 * 1024;
 const PPTX_PART = CRAFTED_ZIP_PART;
 const LOCAL_HEADER_SIZE = 30;
 const CENTRAL_SIGNATURE = Buffer.from([0x50, 0x4b, 0x01, 0x02]);
+const END_OF_DIRECTORY_SIGNATURE = 0x06054b50;
 const END_OF_DIRECTORY_SIZE = 22;
+const END_OF_DIRECTORY_SIZE_FIELD = 12;
 const END_OF_DIRECTORY_OFFSET_FIELD = 16;
 const CENTRAL_COMPRESSED_SIZE_FIELD = 20;
 
@@ -92,7 +98,30 @@ const partEndingBeforeItsDeclaredSize = (
   return cut;
 };
 
-describe('inspectArchive passes non-ZIP and unreadable input through', () => {
+/** End records whose directory size and offset point at no central directory. */
+const endRecordsLeadingNowhere = (
+  length: number,
+  positions: readonly number[],
+): Buffer => {
+  const bytes = Buffer.alloc(length);
+  for (const at of positions) {
+    bytes.writeUInt32LE(END_OF_DIRECTORY_SIGNATURE, at);
+    bytes.writeUInt32LE(0x1234, at + END_OF_DIRECTORY_SIZE_FIELD);
+    bytes.writeUInt32LE(0x5678, at + END_OF_DIRECTORY_OFFSET_FIELD);
+  }
+  return bytes;
+};
+
+// The end record still points at a directory, but 3 bytes past its start.
+const directoryOffsetShifted = (): Buffer => {
+  const data = zip([[PPTX_PART, '<x/>']]);
+  const field =
+    data.length - END_OF_DIRECTORY_SIZE + END_OF_DIRECTORY_OFFSET_FIELD;
+  data.writeUInt32LE(data.readUInt32LE(field) + 3, field);
+  return data;
+};
+
+describe('inspectArchive passes input that is not a ZIP through', () => {
   it('returns the archive open when the required part is there', async () => {
     const data = zip([
       [PPTX_PART, '<x/>'],
@@ -104,12 +133,6 @@ describe('inspectArchive passes non-ZIP and unreadable input through', () => {
     );
 
     expect(part.toString()).toBe('<x/>');
-  });
-
-  it('passes a ZIP without the required part through', async () => {
-    const data = zip([['word/document.xml', '<x/>']]);
-
-    expect(await inspectArchive(data, PPTX_PART, limits())).toBeNull();
   });
 
   it.each([
@@ -129,16 +152,22 @@ describe('inspectArchive passes non-ZIP and unreadable input through', () => {
     ).toBeNull();
   });
 
-  it('passes an empty ZIP through', async () => {
-    expect(await inspectArchive(buildZip([]), PPTX_PART, limits())).toBeNull();
-  });
-
   it.each([
     ['docx', buildEncryptedDocx],
     ['xlsx', buildEncryptedXlsx],
     ['pptx', buildEncryptedPptx],
   ])('passes an encrypted %s (an OLE file, not a ZIP) through', async (_, build) => {
     expect(await inspectArchive(build(), PPTX_PART, limits())).toBeNull();
+  });
+
+  it.each([
+    ['docx', () => docxParts(['text'])],
+    ['xlsx', () => xlsxParts([{ name: 'Sheet', rows: [['text']] }])],
+    ['pptx', () => pptxParts([{ title: 'text' }])],
+  ])('passes an encrypted %s holding an end record far from its end through', async (_, parts) => {
+    const encrypted = buildEncryptedWithFarEndRecord(parts());
+
+    expect(await inspectArchive(encrypted, PPTX_PART, limits())).toBeNull();
   });
 
   it('passes local entries without a central directory through', async () => {
@@ -150,19 +179,25 @@ describe('inspectArchive passes non-ZIP and unreadable input through', () => {
       ),
     ).toBeNull();
   });
+});
 
-  it('passes a ZIP with the required part twice through', async () => {
-    expect(
-      await inspectArchive(buildDuplicateNameZip(), PPTX_PART, limits()),
-    ).toBeNull();
-  });
-
-  // CPython's zipfile refuses these, so Python hands them to anydoc whole.
+describe('inspectArchive refuses a ZIP it cannot check as malformed', () => {
   it.each([
-    ['an entry needing version 10.0 to extract', buildVersionNeeded10xZip],
-    ['a UTF-8-flagged name that is not UTF-8', buildUtf8FlagWithNonUtf8NameZip],
-  ])('passes %s through', async (_, build) => {
-    expect(await inspectArchive(build(), PPTX_PART, limits())).toBeNull();
+    ['without the required part', () => zip([['word/document.xml', '<x/>']])],
+    ['with the required part twice', buildDuplicateNameZip],
+    ['with no entries', () => buildZip([])],
+    ['with an entry needing version 10.0 to extract', buildVersionNeeded10xZip],
+    [
+      'with a UTF-8-flagged name that is not UTF-8',
+      buildUtf8FlagWithNonUtf8NameZip,
+    ],
+    ['whose end record points past its directory', directoryOffsetShifted],
+  ])('refuses a ZIP %s', async (_, build) => {
+    const error = await conversionErrorOf(() =>
+      inspectArchive(build(), PPTX_PART, limits()),
+    );
+
+    expect(error.kind).toBe('malformed');
   });
 });
 
@@ -255,6 +290,28 @@ describe('inspectArchive accepts real packages', () => {
     const parts = await withArchive(book, 'xl/workbook.xml', readAllEntries);
 
     expect(parts.length).toBeGreaterThan(1);
+  });
+
+  it.each([
+    ['70,000 zeros after it', 0, Buffer.alloc(70_000)],
+    ['100 bytes before it and 70,000 after', 100, Buffer.alloc(70_000)],
+    [
+      '70,000 bytes after it holding end records that lead nowhere',
+      0,
+      endRecordsLeadingNowhere(70_000, [0, 2_000, 4_000]),
+    ],
+  ])('finds the archive with %s', async (_, before, after) => {
+    const data = Buffer.concat([
+      Buffer.alloc(before),
+      zip([[PPTX_PART, '<x/>']]),
+      after,
+    ]);
+
+    const part = await withArchive(data, PPTX_PART, (archive) =>
+      archive.readPart(PPTX_PART, 100),
+    );
+
+    expect(part.toString()).toBe('<x/>');
   });
 
   it('accepts a part written with zip64 sizes', async () => {

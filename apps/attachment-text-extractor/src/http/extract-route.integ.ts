@@ -16,9 +16,9 @@ import {
 import { useTestService } from './spec-support/test-service';
 
 // POST /extract with a stand-in runner: what reaches the runner, how its
-// outcome becomes the answer (Req 1.3), the slot (Req 3.2) and the size limit
-// (Req 3.3). Python test_extract_router.py (success, mapping, slot release,
-// intake limits) and test_client_disconnect.py (the abort signal; Req 3.5).
+// outcome becomes the answer, the slot and the size limit.
+// Python test_extract_router.py (success, mapping, slot release,
+// intake limits) and test_client_disconnect.py (the abort signal).
 
 let runner = fakeRunner();
 const service = useTestService(() => {
@@ -227,7 +227,7 @@ describe('the file size limit (MAX_FILE_SIZE_MB=1)', () => {
   });
 });
 
-describe('a caller that goes away (Req 3.5)', () => {
+describe('a caller that goes away', () => {
   it('aborts the run, and the slot comes back only after the run has ended', async () => {
     const held = holdingRunner({ endOnAbort: false });
     const { url, token } = await service.restart(held.runner, {

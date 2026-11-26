@@ -20,6 +20,7 @@ import {
   createConcurrencyLimit,
 } from './concurrency-limit';
 import { buildExtractRequestBody } from './extract-request-body';
+import { toGrowiAppIdHeaderValue } from './growi-app-id-header';
 import { readFileChunks } from './read-file-chunks';
 import {
   isCloudMetadataAddress,
@@ -110,9 +111,12 @@ function mapAxiosErrorToOutcome(
 }
 
 /** Minimal type guard for Axios errors. */
-function isAxiosError(
-  error: unknown,
-): error is { isAxiosError: true; response?: unknown; code?: string } {
+function isAxiosError(error: unknown): error is {
+  isAxiosError: true;
+  response?: unknown;
+  code?: string;
+  message?: string;
+} {
   return (
     typeof error === 'object' &&
     error !== null &&
@@ -120,12 +124,22 @@ function isAxiosError(
   );
 }
 
+/** axios names no code of its own for an answer above maxContentLength. */
+const isResponseTooLarge = (error: unknown): boolean =>
+  isAxiosError(error) &&
+  error.response == null &&
+  error.code === 'ERR_BAD_RESPONSE' &&
+  (error.message ?? '').startsWith('maxContentLength size of');
+
 type CallExtractorOptions = {
   attachment: AttachmentWithComputed;
   body: PostExtractBody;
   extractorUri: string;
   token: string;
+  /** Already checked by toGrowiAppIdHeaderValue; omitted when not sendable. */
+  appId?: string;
   timeoutMs: number;
+  maxResponseBytes: number;
   isRetry: boolean;
   /** Aborted once no one waits for the result: cancels the request and the retry. */
   signal?: AbortSignal;
@@ -138,17 +152,34 @@ type CallExtractorOptions = {
 async function callExtractor(
   opts: CallExtractorOptions,
 ): Promise<ExtractionOutcome> {
-  const { attachment, body, extractorUri, token, timeoutMs, isRetry, signal } =
-    opts;
+  const {
+    attachment,
+    body,
+    extractorUri,
+    token,
+    appId,
+    timeoutMs,
+    maxResponseBytes,
+    isRetry,
+    signal,
+  } = opts;
+
+  // axios' `timeout` only limits the wait between two chunks, so an answer
+  // that keeps arriving a little at a time would never end.
+  const deadline = AbortSignal.timeout(timeoutMs);
 
   try {
     const response = await postExtract(body, {
       baseURL: extractorUri,
-      headers: { Authorization: `Bearer ${token}` },
+      headers: {
+        Authorization: `Bearer ${token}`,
+        ...(appId != null ? { 'X-Growi-App-Id': appId } : {}),
+      },
       timeout: timeoutMs,
       // A redirect could point the request at an internal address (SSRF)
       maxRedirects: 0,
-      signal,
+      maxContentLength: maxResponseBytes,
+      signal: signal == null ? deadline : AbortSignal.any([signal, deadline]),
     });
 
     const pages: ExtractedPage[] = response.data.pages.map((p) => ({
@@ -173,6 +204,17 @@ async function callExtractor(
         return callExtractor({ ...opts, isRetry: true });
       }
       return outcome;
+    }
+
+    if (isResponseTooLarge(error)) {
+      logger.warn(
+        { attachmentId: attachment.id, maxResponseBytes },
+        'The answer of attachment-text-extractor exceeded the size limit',
+      );
+      return {
+        kind: 'resourceLimit',
+        message: 'The extraction result exceeds the size GROWI accepts',
+      };
     }
 
     // Network-level errors (no response) or unmapped error codes
@@ -205,6 +247,13 @@ type DeliveryFileFinder = {
  */
 const DEFAULT_MAX_CONCURRENT_EXTRACTIONS = 3;
 
+/**
+ * With its default MAX_RESULT_BYTES (16MiB) the extractor answers with at
+ * most about 33MiB; anything far above that is not an answer worth holding
+ * in memory.
+ */
+const DEFAULT_MAX_RESPONSE_BYTES = 64 * 1024 * 1024;
+
 export class AttachmentTextExtractorService {
   private readonly fileUploader: DeliveryFileFinder;
 
@@ -212,13 +261,17 @@ export class AttachmentTextExtractorService {
   // re-extractions and a rebuild all share this limit.
   private readonly limit: ConcurrencyLimit;
 
+  private readonly maxResponseBytes: number;
+
   constructor(
     fileUploader: DeliveryFileFinder,
     {
       maxConcurrentExtractions = DEFAULT_MAX_CONCURRENT_EXTRACTIONS,
-    }: { maxConcurrentExtractions?: number } = {},
+      maxResponseBytes = DEFAULT_MAX_RESPONSE_BYTES,
+    }: { maxConcurrentExtractions?: number; maxResponseBytes?: number } = {},
   ) {
     this.fileUploader = fileUploader;
+    this.maxResponseBytes = maxResponseBytes;
     this.limit = createConcurrencyLimit(maxConcurrentExtractions);
   }
 
@@ -250,6 +303,10 @@ export class AttachmentTextExtractorService {
       if (!extractorToken) {
         return { kind: 'serviceUnreachable' };
       }
+
+      const appId = toGrowiAppIdHeaderValue(
+        configManager.getConfig('app:growiAppIdForCloud'),
+      );
 
       const timeoutMs = configManager.getConfig(
         'app:attachmentFullTextSearch:timeoutMs',
@@ -304,6 +361,7 @@ export class AttachmentTextExtractorService {
           : this.readAndExtract(attachment, {
               extractorUri,
               token: extractorToken,
+              appId,
               timeoutMs,
               signal,
             }),
@@ -323,7 +381,7 @@ export class AttachmentTextExtractorService {
     attachment: AttachmentWithComputed,
     settings: Pick<
       CallExtractorOptions,
-      'extractorUri' | 'token' | 'timeoutMs' | 'signal'
+      'extractorUri' | 'token' | 'appId' | 'timeoutMs' | 'signal'
     >,
   ): Promise<ExtractionOutcome> {
     // --- Step 6: Fetch file bytes ---
@@ -352,6 +410,12 @@ export class AttachmentTextExtractorService {
     }
 
     // --- Step 7: Call extractor (with built-in retry for 503) ---
-    return callExtractor({ attachment, body, ...settings, isRetry: false });
+    return callExtractor({
+      attachment,
+      body,
+      ...settings,
+      maxResponseBytes: this.maxResponseBytes,
+      isRetry: false,
+    });
   }
 }

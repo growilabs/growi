@@ -20,6 +20,7 @@ GROWI には添付ファイル (PDF / Office 等) のテキストを抽出する
 - サービスは **ステートレス** で、k8s の共有 Deployment として運用でき、Docker image を使う OSS の環境でも動かせる
 - 外部バイナリ・ネットワーク egress を要求せず、npm から取得できる部品 (ビルド済みのネイティブ部品と WASM を含む) だけで完結する (子プロセスに上限を掛ける util-linux の `prlimit` は例外として認める)
 - 悪意ある大容量/ハングを起こす添付に対するリソース保護 (最大サイズ / タイムアウト / 同時実行上限) が組み込まれている
+- GROWI.cloud で 1 つのサービスを複数の app で共有するとき、運用者がログの行から呼び出し元の app を、`/metrics` から処理中の件数・応答の数・所要時間を見られる
 - Image サイズは 400MB 以下に収まる
 - 経路の定義から作る OpenAPI の文書を、`packages/attachment-text-extractor-client` (orval で生成) 向けに書き出せる
 - monorepo のほかの部分と同じ言語 (TypeScript) と道具 (pnpm / turbo / vitest / biome) で保守できる
@@ -46,7 +47,8 @@ GROWI には添付ファイル (PDF / Office 等) のテキストを抽出する
 
 ### In
 - `apps/attachment-text-extractor/` ディレクトリ全体 (package 設定 / src / テスト / scripts / ベンチマーク / Dockerfile / `docker/README.md` / `AGENTS.md`)
-- Hono アプリ: `POST /extract` (multipart)、`GET /healthz`、`GET /readyz`、`GET /openapi.json`
+- Hono アプリ: `POST /extract` (multipart と任意のヘッダー `X-Growi-App-Id`)、`GET /healthz`、`GET /readyz`、`GET /openapi.json`、`GET /metrics` (Prometheus のテキスト形式)
+- 呼び出し元の app を `/extract` のログの行に出すことと、稼働状況の指標
 - 形式別の変換と形式の対応表
 - リソース保護 (size / timeout / 同時実行の枠)
 - API のスキーマ (ExtractResponse / PageInfo / ErrorResponse / ErrorCode)
@@ -87,7 +89,7 @@ GROWI には添付ファイル (PDF / Office 等) のテキストを抽出する
 ### Upstream (依存先)
 - `@firecrawl/anydoc` (npm、版を固定)
 - `@embedpdf/pdfium` (npm、版を固定)
-- `hono` / `@hono/node-server` / `hono-openapi` / `zod` (npm)
+- `hono` / `@hono/node-server` / `hono-openapi` / `zod` / `@prometheus-io/client` (npm)
 - Node.js 24 / pnpm / Docker build runtime / util-linux の `prlimit`
 - 既存 `apps/pdf-converter` のマイクロサービス運用パターン (Dockerfile 構造、CI の形) — 参考のみ、コード依存なし
 

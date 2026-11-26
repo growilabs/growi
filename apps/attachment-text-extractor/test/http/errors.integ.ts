@@ -16,7 +16,7 @@ import {
 import { useBlackboxService } from './blackbox-service';
 
 // Black box (research.md 22.7 `errors`): the rows of the error table a default
-// service reaches from a document alone (Req 1.3). Python test_e2e_http.py
+// service reaches from a document alone. Python test_e2e_http.py
 // TestErrorTableOverHttp; its three 401 rows are in auth.integ.ts. Rows that
 // need other settings or a stand-in child are in src/http/extract-limits.integ.ts.
 

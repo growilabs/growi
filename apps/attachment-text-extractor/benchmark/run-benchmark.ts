@@ -9,7 +9,7 @@ import { renderMarkdownReport } from './report-markdown';
 import { parseRunOptions, RUN_USAGE } from './run-options';
 
 // `pnpm benchmark`: sends the corpus to an extraction service's POST /extract
-// and prints per-format, per-metric tables (requirements Req 2.9, 2.10).
+// and prints per-format, per-metric tables.
 // Point it at the Python service (research.md 8) or the Node one, e.g.
 //
 //   BENCHMARK_TOKEN=... pnpm benchmark --url http://127.0.0.1:18000 \

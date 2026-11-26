@@ -1,6 +1,6 @@
 import { buildChildEnv } from './child-env';
 
-// Req 3.8 and research.md 15.4 (6) / 19.1: the child's environment is an
+// research.md 15.4 (6) / 19.1: the child's environment is an
 // explicit object, never derived from the parent's process.env, so the service
 // token, NODE_OPTIONS, PATH and anything else the HTTP process holds cannot
 // reach it. Exact equality is the check: this test process has a PATH and more,

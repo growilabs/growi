@@ -1,12 +1,5 @@
-import type { estypes as ES8types } from '@elastic/elasticsearch8';
-import type { estypes as ES9types } from '@elastic/elasticsearch9';
-
 import type SearchService from '~/server/service/search';
-import {
-  type ElasticsearchClientDelegator,
-  isES8ClientDelegator,
-  isES9ClientDelegator,
-} from '~/server/service/search-delegator/elasticsearch-client-delegator';
+import type { ElasticsearchClientDelegator } from '~/server/service/search-delegator/elasticsearch-client-delegator';
 
 import {
   type AttachmentSearchResponse,
@@ -17,28 +10,12 @@ import {
   createSearchAccessiblePages,
   type PageIndexSearchResponse,
 } from './search-accessible-pages';
-
-/**
- * Sends a search request with top-level parameters (`query`, `size`,
- * `highlight`, ...), a shape both the v8 and the v9 clients accept.
- */
-const searchWithTopLevelParams = (
-  client: ElasticsearchClientDelegator,
-  params: Record<string, unknown>,
-): Promise<unknown> => {
-  if (isES8ClientDelegator(client)) {
-    return client.search(params as ES8types.SearchRequest);
-  }
-  if (isES9ClientDelegator(client)) {
-    return client.search(params as ES9types.SearchRequest);
-  }
-  throw new Error('Unsupported Elasticsearch version');
-};
+import { searchWithTopLevelParams } from './search-with-top-level-params';
 
 export type CreateAttachmentSearchResultAggregatorArgs = {
   searchService: Pick<
     SearchService,
-    'searchFormattedPages' | 'fullTextSearchDelegator' | 'canShowSnippet'
+    'fullTextSearchDelegator' | 'canShowSnippet'
   >;
   esClient: ElasticsearchClientDelegator;
   attachmentIndexName: string;
@@ -63,9 +40,7 @@ export const createAttachmentSearchResultAggregator = ({
     createFindSnippetVisiblePageIds(searchService),
   );
 
-  // The page list comes from the regular page search pipeline for the same viewer.
   return new AttachmentSearchResultAggregator(
-    (input, options) => searchService.searchFormattedPages(input, options),
     {
       searchAttachments: async (body) =>
         (await searchWithTopLevelParams(esClient, {

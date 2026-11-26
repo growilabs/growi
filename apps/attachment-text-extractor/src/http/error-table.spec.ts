@@ -1,12 +1,13 @@
 import { ERROR_CODES } from '../contract/error-code';
 import {
   ERROR_TABLE,
+  EXTRACT_RESULTS,
   extractErrorStatuses,
   UNAUTHORIZED_ANSWER,
 } from './error-table';
 
 // The one table from a failure kind to ErrorCode, HTTP status and the fixed
-// message (Req 1.3, 1.8, 5.5). A missing kind is a type error (Record over
+// message. A missing kind is a type error (Record over
 // FailureKind); this test pins the values: the target spec's design.md
 // §Error Handling, with the Python service's fixed texts (extract_errors.py).
 
@@ -86,5 +87,29 @@ describe('extractErrorStatuses', () => {
       status: 401,
       message: 'Missing or invalid Bearer token',
     });
+  });
+});
+
+describe('EXTRACT_RESULTS', () => {
+  it('is ok, every failure kind and every refusal, each once', () => {
+    expect([...EXTRACT_RESULTS].sort()).toEqual(
+      [
+        'ok',
+        'unsupported',
+        'encrypted',
+        'malformed',
+        'limit_exceeded',
+        'memory_exceeded',
+        'result_too_large',
+        'timeout',
+        'crashed',
+        'internal',
+        'file_too_large',
+        'service_busy',
+        'upload_timeout',
+        'invalid_upload',
+        'client_disconnected',
+      ].sort(),
+    );
   });
 });

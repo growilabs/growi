@@ -230,7 +230,7 @@ const modes = {
     writeAll(RESULT_FD, Buffer.concat([header, Buffer.from('{'.repeat(10))]));
     process.exit(0);
   },
-  // Sends the argument verbatim as the result body (protocol and Req 3.9 cases).
+  // Sends the argument verbatim as the result body (protocol cases).
   'raw-result': () => {
     readRestOfBody();
     writeAll(
