@@ -1,6 +1,8 @@
 {
   "backlinks": {
     "failed_to_fetch": "백링크를 가져오지 못했습니다.",
+    "index_building": "백링크 색인을 아직 구축하는 중입니다. 이 기능을 활성화한 이후 편집되지 않은 페이지의 백링크는 누락될 수 있습니다.",
+    "index_partial": "{{coveredSince}} 이후 편집되지 않은 페이지의 백링크는 포함되지 않습니다.",
     "link_status_unavailable": "링크 상태를 확인하지 못했습니다.",
     "no_backlinks": "아직 백링크가 없습니다.",
     "outgoing_needing_attention": "확인이 필요한 나가는 링크",

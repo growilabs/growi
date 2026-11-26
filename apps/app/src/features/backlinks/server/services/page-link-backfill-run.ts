@@ -5,6 +5,7 @@ import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 
 import {
+  BACKFILL_RETRY_DELAYS_MS,
   BackfillScopeKind,
   type BacklinksBackfillProgressData,
 } from '../../interfaces/page-link-backfill';
@@ -13,7 +14,6 @@ import { loadBackfillLinkResolver } from './backfill-link-resolver';
 import {
   BACKFILL_CHECKPOINT_EVERY_PAGES,
   BACKFILL_CHECKPOINT_INTERVAL_MS,
-  BACKFILL_RETRY_DELAYS_MS,
   type BackfillPacing,
   restAfterBackfillPageMs,
 } from './backfill-pacing';

@@ -6,13 +6,13 @@ import type { PageModel } from '~/server/models/page';
 import PageModelFactory from '~/server/models/page';
 import { prisma } from '~/utils/prisma';
 
-import type { BacklinksBackfillProgressData } from '../../interfaces/page-link-backfill';
-import { ensurePageLinkIndexes } from '../models/page-link-indexes';
-import { throwOnWriteErrors } from '../models/throw-on-write-errors';
 import {
   BACKFILL_RETRY_DELAYS_MS,
-  type BackfillPacing,
-} from './backfill-pacing';
+  type BacklinksBackfillProgressData,
+} from '../../interfaces/page-link-backfill';
+import { ensurePageLinkIndexes } from '../models/page-link-indexes';
+import { throwOnWriteErrors } from '../models/throw-on-write-errors';
+import type { BackfillPacing } from './backfill-pacing';
 import { PageLinkBackfillCron } from './page-link-backfill-cron';
 import { handlePageUpsertById } from './page-link-service-handlers';
 

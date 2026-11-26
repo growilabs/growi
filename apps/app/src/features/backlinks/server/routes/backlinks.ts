@@ -15,6 +15,7 @@ import loggerFactory from '~/utils/logger';
 
 import { findUserGroupIdsForViewer } from '../services/find-user-group-ids-for-viewer';
 import { isPageReadableByViewer } from '../services/is-page-readable-by-viewer';
+import { readBacklinksIndexState } from '../services/read-backlinks-index-state';
 
 const logger = loggerFactory('growi:routes:apiv3:backlink');
 
@@ -56,7 +57,7 @@ const getBacklinksHandler = (crowi: Crowi): RequestHandler => {
         );
       }
 
-      const [backlinks, linkTargets] = await Promise.all([
+      const [backlinks, linkTargets, indexState] = await Promise.all([
         crowi.pageLinkService.findBacklinks(pageObjectId, viewer, userGroups),
         crowi.pageLinkService
           .findForwardLinkHealth(pageObjectId, viewer, userGroups)
@@ -64,9 +65,13 @@ const getBacklinksHandler = (crowi: Crowi): RequestHandler => {
             logger.error({ err }, 'Failed to get forward link health');
             return null;
           }),
+        readBacklinksIndexState().catch((err) => {
+          logger.error({ err }, 'Failed to get the backlinks index state');
+          return null;
+        }),
       ]);
 
-      return res.apiv3({ backlinks, linkTargets });
+      return res.apiv3({ backlinks, linkTargets, indexState });
     } catch (err) {
       logger.error({ err }, 'Failed to get backlinks');
       // Deliberately not forwarding `err`: apiv3Err serializes an Error's own
@@ -87,9 +92,10 @@ const getBacklinksHandler = (crowi: Crowi): RequestHandler => {
  *        tags: [Page]
  *        summary: /page/backlinks
  *        description: >
- *          Get the pages that link to the given page, and the given page's outbound
- *          links whose target is trashed or broken. Sources the requesting user
- *          cannot read, and sources in the trash, are omitted.
+ *          Get the pages that link to the given page, the given page's outbound
+ *          links whose target is trashed or broken, and how far the backlinks index
+ *          covers older pages. Sources the requesting user cannot read, and sources
+ *          in the trash, are omitted.
  *        parameters:
  *          - name: pageId
  *            in: query
@@ -142,6 +148,25 @@ const getBacklinksHandler = (crowi: Crowi): RequestHandler => {
  *                          targetState:
  *                            type: string
  *                            enum: [trashed, broken]
+ *                    indexState:
+ *                      type: object
+ *                      nullable: true
+ *                      description: >
+ *                        Whether backlinks from older pages can be missing because the
+ *                        backfill has not covered them. null when the lookup failed
+ *                        (backlinks are still returned).
+ *                      properties:
+ *                        coverage:
+ *                          type: string
+ *                          enum: [none, partial, all]
+ *                          description: >
+ *                            none until a backfill run completes; partial when only pages
+ *                            edited since coveredSince are covered
+ *                        coveredSince:
+ *                          type: string
+ *                          format: date-time
+ *                          nullable: true
+ *                          description: Set exactly when coverage is partial
  *          400:
  *            description: pageId is missing or is not a MongoDB ID.
  *          404:

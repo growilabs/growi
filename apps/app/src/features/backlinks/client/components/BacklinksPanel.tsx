@@ -6,6 +6,7 @@ import { useCurrentPageId } from '~/states/page';
 
 import { useSWRxBacklinks } from '../stores/backlinks';
 import { BacklinkListItem } from './BacklinkListItem';
+import { BacklinksIndexNotice } from './BacklinksIndexNotice';
 import { LinkTargetsSection } from './LinkTargetsSection';
 
 export const BacklinksPanel = (): JSX.Element => {
@@ -15,6 +16,7 @@ export const BacklinksPanel = (): JSX.Element => {
   const { data, error, isLoading } = useSWRxBacklinks(pageId ?? null);
   const backlinks = data?.backlinks;
   const linkTargets = data?.linkTargets;
+  const indexState = data?.indexState ?? null;
 
   if (error != null) {
     return (
@@ -42,6 +44,7 @@ export const BacklinksPanel = (): JSX.Element => {
   // link out to a trashed or broken target
   return (
     <>
+      <BacklinksIndexNotice indexState={indexState} />
       {hasBacklinks ? (
         <ul className="list-group" data-testid="backlinks-list">
           {backlinks.map((backlink) => (

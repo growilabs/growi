@@ -7,6 +7,17 @@ export const BackfillScopeKind = {
 export type BackfillScopeKind =
   (typeof BackfillScopeKind)[keyof typeof BackfillScopeKind];
 
+/**
+ * The wait before the poll retries a failed run, by the number of failures in a row; its length
+ * is the cap, after which the job is left for the admin (design.md, "Failed run"). Here rather
+ * than with the other pacing values because the admin settings show the cap.
+ */
+export const BACKFILL_RETRY_DELAYS_MS: readonly number[] = [
+  5 * 60_000,
+  15 * 60_000,
+  30 * 60_000,
+];
+
 /** Payload of `SocketEventName.BacklinksBackfillProgress` on the admin channel. */
 export interface BacklinksBackfillProgressData {
   readonly status: 'running' | 'stopped' | 'complete';

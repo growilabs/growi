@@ -188,14 +188,14 @@ graph TB
 
 ### Directory Structure
 
-Tests are co-located (`*.spec.ts` / `*.integ.ts`) and omitted below. Files marked **(B3)** are the
-backfill, which is not yet built.
+Tests are co-located (`*.spec.ts` / `*.integ.ts`) and omitted below. Files marked **(B3)** belong to the
+backfill.
 
 ```
 apps/app/src/features/backlinks/
 ├── interfaces/
 │   ├── page-link.ts              # IPageLink only
-│   └── backlink.ts               # read DTOs: IBacklink, IBacklinkResponse, ILinkTarget, LinkTargetState
+│   └── backlink.ts               # read DTOs: IBacklink, IBacklinkResponse, ILinkTarget, LinkTargetState, IBacklinksIndexState
 ├── server/
 │   ├── models/
 │   │   ├── page-link.ts          # Prisma extension (Prisma.defineExtension) — the pagelinks model methods
@@ -217,23 +217,40 @@ apps/app/src/features/backlinks/
 │   │   ├── page-link-service.ts        # thin Crowi adapter: subscribes to crowi.events.page, owns config access, delegates
 │   │   ├── duty-cycle-rest.ts          # pure: rest owed after measured work at a duty (shared by the drain and the backfill)
 │   │   ├── backfill-range.ts           # (B3) pure: the walk's page filter; scope cutoff + coverage -> the run's updatedAt range; coverage after a run
-│   │   ├── backfill-pacing.ts          # (B3) backfill config validation, rest with the page-rate floor, checkpoint cadence, lease length, failed-run retry schedule
+│   │   ├── backfill-pacing.ts          # (B3) backfill config validation, rest with the page-rate floor, checkpoint cadence, lease length
 │   │   ├── backfill-link-resolver.ts   # (B3) in-memory path->id map + permalink id set (one projection query per run)
 │   │   ├── backfill-page.ts            # (B3) one page: body read, size cap, extract, resolve, write; bounded retries
 │   │   ├── page-link-backfill-run.ts   # (B3) one claimed run: first-claim cutoff/total, paced walk, fenced checkpoints and endings
-│   │   └── page-link-backfill-cron.ts  # (B3) CronService start poll: in-process guard, claim, self-stop, admin progress emitter
+│   │   ├── page-link-backfill-cron.ts  # (B3) CronService start poll: in-process guard, claim, self-stop, admin progress emitter
+│   │   ├── backfill-scope-request.ts   # (B3) pure: validates the admin's start body into a scope
+│   │   ├── backfill-admin-state.ts     # (B3) pure: job row + page counts -> the admin state DTO (claim left out)
+│   │   ├── read-backfill-admin-state.ts    # (B3) admin state read: job row + the not-included / total page counts
+│   │   ├── backlinks-index-state.ts    # (B3) pure: job row (or none) -> the panel's coverage summary
+│   │   └── read-backlinks-index-state.ts   # (B3) the panel's one job read: no counts, no boot upsert
 │   └── routes/
 │       ├── backlinks.ts                # apiv3 route factory (GET) — getBacklinksHandlerFactory
 │       └── backlinks-backfill-admin.ts # (B3) apiv3 admin routes: GET state, POST start (scope), POST stop, POST resume
 └── client/
     ├── stores/
     │   ├── backlinks.ts                # SWR hook — useSWRxBacklinks
-    │   └── backlinks-backfill.ts       # (B3) SWR hook for the admin settings section
+    │   └── backlinks-backfill.ts       # (B3) SWR hook for the admin state; polls while a run is requested or running
+    ├── hooks/
+    │   ├── use-backfill-progress-socket.ts  # (B3) admin-socket progress -> state cache, then revalidate
+    │   └── use-backfill-actions.ts     # (B3) POST start / stop / resume, refusals toasted
+    ├── utils/
+    │   ├── backfill-admin-view.ts      # (B3) pure: state -> which row of the admin-settings table, and its controls
+    │   ├── backfill-progress.ts        # (B3) pure: the counts shown to the admin (percent capped until complete)
+    │   ├── backfill-start-request.ts   # (B3) pure: scope picker input -> start body
+    │   └── backlinks-index-notice.ts   # (B3) pure: the panel's coverage summary -> which notice, if any
     └── components/
-        ├── BacklinksPanel.tsx          # incoming list + empty state + link-status-unavailable notice
+        ├── BacklinksPanel.tsx          # incoming list + empty state + link-status-unavailable notice + index notice
+        ├── BacklinksIndexNotice.tsx    # (B3) the panel's "index still building / partial" notice
         ├── LinkTargetsSection.tsx      # "outgoing links needing attention" section (forward-health rows)
         ├── BacklinkListItem.tsx        # one row (path label linking to /{pageId}, + target-state badge for forward-health rows)
-        └── BacklinksBackfillAdmin.tsx  # (B3) admin settings section: scope picker, progress, coverage line
+        ├── BacklinksBackfillAdmin.tsx  # (B3) admin settings section: composes the parts below
+        ├── BackfillStatusMessage.tsx   # (B3) the state line (not started, error and retry, stopped, coverage)
+        ├── BackfillProgress.tsx        # (B3) processed of runTotal, percent, skipped pages
+        └── BackfillScopeForm.tsx       # (B3) scope picker + Start
 
 # Migration: apps/app/src/migrations/20260901064500-add-indexes-to-pagelinks.js provisions
 # the three pagelinks indexes. Required because pagelinks is a prisma-only collection — no
@@ -268,6 +285,11 @@ apps/app/src/features/backlinks/
   parameter (`maxDepth`), not baked into the pipeline: `$graphLookup` is memory-bound at 100MB with
   no disk spill, so the save path passes `REDIRECT_CHAIN_MAX_DEPTH`, while page view passes nothing — a cap there would
   answer an old URL with a not-found once the chain outgrows it.
+- `apps/app/src/client/components/Admin/App/AppSettingsPageContents.tsx` — **(B3)** mount
+  `BacklinksBackfillAdmin` as a section of the App settings page, after the page bulk export
+  section: a one-off data job beside the other ones there, with no new admin route or menu entry.
+  Its strings are in every locale's `admin.json` (`backlinks_backfill.*`); the panel's notice
+  strings are in `translation.json` (`backlinks.index_*`).
 - `apps/app/src/client/components/PageAccessoriesModal/PageAccessoriesModal.tsx` (+ the
   modal-contents map in `apps/app/src/states/ui/modal/page-accessories.ts`) — add the **Backlinks**
   tab mapping to `BacklinksPanel`.
@@ -1091,7 +1113,8 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
   (a date; none for all pages) and is stored on the job document, so it does not float across
   restarts. `since` is that date; `maxPages` is the `updatedAt` of the Nth newest page, read from the
   `updatedAt` index. Pages can tie on `updatedAt`, so a `maxPages` run covers N pages or slightly
-  more. N counts from the newest page of the whole wiki, not from the edge of an earlier run.
+  more. N counts from the newest page of the whole wiki, not from the edge of an earlier run; the
+  admin form says so under the field, since "the next N" is the natural reading.
   When the wiki has fewer than N pages of the kind the walk scans, the scope is every page: the
   run has no lower bound and ends with coverage `all`.
 - **First claim of a run.** The loop treats a claimed job whose `runTotal` is null as a new run:
@@ -1147,7 +1170,7 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
   | `failed`, retry due (`retryAt` set) | the last error, and when it retries (`retryAt`, retry `failedAttempts` of 3) | Stop, or Resume to retry now; Start disabled |
   | `failed`, no retry due | the last error; it is not retried | Resume, or a new scope + Start |
   | `stopped` | where it stopped (processed of `runTotal`) | Resume, or a new scope + Start |
-  | `coverage: partial`, idle | "Backlinks cover pages edited since `<coveredSince>`; about N older pages are not included" | scope picker + Start |
+  | `coverage: partial`, idle | "Backlinks are built only for the newer pages", then `<coveredSince>` and "about N of <total>" older pages not included, each on its own labelled line | scope picker + Start |
   | `coverage: all` | "Backlinks are indexed for all pages (completed `<completedAt>`)" | none |
 
   The line stays after completion instead of hiding the whole section, so an admin who comes back can
@@ -1254,7 +1277,8 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
   - Accepted: a fault that strikes just after every checkpoint never reaches the cap. Each retry
     still saves progress, so the run moves toward its end rather than retrying forever, though
     each retry rebuilds the path map.
-  - The schedule is a list of delays in `backfill-pacing.ts` (`BACKFILL_RETRY_DELAYS_MS`), whose
+  - The schedule is a list of delays, `BACKFILL_RETRY_DELAYS_MS` in
+    `interfaces/page-link-backfill.ts` (shared because the admin settings show the cap), whose
     length is the cap. The failure write takes it as a parameter and picks the delay on the
     database, from the stored count in the same write, so the count and the retry time cannot
     disagree.
@@ -1268,8 +1292,11 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
   document missing stops the poll, as at rest. The rows in `pagelinks` stay valid either way.
 - The backlinks panel shows an "index still building / partial" state whenever coverage is not `all`
   or a run is active, so a gated or in-progress backfill is a visible gap and not a silent one; for
-  a partial index it says that pages not edited since `coveredSince` are not included (4.4). Whether
-  the coverage summary rides on the backlinks response or on its own hook is a B3 choice.
+  a partial index it says that pages not edited since `coveredSince` are not included (4.4). The
+  coverage summary rides on `GET /page/backlinks` as `indexState: { coverage, coveredSince } | null`,
+  not on the admin endpoint, which is admin-only: one read of the job document with no page counts
+  and no boot upsert, and `null` when that read fails (the panel then shows no notice). No run is
+  ever outstanding at coverage `all`, so "coverage is not `all`" is the whole condition.
 
 ## Data Models
 
