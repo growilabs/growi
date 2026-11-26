@@ -1170,7 +1170,7 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
   | `failed`, retry due (`retryAt` set) | the last error, and when it retries (`retryAt`, retry `failedAttempts` of 3) | Stop, or Resume to retry now; Start disabled |
   | `failed`, no retry due | the last error; it is not retried | Resume, or a new scope + Start |
   | `stopped` | where it stopped (processed of `runTotal`) | Resume, or a new scope + Start |
-  | `coverage: partial`, idle | "Backlinks are built only for the newer pages", then `<coveredSince>` and "about N" older pages not included, each on its own labelled line | scope picker + Start |
+  | `coverage: partial`, idle | "Backlinks are built only for the newer pages", then `<coveredSince>` and "about N of <total>" older pages not included, each on its own labelled line | scope picker + Start |
   | `coverage: all` | "Backlinks are indexed for all pages (completed `<completedAt>`)" | none |
 
   The line stays after completion instead of hiding the whole section, so an admin who comes back can
