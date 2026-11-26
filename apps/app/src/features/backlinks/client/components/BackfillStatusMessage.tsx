@@ -102,6 +102,7 @@ export const BackfillStatusMessage = ({ kind, state }: Props): JSX.Element => {
                 <dd className="fw-bold mb-1">
                   {t('admin:backlinks_backfill.not_included_pages', {
                     pages: state.notIncludedCount,
+                    total: state.totalPageCount,
                   })}
                 </dd>
               </div>

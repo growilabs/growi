@@ -397,7 +397,7 @@
     "partial": "Les rétroliens ne sont construits que pour les pages les plus récentes.",
     "covered_since": "Inclut les pages modifiées depuis le",
     "not_included": "Pages plus anciennes pas encore incluses",
-    "not_included_pages": "environ {{pages}} pages",
+    "not_included_pages": "environ {{pages}} pages sur {{total}}",
     "all": "Les rétroliens sont indexés pour toutes les pages (terminé le {{completedAt}}).",
     "scope": "Pages à inclure",
     "scope_all": "Toutes les pages",

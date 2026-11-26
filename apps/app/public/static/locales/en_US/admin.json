@@ -399,7 +399,7 @@
     "partial": "Backlinks are built only for the newer pages.",
     "covered_since": "Includes pages edited since",
     "not_included": "Older pages not included yet",
-    "not_included_pages": "about {{pages}} pages",
+    "not_included_pages": "about {{pages}} of {{total}} pages",
     "all": "Backlinks are indexed for all pages (completed {{completedAt}}).",
     "scope": "Pages to include",
     "scope_all": "All pages",

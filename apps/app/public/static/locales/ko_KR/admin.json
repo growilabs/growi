@@ -377,7 +377,7 @@
     "partial": "백링크는 최신 페이지에 대해서만 생성되었습니다.",
     "covered_since": "다음 시점 이후 편집된 페이지 포함",
     "not_included": "아직 포함되지 않은 오래된 페이지",
-    "not_included_pages": "약 {{pages}}개 페이지",
+    "not_included_pages": "전체 {{total}}개 중 약 {{pages}}개 페이지",
     "all": "모든 페이지의 백링크가 색인되었습니다({{completedAt}}에 완료).",
     "scope": "포함할 페이지",
     "scope_all": "모든 페이지",

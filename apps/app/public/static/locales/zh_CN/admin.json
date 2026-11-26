@@ -399,7 +399,7 @@
     "partial": "反向链接仅为较新的页面构建。",
     "covered_since": "包含自此以来编辑的页面",
     "not_included": "尚未包含的较旧页面",
-    "not_included_pages": "约 {{pages}} 个页面",
+    "not_included_pages": "共 {{total}} 个页面中约 {{pages}} 个",
     "all": "所有页面的反向链接均已建立索引（完成于 {{completedAt}}）。",
     "scope": "包含的页面",
     "scope_all": "所有页面",
