@@ -80,6 +80,13 @@ describe('filterUsersWhoCanViewPage', () => {
           { item: externalGroupId, type: GroupType.externalUserGroup },
         ],
       },
+      bothGroups: {
+        grant: PageGrant.GRANT_USER_GROUP,
+        grantedGroups: [
+          { item: userGroupId, type: GroupType.userGroup },
+          { item: externalGroupId, type: GroupType.externalUserGroup },
+        ],
+      },
     };
     for (const [key, seed] of Object.entries(seeds)) {
       // biome-ignore lint/performance/noAwaitInLoops: a few fixture pages
@@ -111,6 +118,7 @@ describe('filterUsersWhoCanViewPage', () => {
     ['owner', ['owner']],
     ['userGroup', ['groupMember']],
     ['externalGroup', ['externalMember']],
+    ['bothGroups', ['groupMember', 'externalMember']],
   ])('keeps exactly the users who can open the %s page', async (key, expected) => {
     const page = pages[key];
 

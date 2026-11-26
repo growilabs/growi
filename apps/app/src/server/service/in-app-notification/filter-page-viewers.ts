@@ -3,8 +3,10 @@ import { getIdForRef, PageGrant as PageGrantValues } from '@growi/core';
 import mongoose from 'mongoose';
 
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
+import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils';
 import type { PageModel } from '~/server/models/page';
 import UserGroupRelation from '~/server/models/user-group-relation';
+import { divideByType } from '~/server/util/granted-group';
 
 type PageGrantFields = {
   // null for a page stored without a grant, which generateGrantCondition treats as public
@@ -58,21 +60,38 @@ const grantOfLastKnown = (page: LastKnownPageGrant): PageGrantFields | null =>
         grantedGroups: page.grantedGroups ?? [],
       };
 
-const findGroupMemberIds = async (
+const findMembersAmong = async (
   grantedGroups: readonly IGrantedGroup[],
+  userIds: readonly string[],
 ): Promise<ReadonlySet<string>> => {
-  const groupIds = grantedGroups.map((g) => getIdForRef(g.item));
-  const [memberIds, externalMemberIds] = await Promise.all([
-    UserGroupRelation.findAllUserIdsForUserGroups(groupIds),
-    ExternalUserGroupRelation.findAllUserIdsForUserGroups(groupIds),
+  const { grantedUserGroups, grantedExternalUserGroups } = divideByType([
+    ...grantedGroups,
   ]);
-  return new Set([...memberIds, ...externalMemberIds]);
+  const query = (groupIds: readonly ObjectIdLike[]) => ({
+    relatedGroup: { $in: groupIds },
+    relatedUser: { $in: userIds },
+  });
+  const [members, externalMembers] = await Promise.all([
+    grantedUserGroups.length === 0
+      ? []
+      : UserGroupRelation.distinct('relatedUser', query(grantedUserGroups)),
+    grantedExternalUserGroups.length === 0
+      ? []
+      : ExternalUserGroupRelation.distinct(
+          'relatedUser',
+          query(grantedExternalUserGroups),
+        ),
+  ]);
+  return new Set([...members, ...externalMembers].map(String));
 };
 
 // Mirrors generateGrantCondition (models/page.ts) with includeAnyoneWithTheLink:
 // a link-only page is viewable by whoever has its id, which a notification
 // recipient has anyway.
-const findPageViewers = async (page: PageGrantFields): Promise<PageViewers> => {
+const findViewersAmong = async (
+  page: PageGrantFields,
+  userIds: readonly string[],
+): Promise<PageViewers> => {
   switch (page.grant) {
     case null:
     case PageGrantValues.GRANT_PUBLIC:
@@ -89,7 +108,7 @@ const findPageViewers = async (page: PageGrantFields): Promise<PageViewers> => {
     case PageGrantValues.GRANT_USER_GROUP:
       return {
         scope: 'only',
-        userIds: await findGroupMemberIds(page.grantedGroups),
+        userIds: await findMembersAmong(page.grantedGroups, userIds),
       };
     default:
       return NOBODY;
@@ -105,8 +124,17 @@ export const filterUsersWhoCanViewPage = async (
   lastKnown: LastKnownPageGrant,
   userIds: readonly Ref<IUser>[],
 ): Promise<Ref<IUser>[]> => {
+  if (userIds.length === 0) {
+    return [];
+  }
   const grant = (await findStoredGrant(pageId)) ?? grantOfLastKnown(lastKnown);
-  const viewers = grant == null ? NOBODY : await findPageViewers(grant);
+  const viewers =
+    grant == null
+      ? NOBODY
+      : await findViewersAmong(
+          grant,
+          userIds.map((id) => getIdForRef(id).toString()),
+        );
   if (viewers.scope === 'anyone') {
     return [...userIds];
   }
