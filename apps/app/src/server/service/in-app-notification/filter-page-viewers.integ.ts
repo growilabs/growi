@@ -13,13 +13,18 @@ import { filterUsersWhoCanViewPage } from './filter-page-viewers';
 
 const WORKER_ID = process.env.VITEST_WORKER_ID ?? '1';
 const PREFIX = `/filter-page-viewers-integ-${WORKER_ID}`;
-const USER_NAMES = ['owner', 'groupMember', 'externalMember', 'outsider'];
+const USER_NAMES = [
+  'owner',
+  'groupMember',
+  'externalMember',
+  'outsider',
+] as const;
 
 type UserName = (typeof USER_NAMES)[number];
 
 describe('filterUsersWhoCanViewPage', () => {
   let Page: PageModel;
-  const users: Record<UserName, HydratedDocument<IUserHasId>> = {};
+  let users: Record<UserName, HydratedDocument<IUserHasId>>;
   const pages: Record<string, HydratedDocument<PageDocument>> = {};
   let userGroupId: Types.ObjectId;
   let externalGroupId: Types.ObjectId;
@@ -35,16 +40,19 @@ describe('filterUsersWhoCanViewPage', () => {
     Page = mongoose.model<PageDocument, PageModel>('Page');
     const User = mongoose.model<IUserHasId>('User');
 
-    for (const name of USER_NAMES) {
+    const createUser = (name: UserName) => {
       const username = `fpv-${name}-${WORKER_ID}`;
-      // biome-ignore lint/performance/noAwaitInLoops: a few fixture users
-      users[name] = await User.create({
+      return User.create({
         name: username,
         username,
         email: `${username}@example.com`,
         status: 2,
       });
-    }
+    };
+    const [owner, groupMember, externalMember, outsider] = await Promise.all(
+      USER_NAMES.map(createUser),
+    );
+    users = { owner, groupMember, externalMember, outsider };
 
     const userGroup = await UserGroup.create({ name: `fpv-g-${WORKER_ID}` });
     userGroupId = userGroup._id;
