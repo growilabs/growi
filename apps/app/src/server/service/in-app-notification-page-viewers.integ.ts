@@ -1,5 +1,6 @@
 import {
   GroupType,
+  type IPage,
   type IUserHasId,
   PageGrant,
   SubscriptionStatusType,
@@ -8,14 +9,17 @@ import mongoose, { type HydratedDocument, Types } from 'mongoose';
 
 import { getInstance } from '^/test/setup/crowi';
 
-import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
+import {
+  SupportedAction,
+  type SupportedActionType,
+  SupportedTargetModel,
+} from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
 import { InAppNotification } from '~/server/models/in-app-notification';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import Subscription from '~/server/models/subscription';
 import UserGroup from '~/server/models/user-group';
 import UserGroupRelation from '~/server/models/user-group-relation';
-import { emitPageUpdateActivity } from '~/server/service/page-save/page-notifications';
 import { preNotifyService } from '~/server/service/pre-notify';
 import { prisma } from '~/utils/prisma';
 
@@ -69,21 +73,9 @@ describe('in-app notifications about a page reach only subscribers who can view 
     grantedGroups: [{ item: userGroupId, type: GroupType.userGroup }],
   });
 
-  // The in-app notification listener is async and emit() does not wait for it.
   const notifiedUsernames = async (
     page: HydratedDocument<PageDocument>,
-    expectedCount: number,
   ): Promise<string[]> => {
-    for (let i = 0; i < 40; i++) {
-      // biome-ignore lint/performance/noAwaitInLoops: polling
-      const count = await InAppNotification.countDocuments({
-        target: page._id,
-      });
-      if (count >= expectedCount) break;
-      await new Promise((resolve) => setTimeout(resolve, 50));
-    }
-    // give a wrongly addressed notification time to land
-    await new Promise((resolve) => setTimeout(resolve, 300));
     const notifications = await InAppNotification.find({
       target: page._id,
     }).lean();
@@ -93,21 +85,30 @@ describe('in-app notifications about a page reach only subscribers who can view 
       .map((user) => user.username);
   };
 
-  const emitBookmark = async (page: HydratedDocument<PageDocument>) => {
+  // Awaits what the activity listener runs, so every notification is written
+  // before the test reads them.
+  const deliver = async (
+    action: SupportedActionType,
+    page: HydratedDocument<PageDocument>,
+    eventTarget: IPage,
+  ): Promise<void> => {
     const activity = await crowi.activityService.createActivity({
-      action: SupportedAction.ACTION_PAGE_BOOKMARK,
+      action,
       targetModel: SupportedTargetModel.MODEL_PAGE,
       target: page,
       user: String(actor._id),
       snapshot: { username: actor.username },
     });
     if (activity == null) {
-      throw new Error('the bookmark activity was not recorded');
+      throw new Error(`the ${action} activity was not recorded`);
     }
-    crowi.events.activity.emit(
-      'updated',
+    const service = crowi.inAppNotificationService;
+    if (service == null) {
+      throw new Error('inAppNotificationService is not initialized');
+    }
+    await service.createInAppNotification(
       activity,
-      page,
+      eventTarget,
       preNotifyService.generatePreNotify(activity),
     );
   };
@@ -145,9 +146,9 @@ describe('in-app notifications about a page reach only subscribers who can view 
       grant: PageGrant.GRANT_PUBLIC,
     });
 
-    await emitBookmark(page);
+    await deliver(SupportedAction.ACTION_PAGE_BOOKMARK, page, page);
 
-    expect(await notifiedUsernames(page, 2)).toEqual([
+    expect(await notifiedUsernames(page)).toEqual([
       member.username,
       outsider.username,
     ]);
@@ -156,21 +157,21 @@ describe('in-app notifications about a page reach only subscribers who can view 
   it('does not notify a subscriber outside the group of a group-only page', async () => {
     const page = await createSubscribedPage('bookmarked', groupOnly());
 
-    await emitBookmark(page);
+    await deliver(SupportedAction.ACTION_PAGE_BOOKMARK, page, page);
 
-    expect(await notifiedUsernames(page, 1)).toEqual([member.username]);
+    expect(await notifiedUsernames(page)).toEqual([member.username]);
   });
 
-  it('applies the same rule to notifications of a page update', async () => {
+  it('applies the same rule to a page update, whose event carries no grant', async () => {
     const page = await createSubscribedPage('updated', groupOnly());
+    // The shape emitPageUpdateActivity emits; activity events are not type-checked.
+    const updateEventTarget = {
+      path: page.path,
+      creator: actor._id,
+    } as unknown as IPage;
 
-    const emitted = await emitPageUpdateActivity(crowi, {
-      activityId: new Types.ObjectId().toString(),
-      page,
-      user: actor,
-    });
+    await deliver(SupportedAction.ACTION_PAGE_UPDATE, page, updateEventTarget);
 
-    expect(emitted).toBe(true);
-    expect(await notifiedUsernames(page, 1)).toEqual([member.username]);
+    expect(await notifiedUsernames(page)).toEqual([member.username]);
   });
 });
