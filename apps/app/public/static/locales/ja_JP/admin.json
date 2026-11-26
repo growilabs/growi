@@ -1274,6 +1274,9 @@
     "ADMIN_SEARCH_CONNECTION": "Elasticsearch の再接続の試行",
     "ADMIN_SEARCH_INDICES_NORMALIZE": "Elasticsearch のインデックスの正規化",
     "ADMIN_SEARCH_INDICES_REBUILD": "Elasticsearch のインデックスのリビルド",
+    "ADMIN_BACKLINKS_BACKFILL_START": "バックリンクのバックフィルを開始",
+    "ADMIN_BACKLINKS_BACKFILL_STOP": "バックリンクのバックフィルを停止",
+    "ADMIN_BACKLINKS_BACKFILL_RESUME": "バックリンクのバックフィルを再開",
     "ADMIN_PAGE_BULK_EXPORT_SETTINGS_UPDATE": "ページ一括エクスポート設定の更新"
   },
   "g2g": {

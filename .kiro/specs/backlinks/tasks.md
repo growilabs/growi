@@ -614,7 +614,7 @@ Independent of B4/B5.
   - _Boundary: PageService (page events), PageLinkService_
   - _Depends: B1.12_
 
-- [ ] B3.6 Add the admin start, state, stop and resume endpoints
+- [x] B3.6 Add the admin start, state, stop and resume endpoints
   - Add apiv3 admin routes behind `loginRequired` and `adminRequired`: GET the job state (status,
     processed and `runTotal` while a run is active, `coverage`, `coveredSince`, `completedAt`,
     `lastError`, and, computed on read, the number of pages not yet included and the total page count
@@ -623,18 +623,19 @@ Independent of B4/B5.
     status `requested` and clears the previous run's `runCutoff`, `runTotal`, `progressMarker`,
     `processed` and `skippedPages` in the same write (the loop treats a claimed job with
     `runTotal == null` as a new run, design.md; without the reset a new start resumes the old
-    range); POST stop, which cancels an unclaimed request, sets `stopRequested` on a running
+    range); POST stop, which cancels an unclaimed request (a new run's back to rest, a resumed
+    run's back to `stopped`), sets `stopRequested` on a running
     run, and sets `stopped` directly when the run's lease has expired or when the job is `failed`
     with a retry due (clearing `failedAttempts` and `retryAt`); and POST resume, valid in `stopped`
     and `failed`, which sets `requested`, keeps the scope, `runCutoff` and the
-    marker, and resets `failedAttempts` and `retryAt`. A start also resets `failedAttempts` and
-    `retryAt`. After start or resume writes `requested`, call the `PageLinkService` method from
+    marker, resets `failedAttempts` and `retryAt` and clears `lastError`. A start also resets
+    `failedAttempts` and `retryAt`, clears `lastError` and releases any claim. After start or resume writes `requested`, call the `PageLinkService` method from
     B3.3 that starts the poll in this process and claims at once; respond without waiting for the
     run. Validate the scope (N a positive integer, the date not in the future). Reject a start while
     a run is active (`requested`, `running` with a live lease, or `failed` with a retry due) and
     when coverage is `all`. Run the boot upsert before reading or writing, so a missing job document
     is recreated (design.md, "If the document goes missing"). GET returns `failedAttempts` and
-    `retryAt`
+    `retryAt`. Start, stop and resume record an admin audit activity (design.md, "Audit log")
   - Done when a non-admin is refused on every route; a valid start writes the request, clears the
     previous run's fields, and returns the state; a new start after a completed or stopped run walks
     its own range rather than resuming the old one; a start while a run is active, with coverage `all`, or with an invalid scope is rejected
@@ -642,7 +643,10 @@ Independent of B4/B5.
     the number of seeded pages older than `coveredSince` and excludes pages the walk skips; stop cancels an
     unclaimed request, flags a running one, and ends an expired-lease run and a `failed` job with a
     retry due directly; resume is accepted in `stopped` and `failed` and rejected otherwise; a start or resume is claimed in the same process without waiting for a
-    tick; with the job document deleted, GET reports "not started" and a start succeeds
+    tick; with the job document deleted, GET reports "not started" and a start succeeds; a
+    successful start, stop or resume settles its audit action with the admin as the operator,
+    emitted before the response, a refused or invalid one leaves an unsettled attempt, and GET
+    records nothing
   - _Requirements: 4.5, 4.6, 4.8, 4.9, 4.10_
   - _Boundary: backlinks-backfill-admin routes_
   - _Depends: B3.1, B3.3_

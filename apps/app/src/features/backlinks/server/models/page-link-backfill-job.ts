@@ -1,5 +1,6 @@
 import type { Prisma, PrismaClient } from '~/generated/prisma/client';
 
+import type { BackfillScopeOf } from '../../interfaces/page-link-backfill';
 import { throwOnWriteErrors } from './throw-on-write-errors';
 
 const COLLECTION = 'pagelinkbackfilljobs';
@@ -31,6 +32,9 @@ export type BackfillCoverageRecord =
   | { readonly coverage: 'partial'; readonly coveredSince: Date }
   | { readonly coverage: 'all' };
 
+/** A validated start scope, as stored in `requestedScope`. */
+export type BackfillScope = BackfillScopeOf<Date>;
+
 /** The checkpoint's view of the admin-owned fields, from the document it just wrote. */
 export interface BackfillCheckpointReply {
   readonly stopRequested: boolean;
@@ -59,6 +63,31 @@ const assertValidRetryDelays = (retryDelaysMs: readonly number[]): void => {
 const toOid = (hex: string | null) => (hex != null ? { $oid: hex } : null);
 const toDate = (date: Date | null) =>
   date != null ? { $date: date.toISOString() } : null;
+
+// Held by someone, with a lease not yet past; `tryClaim` takes a `running` job over exactly when
+// this is false.
+const HOLDS_LIVE_LEASE = {
+  $and: [
+    { $ne: ['$claimedBy', null] },
+    { $not: [{ $lt: ['$leaseExpiresAt', '$$NOW'] }] },
+  ],
+};
+
+const IS_RUNNING_WITH_LIVE_LEASE = {
+  $and: [{ $eq: ['$status', 'running'] }, HOLDS_LIVE_LEASE],
+};
+
+// A failed run the poll will retry on its own. In `$expr` null and a missing field sort before
+// every date, so `$gt` null is the test for "set".
+const IS_FAILED_WITH_RETRY_DUE = {
+  $and: [{ $eq: ['$status', 'failed'] }, { $gt: ['$retryAt', null] }],
+};
+
+const toStoredScope = (scope: BackfillScope) => ({
+  kind: scope.kind,
+  maxPages: scope.kind === 'maxPages' ? scope.maxPages : null,
+  since: toDate(scope.kind === 'since' ? scope.since : null),
+});
 
 const progressFields = (progress: BackfillProgress) => ({
   progressMarker: toOid(progress.progressMarker),
@@ -167,6 +196,142 @@ export const createPageLinkBackfillJobModel = (
     },
 
     /**
+     * The admin's start: write the request and clear the previous run, so the loop's first claim
+     * treats it as a new run over its own range. Refused while a run is active (`requested`,
+     * `running` under a live lease, or `failed` with a retry due) and once coverage is `all`; a
+     * dead owner's later fenced writes are refused too, since the job is no longer `running`.
+     *
+     * @returns whether the request was written
+     */
+    async requestStart(scope: BackfillScope): Promise<boolean> {
+      const result = await client.$runCommandRaw({
+        findAndModify: COLLECTION,
+        query: {
+          _id: JOB_ID,
+          coverage: { $ne: 'all' },
+          status: { $ne: 'requested' },
+          $expr: {
+            $not: [
+              { $or: [IS_RUNNING_WITH_LIVE_LEASE, IS_FAILED_WITH_RETRY_DUE] },
+            ],
+          },
+        },
+        update: {
+          $set: {
+            status: 'requested',
+            requestedScope: toStoredScope(scope),
+            stopRequested: false,
+            runCutoff: null,
+            runTotal: null,
+            ...progressFields({
+              progressMarker: null,
+              processed: 0,
+              skippedPages: 0,
+            }),
+            ...releaseClaimFields,
+            ...noFailureFields,
+            lastError: null,
+          },
+          $currentDate: { requestedAt: true },
+        },
+        new: true,
+      });
+      throwOnWriteErrors(result, 'backfill job requestStart');
+      return result.value != null;
+    },
+
+    /**
+     * The admin's Stop, decided in one write from the state it finds:
+     * - `requested`: the request is cancelled. A new run's goes back to `idle` with the request
+     *   cleared; a resumed run's goes back to `stopped`, so it can still be resumed.
+     * - `running` under a live lease: `stopRequested`, which the loop acts on at its checkpoint.
+     * - `running` whose lease has expired: `stopped` with the claim released, since no loop will
+     *   see the flag; the dead owner's later fenced writes are refused.
+     * - `failed` with a retry due: `stopped`, with the retry cancelled. Nobody holds the claim
+     *   while a retry waits, so nothing else has to see the Stop.
+     *
+     * @returns whether the Stop applied; false in any other state
+     */
+    async requestStop(): Promise<boolean> {
+      const isRequested = { $eq: ['$status', 'requested'] };
+      const isNewRunRequest = {
+        $and: [isRequested, { $eq: ['$runTotal', null] }],
+      };
+      const keepIfLive = (field: string) => ({
+        $cond: [IS_RUNNING_WITH_LIVE_LEASE, field, null],
+      });
+      const keepUnlessNewRunRequest = (field: string) => ({
+        $cond: [isNewRunRequest, null, field],
+      });
+
+      const result = await client.$runCommandRaw({
+        findAndModify: COLLECTION,
+        query: {
+          _id: JOB_ID,
+          $or: [
+            { status: { $in: ['requested', 'running'] } },
+            { status: 'failed', retryAt: { $ne: null } },
+          ],
+        },
+        update: [
+          {
+            $set: {
+              status: {
+                $cond: [
+                  isNewRunRequest,
+                  'idle',
+                  {
+                    $cond: [IS_RUNNING_WITH_LIVE_LEASE, 'running', 'stopped'],
+                  },
+                ],
+              },
+              stopRequested: IS_RUNNING_WITH_LIVE_LEASE,
+              claimedBy: keepIfLive('$claimedBy'),
+              leaseExpiresAt: keepIfLive('$leaseExpiresAt'),
+              requestedScope: keepUnlessNewRunRequest('$requestedScope'),
+              requestedAt: keepUnlessNewRunRequest('$requestedAt'),
+              // A failed run's count ends with the Stop; a live run keeps its own until it settles.
+              failedAttempts: {
+                $cond: [IS_FAILED_WITH_RETRY_DUE, 0, '$failedAttempts'],
+              },
+              retryAt: null,
+            },
+          },
+        ],
+        new: true,
+      });
+      throwOnWriteErrors(result, 'backfill job requestStop');
+      return result.value != null;
+    },
+
+    /**
+     * The admin's Resume of a `stopped` or `failed` run: request it again, keeping its scope,
+     * cutoff, total, marker and counts, so the next claim continues where it stopped. A failed
+     * run gets its retries again, and its old error is cleared; one with a retry due is retried
+     * now instead of at `retryAt`.
+     *
+     * @returns whether the job was `stopped` or `failed` and is now requested
+     */
+    async requestResume(): Promise<boolean> {
+      const result = await client.$runCommandRaw({
+        findAndModify: COLLECTION,
+        query: { _id: JOB_ID, status: { $in: ['stopped', 'failed'] } },
+        update: {
+          $set: {
+            status: 'requested',
+            stopRequested: false,
+            ...noFailureFields,
+            lastError: null,
+          },
+          $currentDate: { requestedAt: true },
+        },
+        new: true,
+      });
+      throwOnWriteErrors(result, 'backfill job requestResume');
+      return result.value != null;
+    },
+
+    /**
      * Atomically claim the job for `owner`. Succeeds only for a `requested` job, a `running`
      * one that nobody holds or whose holder's lease has expired, or a `failed` one whose
      * `retryAt` has passed. Any other job is never handed out (rationale: design.md, "Stop and
@@ -199,20 +364,14 @@ export const createPageLinkBackfillJobModel = (
               {
                 $and: [
                   { $eq: ['$status', 'running'] },
-                  {
-                    $or: [
-                      { $eq: ['$claimedBy', null] },
-                      { $lt: ['$leaseExpiresAt', '$$NOW'] },
-                    ],
-                  },
+                  { $not: [HOLDS_LIVE_LEASE] },
                 ],
               },
               {
+                // Without the "set" test a bare `$lte` would also hand out a job whose retries
+                // are used up: null sorts before `$$NOW`.
                 $and: [
-                  { $eq: ['$status', 'failed'] },
-                  // In `$expr` null and a missing field sort before every date, so a bare `$lte`
-                  // would hand out a job whose retries are used up.
-                  { $gt: ['$retryAt', null] },
+                  IS_FAILED_WITH_RETRY_DUE,
                   { $lte: ['$retryAt', '$$NOW'] },
                 ],
               },

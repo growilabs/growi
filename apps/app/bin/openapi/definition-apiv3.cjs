@@ -101,6 +101,7 @@ module.exports = {
         'AppSettings',
         'AiSettings',
         'ChangeProposalSettings',
+        'BacklinksBackfill',
         'ExternalUserGroups',
         'SecuritySetting',
         'MarkDownSetting',

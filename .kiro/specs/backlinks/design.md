@@ -250,6 +250,9 @@ apps/app/src/features/backlinks/
   `PageLinkService.startBackfillPoll()`, which schedules the backfill poll only while a run is
   outstanding.
 - `apps/app/src/server/routes/apiv3/index.js` — register the backlinks route.
+- `apps/app/src/interfaces/activity.ts` — **(B3)** the backfill's three admin audit actions
+  (`ADMIN_BACKLINKS_BACKFILL_START` / `_STOP` / `_RESUME`, large action group), with their labels
+  in every locale's `admin.json`.
 - `apps/app/src/server/models/page-redirect.ts` — add `retrieveFromPathsRedirectingTo` (the reverse
   walk: which paths reach a given one) and re-implement `removePageRedirectsByToPath` over it, so
   that pipeline exists once as well. Add the `retrievePageRedirectEndpointsBatch`
@@ -1152,8 +1155,10 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
   rejects while a run is active or when coverage is `all`); hiding the control is a convenience, not
   the check.
 - **Stop and resume.** Stop is an admin-owned `stopRequested` flag on the job document.
-  - A request not yet claimed (`requested`) is cancelled: the request is cleared and the document
-    returns to rest, with coverage unchanged.
+  - A request not yet claimed (`requested`) is cancelled, with coverage unchanged. A new run's
+    request (`runTotal` null) is cleared and the document returns to rest. A resumed run's request
+    returns to `stopped` with its scope, range, marker and counts, so it can still be resumed; this
+    holds for a resumed `failed` run too, since the admin halted it.
   - For a `running` run the endpoint sets `stopRequested`. The loop checks it at each checkpoint,
     saves the marker and counts, releases its claim, sets `stopped`, clears the flag and exits, so
     Resume does not wait for the lease to expire. The stop takes effect at the next checkpoint plus
@@ -1170,10 +1175,18 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
   - Resume (`POST resume`, valid in `stopped` and `failed`) sets `requested`
     and keeps `requestedScope`, `runCutoff` and the marker, so the run continues over the same range
     and redoes at most one checkpoint interval (idempotent upserts), the same path as crash
-    recovery. It resets `failedAttempts` and `retryAt`, so a resumed run gets its retries again. A
-    new start with a scope resets the marker and the retry fields instead. Neither a `stopped`
+    recovery. It resets `failedAttempts` and `retryAt` and clears `lastError`, so a resumed run gets
+    its retries again and the error shown is always the current run's. A new start with a scope
+    resets the marker and the retry fields instead. Neither a `stopped`
     document nor a `failed` one with no retry due is picked up by the poll.
   - Stopping never changes coverage: `coveredSince` moves only on completion.
+- **Audit log.** Start, Stop and Resume each record an admin audit `Activity` for the admin who
+  made the request: `ADMIN_BACKLINKS_BACKFILL_START`, `_STOP` and `_RESUME`, in the large action
+  group like `ADMIN_SEARCH_INDICES_REBUILD`. The routes follow
+  `apps/app/.claude/rules/activity-recording.md`: `addActivity` runs after the auth chain, and the
+  action is emitted after the write succeeds and before the response. A refused or invalid
+  request (a 409 or 400) is therefore recorded as an unsettled attempt. Reading the state records
+  nothing. The row does not carry the scope, as the search-index rebuild's carries no detail.
 - **GROWI.cloud: the same control as on-prem, bounded by the per-app limits only.** GROWI.cloud apps
   share a MongoDB, and a duty cycle bounds one app's busy share, not the total: many customer admins
   starting a full backfill at about the same time would load the shared cluster at (apps × duty).
@@ -1208,10 +1221,13 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
   value falls back, with a warning, to its default).
 - **The job document is both the control and the status surface.** The app upserts it at boot
   (`$setOnInsert`: idle, `coverage: none`); the admin endpoints write the request (`requestedScope`,
-  `requestedAt`, `stopRequested`); the job writes everything else (`status`, `runCutoff`,
+  `requestedAt`, `stopRequested`) and `status`; the job writes everything else (`runCutoff`,
   `coverage`, `coveredSince`, progress marker, `processed`, `skippedPages`, `runTotal`,
-  claim/lease, `completedAt`, `lastError`, `failedAttempts`, `retryAt`); Start and Resume also
-  reset `failedAttempts` and `retryAt`. It is a document and not a config key because completion
+  claim/lease, `completedAt`, `lastError`, `failedAttempts`, `retryAt`). Besides the request, the
+  endpoints only ever reset job-written fields: Start clears the previous run (`runCutoff`,
+  `runTotal`, the marker and counts, `lastError`, the retry fields) and releases any claim; Resume
+  resets the retry fields and clears `lastError`; Stop releases an expired or retry-waiting run's
+  claim and retry fields. It is a document and not a config key because completion
   is state the job writes, not a setting an operator edits, and a copy in config could disagree
   with it. The tick reads the document directly from the database, not through
   `configManager`. `complete` is not terminal: the document returns to rest after a run, and a new

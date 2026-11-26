@@ -1285,6 +1285,9 @@
     "ADMIN_SEARCH_CONNECTION": "Attempting to reconnect to Elasticsearch",
     "ADMIN_SEARCH_INDICES_NORMALIZE": "Normalize of Elasticsearch indexes",
     "ADMIN_SEARCH_INDICES_REBUILD": "Rebuild Elasticsearch indexes",
+    "ADMIN_BACKLINKS_BACKFILL_START": "Start the backlinks backfill",
+    "ADMIN_BACKLINKS_BACKFILL_STOP": "Stop the backlinks backfill",
+    "ADMIN_BACKLINKS_BACKFILL_RESUME": "Resume the backlinks backfill",
     "ADMIN_PAGE_BULK_EXPORT_SETTINGS_UPDATE": "Update Page Bulk Export Settings"
   },
   "g2g": {

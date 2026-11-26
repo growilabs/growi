@@ -1274,6 +1274,9 @@
     "ADMIN_SEARCH_CONNECTION": "重试Elasticsearch连接",
     "ADMIN_SEARCH_INDICES_NORMALIZE": "试图重新连接Elasticsearch",
     "ADMIN_SEARCH_INDICES_REBUILD": "重建 Elasticsearch 索引",
+    "ADMIN_BACKLINKS_BACKFILL_START": "开始反向链接回填",
+    "ADMIN_BACKLINKS_BACKFILL_STOP": "停止反向链接回填",
+    "ADMIN_BACKLINKS_BACKFILL_RESUME": "恢复反向链接回填",
     "ADMIN_PAGE_BULK_EXPORT_SETTINGS_UPDATE": "更新页面批量导出设置"
   },
   "g2g": {

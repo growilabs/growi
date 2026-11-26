@@ -5,6 +5,7 @@ import { factory as aiToolsRouteFactory } from '~/features/ai-tools/server/route
 import { createAiUsageRouter } from '~/features/ai-usage/server';
 import { factory as auditLogBulkExportRouteFactory } from '~/features/audit-log-bulk-export/server/routes/apiv3';
 import { getBacklinksHandlerFactory } from '~/features/backlinks/server/routes/backlinks';
+import { createBacklinksBackfillAdminRouter } from '~/features/backlinks/server/routes/backlinks-backfill-admin';
 import {
   createChangeProposalAdminRouter,
   createChangeProposalRouter,
@@ -132,6 +133,10 @@ export const setup = (crowi, app) => {
   routerForAdmin.use('/export', setupExport(crowi));
   routerForAdmin.use('/import', importRoute(crowi));
   routerForAdmin.use('/search', setupSearch(crowi));
+  routerForAdmin.use(
+    '/backlinks-backfill',
+    createBacklinksBackfillAdminRouter(crowi),
+  );
   // Not feature-gated: this is where an admin enables attachment search.
   routerForAdmin.use(
     '/admin/attachment-search',
