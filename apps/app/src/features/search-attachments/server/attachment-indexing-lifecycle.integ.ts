@@ -440,6 +440,31 @@ describe.skipIf(process.env.ELASTICSEARCH_URI == null)(
         expect(await docsOfAttachment(NAMES.alias, deleted)).toEqual([]);
       });
 
+      it('leaves out of the new index the docs of a page that no longer exists', async () => {
+        const kept = await upload(
+          fixtureFileContent({ pages: 1, word: `zzstay${RUN}` }),
+        );
+        const { Page } = crowi.models;
+        const gonePage = await Page.create({
+          path: `/attlife-gone-${RUN}`,
+          grant: PageGrant.GRANT_PUBLIC,
+          creator: user._id,
+          lastUpdateUser: user._id,
+        });
+        const orphan = await upload(
+          fixtureFileContent({ pages: 2, word: `zzorphan${RUN}` }),
+          gonePage._id.toString(),
+        );
+        // the page goes without its attachments, as a page deletion leaves them
+        await Page.deleteMany({ _id: gonePage._id });
+
+        expect(batch().startRebuild(async () => {})).toBe(true);
+        await waitForRebuildToEnd();
+
+        expect(await docsOfAttachment(NAMES.alias, orphan)).toEqual([]);
+        expect(await docsOfAttachment(NAMES.alias, kept)).toHaveLength(1);
+      });
+
       it('leaves out of the new index an attachment deleted while the rebuild extracts it', async () => {
         const holdKey = `hold-b-${RUN}`;
         const victim = await uploadUnindexed(

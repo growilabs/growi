@@ -80,6 +80,7 @@ export { buildDocx, docxParts } from './docx';
 export {
   buildEncryptedDocx,
   buildEncryptedPptx,
+  buildEncryptedWithFarEndRecord,
   buildEncryptedXlsx,
   ENCRYPTED_MARKER,
   OFFICE_PASSWORD,

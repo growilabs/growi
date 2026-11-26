@@ -193,7 +193,7 @@ describe('convertPdf', () => {
     });
   });
 
-  describe('Japanese line-break joining (the PDF route only, Req 2.5)', () => {
+  describe('Japanese line-break joining (the PDF route only)', () => {
     it('closes the gap between two Japanese lines', async () => {
       const pages = await convertPdf(
         buildJapaneseLinesPdf(['日本', '語です']),
@@ -216,6 +216,36 @@ describe('convertPdf', () => {
       const pages = await convertPdf(buildTextPdf(['Hello world']), limits());
 
       expect(pages[0]?.content.trim()).toBe('Hello world');
+    });
+  });
+
+  describe('result size limit', () => {
+    it('stops a PDF whose first page alone exceeds the limit as result_too_large', async () => {
+      const bytes = buildTextPdf(['Hello world']);
+      const [page] = await convertPdf(bytes, limits());
+      const pageBytes = Buffer.byteLength(page?.content ?? '', 'utf8');
+
+      const failure = await conversionErrorOf(() =>
+        convertPdf(bytes, conversionLimits({ maxResultBytes: pageBytes - 1 })),
+      );
+
+      expect(failure.kind).toBe('result_too_large');
+    });
+
+    it('accepts a PDF whose pages add up to exactly the limit', async () => {
+      const bytes = textPdf();
+      const pages = await convertPdf(bytes, limits());
+      const total = pages.reduce(
+        (sum, page) => sum + Buffer.byteLength(page.content, 'utf8'),
+        0,
+      );
+
+      const again = await convertPdf(
+        bytes,
+        conversionLimits({ maxResultBytes: total }),
+      );
+
+      expect(again).toHaveLength(3);
     });
   });
 });

@@ -69,32 +69,7 @@ export async function initAttachmentFullTextSearch(
     }
   }
 
-  // ----------------------------------------------------------------
-  // Build orphan sweeper with version-agnostic ES callbacks
-  // ----------------------------------------------------------------
-  const runSearch = async (
-    indexName: string,
-    body: unknown,
-  ): Promise<unknown> => {
-    return esClient.search({ index: indexName, body });
-  };
-
-  const runDeleteByPageId = async (
-    targetIndex: string,
-    pageId: string,
-  ): Promise<void> => {
-    await esClient.deleteByQuery({
-      index: targetIndex,
-      body: { query: { term: { pageId } } },
-      conflicts: 'proceed',
-    });
-  };
-
-  const orphanSweeper = createAttachmentOrphanSweeper(
-    delegatorExt,
-    runSearch,
-    runDeleteByPageId,
-  );
+  const orphanSweeper = createAttachmentOrphanSweeper(delegatorExt);
 
   // ----------------------------------------------------------------
   // Build batch and indexer

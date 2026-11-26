@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 import { SPEC_TMP_PREFIX } from '../fixtures';
 
-// Req 9.1 / 9.5: the image check compares the document the container serves
+// The image check compares the document the container serves
 // with the one scripts/export-openapi.ts writes (research.md 17.7, 27.8), by
 // running scripts/check-openapi-drift.ts as a command, with plain `node` as
 // the CI job does. Python check_openapi_drift.py's command line.

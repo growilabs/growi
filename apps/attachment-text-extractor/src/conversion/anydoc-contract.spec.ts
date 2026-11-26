@@ -38,8 +38,7 @@ import {
 // behaviours the PPTX / XLSX splitters, the format table and the error
 // classification rely on. They call anydoc directly and import nothing from
 // src/, so they keep running (and must stay green) before and after the
-// conversion layer exists. Raising the anydoc version requires these to pass
-// (Req 4.2).
+// conversion layer exists. Raising the anydoc version requires these to pass.
 
 const PINNED_VERSION = '0.2.4';
 

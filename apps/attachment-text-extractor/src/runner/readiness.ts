@@ -55,18 +55,36 @@ export const probeConversions = async (
 };
 
 /**
- * Callers that arrive while a check runs share it: /readyz needs no token, so
- * its callers must not be able to start probe children without bound. Nothing
- * is cached once a check ends, so readiness can come back after a failure.
+ * Callers that arrive while a check runs share it, and a settled check (ready,
+ * not ready, or thrown) answers every caller for `keepMs` after it settled:
+ * /readyz needs no token, so its callers must not be able to start probe
+ * children without bound. Why the result is kept, and counted from the end of
+ * the check: research.md §9.4.
  */
-export const sharedWhileRunning = <T>(
+export const sharedThenKept = <T>(
   task: () => Promise<T>,
+  keepMs: number,
+  now: () => number,
 ): (() => Promise<T>) => {
-  let running: Promise<T> | null = null;
+  let latest: Promise<T> | null = null;
+  // null while `latest` is still running.
+  let settledAt: number | null = null;
   return () => {
-    running ??= task().finally(() => {
-      running = null;
-    });
-    return running;
+    if (
+      latest !== null &&
+      (settledAt === null || now() - settledAt <= keepMs)
+    ) {
+      return latest;
+    }
+    const check = task();
+    const markSettled = () => {
+      if (latest === check) {
+        settledAt = now();
+      }
+    };
+    latest = check;
+    settledAt = null;
+    check.then(markSettled, markSettled);
+    return check;
   };
 };

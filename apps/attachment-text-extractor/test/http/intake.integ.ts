@@ -18,9 +18,9 @@ import {
 import { useBlackboxService } from './blackbox-service';
 
 // Black box (research.md 22.7 `intake`): what the default limits do before a
-// conversion starts. Req 3.1: a declared Content-Length over the cap is 413
+// conversion starts. A declared Content-Length over the cap is 413
 // without the body; `Expect: 100-continue` gets no 100 for such a body (16.5);
-// Req 3.6: a CSV one byte over the default 8 MiB cap is refused. Python
+// A CSV one byte over the default 8 MiB cap is refused. Python
 // test_live_server.py TestIntakeOrder (first row) and test_e2e_http.py
 // TestInputSizeCapsOverHttp (default cap row). Rows that need other limits are
 // in src/http/receive-upload.integ.ts.

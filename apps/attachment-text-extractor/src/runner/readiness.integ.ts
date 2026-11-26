@@ -1,11 +1,16 @@
+import { mkdtempSync, rmSync, symlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { SPEC_TMP_PREFIX } from '../../test/fixtures/tmp-prefix';
 import { createConversionRunner } from './conversion-runner';
 import {
   childPids,
   hasEnded,
   killStrayChildren,
   MISSING_CHILD,
+  manualClock,
   runnerOptions,
   SILENT_CHILD,
   waitForOnlyChild,
@@ -13,7 +18,7 @@ import {
   within,
 } from './spec-support';
 
-// Req 8.8 and design.md: ready means prlimit can be started and a probe child,
+// design.md: ready means prlimit can be started and a probe child,
 // started the same way as a conversion child (prlimit, childEntry), loads every
 // conversion component and answers. Python test_forkserver.py: the five cases
 // 22.3 carries over (ready with everything loaded, not ready when a component
@@ -78,6 +83,36 @@ describe.skipIf(process.platform !== 'linux')(
       );
       // The stuck probe is stopped and reaped, not left behind.
       expect(await waitUntil(() => childPids().length === 0, 2_000)).toBe(true);
+    });
+
+    describe('a settled check', () => {
+      let workDir = '';
+
+      beforeEach(() => {
+        workDir = mkdtempSync(path.join(tmpdir(), `${SPEC_TMP_PREFIX}ready-`));
+      });
+
+      afterEach(() => {
+        rmSync(workDir, { recursive: true, force: true });
+      });
+
+      it('is answered for 10 s after it settled, then checked again', async () => {
+        const prlimitPath = path.join(workDir, 'prlimit');
+        const clock = manualClock();
+        const runner = createConversionRunner(
+          runnerOptions({ prlimitPath, readinessClock: clock.now }),
+        );
+        expect((await within(runner.readiness())).ready).toBe(false);
+
+        symlinkSync('/usr/bin/prlimit', prlimitPath);
+        clock.advance(10_000);
+        const kept = await within(runner.readiness());
+        clock.advance(1);
+        const checkedAgain = await within(runner.readiness());
+
+        expect(kept.ready).toBe(false);
+        expect(checkedAgain.ready).toBe(true);
+      });
     });
   },
 );

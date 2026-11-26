@@ -201,7 +201,7 @@ describe('what each per-slide package contains', () => {
   }, 60_000);
 });
 
-describe('packages that do not pass the ZIP pre-check go to anydoc whole', () => {
+describe('input that is not a ZIP goes to anydoc whole', () => {
   it('hands an encrypted PPTX over whole and reports encrypted', async () => {
     const deck = buildEncryptedPptx();
 
@@ -406,6 +406,19 @@ describe('relationship targets are resolved inside the package only', () => {
 });
 
 describe('limits and malformed packages', () => {
+  it('refuses a ZIP without the presentation part as malformed before anydoc runs', async () => {
+    const deck = buildZip(
+      pptxParts([{ title: 'only slide' }]).filter(
+        (part) => part.name !== PRESENTATION,
+      ),
+    );
+
+    const error = await conversionErrorOf(() => convertPptx(deck, limits()));
+
+    expect(error.kind).toBe('malformed');
+    expect(sentPackages()).toEqual([]);
+  });
+
   it('rejects a slide list longer than the entry limit', async () => {
     const deck = buildZip(
       editPart(pptxParts([{ title: 'only slide' }]), PRESENTATION, (xml) =>
@@ -486,5 +499,53 @@ describe('limits and malformed packages', () => {
 
   it('returns no elements for a presentation without slides', async () => {
     expect(await convertPptx(buildPptx([]), limits())).toEqual([]);
+  });
+});
+
+describe('result size limit', () => {
+  const malformedFromAnydoc = (): Error =>
+    Object.assign(new Error('bad slide'), { code: 'malformed' });
+
+  // A stop before the second slide leaves its queued once-value behind.
+  afterEach(() => {
+    anydoc.mockReset();
+  });
+
+  const threeSlides = (): Buffer =>
+    buildPptx([{ title: 'a' }, { title: 'b' }, { title: 'c' }]);
+
+  it('stops at the slide that exceeds the limit, before a later malformed slide is read', async () => {
+    anydoc.mockResolvedValueOnce('x'.repeat(11));
+    anydoc.mockRejectedValueOnce(malformedFromAnydoc());
+
+    const error = await conversionErrorOf(() =>
+      convertPptx(threeSlides(), limits({ maxResultBytes: 10 })),
+    );
+
+    expect(error.kind).toBe('result_too_large');
+  });
+
+  it('still reports the later malformed slide while the total stays within the limit', async () => {
+    anydoc.mockResolvedValueOnce('x'.repeat(10));
+    anydoc.mockRejectedValueOnce(malformedFromAnydoc());
+
+    const error = await conversionErrorOf(() =>
+      convertPptx(threeSlides(), limits({ maxResultBytes: 10 })),
+    );
+
+    expect(error.kind).toBe('malformed');
+  });
+
+  it('counts a slide after newlines are unified, so CRLF does not stop it early', async () => {
+    anydoc.mockResolvedValueOnce('a\r\nb');
+    anydoc.mockResolvedValueOnce('c\r\nd');
+
+    // 6 bytes once unified; 8 bytes if the carriage returns were counted.
+    const pages = await convertPptx(
+      buildPptx([{ title: 'a' }, { title: 'b' }]),
+      limits({ maxResultBytes: 6 }),
+    );
+
+    expect(pages).toHaveLength(2);
   });
 });

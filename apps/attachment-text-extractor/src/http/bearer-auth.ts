@@ -4,25 +4,9 @@ import type { MiddlewareHandler } from 'hono';
 import type { AppEnv } from './app-env';
 import { errorAnswer } from './early-answer';
 import { UNAUTHORIZED_ANSWER } from './error-table';
-
-// The only paths answered without a token (Req 1.6); every other one, an
-// unknown one included, needs it, and is checked before anything else runs.
-const OPEN_PATHS: ReadonlySet<string> = new Set([
-  '/healthz',
-  '/readyz',
-  '/openapi.json',
-]);
+import { isOpenEndpoint } from './request-target';
 
 const SCHEME = 'Bearer ';
-
-// Matched on the request target as sent, not on the path routing sees: the
-// URL parser resolves "/./healthz" or "/%68ealthz" to an open path, which must
-// still need the token. A target that matches exactly holds no "." segment or
-// escape, so it routes to that very path.
-const isOpen = (target = ''): boolean => {
-  const query = target.indexOf('?');
-  return OPEN_PATHS.has(query === -1 ? target : target.slice(0, query));
-};
 
 // Equal-length digests: the comparison neither throws on a length mismatch
 // nor tells how long the token is.
@@ -32,7 +16,7 @@ const digest = (bytes: Buffer): Buffer =>
 export const bearerAuth = (token: string): MiddlewareHandler<AppEnv> => {
   const expected = digest(Buffer.from(token, 'utf8'));
   return async (c, next) => {
-    if (isOpen(c.env.incoming.url)) {
+    if (isOpenEndpoint(c.env.incoming.url)) {
       await next();
       return;
     }

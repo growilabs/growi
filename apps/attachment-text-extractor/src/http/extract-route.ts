@@ -11,7 +11,8 @@ import {
   ExtractResponseSchema,
 } from './api-schemas';
 import type { AppContext, AppEnv } from './app-env';
-import { createConcurrencySlots } from './concurrency-slots';
+import { APP_ID_PATTERN, appLabelOf } from './app-label';
+import type { ConcurrencySlots } from './concurrency-slots';
 import { errorAnswer } from './early-answer';
 import {
   ERROR_TABLE,
@@ -48,6 +49,7 @@ export interface ExtractRouteDeps {
   readonly settings: Settings;
   readonly runner: ConversionRunner;
   readonly log: RequestLog;
+  readonly slots: ConcurrencySlots;
 }
 
 const MIB = 1024 * 1024;
@@ -213,6 +215,14 @@ const convertAndAnswer = async (
 // (research.md 17.13 3). The answer is built as a stream, so the schemas
 // cannot check it at compile time; the ajv tests check real answers.
 const describeExtract = describeRoute({
+  parameters: [
+    {
+      in: 'header',
+      name: 'X-Growi-App-Id',
+      required: false,
+      schema: { type: 'string', pattern: APP_ID_PATTERN.source },
+    },
+  ],
   requestBody: {
     required: true,
     content: {
@@ -244,10 +254,15 @@ export const registerExtractRoute = (
   app: Hono<AppEnv>,
   deps: ExtractRouteDeps,
 ): void => {
-  const slots = createConcurrencySlots(deps.settings.maxConcurrency);
+  const { slots } = deps;
   const intake = intakeOf(deps.settings);
   app.post('/extract', describeExtract, async (c) => {
-    const line = deps.log.start();
+    const write = deps.log.start(appLabelOf(c.env.incoming.headers));
+    let written = false;
+    const line: RequestLine = (result, facts) => {
+      written = true;
+      write(result, facts);
+    };
     if (declaredOverCap(c.env.incoming, intake.maxBodyBytes)) {
       line('file_too_large');
       return refusalAnswer(c, {
@@ -269,6 +284,9 @@ export const registerExtractRoute = (
       return await convertAndAnswer(c, deps, received.input, line);
     } finally {
       release();
+      // Hono answers an unexpected throw with a 500; it still gets its line,
+      // so the results add up to the answers.
+      if (!written) line('internal');
     }
   });
 };

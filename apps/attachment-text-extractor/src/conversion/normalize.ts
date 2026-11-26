@@ -13,8 +13,17 @@ const JAPANESE_GAP = new RegExp(
 );
 const CARRIAGE_RETURN = /\r\n?/g;
 
-export const normalizeNewlines = (text: string): string =>
-  replaceBatched(text, CARRIAGE_RETURN, () => '\n');
+declare const lfOnly: unique symbol;
+/** Text whose every newline is LF: what the result budget counts (research.md §9.7). */
+export type LfText = string & { readonly [lfOnly]: true };
 
-export const joinBrokenJapanese = (text: string): string =>
-  replaceBatched(text, JAPANESE_GAP, () => '');
+// The only places a string becomes LfText: CR and CRLF are all replaced here,
+// and closing a gap removes characters without adding any.
+export const normalizeNewlines = (text: string): LfText =>
+  replaceBatched(text, CARRIAGE_RETURN, () => '\n') as LfText;
+
+export function joinBrokenJapanese(text: LfText): LfText;
+export function joinBrokenJapanese(text: string): string;
+export function joinBrokenJapanese(text: string): string {
+  return replaceBatched(text, JAPANESE_GAP, () => '');
+}
