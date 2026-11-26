@@ -261,8 +261,10 @@ describe('BacklinksBackfillAdmin', () => {
 
       const status = await screen.findByTestId('backfill-status');
       expect(status).toHaveTextContent(`${K}.partial`);
-      expect(status).toHaveTextContent('2026-03-01');
-      expect(status).toHaveTextContent('"pages":321');
+      const [coveredSince, notIncluded] =
+        within(status).getAllByRole('definition');
+      expect(coveredSince).toHaveTextContent('2026-03-01');
+      expect(notIncluded).toHaveTextContent('"pages":321');
       expect(button(START)).toBeEnabled();
       expect(screen.getByLabelText(`${K}.scope_all`)).toBeInTheDocument();
     });
@@ -456,6 +458,16 @@ describe('BacklinksBackfillAdmin', () => {
         '/backlinks-backfill/start',
         { kind: 'all' },
       );
+    });
+
+    it('explains, on the page count field, that N counts from the newest page', async () => {
+      mocks.apiv3Get.mockResolvedValue(respondWith(stateOf()));
+      renderAdmin();
+      await screen.findByTestId('backfill-status');
+
+      expect(
+        screen.getByLabelText(`${K}.max_pages_label`),
+      ).toHaveAccessibleDescription(`${K}.max_pages_hint`);
     });
 
     it('does not send an invalid scope, and says why', async () => {
