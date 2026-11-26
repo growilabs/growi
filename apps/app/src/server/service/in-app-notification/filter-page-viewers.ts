@@ -85,9 +85,10 @@ const findMembersAmong = async (
   return new Set([...members, ...externalMembers].map(String));
 };
 
-// Mirrors generateGrantCondition (models/page.ts) with includeAnyoneWithTheLink:
-// a link-only page is viewable by whoever has its id, which a notification
-// recipient has anyway.
+// Mirrors generateGrantCondition (models/page.ts) with includeAnyoneWithTheLink,
+// the rule the subscribe API checks too. ProposalNotifier leaves link-only pages
+// out instead, since one of its notifications lists several pages and would
+// hand one page's link to a subscriber of another.
 const findViewersAmong = async (
   page: PageGrantFields,
   userIds: readonly string[],
