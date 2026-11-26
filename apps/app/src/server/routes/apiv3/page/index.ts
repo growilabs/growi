@@ -1112,6 +1112,8 @@ export const setup = (crowi: Crowi): Router => {
    *              application/json:
    *                schema:
    *                  $ref: '#/components/schemas/Page'
+   *          404:
+   *            description: Page is not found or forbidden (subscribing only; unsubscribing is always allowed).
    *          500:
    *            description: Internal server error.
    */
