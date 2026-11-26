@@ -1113,7 +1113,8 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
   (a date; none for all pages) and is stored on the job document, so it does not float across
   restarts. `since` is that date; `maxPages` is the `updatedAt` of the Nth newest page, read from the
   `updatedAt` index. Pages can tie on `updatedAt`, so a `maxPages` run covers N pages or slightly
-  more. N counts from the newest page of the whole wiki, not from the edge of an earlier run.
+  more. N counts from the newest page of the whole wiki, not from the edge of an earlier run; the
+  admin form says so under the field, since "the next N" is the natural reading.
   When the wiki has fewer than N pages of the kind the walk scans, the scope is every page: the
   run has no lower bound and ends with coverage `all`.
 - **First claim of a run.** The loop treats a claimed job whose `runTotal` is null as a new run:
@@ -1169,7 +1170,7 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
   | `failed`, retry due (`retryAt` set) | the last error, and when it retries (`retryAt`, retry `failedAttempts` of 3) | Stop, or Resume to retry now; Start disabled |
   | `failed`, no retry due | the last error; it is not retried | Resume, or a new scope + Start |
   | `stopped` | where it stopped (processed of `runTotal`) | Resume, or a new scope + Start |
-  | `coverage: partial`, idle | "Backlinks cover pages edited since `<coveredSince>`; about N older pages are not included" | scope picker + Start |
+  | `coverage: partial`, idle | "Backlinks are built only for the newer pages", then `<coveredSince>` and "about N" older pages not included, each on its own labelled line | scope picker + Start |
   | `coverage: all` | "Backlinks are indexed for all pages (completed `<completedAt>`)" | none |
 
   The line stays after completion instead of hiding the whole section, so an admin who comes back can
