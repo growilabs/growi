@@ -61,24 +61,31 @@ describe('PageOperationService at server startup', () => {
     await PageOperation.deleteMany({ fromPath: /^\/page-op-startup/ });
   });
 
-  it('removes operation records left by an interrupted operation, so the paths can be operated on again', async () => {
+  it('removes operation records of the other interrupted operations but keeps a duplicate, which the recovery cron takes over', async () => {
     await createRecord(
       PageActionType.Duplicate,
       PageActionStage.Main,
       '/page-op-startup/duplicate',
       '/page-op-startup/duplicate2',
     );
-    await createRecord(
+    const discardedTypes = [
+      PageActionType.Create,
+      PageActionType.Update,
       PageActionType.Delete,
-      PageActionStage.Main,
-      '/page-op-startup/delete',
-      '/trash/page-op-startup/delete',
-    );
-    await createRecord(
+      PageActionType.DeleteCompletely,
+      PageActionType.Revert,
+      PageActionType.NormalizeParent,
       PageActionType.Rename,
-      PageActionStage.Main,
-      '/page-op-startup/rename-main',
-      '/page-op-startup/rename-main2',
+    ];
+    await Promise.all(
+      discardedTypes.map((actionType) =>
+        createRecord(
+          actionType,
+          PageActionStage.Main,
+          `/page-op-startup/${actionType}`,
+          `/page-op-startup/${actionType}-moved`,
+        ),
+      ),
     );
     expect(
       await crowi.pageOperationService.canOperate(
@@ -93,15 +100,21 @@ describe('PageOperationService at server startup', () => {
     expect(
       await remainingActionTypes([
         '/page-op-startup/duplicate',
-        '/page-op-startup/delete',
-        '/page-op-startup/rename-main',
+        ...discardedTypes.map((t) => `/page-op-startup/${t}`),
       ]),
-    ).toEqual([]);
+    ).toEqual([`${PageActionType.Duplicate}/${PageActionStage.Main}`]);
     expect(
       await crowi.pageOperationService.canOperate(
         true,
         '/page-op-startup/duplicate',
         '/page-op-startup/duplicate-moved',
+      ),
+    ).toBe(false);
+    expect(
+      await crowi.pageOperationService.canOperate(
+        true,
+        `/page-op-startup/${PageActionType.Delete}`,
+        `/page-op-startup/${PageActionType.Delete}-moved`,
       ),
     ).toBe(true);
   });

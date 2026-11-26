@@ -370,7 +370,7 @@ describe.skipIf(process.platform !== 'linux')(
       });
     });
 
-    // Req 3.9: the parent decodes what the child sends as JSON data and nothing else.
+    // The parent decodes what the child sends as JSON data and nothing else.
     describe('a result that breaks the protocol', () => {
       it.each([
         ['not JSON', 'this is not json'],
@@ -425,7 +425,7 @@ describe.skipIf(process.platform !== 'linux')(
       });
     });
 
-    // Req 3.6: CSV / TSV over MAX_CSV_BYTES and HTML over MAX_HTML_BYTES never get a child.
+    // CSV / TSV over MAX_CSV_BYTES and HTML over MAX_HTML_BYTES never get a child.
     describe('input size caps checked before a child is started', () => {
       const capped = () =>
         standInRunner({
@@ -471,7 +471,7 @@ describe.skipIf(process.platform !== 'linux')(
       });
     });
 
-    describe('cancellation (Req 3.5)', () => {
+    describe('cancellation', () => {
       it('kills and reaps the child when the signal is aborted mid-run', async () => {
         const runner = standInRunner();
         const controller = new AbortController();

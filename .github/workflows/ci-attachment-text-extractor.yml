@@ -63,9 +63,19 @@ jobs:
 
   # The steps are those of scripts/image-check/check-image.sh, which runs the
   # same procedure on any machine with docker (`check-image.sh all`).
+  # On both platforms the image is published for. The arm64 runner is a native
+  # one, so the image is built and run there without emulation.
   ci-attachment-text-extractor-image:
-    name: Image check for attachment-text-extractor
-    runs-on: ubuntu-latest
+    name: Image check for attachment-text-extractor (${{ matrix.platform }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     permissions:
       contents: read
@@ -109,7 +119,7 @@ jobs:
         if: always()
         run: bash "$CHECK_IMAGE" stop || true
 
-      # Req 3.14 and 11.2: the heaviest loads against the 2 Gi limit and the
+      # Measures the heaviest loads against the 2 Gi limit and the
       # child peak RSS of the baseline files, in containers of their own. The
       # figures go to the job summary. Only when the workflow is started by
       # hand: do that after upgrading the conversion libraries (anydoc,

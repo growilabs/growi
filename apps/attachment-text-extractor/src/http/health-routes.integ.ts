@@ -3,10 +3,11 @@ import { fakeRunner } from './spec-support/fake-runner';
 import { useTestService } from './spec-support/test-service';
 
 // /healthz and /readyz on the HTTP layer, with the runner's readiness scripted
-// (Req 8.8, D2). Python test_health.py and test_main.py's lifespan rows that
+// (D2). Python test_health.py and test_main.py's lifespan rows that
 // carry over: ready -> 200, not ready -> 503 `not_ready`, public names only,
-// and /readyz is asked afresh every time, so a pod that was not ready comes
-// back (Python re-verified a cached "not ready"; research.md 22.3).
+// and the route asks the runner on every call, so a pod that was not ready comes
+// back (Python re-verified a cached "not ready"; research.md 22.3). How long the
+// runner keeps a result is the runner's (readiness.spec.ts).
 // Readiness carries only `ready` (research.md 23.5), so which component is
 // missing is not checked (Python's "anydoc: missing" row has no counterpart).
 
@@ -34,7 +35,7 @@ describe('GET /healthz', () => {
     expect(jsonOf(answer)).toEqual({ status: 'ok' });
   });
 
-  it('stays 200 while the service is not ready (Req 8.8)', async () => {
+  it('stays 200 while the service is not ready', async () => {
     runner.readiness.mockResolvedValue({ ready: false });
 
     const answer = await getPath(service.current().url, '/healthz');

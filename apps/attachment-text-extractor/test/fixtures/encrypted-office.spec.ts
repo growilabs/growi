@@ -4,11 +4,13 @@ import officeCrypto from 'officecrypto-tool';
 import {
   buildEncryptedDocx,
   buildEncryptedPptx,
+  buildEncryptedWithFarEndRecord,
   buildEncryptedXlsx,
   ENCRYPTED_MARKER,
   OFFICE_PASSWORD,
 } from './encrypted-office';
 import { anydocErrorCode, anydocMarkdown } from './spec-support';
+import { xlsxParts } from './xlsx';
 
 const OLE_MAGIC = Buffer.from('d0cf11e0a1b11ae1', 'hex');
 
@@ -51,5 +53,28 @@ describe.each([
     });
 
     expect(await anydocMarkdown(plain, extension)).toContain(ENCRYPTED_MARKER);
+  });
+});
+
+describe('encrypted package holding an end record far from its end', () => {
+  const END_RECORD_SIGNATURE = Buffer.from([0x50, 0x4b, 0x05, 0x06]);
+  const SEARCH_WINDOW = 0xffff + 22;
+
+  let encrypted: Buffer;
+  beforeAll(() => {
+    encrypted = buildEncryptedWithFarEndRecord(
+      xlsxParts([{ name: 'Sheet', rows: [[ENCRYPTED_MARKER]] }]),
+    );
+  });
+
+  it('holds the record before the last 64 KiB', () => {
+    const at = encrypted.indexOf(END_RECORD_SIGNATURE);
+
+    expect(at).toBeGreaterThanOrEqual(0);
+    expect(encrypted.length - at).toBeGreaterThan(SEARCH_WINDOW);
+  });
+
+  it('is still refused by anydoc as encrypted', async () => {
+    expect(await anydocErrorCode(encrypted, 'xlsx')).toBe('encrypted');
   });
 });

@@ -11,7 +11,7 @@ import {
   sourceCharactersOf,
 } from './corpus-document';
 
-// Plain text, CSV and HTML documents in the encodings of Req 2.4. Shift_JIS,
+// Plain text, CSV and HTML documents in several Japanese encodings. Shift_JIS,
 // cp932, EUC-JP and ISO-2022-JP text avoids 〜 and ～ (research.md 9.10).
 
 interface TextDocumentSpec {

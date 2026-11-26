@@ -5,7 +5,7 @@ import { ERROR_CODES } from '../contract/error-code';
 
 // The request and answer schemas the OpenAPI document is generated from
 // (research.md 17.13). Only `.meta({ id })` names a shared schema; every other
-// name is the generator's default (Req 7.1, 7.6).
+// name is the generator's default.
 
 export const ErrorCodeSchema = z.enum(ERROR_CODES).meta({ id: 'ErrorCode' });
 

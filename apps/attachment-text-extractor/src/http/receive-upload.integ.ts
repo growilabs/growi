@@ -21,12 +21,12 @@ import {
 } from './spec-support/raw-http';
 import { type TestService, useTestService } from './spec-support/test-service';
 
-// Receiving the body (Req 3.1-3.3): the order auth -> declared length -> slot
+// Receiving the body: the order auth -> declared length -> slot
 // -> capped, deadlined read; the cap counts the bytes that arrive. A real
 // server on a free port, a stand-in runner. Python test_live_server.py
 // TestIntakeOrder / TestUploadsDoNotUseTmpdir (the parse rows), test_limits.py
 // (body cap) and test_integration_auth.py (401 before the slot).
-// Req 3.3 (memory only, no temporary file): TMPDIR is shared with other test
+// Memory only, no temporary file: TMPDIR is shared with other test
 // processes, so instead of comparing its listing, the test watches the files
 // this process (the server) holds open under it while uploads are in flight.
 
@@ -186,7 +186,7 @@ describe('a body without Content-Length (chunked)', () => {
   });
 });
 
-describe('the slot is taken before the body is read (Req 3.2)', () => {
+describe('the slot is taken before the body is read', () => {
   it('a second upload gets 503 at once while the first is still uploading, and the slot comes back', async () => {
     const target = await restart({
       MAX_CONCURRENCY: '1',
@@ -369,35 +369,32 @@ const tempFilesOpenedDuring = async (
   return [...seen];
 };
 
-describe.skipIf(process.platform !== 'linux')(
-  'uploads stay in memory (Req 3.3)',
-  () => {
-    it('three concurrent 25 MiB uploads open no temporary file, mid-body or mid-conversion', async () => {
-      const held = holdingRunner();
-      const target = await service.restart(held.runner, {
-        MAX_CONCURRENCY: '3',
-      });
-      const before = openTempFiles();
-      const uploads = await Promise.all(
-        [1, 2, 3].map(() => openUpload(target, 25 * MIB, 20 * MIB)),
-      );
-      try {
-        // Mid-body: 20 of the 25 MiB have arrived.
-        expect(await tempFilesOpenedDuring(before, 500)).toEqual([]);
-
-        for (const upload of uploads) {
-          await upload.send(
-            Buffer.concat([Buffer.alloc(5 * MIB, 0x78), bodyTail()]),
-          );
-        }
-        // Mid-conversion: the first run holds its whole file.
-        const { input } = await held.started;
-        expect(forwardedBytes(input).length).toBe(25 * MIB);
-        expect(await tempFilesOpenedDuring(before, 500)).toEqual([]);
-      } finally {
-        held.release();
-        for (const upload of uploads) upload.destroy();
-      }
+describe.skipIf(process.platform !== 'linux')('uploads stay in memory', () => {
+  it('three concurrent 25 MiB uploads open no temporary file, mid-body or mid-conversion', async () => {
+    const held = holdingRunner();
+    const target = await service.restart(held.runner, {
+      MAX_CONCURRENCY: '3',
     });
-  },
-);
+    const before = openTempFiles();
+    const uploads = await Promise.all(
+      [1, 2, 3].map(() => openUpload(target, 25 * MIB, 20 * MIB)),
+    );
+    try {
+      // Mid-body: 20 of the 25 MiB have arrived.
+      expect(await tempFilesOpenedDuring(before, 500)).toEqual([]);
+
+      for (const upload of uploads) {
+        await upload.send(
+          Buffer.concat([Buffer.alloc(5 * MIB, 0x78), bodyTail()]),
+        );
+      }
+      // Mid-conversion: the first run holds its whole file.
+      const { input } = await held.started;
+      expect(forwardedBytes(input).length).toBe(25 * MIB);
+      expect(await tempFilesOpenedDuring(before, 500)).toEqual([]);
+    } finally {
+      held.release();
+      for (const upload of uploads) upload.destroy();
+    }
+  });
+});

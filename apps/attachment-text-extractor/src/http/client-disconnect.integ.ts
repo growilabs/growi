@@ -16,7 +16,7 @@ import {
   useTestService,
 } from './spec-support/test-service';
 
-// Req 3.5 end to end: a caller that goes away mid-conversion has its child
+// End to end: a caller that goes away mid-conversion has its child
 // stopped and reaped, and the slot comes back. The real HTTP layer and runner
 // with a stand-in child that converts forever ('hang'). Python
 // test_live_disconnect.py.

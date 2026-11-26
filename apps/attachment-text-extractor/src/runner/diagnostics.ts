@@ -98,8 +98,8 @@ export const logConversion = (
 
 /**
  * For the probe children: each warning is written the first time only.
- * /readyz needs no token and probes on every call, so a warning every probe
- * child repeats must not become a line per call.
+ * /readyz needs no token and can be made to probe every 10 s for as long as the
+ * pod runs, so a warning every probe child repeats must not become a line per probe.
  */
 export const createOnceOnlyWarningLog = (
   log: LeveledLog,
@@ -117,8 +117,8 @@ export const createOnceOnlyWarningLog = (
 
 /**
  * Writes why the service is not ready when that changes, not on every check:
- * /readyz needs no token and probes on every call, so its callers must not be
- * able to fill the log. `reason` is null when ready.
+ * /readyz needs no token and can be made to probe every 10 s for as long as the
+ * pod runs, so its callers must not be able to fill the log. `reason` is null when ready.
  */
 export const createReadinessLog = (
   log: LeveledLog,

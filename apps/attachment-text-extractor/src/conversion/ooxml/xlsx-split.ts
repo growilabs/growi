@@ -32,7 +32,7 @@ const markedPackage = async (
 /**
  * One element per sheet that has text, after the cell-count pre-check, through
  * one anydoc call: anydoc writes no sheet boundary of its own, so each sheet
- * is renamed to a marker first. A file that fails the ZIP pre-check (legacy
+ * is renamed to a marker first. A file that is not a ZIP (legacy
  * XLS, encrypted OOXML) goes to anydoc whole as one unnumbered element.
  */
 export const convertXlsx = async (

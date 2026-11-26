@@ -12,7 +12,7 @@ import { startTestService } from '../../src/http/spec-support/test-service';
 import { TS_NODE_ARGS } from '../../src/runner/spec-support';
 import { SPEC_TMP_PREFIX } from '../fixtures';
 
-// Req 7.1: `scripts/export-openapi.ts --output <path>` writes the document
+// `scripts/export-openapi.ts --output <path>` writes the document
 // GET /openapi.json serves, the file committed to the client package. Run as
 // its own process, as the package script runs it.
 
@@ -64,7 +64,7 @@ describe('scripts/export-openapi.ts', () => {
     }
   }, 60_000);
 
-  // Req 7.3: the generated client is built from the committed document.
+  // The generated client is built from the committed document.
   it('writes the document committed to the client package (after a contract change: `export-openapi`, then regenerate the client)', async () => {
     const committed: unknown = JSON.parse(
       readFileSync(COMMITTED_DOCUMENT, 'utf8'),

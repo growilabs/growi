@@ -33,6 +33,7 @@ describe('PUT /_api/v3/admin/attachment-search/config audit record', () => {
   let admin: IUserHasId;
   let originalSearchService: Crowi['searchService'];
   let originalIndexOperations: Crowi['attachmentIndexOperations'];
+  let envVarsLocked = false;
 
   const put = (body: Record<string, unknown>) =>
     request(app).put(ENDPOINT).send(body);
@@ -46,6 +47,12 @@ describe('PUT /_api/v3/admin/attachment-search/config audit record', () => {
 
     const originalGetConfig = configManager.getConfig.bind(configManager);
     vi.spyOn(configManager, 'getConfig').mockImplementation((key, source) => {
+      if (
+        envVarsLocked &&
+        key === 'env:useOnlyEnvVars:app:attachmentFullTextSearch'
+      ) {
+        return true;
+      }
       // The settings action belongs to the large audit-log group
       if (key === 'app:auditLogEnabled') return true;
       if (key === 'app:auditLogActionGroupSize') return ActionGroupSize.Large;
@@ -75,6 +82,7 @@ describe('PUT /_api/v3/admin/attachment-search/config audit record', () => {
   }, 60_000);
 
   afterEach(async () => {
+    envVarsLocked = false;
     await prisma.activities.deleteMany({ where: { endpoint: ENDPOINT } });
   });
 
@@ -117,6 +125,25 @@ describe('PUT /_api/v3/admin/attachment-search/config audit record', () => {
       extractorToken: TOKEN,
     });
     expect(res.status).toBe(400);
+
+    await vi.waitFor(
+      async () =>
+        expect(await activities()).toEqual([
+          expect.objectContaining({
+            action: SupportedAction.ACTION_UNSETTLED,
+            userId: admin._id.toString(),
+          }),
+        ]),
+      { timeout: 3_000, interval: 50 },
+    );
+  });
+
+  it('refuses with 409 while pinned by environment variables and records only an unsettled attempt', async () => {
+    envVarsLocked = true;
+
+    const res = await put({ timeoutMs: 999 });
+    expect(res.status).toBe(409);
+    expect(res.body.errors[0].code).toBe('config_locked_by_env_vars');
 
     await vi.waitFor(
       async () =>

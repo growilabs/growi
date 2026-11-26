@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import type { BurstReport } from './spec-support/burst-host';
 import { TS_NODE_ARGS } from './spec-support/stand-in';
 
-// Req 3.10 / design.md Error Handling: a child that cannot be started is that
+// design.md Error Handling: a child that cannot be started is that
 // one request's `crashed`, never the end of the HTTP process. Running out of
 // descriptors (EMFILE) is the start failure Node reports differently: the
 // ChildProcess comes back without its stdio at all. A separate parent

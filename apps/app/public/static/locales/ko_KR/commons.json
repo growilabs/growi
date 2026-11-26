@@ -87,7 +87,11 @@
     "notifications": "알림",
     "filter_all": "전체",
     "no_news": "공지사항이 없습니다",
-    "view_detail": "자세히 보기"
+    "view_detail": "자세히 보기",
+    "page_duplicate_interrupted": {
+      "summary": "{{toPath}}의 복사본이 불완전합니다. {{fromPath}}의 {{sourcePageCount}}개 페이지 중 {{copiedPageCount}}개만 복사되었습니다.",
+      "advice": "불완전한 복사본을 삭제하거나 다른 이름으로 다시 복제할 수 있습니다."
+    }
   },
   "personal_dropdown": {
     "home": "홈",

@@ -278,7 +278,7 @@ describe('decodeText: hostile and narrow declarations, same result as the Python
   });
 });
 
-// Req 2.3: recorded differences (research.md 18.7). The Python service returns
+// Recorded differences (research.md 18.7). The Python service returns
 // something else for these inputs; the names say what Python does and why.
 describe('decodeText: Node-only expectations, Python differs (research.md 18.7)', () => {
   it.each([
@@ -323,13 +323,13 @@ describe('decodeText: Node-only expectations, Python differs (research.md 18.7)'
   });
 });
 
-// Req 2.6 known limitation, kept on purpose: without a BOM or a declaration,
+// Known limitation, kept on purpose: without a BOM or a declaration,
 // UTF-16 is not recognised, so the text comes back garbled (the Python service
 // too: charset-normalizer returned neither the Japanese nor the ASCII text for
 // LE or BE). The check is "not the original" rather than a fixed garbled
 // string, which depends on the detector. If a change makes this pass no
-// longer, the limitation has changed: record it in research.md (Req 2.6).
-describe('decodeText: known limitation, UTF-16 without a BOM is not recognised (Req 2.6)', () => {
+// longer, the limitation has changed: record it in research.md.
+describe('decodeText: known limitation, UTF-16 without a BOM is not recognised', () => {
   const utf16be = (text: string): Buffer =>
     Buffer.from(text, 'utf16le').swap16();
 
