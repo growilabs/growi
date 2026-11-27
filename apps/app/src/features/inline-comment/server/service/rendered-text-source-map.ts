@@ -32,7 +32,7 @@ interface WalkState {
   readonly chunks: string[];
   readonly sources: (SourceSpan | null)[];
   readonly diagramBlocks: SourceSpan[];
-  /** End of the last mapped source offset; text without a position is searched for after it. */
+  /** Source end of the last mapped character; text without a position is searched for after it. */
   cursor: number;
 }
 
@@ -179,13 +179,19 @@ const sourceSpansOfText = (
     return value.split('').map(() => null);
   }
 
+  // The cursor only narrows the search inside the ancestor: content rendered
+  // out of source order (footnote definitions) starts before it.
+  const { span } = scope;
   const window = {
-    start: Math.max(scope.span.start, state.cursor),
-    end: scope.span.end,
+    start:
+      state.cursor >= span.start && state.cursor <= span.end
+        ? state.cursor
+        : span.start,
+    end: span.end,
   };
-  const found = state.markdown.indexOf(value, window.start);
-  return found !== -1 && found + value.length <= window.end
-    ? identitySpans(found, value.length)
+  const found = state.markdown.slice(window.start, window.end).indexOf(value);
+  return found !== -1
+    ? identitySpans(window.start + found, value.length)
     : alignSpans(value, state.markdown, window);
 };
 
@@ -199,7 +205,7 @@ const appendText = (
   state.chunks.push(value);
   for (const span of spans) {
     state.sources.push(span);
-    if (span != null && span.end > state.cursor) state.cursor = span.end;
+    if (span != null) state.cursor = span.end;
   }
 };
 

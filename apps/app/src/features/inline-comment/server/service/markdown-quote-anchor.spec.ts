@@ -183,6 +183,17 @@ describe('resolveMarkdownQuoteAnchor', () => {
       expect(browserText).toContain(expectedQuote);
     });
 
+    it('quotes a footnote definition written before later text, though it is rendered at the end', async () => {
+      const md = 'a[^1]\n\n[^1]: :smile: note\n\nlater para';
+
+      const result = await resolveMarkdownQuoteAnchor(md, ':smile: note');
+
+      expect(result).toEqual({
+        kind: 'anchored',
+        anchor: expect.objectContaining({ quote: '😄 note' }),
+      });
+    });
+
     it('unescapes markdown escapes and entities', async () => {
       const result = await resolveMarkdownQuoteAnchor(
         'a \\*b\\* &amp; c',
