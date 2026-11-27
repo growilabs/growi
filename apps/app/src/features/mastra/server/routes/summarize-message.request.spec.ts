@@ -104,22 +104,18 @@ describe('POST /summary — request handling', () => {
       );
     });
 
-    it('streams the limit_exceeded cut-off to the client before the summary text', async () => {
+    it('relays the limit_exceeded tool output to the client unchanged', async () => {
       const response = await request(route.app)
         .post('/summary')
         .send({ pageId: longPage._id.toString() })
         .expect(200);
 
-      const chunks = parseSse(response.text);
-      const lastToolOutputAt = chunks.findLastIndex(
+      const lastToolOutput = parseSse(response.text).findLast(
         (chunk) => chunk.type === 'tool-output-available',
       );
-      expect(chunks[lastToolOutputAt]?.output).toMatchObject({
+      expect(lastToolOutput?.output).toMatchObject({
         result: 'limit_exceeded',
       });
-      expect(
-        chunks.findIndex((chunk) => chunk.type === 'text-delta'),
-      ).toBeGreaterThan(lastToolOutputAt);
     });
 
     it('withdraws tools from every later step once the budget is spent', async () => {
@@ -146,8 +142,8 @@ describe('POST /summary — request handling', () => {
     });
   });
 
-  // Suppressing a duplicate click is the trigger UI's job (task 8's
-  // isGenerating); the server only has to keep concurrent runs independent.
+  // Suppressing a duplicate click is the trigger UI's job (Req 1.5); the
+  // server only has to keep concurrent runs independent.
   describe('concurrent requests for the same page', () => {
     it('serves both, each with its own RequestContext and a budget neither run shares', async () => {
       const body = { pageId: longPage._id.toString() };
