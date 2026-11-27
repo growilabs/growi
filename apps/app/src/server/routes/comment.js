@@ -280,11 +280,17 @@ export const setup = (crowi, _app) => {
    *                properties:
    *                  commentForm:
    *                    type: object
+   *                    required:
+   *                      - page_id
+   *                      - revision_id
+   *                      - comment
    *                    properties:
    *                      page_id:
    *                        $ref: '#/components/schemas/ObjectId'
    *                      revision_id:
-   *                        $ref: '#/components/schemas/ObjectId'
+   *                        allOf:
+   *                          - $ref: '#/components/schemas/ObjectId'
+   *                        description: ID of a revision of the page, usually the latest one.
    *                      comment:
    *                        $ref: '#/components/schemas/CommentBody'
    *                      comment_position:
@@ -298,6 +304,18 @@ export const setup = (crowi, _app) => {
    *                          otherwise the request fails. Omit it, or send an empty
    *                          string, to post a top-level comment. To reply to an inline
    *                          comment, use POST /_api/v3/inline-comments/{id}/replies.
+   *                  slackNotificationForm:
+   *                    type: object
+   *                    description: >
+   *                      Optional. Notifies Slack channels of the new comment when Slack
+   *                      integration is configured. Omit it to send no Slack notification.
+   *                    properties:
+   *                      isSlackEnabled:
+   *                        type: boolean
+   *                        description: true to send the notification.
+   *                      slackChannels:
+   *                        type: string
+   *                        description: Comma-separated channel names, e.g. "general,dev".
    *                required:
    *                  - commentForm
    *        responses:
@@ -452,7 +470,7 @@ export const setup = (crowi, _app) => {
     }
 
     // slack notification
-    if (slackNotificationForm.isSlackEnabled) {
+    if (slackNotificationForm?.isSlackEnabled) {
       const { slackChannels } = slackNotificationForm;
 
       try {
@@ -489,22 +507,25 @@ export const setup = (crowi, _app) => {
    *            application/json:
    *              schema:
    *                properties:
-   *                  form:
+   *                  commentForm:
    *                    type: object
+   *                    required:
+   *                      - comment_id
+   *                      - revision_id
+   *                      - comment
    *                    properties:
-   *                      commentForm:
-   *                        type: object
-   *                        properties:
-   *                          page_id:
-   *                            $ref: '#/components/schemas/ObjectId'
-   *                          revision_id:
-   *                            $ref: '#/components/schemas/ObjectId'
-   *                          comment_id:
-   *                            $ref: '#/components/schemas/ObjectId'
-   *                          comment:
-   *                            $ref: '#/components/schemas/CommentBody'
+   *                      comment_id:
+   *                        $ref: '#/components/schemas/ObjectId'
+   *                      revision_id:
+   *                        allOf:
+   *                          - $ref: '#/components/schemas/ObjectId'
+   *                        description: >
+   *                          ID of a revision of the comment's page, usually the latest one.
+   *                          The comment is re-linked to this revision.
+   *                      comment:
+   *                        $ref: '#/components/schemas/CommentBody'
    *                required:
-   *                  - form
+   *                  - commentForm
    *        responses:
    *          200:
    *            description: Succeeded to update comment dody.
