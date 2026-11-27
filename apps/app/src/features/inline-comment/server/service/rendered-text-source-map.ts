@@ -13,13 +13,19 @@ export interface SourceSpan {
 export interface RenderedTextWithSource {
   readonly text: string;
   /**
-   * One entry per UTF-16 code unit of `text`. `null` when the character has
-   * no place in the markdown (e.g. the newline between two blocks).
+   * Where each UTF-16 code unit of `text` came from: `[sourceStarts[i],
+   * sourceEnds[i])` in the markdown, or `NO_SOURCE` in both when the
+   * character has no place in the markdown (e.g. the newline between two
+   * blocks). Typed arrays keep a long page to a few bytes per character.
    */
-  readonly sources: readonly (SourceSpan | null)[];
+  readonly sourceStarts: Int32Array;
+  readonly sourceEnds: Int32Array;
   /** Code blocks the browser draws as diagrams; their source is not in `text`. */
   readonly diagramBlocks: readonly SourceSpan[];
 }
+
+/** Marks a character with no source; markdown offsets are never negative. */
+export const NO_SOURCE = -1;
 
 const DIAGRAM_LANGUAGES: ReadonlySet<string> = new Set([
   'drawio',
@@ -30,7 +36,10 @@ const DIAGRAM_LANGUAGES: ReadonlySet<string> = new Set([
 interface WalkState {
   readonly markdown: string;
   readonly chunks: string[];
-  readonly sources: (SourceSpan | null)[];
+  /** Grown by doubling; only the first `length` entries are meaningful. */
+  starts: Int32Array;
+  ends: Int32Array;
+  length: number;
   readonly diagramBlocks: SourceSpan[];
   /** Source end of the last mapped character; text without a position is searched for after it. */
   cursor: number;
@@ -85,8 +94,37 @@ const trustedSpanOf = (
   return { start, end };
 };
 
-const identitySpans = (start: number, length: number): SourceSpan[] =>
-  Array.from({ length }, (_, i) => ({ start: start + i, end: start + i + 1 }));
+const ensureCapacity = (state: WalkState, extra: number): void => {
+  const needed = state.length + extra;
+  if (needed <= state.starts.length) return;
+  let capacity = state.starts.length * 2;
+  while (capacity < needed) capacity *= 2;
+  const starts = new Int32Array(capacity);
+  starts.set(state.starts);
+  const ends = new Int32Array(capacity);
+  ends.set(state.ends);
+  state.starts = starts;
+  state.ends = ends;
+};
+
+const writeNoSource = (state: WalkState, count: number): void => {
+  state.starts.fill(NO_SOURCE, state.length, state.length + count);
+  state.ends.fill(NO_SOURCE, state.length, state.length + count);
+  state.length += count;
+};
+
+/** Writes `count` characters that map one to one onto the markdown from `sourceStart`. */
+const writeIdentity = (
+  state: WalkState,
+  sourceStart: number,
+  count: number,
+): void => {
+  for (let i = 0; i < count; i++) {
+    state.starts[state.length + i] = sourceStart + i;
+    state.ends[state.length + i] = sourceStart + i + 1;
+  }
+  state.length += count;
+};
 
 /**
  * How far ahead a rendered character is looked for in the markdown: longer
@@ -111,12 +149,12 @@ const indexWithin = (text: string, char: string, from: number): number => {
  * neighbours. Approximate by design (design.md「本文の markdown の一部を
  * 指定しての作成」).
  */
-const alignSpans = (
+const writeAligned = (
+  state: WalkState,
   value: string,
-  markdown: string,
   window: SourceSpan,
-): SourceSpan[] => {
-  const slice = markdown.slice(window.start, window.end);
+): void => {
+  const slice = state.markdown.slice(window.start, window.end);
   const maxCommon = Math.min(value.length, slice.length);
 
   let prefixLength = 0;
@@ -135,67 +173,71 @@ const alignSpans = (
     suffixLength++;
   }
 
+  writeIdentity(state, window.start, prefixLength);
+
   const middleStart = window.start + prefixLength;
   const middleEnd = window.end - suffixLength;
-  const middleSlice = markdown.slice(middleStart, middleEnd);
-  const middleValue = value.slice(prefixLength, value.length - suffixLength);
+  const middleSlice = slice.slice(prefixLength, slice.length - suffixLength);
+  const middleLength = value.length - prefixLength - suffixLength;
+  const { starts, ends } = state;
+  const base = state.length;
 
-  const matched: (number | null)[] = [];
+  // Forward: a matched character maps to its offset; an unmatched one starts
+  // where its previous matched neighbour ends (its end is filled below).
   let searchFrom = 0;
-  for (const char of middleValue.split('')) {
-    const found = indexWithin(middleSlice, char, searchFrom);
+  let previousEnd = middleStart;
+  for (let k = 0; k < middleLength; k++) {
+    const found = indexWithin(middleSlice, value[prefixLength + k], searchFrom);
     if (found === -1) {
-      matched.push(null);
+      starts[base + k] = previousEnd;
+      ends[base + k] = NO_SOURCE;
     } else {
-      matched.push(middleStart + found);
+      starts[base + k] = middleStart + found;
+      ends[base + k] = middleStart + found + 1;
+      previousEnd = middleStart + found + 1;
       searchFrom = found + 1;
     }
   }
-
-  // Each unmatched character spans from its previous matched neighbour's end
-  // to its next matched neighbour's start.
-  const gapStarts: number[] = [];
-  let previousEnd = middleStart;
-  for (const offset of matched) {
-    gapStarts.push(previousEnd);
-    if (offset != null) previousEnd = offset + 1;
-  }
-  const middleSpans: SourceSpan[] = new Array(matched.length);
+  // Backward: an unmatched character ends where its next matched neighbour starts.
   let nextStart = middleEnd;
-  for (let i = matched.length - 1; i >= 0; i--) {
-    const offset = matched[i];
-    if (offset != null) {
-      middleSpans[i] = { start: offset, end: offset + 1 };
-      nextStart = offset;
+  for (let k = middleLength - 1; k >= 0; k--) {
+    if (ends[base + k] === NO_SOURCE) {
+      ends[base + k] = nextStart;
     } else {
-      middleSpans[i] = { start: gapStarts[i], end: nextStart };
+      nextStart = starts[base + k];
     }
   }
+  state.length += middleLength;
 
-  return [
-    ...identitySpans(window.start, prefixLength),
-    ...middleSpans,
-    ...identitySpans(window.end - suffixLength, suffixLength),
-  ];
+  writeIdentity(state, window.end - suffixLength, suffixLength);
 };
 
-const sourceSpansOfText = (
+/** Writes the sources of `value`'s characters; returns false when none has a source. */
+const writeSourcesOfText = (
   value: string,
   node: Text,
   scope: Scope,
   state: WalkState,
-): (SourceSpan | null)[] => {
+): boolean => {
+  const { markdown } = state;
   const own = trustedSpanOf(node, scope.span);
   if (own != null) {
-    return state.markdown.slice(own.start, own.end) === value
-      ? identitySpans(own.start, value.length)
-      : alignSpans(value, state.markdown, own);
+    if (
+      own.end - own.start === value.length &&
+      markdown.startsWith(value, own.start)
+    ) {
+      writeIdentity(state, own.start, value.length);
+    } else {
+      writeAligned(state, value, own);
+    }
+    return true;
   }
 
   // Inter-block whitespace and text placed by a plugin outside any
   // positioned element have no meaningful place in the markdown.
   if (!scope.positioned || value.trim() === '') {
-    return value.split('').map(() => null);
+    writeNoSource(state, value.length);
+    return false;
   }
 
   // The cursor only narrows the search inside the ancestor: content rendered
@@ -208,10 +250,13 @@ const sourceSpansOfText = (
         : span.start,
     end: span.end,
   };
-  const found = state.markdown.slice(window.start, window.end).indexOf(value);
-  return found !== -1
-    ? identitySpans(window.start + found, value.length)
-    : alignSpans(value, state.markdown, window);
+  const found = markdown.slice(window.start, window.end).indexOf(value);
+  if (found !== -1) {
+    writeIdentity(state, window.start + found, value.length);
+  } else {
+    writeAligned(state, value, window);
+  }
+  return true;
 };
 
 const appendText = (
@@ -220,11 +265,11 @@ const appendText = (
   scope: Scope,
   state: WalkState,
 ): void => {
-  const spans = sourceSpansOfText(value, node, scope, state);
+  ensureCapacity(state, value.length);
+  const mapped = writeSourcesOfText(value, node, scope, state);
   state.chunks.push(value);
-  for (const span of spans) {
-    state.sources.push(span);
-    if (span != null) state.cursor = span.end;
+  if (mapped && value.length > 0) {
+    state.cursor = state.ends[state.length - 1];
   }
 };
 
@@ -280,10 +325,13 @@ export function renderedTextWithSourceOf(
   tree: Root,
   markdown: string,
 ): RenderedTextWithSource {
+  const initialCapacity = Math.max(16, markdown.length);
   const state: WalkState = {
     markdown,
     chunks: [],
-    sources: [],
+    starts: new Int32Array(initialCapacity),
+    ends: new Int32Array(initialCapacity),
+    length: 0,
     diagramBlocks: [],
     cursor: 0,
   };
@@ -294,7 +342,8 @@ export function renderedTextWithSourceOf(
   );
   return {
     text: state.chunks.join(''),
-    sources: state.sources,
+    sourceStarts: state.starts.slice(0, state.length),
+    sourceEnds: state.ends.slice(0, state.length),
     diagramBlocks: state.diagramBlocks,
   };
 }

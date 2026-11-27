@@ -13,9 +13,10 @@ import {
   type RevisionBody,
   renderedTextOfRevision,
 } from './rendered-text-cache';
-import type {
-  RenderedTextWithSource,
-  SourceSpan,
+import {
+  NO_SOURCE,
+  type RenderedTextWithSource,
+  type SourceSpan,
 } from './rendered-text-source-map';
 
 export type MarkdownRangeAnchoring =
@@ -43,17 +44,29 @@ export function anchorForMarkdownRange(
   rendered: RenderedTextWithSource,
   range: MarkdownRange,
 ): MarkdownRangeAnchoring {
-  const { text, sources, diagramBlocks } = rendered;
+  const { text, sourceStarts, sourceEnds, diagramBlocks } = rendered;
   if (diagramBlocks.some((block) => overlaps(block, range))) {
     return { kind: 'not-anchorable' };
   }
 
-  const isInRange = (source: SourceSpan | null): boolean =>
-    source != null && overlaps(source, range);
-  let first = sources.findIndex(isInRange);
-  let last = sources.findLastIndex(isInRange);
+  // The same overlap test as `overlaps`, read straight from the typed arrays.
+  const isInRange = (index: number): boolean =>
+    sourceStarts[index] !== NO_SOURCE &&
+    sourceStarts[index] < range.end &&
+    sourceEnds[index] > range.start;
+  let first = -1;
+  for (let i = 0; i < sourceStarts.length && first === -1; i++) {
+    if (isInRange(i)) first = i;
+  }
   if (first === -1) {
     return { kind: 'not-anchorable' };
+  }
+  let last = first;
+  for (let i = sourceStarts.length - 1; i > first; i--) {
+    if (isInRange(i)) {
+      last = i;
+      break;
+    }
   }
   if (first > 0 && isLowSurrogate(text.charCodeAt(first))) first--;
   if (last < text.length - 1 && isHighSurrogate(text.charCodeAt(last))) last++;
