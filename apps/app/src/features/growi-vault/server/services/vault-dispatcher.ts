@@ -109,8 +109,8 @@ export interface BulkPageOperationEvent {
  * rename of the page's own path cannot be expressed as a directory-subtree
  * `rename-prefix` (that op only relocates `type === 'tree'` entries). We model
  * a single-page rename as remove(oldPath) + upsert(newPath) instead, which
- * correctly moves the blob. Descendant relocation is still handled by the
- * `rename-prefix` instruction emitted from the 'updateMany' event.
+ * correctly moves the blob. On the v5 page tree, descendants are relocated by
+ * the `rename-prefix` instruction emitted from the 'updateMany' event.
  */
 export interface PageRenamedEvent {
   /** The page object reflecting the current (post-rename) state. */

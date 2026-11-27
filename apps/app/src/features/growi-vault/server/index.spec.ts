@@ -181,6 +181,7 @@ vi.mock('~/server/models/page', () => ({
 // Import the SUT after the mocks are in place.
 // ---------------------------------------------------------------------------
 
+import type { PageUpdateManyEventExtras } from '~/server/events/page';
 import { configManager } from '~/server/service/config-manager';
 
 import {
@@ -258,94 +259,134 @@ async function flush() {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe('initializeVaultFeature — updateMany subscription (task 21.1-A / Stage 1)', () => {
+describe("initializeVaultFeature — 'updateMany' of descendants renamed page by page (v4)", () => {
+  const listedPagesRename: PageUpdateManyEventExtras = {
+    scope: 'listed-pages',
+    oldPagePathPrefix: '/a',
+    newPagePathPrefix: '/c',
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
     enableVaultSettings();
   });
 
-  it('dispatches one per-page upsert for every page carried by updateMany', async () => {
+  it('relocates each listed page from its pre-rename path to its new path', async () => {
     const crowi = makeCrowiStub();
     await initializeVaultFeature(crowi);
 
     const pages = [
       { _id: { toString: () => 'p1' }, path: '/a/x', revision: 'r1' },
-      { _id: { toString: () => 'p2' }, path: '/a/y', revision: 'r2' },
-      { _id: { toString: () => 'p3' }, path: '/a/z', revision: 'r3' },
+      { _id: { toString: () => 'p2' }, path: '/a/y/z', revision: 'r2' },
     ];
 
-    crowi.events.page.emit('updateMany', pages, { _id: 'u1' });
+    crowi.events.page.emit(
+      'updateMany',
+      pages,
+      { _id: 'u1' },
+      listedPagesRename,
+    );
     await flush();
 
-    expect(dispatcherOnPageChanged).toHaveBeenCalledTimes(3);
-    expect(dispatcherOnPageChanged).toHaveBeenNthCalledWith(1, {
-      type: 'update',
+    expect(dispatcherOnBulkOperation).not.toHaveBeenCalled();
+    expect(dispatcherOnPageChanged).not.toHaveBeenCalled();
+    expect(dispatcherOnPageRenamed).toHaveBeenCalledTimes(2);
+    expect(dispatcherOnPageRenamed).toHaveBeenCalledWith({
       page: pages[0],
+      oldPath: '/a/x',
+      newPath: '/c/x',
       revisionId: 'r1',
     });
-    expect(dispatcherOnPageChanged).toHaveBeenNthCalledWith(3, {
-      type: 'update',
-      page: pages[2],
-      revisionId: 'r3',
+    expect(dispatcherOnPageRenamed).toHaveBeenCalledWith({
+      page: pages[1],
+      oldPath: '/a/y/z',
+      newPath: '/c/y/z',
+      revisionId: 'r2',
     });
   });
 
-  it('skips pages with no revision (auto-generated intermediate paths)', async () => {
+  it('hands a page without revision over with an undefined revisionId', async () => {
     const crowi = makeCrowiStub();
     await initializeVaultFeature(crowi);
 
-    const pages = [
-      { _id: { toString: () => 'p1' }, path: '/a/x', revision: 'r1' },
-      // Auto-generated intermediate page — no revision.
-      { _id: { toString: () => 'p2' }, path: '/a' },
-      { _id: { toString: () => 'p3' }, path: '/a/z', revision: 'r3' },
-    ];
+    const pages = [{ _id: { toString: () => 'p1' }, path: '/a/empty' }];
 
-    crowi.events.page.emit('updateMany', pages, { _id: 'u1' });
+    crowi.events.page.emit(
+      'updateMany',
+      pages,
+      { _id: 'u1' },
+      listedPagesRename,
+    );
     await flush();
 
-    expect(dispatcherOnPageChanged).toHaveBeenCalledTimes(2);
-    const dispatched = dispatcherOnPageChanged.mock.calls.map(
-      (args) => (args[0] as { revisionId: string }).revisionId,
-    );
-    expect(dispatched).toEqual(['r1', 'r3']);
+    expect(dispatcherOnPageRenamed).toHaveBeenCalledWith({
+      page: pages[0],
+      oldPath: '/a/empty',
+      newPath: '/c/empty',
+      revisionId: undefined,
+    });
   });
 
   it('resolves revision when populated as an ObjectId-like object', async () => {
     const crowi = makeCrowiStub();
     await initializeVaultFeature(crowi);
 
-    const populatedRevision = {
-      _id: { toString: () => 'rev-from-populated' },
-    };
     const pages = [
       {
         _id: { toString: () => 'p1' },
         path: '/a/x',
-        revision: populatedRevision,
+        revision: { _id: { toString: () => 'rev-from-populated' } },
       },
     ];
 
-    crowi.events.page.emit('updateMany', pages, { _id: 'u1' });
+    crowi.events.page.emit(
+      'updateMany',
+      pages,
+      { _id: 'u1' },
+      listedPagesRename,
+    );
     await flush();
 
-    expect(dispatcherOnPageChanged).toHaveBeenCalledTimes(1);
-    expect(dispatcherOnPageChanged).toHaveBeenCalledWith({
-      type: 'update',
-      page: pages[0],
-      revisionId: 'rev-from-populated',
-    });
+    expect(dispatcherOnPageRenamed).toHaveBeenCalledWith(
+      expect.objectContaining({ revisionId: 'rev-from-populated' }),
+    );
   });
 
   it('does nothing when the payload is not an array (defensive)', async () => {
     const crowi = makeCrowiStub();
     await initializeVaultFeature(crowi);
 
-    crowi.events.page.emit('updateMany', undefined, { _id: 'u1' });
-    crowi.events.page.emit('updateMany', null, { _id: 'u1' });
+    crowi.events.page.emit(
+      'updateMany',
+      undefined,
+      { _id: 'u1' },
+      listedPagesRename,
+    );
+    crowi.events.page.emit(
+      'updateMany',
+      null,
+      { _id: 'u1' },
+      listedPagesRename,
+    );
+    await flush();
+
+    expect(dispatcherOnPageRenamed).not.toHaveBeenCalled();
+    expect(dispatcherOnBulkOperation).not.toHaveBeenCalled();
+  });
+
+  it('dispatches nothing when the event carries no rename extras', async () => {
+    const crowi = makeCrowiStub();
+    await initializeVaultFeature(crowi);
+
+    const pages = [
+      { _id: { toString: () => 'p1' }, path: '/x', revision: 'r1' },
+    ];
+    crowi.events.page.emit('updateMany', pages, { _id: 'u1' });
     await flush();
 
     expect(dispatcherOnPageChanged).not.toHaveBeenCalled();
+    expect(dispatcherOnPageRenamed).not.toHaveBeenCalled();
+    expect(dispatcherOnBulkOperation).not.toHaveBeenCalled();
   });
 
   it('does not subscribe to updateMany when vaultEnabled=false', async () => {
@@ -363,14 +404,19 @@ describe('initializeVaultFeature — updateMany subscription (task 21.1-A / Stag
     const pages = [
       { _id: { toString: () => 'p1' }, path: '/a/x', revision: 'r1' },
     ];
-    crowi.events.page.emit('updateMany', pages, { _id: 'u1' });
+    crowi.events.page.emit(
+      'updateMany',
+      pages,
+      { _id: 'u1' },
+      listedPagesRename,
+    );
     await flush();
 
-    expect(dispatcherOnPageChanged).not.toHaveBeenCalled();
+    expect(dispatcherOnPageRenamed).not.toHaveBeenCalled();
   });
 
-  it('logs a warning and does not throw when dispatcher.onPageChanged rejects', async () => {
-    dispatcherOnPageChanged.mockRejectedValueOnce(new Error('boom'));
+  it('logs a warning and does not throw when dispatcher.onPageRenamed rejects', async () => {
+    dispatcherOnPageRenamed.mockRejectedValueOnce(new Error('boom'));
 
     const crowi = makeCrowiStub();
     await initializeVaultFeature(crowi);
@@ -379,10 +425,13 @@ describe('initializeVaultFeature — updateMany subscription (task 21.1-A / Stag
       { _id: { toString: () => 'p1' }, path: '/a/x', revision: 'r1' },
     ];
 
-    // The emit must not propagate the rejection — fire-and-forget catch is
-    // expected to swallow it into a logger.warn call.
     expect(() =>
-      crowi.events.page.emit('updateMany', pages, { _id: 'u1' }),
+      crowi.events.page.emit(
+        'updateMany',
+        pages,
+        { _id: 'u1' },
+        listedPagesRename,
+      ),
     ).not.toThrow();
     await flush();
 
@@ -473,70 +522,123 @@ describe('initializeVaultFeature — Stage 2 subscriptions (task 21.1-B)', () =>
   });
 
   // -------------------------------------------------------------------------
-  // 'updateMany' — bulk rename Stage 2 fast path
+  // 'updateMany' — descendants renamed as a whole subtree (v5)
   // -------------------------------------------------------------------------
 
-  describe("'updateMany' with prefix extras", () => {
-    it('collapses bulk rename into one rename-prefix per affected namespace (de-duped)', async () => {
-      namespaceMapperComputePageNamespaces
-        .mockReturnValueOnce({ current: ['public'], previous: undefined })
-        .mockReturnValueOnce({
-          current: ['public', 'group-eng'],
+  describe("'updateMany' of a subtree rename", () => {
+    const pageIn = (id: string, namespaces: ReadonlyArray<string>) => ({
+      _id: { toString: () => id },
+      path: `/old/${id}`,
+      namespaces,
+    });
+
+    beforeEach(() => {
+      namespaceMapperComputePageNamespaces.mockImplementation(
+        (page: unknown) => ({
+          current:
+            page != null &&
+            typeof page === 'object' &&
+            'namespaces' in page &&
+            Array.isArray(page.namespaces)
+              ? page.namespaces
+              : [],
           previous: undefined,
-        })
-        .mockReturnValueOnce({ current: ['group-eng'], previous: undefined });
-
-      const crowi = makeCrowiStub();
-      await initializeVaultFeature(crowi);
-
-      const pages = [
-        { _id: { toString: () => 'p1' }, path: '/new/a' },
-        { _id: { toString: () => 'p2' }, path: '/new/b' },
-        { _id: { toString: () => 'p3' }, path: '/new/c' },
-      ];
-
-      crowi.events.page.emit(
-        'updateMany',
-        pages,
-        { _id: 'u1' },
-        { oldPagePathPrefix: '/old/', newPagePathPrefix: '/new/' },
-      );
-      await flush();
-
-      // One bulk op, not three per-page upserts.
-      expect(dispatcherOnPageChanged).not.toHaveBeenCalled();
-      expect(dispatcherOnBulkOperation).toHaveBeenCalledTimes(1);
-
-      const call = dispatcherOnBulkOperation.mock.calls[0][0] as Parameters<
-        typeof dispatcherOnBulkOperation
-      >[0];
-      expect(call.type).toBe('rename-prefix');
-      expect(call.oldPrefix).toBe('/old/');
-      expect(call.newPrefix).toBe('/new/');
-      // De-duped union of the three pages' namespaces, order-insensitive.
-      expect((call.namespaces as ReadonlyArray<string>).slice().sort()).toEqual(
-        ['group-eng', 'public'],
+        }),
       );
     });
 
-    it('falls back to per-page upsert when extras is omitted (legacy emit)', async () => {
+    const subtreeRename = (): PageUpdateManyEventExtras => ({
+      scope: 'subtree',
+      oldPagePathPrefix: '/old',
+      newPagePathPrefix: '/new',
+      operation: {},
+    });
+
+    /** Namespaces of every rename-prefix dispatched so far, in order. */
+    const renamePrefixNamespaces = (): string[] =>
+      dispatcherOnBulkOperation.mock.calls.flatMap(
+        ([event]) => event.namespaces,
+      );
+
+    it('dispatches one rename-prefix per namespace with the page-path prefixes, not per page', async () => {
       const crowi = makeCrowiStub();
       await initializeVaultFeature(crowi);
 
-      const pages = [
-        { _id: { toString: () => 'p1' }, path: '/x', revision: 'r1' },
-      ];
-      // No 4th arg — legacy contract.
-      crowi.events.page.emit('updateMany', pages, { _id: 'u1' });
+      crowi.events.page.emit(
+        'updateMany',
+        [
+          pageIn('p1', ['public']),
+          pageIn('p2', ['public', 'group-eng']),
+          pageIn('p3', ['group-eng']),
+        ],
+        { _id: 'u1' },
+        subtreeRename(),
+      );
       await flush();
 
-      expect(dispatcherOnBulkOperation).not.toHaveBeenCalled();
-      expect(dispatcherOnPageChanged).toHaveBeenCalledTimes(1);
-      expect(dispatcherOnPageChanged).toHaveBeenCalledWith({
-        type: 'update',
-        page: pages[0],
-        revisionId: 'r1',
+      expect(dispatcherOnPageChanged).not.toHaveBeenCalled();
+      expect(dispatcherOnPageRenamed).not.toHaveBeenCalled();
+      expect(dispatcherOnBulkOperation).toHaveBeenCalledWith({
+        type: 'rename-prefix',
+        namespaces: expect.any(Array),
+        oldPrefix: '/old',
+        newPrefix: '/new',
       });
+      expect(renamePrefixNamespaces().sort()).toEqual(['group-eng', 'public']);
+    });
+
+    it('dispatches rename-prefix once per namespace across all batches of one operation, as soon as the namespace appears', async () => {
+      const crowi = makeCrowiStub();
+      await initializeVaultFeature(crowi);
+      const rename = subtreeRename();
+
+      crowi.events.page.emit(
+        'updateMany',
+        [pageIn('p1', ['public'])],
+        { _id: 'u1' },
+        rename,
+      );
+      await flush();
+      expect(renamePrefixNamespaces()).toEqual(['public']);
+
+      crowi.events.page.emit(
+        'updateMany',
+        [pageIn('p2', ['public'])],
+        { _id: 'u1' },
+        rename,
+      );
+      await flush();
+      expect(renamePrefixNamespaces()).toEqual(['public']);
+
+      crowi.events.page.emit(
+        'updateMany',
+        [pageIn('p3', ['public', 'group-eng'])],
+        { _id: 'u1' },
+        rename,
+      );
+      await flush();
+      expect(renamePrefixNamespaces()).toEqual(['public', 'group-eng']);
+    });
+
+    it('dispatches again for a later, separate rename with the same paths', async () => {
+      const crowi = makeCrowiStub();
+      await initializeVaultFeature(crowi);
+
+      crowi.events.page.emit(
+        'updateMany',
+        [pageIn('p1', ['public'])],
+        { _id: 'u1' },
+        subtreeRename(),
+      );
+      crowi.events.page.emit(
+        'updateMany',
+        [pageIn('p1', ['public'])],
+        { _id: 'u1' },
+        subtreeRename(),
+      );
+      await flush();
+
+      expect(renamePrefixNamespaces()).toEqual(['public', 'public']);
     });
   });
 

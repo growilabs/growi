@@ -25,7 +25,13 @@ import mongoose from 'mongoose';
 import { afterAll, describe, expect, it } from 'vitest';
 import { mock } from 'vitest-mock-extended';
 
+import type { PageUpdateManyEventExtras } from '~/server/events/page';
+
 import { getVaultE2eHandle } from '../../../../test/setup/vault-e2e';
+import {
+  createVaultDescendantsRenameHandler,
+  type RenamedDescendant,
+} from '../server/services/vault-descendants-rename-handler';
 import { vaultNamespaceMapper } from '../server/services/vault-namespace-mapper';
 import { createVaultPageUpdateHandler } from '../server/services/vault-page-update-handler';
 import { VAULT_E2E_CONFIG, VAULT_E2E_PAGES } from './fixture-contract';
@@ -322,6 +328,170 @@ describe('GROWI Vault — clone E2E contract', () => {
 
     await expectCloneEventually(VAULT_E2E_CONFIG.admin.pat, 'lacks the file');
     await expectCloneEventually(VAULT_E2E_CONFIG.member.pat, 'has the file');
+  });
+
+  // ----------------------------------------------------------------------
+  // Contract: renaming a page with descendants relocates the descendant
+  // files in the clone. The handler is fed what PageService emits: one
+  // 'updateMany' per batch of descendants, all carrying the same operation.
+  // ----------------------------------------------------------------------
+  describe('descendant rename', () => {
+    type SeededPage = RenamedDescendant & {
+      readonly body: string;
+      readonly revision: mongoose.Types.ObjectId;
+    };
+
+    /** Publishes public pages and waits until the admin clone has their files. */
+    const seedPublicPages = async (
+      paths: readonly string[],
+    ): Promise<SeededPage[]> => {
+      const pages = paths.map((path) => ({
+        _id: new mongoose.Types.ObjectId(),
+        revision: new mongoose.Types.ObjectId(),
+        path,
+        body: `# ${path}\n`,
+        grant: PageGrant.GRANT_PUBLIC,
+        grantedGroups: [],
+        grantedUsers: [],
+      }));
+      await db()
+        .collection('revisions')
+        .insertMany(
+          pages.map((p) => ({ _id: p.revision, body: p.body, pageId: p._id })),
+        );
+      const { dispatcher } = getVaultE2eHandle();
+      await Promise.all(
+        pages.map((page) =>
+          dispatcher.onPageChanged({
+            type: 'update',
+            page,
+            revisionId: page.revision.toString(),
+          }),
+        ),
+      );
+      await expect
+        .poll(async () => adminCloneFiles(), { timeout: 30_000, interval: 500 })
+        .toEqual(expect.arrayContaining(paths.map(mappedFile)));
+      return pages;
+    };
+
+    const mappedFile = (path: string): string => `${path.slice(1)}.md`;
+
+    const adminCloneFiles = async (): Promise<string[]> => {
+      const dir = await cloneAuthenticated(VAULT_E2E_CONFIG.admin.pat);
+      tmpDirs.push(dir);
+      return listFiles(dir);
+    };
+
+    const adminCloneAfterDrain = async (): Promise<{
+      files: string[];
+      read: (file: string) => Promise<string>;
+    }> => {
+      await waitForInstructionsDrained(30_000);
+      const dir = await cloneAuthenticated(VAULT_E2E_CONFIG.admin.pat);
+      tmpDirs.push(dir);
+      return {
+        files: await listFiles(dir),
+        read: (file) => readFile(join(dir, file), 'utf-8'),
+      };
+    };
+
+    /** Emits the descendants one per batch, as one rename operation. */
+    const renameDescendantsInBatches = async (
+      descendants: readonly SeededPage[],
+      oldPagePathPrefix: string,
+      newPagePathPrefix: string,
+    ): Promise<void> => {
+      const handleDescendantsRenamed = createVaultDescendantsRenameHandler(
+        getVaultE2eHandle().dispatcher,
+        vaultNamespaceMapper,
+      );
+      const rename: PageUpdateManyEventExtras = {
+        scope: 'subtree',
+        oldPagePathPrefix,
+        newPagePathPrefix,
+        operation: {},
+      };
+      for (const page of descendants) {
+        // biome-ignore lint/performance/noAwaitInLoops: batches arrive one after another
+        await handleDescendantsRenamed([page], rename);
+      }
+    };
+
+    it('moves every descendant file to the new directory with its body unchanged', async () => {
+      const descendants = await seedPublicPages([
+        '/vault-e2e-subtree/a/x',
+        '/vault-e2e-subtree/a/deep/y',
+      ]);
+
+      await renameDescendantsInBatches(
+        descendants,
+        '/vault-e2e-subtree/a',
+        '/vault-e2e-subtree/c',
+      );
+
+      const clone = await adminCloneAfterDrain();
+      expect(clone.files).not.toContain('vault-e2e-subtree/a/x.md');
+      expect(clone.files).not.toContain('vault-e2e-subtree/a/deep/y.md');
+      expect(await clone.read('vault-e2e-subtree/c/x.md')).toBe(
+        descendants[0].body,
+      );
+      expect(await clone.read('vault-e2e-subtree/c/deep/y.md')).toBe(
+        descendants[1].body,
+      );
+    });
+
+    it('keeps the files already in the destination directory', async () => {
+      const [existing, ...descendants] = await seedPublicPages([
+        '/vault-e2e-merge/c/existing',
+        '/vault-e2e-merge/a/x',
+      ]);
+
+      await renameDescendantsInBatches(
+        descendants,
+        '/vault-e2e-merge/a',
+        '/vault-e2e-merge/c',
+      );
+
+      const clone = await adminCloneAfterDrain();
+      expect(await clone.read('vault-e2e-merge/c/existing.md')).toBe(
+        existing.body,
+      );
+      expect(await clone.read('vault-e2e-merge/c/x.md')).toBe(
+        descendants[0].body,
+      );
+    });
+
+    it('renames a page under itself without nesting its files any deeper', async () => {
+      const [renamedPage, ...descendants] = await seedPublicPages([
+        '/vault-e2e-nest/a',
+        '/vault-e2e-nest/a/x',
+        '/vault-e2e-nest/a/y',
+      ]);
+
+      // PageService emits 'rename' for the page itself before it renames
+      // the descendants.
+      await getVaultE2eHandle().dispatcher.onPageRenamed({
+        page: renamedPage,
+        oldPath: '/vault-e2e-nest/a',
+        newPath: '/vault-e2e-nest/a/b',
+        revisionId: renamedPage.revision.toString(),
+      });
+      await renameDescendantsInBatches(
+        descendants,
+        '/vault-e2e-nest/a',
+        '/vault-e2e-nest/a/b',
+      );
+
+      const clone = await adminCloneAfterDrain();
+      expect(
+        clone.files.filter((f) => f.startsWith('vault-e2e-nest/')).sort(),
+      ).toEqual([
+        'vault-e2e-nest/a/b.md',
+        'vault-e2e-nest/a/b/x.md',
+        'vault-e2e-nest/a/b/y.md',
+      ]);
+    });
   });
 
   // ----------------------------------------------------------------------

@@ -92,6 +92,7 @@ import * as VaultBlobHasher from './vault-blob-hasher.js';
 import { applyInstruction } from './vault-namespace-builder.js';
 import { withNamespaceLock } from './vault-namespace-lock.js';
 import * as VaultPathMapper from './vault-path-mapper.js';
+import type { CommitOptions, TreeEntry } from './vault-repo-storage.js';
 import * as VaultRepoStorage from './vault-repo-storage.js';
 
 // ---------------------------------------------------------------------------
@@ -624,6 +625,204 @@ describe('op: rename-prefix', () => {
       'refs/namespaces/public/refs/heads/main',
       'commit-rename',
     );
+  });
+});
+
+describe('op: rename-prefix — resulting namespace tree', () => {
+  /** Backs readTree / writeTree / readRef / writeCommit with an in-memory object store. */
+  function useInMemoryRepo(files: Record<string, string>): {
+    readFiles: () => Promise<Record<string, string>>;
+  } {
+    const objects = new Map<string, ReadonlyArray<TreeEntry>>();
+    const commitTrees = new Map<string, string>();
+    const storeTree = (entries: ReadonlyArray<TreeEntry>): string => {
+      const sorted = [...entries].sort((a, b) => a.path.localeCompare(b.path));
+      const oid = `tree:${JSON.stringify(sorted)}`;
+      objects.set(oid, sorted);
+      return oid;
+    };
+    const buildTree = (paths: Record<string, string>): string => {
+      const blobs: TreeEntry[] = [];
+      const dirs = new Map<string, Record<string, string>>();
+      for (const [filePath, blobOid] of Object.entries(paths)) {
+        const [head, ...rest] = filePath.split('/');
+        if (rest.length === 0) {
+          blobs.push({
+            mode: '100644',
+            path: head,
+            oid: blobOid,
+            type: 'blob',
+          });
+        } else {
+          dirs.set(head, { ...dirs.get(head), [rest.join('/')]: blobOid });
+        }
+      }
+      const trees: TreeEntry[] = [...dirs].map(([name, children]) => ({
+        mode: '040000',
+        path: name,
+        oid: buildTree(children),
+        type: 'tree',
+      }));
+      return storeTree([...blobs, ...trees]);
+    };
+    const flatten = (oid: string, prefix: string): Record<string, string> =>
+      Object.assign(
+        {},
+        ...(objects.get(oid) ?? []).map((e) =>
+          e.type === 'tree'
+            ? flatten(e.oid, `${prefix}${e.path}/`)
+            : { [`${prefix}${e.path}`]: e.oid },
+        ),
+      );
+
+    let headCommit = 'commit-0';
+    commitTrees.set(headCommit, buildTree(files));
+
+    asMock(VaultRepoStorage.readRef).mockImplementation(() =>
+      Promise.resolve(headCommit),
+    );
+    asMock(VaultRepoStorage.readTree).mockImplementation((oid: string) => {
+      const entries = objects.get(commitTrees.get(oid) ?? oid);
+      return entries == null
+        ? Promise.reject(new Error(`unknown object ${oid}`))
+        : Promise.resolve(entries);
+    });
+    asMock(VaultRepoStorage.writeTree).mockImplementation(
+      (entries: ReadonlyArray<TreeEntry>) =>
+        Promise.resolve(storeTree(entries)),
+    );
+    asMock(VaultRepoStorage.writeCommit).mockImplementation(
+      (opts: CommitOptions) => {
+        const oid = `commit-${commitTrees.size}`;
+        commitTrees.set(oid, opts.tree);
+        return Promise.resolve(oid);
+      },
+    );
+    asMock(VaultRepoStorage.updateRef).mockImplementation(
+      (_ref: string, oid: string) => {
+        headCommit = oid;
+        return Promise.resolve();
+      },
+    );
+
+    return {
+      readFiles: () => {
+        const treeOid = commitTrees.get(headCommit);
+        return Promise.resolve(treeOid == null ? {} : flatten(treeOid, ''));
+      },
+    };
+  }
+
+  const renamePrefix = (oldPrefix: string, newPrefix: string) =>
+    applyInstruction(
+      makeInstruction({
+        op: 'rename-prefix',
+        payload: { namespace: 'public', oldPrefix, newPrefix },
+      }),
+    );
+
+  beforeEach(async () => {
+    const actualMapper = await vi.importActual<
+      typeof import('./vault-path-mapper.js')
+    >('./vault-path-mapper.js');
+    asMock(VaultPathMapper.map).mockImplementation(actualMapper.map);
+    asMock(VaultPathMapper.mapPrefix).mockImplementation(
+      actualMapper.mapPrefix,
+    );
+  });
+
+  it('moves every file under the old directory to the new directory', async () => {
+    const repo = useInMemoryRepo({
+      'a/x.md': 'blob-x',
+      'a/sub/y.md': 'blob-y',
+      'other.md': 'blob-other',
+    });
+
+    await renamePrefix('/a', '/c');
+
+    expect(await repo.readFiles()).toEqual({
+      'c/x.md': 'blob-x',
+      'c/sub/y.md': 'blob-y',
+      'other.md': 'blob-other',
+    });
+  });
+
+  it('merges into an existing destination directory, keeping entries from both sides', async () => {
+    const repo = useInMemoryRepo({
+      'a/x.md': 'blob-x',
+      'a/sub/y.md': 'blob-y',
+      'c/existing.md': 'blob-existing',
+      'c/sub/z.md': 'blob-z',
+    });
+
+    await renamePrefix('/a', '/c');
+
+    expect(await repo.readFiles()).toEqual({
+      'c/x.md': 'blob-x',
+      'c/existing.md': 'blob-existing',
+      'c/sub/y.md': 'blob-y',
+      'c/sub/z.md': 'blob-z',
+    });
+  });
+
+  it('keeps the entry already at the destination when a name exists on both sides', async () => {
+    const repo = useInMemoryRepo({
+      'a/x.md': 'blob-x-moved',
+      'a/sub/y.md': 'blob-y-moved',
+      'c/x.md': 'blob-x-destination',
+      'c/sub/y.md': 'blob-y-destination',
+    });
+
+    await renamePrefix('/a', '/c');
+
+    expect(await repo.readFiles()).toEqual({
+      'c/x.md': 'blob-x-destination',
+      'c/sub/y.md': 'blob-y-destination',
+    });
+  });
+
+  it('renames a directory under itself one level deeper, not further', async () => {
+    const repo = useInMemoryRepo({
+      'a/x.md': 'blob-x',
+      'a/sub/y.md': 'blob-y',
+    });
+
+    await renamePrefix('/a', '/a/b');
+
+    expect(await repo.readFiles()).toEqual({
+      'a/b/x.md': 'blob-x',
+      'a/b/sub/y.md': 'blob-y',
+    });
+  });
+
+  it('leaves the renamed page file in place when it was already written at its new path inside the old directory', async () => {
+    const repo = useInMemoryRepo({
+      'a/b.md': 'blob-renamed-page',
+      'a/x.md': 'blob-x',
+    });
+
+    await renamePrefix('/a', '/a/b');
+
+    expect(await repo.readFiles()).toEqual({
+      'a/b.md': 'blob-renamed-page',
+      'a/b/x.md': 'blob-x',
+    });
+  });
+
+  it('moves a descendant that shares a name with the new path below the new directory', async () => {
+    const repo = useInMemoryRepo({
+      'a/b/c.md': 'blob-renamed-page',
+      'a/b.md': 'blob-descendant-b',
+      'a/b/y.md': 'blob-descendant-b-y',
+    });
+
+    await renamePrefix('/a', '/a/b/c');
+
+    expect(await repo.readFiles()).toEqual({
+      'a/b/c.md': 'blob-renamed-page',
+      'a/b/c/b.md': 'blob-descendant-b',
+      'a/b/c/b/y.md': 'blob-descendant-b-y',
+    });
   });
 });
 
