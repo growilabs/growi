@@ -194,6 +194,22 @@ describe('resolveMarkdownQuoteAnchor', () => {
       });
     });
 
+    it('anchors a range near the end of a long paragraph full of entities', async () => {
+      const md = `${'あ&hearts;'.repeat(40_000)} target end`;
+
+      const result = await resolveMarkdownQuoteAnchor(md, 'target');
+
+      expect(result).toEqual({
+        kind: 'anchored',
+        anchor: {
+          quote: 'target',
+          prefix: `${'あ♥'.repeat(20)} `.slice(-40),
+          suffix: ' end',
+          approxOffset: 'あ♥'.length * 40_000 + 1,
+        },
+      });
+    });
+
     it('unescapes markdown escapes and entities', async () => {
       const result = await resolveMarkdownQuoteAnchor(
         'a \\*b\\* &amp; c',

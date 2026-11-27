@@ -85,6 +85,21 @@ const identitySpans = (start: number, length: number): SourceSpan[] =>
   Array.from({ length }, (_, i) => ({ start: start + i, end: start + i + 1 }));
 
 /**
+ * How far ahead a rendered character is looked for in the markdown: longer
+ * than any entity, escape or emoji shortcode it may stand for, and short
+ * enough that a character with no counterpart costs a constant amount.
+ */
+const ALIGNMENT_LOOKAHEAD = 64;
+
+const indexWithin = (text: string, char: string, from: number): number => {
+  const end = Math.min(text.length, from + ALIGNMENT_LOOKAHEAD);
+  for (let i = from; i < end; i++) {
+    if (text[i] === char) return i;
+  }
+  return -1;
+};
+
+/**
  * Maps each character of `value` into `window` of the markdown when they
  * differ (escapes, entities, emoji shortcodes): the common prefix and suffix
  * map one to one, the rest is matched character by character in order, and
@@ -124,7 +139,7 @@ const alignSpans = (
   const matched: (number | null)[] = [];
   let searchFrom = 0;
   for (const char of middleValue.split('')) {
-    const found = middleSlice.indexOf(char, searchFrom);
+    const found = indexWithin(middleSlice, char, searchFrom);
     if (found === -1) {
       matched.push(null);
     } else {
