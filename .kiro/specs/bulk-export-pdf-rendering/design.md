@@ -160,11 +160,12 @@ graph TB
 apps/app/src/features/page-bulk-export/server/service/page-bulk-export-job-cron/markdown/
 ├── index.ts                          # バレル: createBulkExportMarkdownRenderer のみ公開
 ├── bulk-export-markdown-renderer.ts  # pipeline 組み立て(dynamicImport)＋renderToHtml＋モジュールキャッシュ
-├── plugin-set.ts                     # 採用プラグインの宣言(名前/順序/オプション) ＝ drift テスト基準
 ├── styles/
 │   ├── index.ts                      # BulkExportStyleProvider: getCss() / wrap()
 │   └── bulk-export-styles.ts         # プリコンパイル CSS の読み込み＋本文 .wiki ラップ
-├── bulk-export-markdown-renderer.spec.ts   # 変換の振る舞いテスト(契約)
+└── bulk-export-markdown-renderer.spec.ts   # 変換の振る舞いテスト(契約)
+apps/app/src/server/service/markdown-pipeline/
+├── plugin-set.ts                     # 採用プラグインの宣言(名前/順序/オプション) ＝ drift テスト基準
 └── renderer-parity.spec.ts           # generateCommonOptions との集合ドリフト検知
 ```
 プリコンパイル CSS 生成物（例 `styles/bulk-export.generated.css`）はビルド成果物。生成機構
@@ -411,7 +412,7 @@ export interface BulkExportStyleProvider {
   描画されることを確認（dedup キャッシュは対象外のため、検証時はページ編集等でハッシュを変える）。
 
 ### Parity / Drift
-- `renderer-parity.spec.ts`: `generateCommonOptions` のプラグイン集合変更が未分類のまま入ると失敗
+- `apps/app/src/server/service/markdown-pipeline/renderer-parity.spec.ts`: `generateCommonOptions` のプラグイン集合変更が未分類のまま入ると失敗
   （6.1, 6.2）。
 
 ## Security Considerations
