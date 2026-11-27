@@ -84,12 +84,15 @@
   - _Depends: 2.2_
   - _Boundary: User Model_
 
-- [x] 2.6 Replace password-set checks that use `password == null` as a proxy with isPasswordSet()
-  - Because they misclassify passwordHash-only users (`password` unset, `passwordHash` set), replace the following 3 locations with `isPasswordSet()`-based checks:
+- [ ] 2.6 Replace password-set checks that use `password == null` as a proxy with isPasswordSet()
+  - Because they misclassify passwordHash-only users (`password` unset, `passwordHash` set), replace the following 5 locations with `isPasswordSet()`-based checks:
     - `apps/app/src/server/routes/login.js` (line ~145): `userData.password == null` → `!userData.isPasswordSet()` (prevents every passwordHash-only user from being wrongly redirected to `/me#password_settings` on each login)
     - `apps/app/src/server/routes/apiv3/personal-setting/index.js` (v8: line ~715): `user.password == null && count <= 1` → `!user.isPasswordSet() && count <= 1` (prevents wrongly blocking LDAP account disassociation)
     - `apps/app/src/server/routes/apiv3/user-activation.ts` (line ~278): `userData.password != null` → `userData.isPasswordSet()` (prevents misjudging the redirect destination)
-  - Confirm that each check is replaced with `isPasswordSet()` and that passwordHash-only users no longer experience wrong redirects / wrong blocks
+    - `apps/app/src/server/routes/apiv3/security-settings/checkSetupStrategiesHasAdmin.ts` (line ~18): the aggregation matches `password: { $exists: true }`, so a migrated administrator is not counted and disabling SAML / LDAP answers 405. Match either credential field instead
+    - `apps/app/src/client/components/Admin/Users/ExternalAccountTable.tsx` (line ~110): `ea.user.password` decides the "set / unset" badge. The response is serialized, so the field is always absent and every user reads as unset. The server has to send the decision instead of the credential
+  - Sweep both the server and the client for any other check that reads `password` alone as a proxy for "has a password". `isPasswordSet()` and g2g's `isLoginable` already consult both fields and need no change
+  - Confirm that each check is replaced with `isPasswordSet()` and that passwordHash-only users no longer experience wrong redirects / wrong blocks / wrong counts
   - _Requirements: 2.2, 2.3_
   - _Depends: 2.1_
   - _Boundary: User Model_
