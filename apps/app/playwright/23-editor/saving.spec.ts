@@ -26,6 +26,33 @@ test('Successfully create page under specific path', async ({ page }) => {
   expect(createdPageId.length).toBe(24);
 });
 
+test('Successfully create an untitled page under the initial parent path', async ({
+  page,
+}) => {
+  const openPageCreateModalShortcutKey = 'c';
+
+  await page.goto('/Sandbox');
+
+  await expect(async () => {
+    await page.keyboard.press(openPageCreateModalShortcutKey);
+    await expect(page.getByTestId('page-create-modal')).toBeVisible({
+      timeout: 1000,
+    });
+  }).toPass();
+  // keep the initial value '/Sandbox/' as is
+  await page.getByTestId('btn-create-page-under-below').click();
+
+  await expect(page).toHaveURL(/\/[0-9a-f]{24}(#edit)?$/);
+
+  const createdPageId = path.basename(new URL(page.url()).pathname);
+  const res = await page.request.get('/_api/v3/page', {
+    params: { pageId: createdPageId },
+  });
+  expect(res.ok()).toBe(true);
+  const { page: createdPage } = await res.json();
+  expect(createdPage.path).toMatch(/^\/Sandbox\/[^/]+$/);
+});
+
 test('Successfully updating a page using a shortcut on a previously created page', async ({
   page,
 }) => {

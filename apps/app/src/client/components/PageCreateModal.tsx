@@ -2,11 +2,9 @@ import type React from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Origin } from '@growi/core';
 import { pagePathUtils, pathUtils } from '@growi/core/dist/utils';
-import { normalizePath } from '@growi/core/dist/utils/path-utils';
 import { format } from 'date-fns/format';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
-import path from 'path';
 import {
   DropdownItem,
   DropdownMenu,
@@ -31,6 +29,7 @@ import {
 import { getLocale } from '~/utils/locale-utils';
 
 import PagePathAutoComplete from './PagePathAutoComplete';
+import { resolvePageCreateTarget } from './resolve-page-create-target';
 
 import styles from './PageCreateModal.module.scss';
 
@@ -137,13 +136,9 @@ const PageCreateModal: React.FC = () => {
    * access input page
    */
   const createInputPage = useCallback(async () => {
-    const targetPath = normalizePath(pageNameInput);
-    const parentPath = path.dirname(targetPath);
-
     return create(
       {
-        path: targetPath,
-        parentPath,
+        ...resolvePageCreateTarget(pageNameInput),
         wip: true,
         origin: Origin.View,
       },
