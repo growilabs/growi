@@ -1,0 +1,8 @@
+@use '../popover-z-index';
+
+// The one style this element owns (Popper writes position/transform itself).
+// Some page-layout ancestors set an explicit z-index with no stacking context
+// to contain it, so without this the portal would paint behind them.
+.selection-popover {
+  z-index: popover-z-index.$popover-z-index;
+}

@@ -37,7 +37,6 @@ import type { RendererOptions } from '~/interfaces/renderer-options';
 import { useCurrentUser } from '~/states/global';
 
 import type { InlineCommentWithReplies } from '../../../interfaces';
-import { INLINE_COMMENT_POPOVER_Z_INDEX } from '../../constants/z-index';
 import { useCloseOnOutsideMouseDown } from '../../hooks/use-close-on-outside-mouse-down';
 import { MentionPickerButton } from '../InlineCommentForm/MentionPickerButton';
 import { MentionAwareCommentInput } from '../MentionAwareCommentInput/MentionAwareCommentInput';
@@ -183,7 +182,6 @@ export const InlineCommentPreviewPopover: FC<
     <div
       ref={setPopperElement}
       data-testid="inline-comment-preview-popover"
-      style={{ zIndex: INLINE_COMMENT_POPOVER_Z_INDEX }}
       // `card` gives the mockup's own surface color and 1px border; the
       // corner radius and the diffuse drop shadow are its `--radius-lg`
       // (14px -> Bootstrap's 1rem `rounded-4`, the nearest step) and

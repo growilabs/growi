@@ -9,8 +9,12 @@
 // `next.config.ts` sets `loadPaths: [<app>/src]`, which is what lets this
 // `@use` be written from anywhere under `src`.
 @use 'client/components/PageComment/comment-inheritance';
+@use '../popover-z-index';
 
 .inline-comment-preview-popover-styles {
+  // Portaled to document.body, so it needs an explicit layer of its own.
+  z-index: popover-z-index.$popover-z-index;
+
   // A fixed width. Without one the popover has no width constraint at all,
   // so it sized itself to whichever content it happened to hold: 602px with
   // a reply thread and 566px in edit mode — the same popover visibly

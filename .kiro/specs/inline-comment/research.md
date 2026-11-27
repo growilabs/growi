@@ -112,11 +112,11 @@ v1の実装後、ユーザー提供の実装UIモックアップ（テキスト�
 jsdomにはレイアウト・ペイントエンジインが無いため、ユニットテストでは検出できない種類の不具合が実ブラウザでの検証（統合タスク・E2Eタスク）で2件見つかった。
 
 - **`mousedown`の既定動作によるボタンの取りこぼし**: `SelectionActionButton`はポータル経由で本文コンテナの外（`document.body`直下）に描画される。`mousedown`の既定動作（文書選択の解除）を止めないと、`mousedown`と`click`の間に選択が消えて状態が`idle`に落ち、ボタンが外れて`onCommit`が発火しない。`SelectionCapture`が`SelectionActionButton`だけを包む要素を置き、その`onMouseDown`で`preventDefault`して対処した（`InlineCommentForm`側には適用せず、入力欄へのカーソル配置を妨げないようにしている）。
-- **スタッキングコンテキストの脱出によるクリック不能**: `SelectionPopover`のポータルは`document.body`直下に描画されるが、`.wiki`ページレイアウトの祖先要素（Bootstrapの`.z-1`クラスを持つflexアイテム。`position: static`でもflexアイテムとしてスタッキングコンテキストを形成する）の背後に回り込み、見た目は前面にあるのに実際にはクリック不能になっていた（`elementFromPoint`が背後の要素を指す）。ポータルの直下要素に`zIndex`を明示指定して解決した（値の決め方は次節）。
+- **スタッキングコンテキストの脱出によるクリック不能**: `SelectionPopover`のポータルは`document.body`直下に描画されるが、`.wiki`ページレイアウトの祖先要素（Bootstrapの`.z-1`クラスを持つflexアイテム。`position: static`でもflexアイテムとしてスタッキングコンテキストを形成する）の背後に回り込み、見た目は前面にあるのに実際にはクリック不能になっていた（`elementFromPoint`が背後の要素を指す）。ポータルの直下要素にz-indexを明示指定して解決した（値の決め方は次節）。
 
 ### ポップオーバーの重なり順は、固定ヘッダー・サイドバーより上、モーダルの背景より下に置く
 
-`SelectionPopover`と`InlineCommentPreviewPopover`はどちらも`document.body`直下に描画され、同じ値`INLINE_COMMENT_POPOVER_Z_INDEX`（`client/constants/z-index.ts`、1040）を使う。前節の`.z-1`（z-index 1）の背後に回り込まないためには、1より大きければ足りる。そのうえで値を次の範囲に置いた。
+`SelectionPopover`と`InlineCommentPreviewPopover`はどちらも`document.body`直下に描画され、同じSCSS変数`$popover-z-index`（`client/components/_popover-z-index.scss`、`bs.$zindex-modal-backdrop - 10`＝1040）を、それぞれのCSS Moduleで使う。前節の`.z-1`（z-index 1）の背後に回り込まないためには、1より大きければ足りる。そのうえで値を次の範囲に置いた。値をTSの定数ではなくBootstrapの変数から書くのは、Bootstrap側の値が変わっても範囲の関係が保たれ、根拠がコードに残るため（同じ層の値は`Sidebar.module.scss`なども同じ書き方をしている）。
 
 - **固定ヘッダー（Bootstrapの`$zindex-fixed`、1030）とサイドバー（`$zindex-fixed + 2`）より上**: スクロールやサイドバーとの重なりで、ポップオーバーが隠れないようにするため
 - **モーダルの背景（`$zindex-modal-backdrop`、1050）より下**: ポップオーバーから開くモーダル（`comment-reactions`の絵文字ピッカーなど）が、開いた元のポップオーバーより手前に出るようにするため。狭い画面で開くサイドバー（`$zindex-modal`）も、ポップオーバーより手前に出る
