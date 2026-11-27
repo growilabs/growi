@@ -40,7 +40,7 @@ import { ADOPTED_PLUGIN_NAMES, EXCLUDED_PLUGIN_NAMES } from './plugin-set';
  */
 const SERVER_RENDERER_PATH = resolve(
   __dirname,
-  '../../../../../../services/renderer/renderer.tsx',
+  '../../../services/renderer/renderer.tsx',
 );
 
 // ---------------------------------------------------------------------------

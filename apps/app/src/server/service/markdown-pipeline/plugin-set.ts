@@ -1,6 +1,7 @@
 /**
  * Canonical declaration of adopted and intentionally-excluded plugins for the
- * bulk-export Markdown → HTML pipeline.
+ * server-side Markdown pipeline (used by page-bulk-export and inline-comment;
+ * designed in .kiro/specs/bulk-export-pdf-rendering).
  *
  * This module is the single source of truth used by:
  *  - EsmPluginLoader (task 3.x) — which plugins to load and in what order
@@ -49,7 +50,7 @@ export interface PluginDeclaration {
 /**
  * Adopted plugins in pipeline execution order.
  *
- * Design reference: design.md § Technology Stack
+ * Design reference: bulk-export-pdf-rendering design.md § Technology Stack
  *   remark-parse, remark-gfm, remark-frontmatter, remark-math,
  *   remark-rehype (allowDangerousHtml), rehype-raw, rehype-slug,
  *   rehype-sanitize, rehype-katex, rehype-stringify
@@ -123,7 +124,7 @@ export const ADOPTED_PLUGINS: ReadonlyArray<PluginDeclaration> = [
 ] as const;
 
 /**
- * Plugins intentionally excluded from the bulk-export pipeline.
+ * Plugins intentionally excluded from the server-side pipeline.
  *
  * These are plugins present in the GROWI web renderer (generateCommonOptions /
  * generateSSRViewOptions) that this pipeline consciously omits. NOTE (改訂 5):
