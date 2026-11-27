@@ -1,5 +1,11 @@
 # @growi/core
 
+## 3.3.0
+
+### Minor Changes
+
+- [#12352](https://github.com/growilabs/growi/pull/12352) [`040283f`](https://github.com/growilabs/growi/commit/040283f82a22cf8622f635434d818654b529fe5d) Thanks [@yuki-takei](https://github.com/yuki-takei)! - `ComposeViewRequest.userId` is now `string`. The compose-view RPC to vault-manager no longer accepts a `null` user id.
+
 ## 3.2.0
 
 ### Minor Changes
