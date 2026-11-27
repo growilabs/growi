@@ -159,7 +159,10 @@ describe.skipIf(process.env.ELASTICSEARCH_URI == null)(
       expect(await aliasTargets(actingNames.alias)).toEqual([rebuilt]);
       expect(await indexExists(abandoned)).toBe(false);
       expect(await snapshot(otherNames)).toEqual(before);
-    });
+      // Seven real Elasticsearch round-trips (ensure/create/swap/create/drop +
+      // two snapshot reads); the default testTimeout is sometimes too tight
+      // for that under ordinary CI contention.
+    }, 30_000);
 
     describe('while the alias does not exist', () => {
       const indexerWith = (extension: AttachmentSearchDelegatorExtension) =>
