@@ -128,6 +128,35 @@ describe('PageService descendant rename → vault_instructions', () => {
     assert((await Page.exists({ path: `${NEW_PATH}/only-me` })) != null);
   });
 
+  it('moves the descendants to the same literal path in the page tree and in the rename-prefix when the new path has $ sequences', async () => {
+    const src = '/vault-descendants-rename-seam/dollar';
+    const dst = '/vault-descendants-rename-seam/n$&y$$z';
+    const target = await Page.create({
+      path: src,
+      parent: new mongoose.Types.ObjectId(),
+      grant: PageGrant.GRANT_PUBLIC,
+      creator: user,
+      lastUpdateUser: user,
+    });
+    await Page.create({
+      path: `${src}/child`,
+      parent: target._id,
+      grant: PageGrant.GRANT_PUBLIC,
+      creator: user,
+      lastUpdateUser: user,
+    });
+
+    await renameDescendants(target, dst);
+    await waitForInstructions(dst, 1);
+
+    const [instruction] = await renamePrefixInstructions(dst);
+    expect(instruction.payload.newPrefix).toBe(dst);
+    const moved = await Page.find({
+      path: /^\/vault-descendants-rename-seam\/n/,
+    }).lean();
+    expect(moved.map((p) => p.path)).toEqual([`${dst}/child`]);
+  });
+
   it('writes the rename-prefix again when the same subtree is renamed back', async () => {
     const there = '/vault-descendants-rename-seam/there';
     const back = '/vault-descendants-rename-seam/back';
