@@ -32,9 +32,9 @@ umbrella spec `chat-integration` の管理画面（`/admin/chat-integration`）�
 |---|---|
 | `chat-integration`（umbrella） | 要件 1・2・9・11 に受け入れ条件を足す。要件 16（管理画面の使いやすさ）を新しく足す。既存の受け入れ条件は変えない。要件は umbrella が持つので、実装の後、この文書の受け入れ条件を umbrella の requirements.md へ移す（tasks.md のタスク 7.2） |
 | `chat-integration-app` | 管理画面（`client/admin/`）と、管理画面の API の受け持ちを、この spec へ移す。app の design.md の「触れない部品」（`CapabilityReportTable`・`ChannelPermissionsSection`・`NotificationDestinationsSection`・`UnpairButton`）と、管理画面の文言を英語の直書きとする取り決めは無くなる（表示言語ごとの文言にする） |
-| roadmap.md | Sub-specs の表にこの spec を足す。順 8「管理画面の作り直し」の対象を、この spec の範囲に広げる。完了したときに、順 8 の行を消す |
+| roadmap.md | Sub-specs の表にこの spec を足し、`chat-integration-app` の行の責務から「管理画面」を外す。順 8「管理画面の作り直し」の対象を、この spec の範囲に広げる。完了したときに、順 8 の行を消す |
 
-再検証が必要になる条件への影響: なし。`@growi/chat` と chat-integration proxy の契約は変えない。
+再検証が必要になる条件への影響: `@growi/chat` と chat-integration proxy の契約は変えないので、protocol と proxy の再検証は要らない。`chat-integration-app` の Revalidation Triggers に「権限や通知先の model を変えたら、`chat-integration-admin-ui` も確かめ直す」を足す（tasks.md のタスク 7.3）。
 
 ### 番号の扱い
 

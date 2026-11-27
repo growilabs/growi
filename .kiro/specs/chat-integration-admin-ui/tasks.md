@@ -262,9 +262,10 @@
 - [ ] 7.4 umbrella の spec.json と roadmap.md に、この spec を載せる
   - umbrella の spec.json の `sub_specs` にこの spec を足し、`updated_at` を更新する
   - roadmap.md の Sub-specs の表に、この spec の行（成果物: `apps/app/src/features/chat-integration/client/admin/` と管理画面の API、責務: 管理画面）を足す
+  - roadmap.md の Sub-specs の表の `chat-integration-app` の行の責務から「管理画面」を外す
   - roadmap.md から、順 8 の行と、順 8 の節を消す。ほかの順の番号は変えない
   - 書き換えた `chat-integration-app` の spec.json の `updated_at` を更新する（`phase` と `approvals` は変えない）
-  - 完了の条件: umbrella の `sub_specs` と roadmap.md の Sub-specs の表にこの spec があり、roadmap.md に順 8 の行が無い。app の spec.json の `updated_at` が更新されている
+  - 完了の条件: umbrella の `sub_specs` と roadmap.md の Sub-specs の表にこの spec があり、`chat-integration-app` の行の責務に「管理画面」が無い。roadmap.md に順 8 の行が無い。app の spec.json の `updated_at` が更新されている
   - _Requirements: 16.9_
   - _Depends: 7.2, 7.3_
 

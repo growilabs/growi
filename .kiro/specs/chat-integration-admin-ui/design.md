@@ -67,7 +67,7 @@
 |---|---|---|
 | `chat-integration`（umbrella） | `requirements.md`、`spec.json` | 要件 1・2・9・11 の末尾に、requirements.md の番号のまま受け入れ条件を足す。要件 16 を足す。既存の番号は振り直さない。この spec は番号を参照するだけにし、spec.json に `owned_by_umbrella: true` を付ける。umbrella の `sub_specs` にこの spec を足す |
 | `chat-integration-app` | `design.md` の「管理画面と個人設定」の要約、「管理画面の関係の状態」、「触れない部品」、ファイル構成と API の表のうち管理画面の部分 | 管理画面の節を取り除き、この spec への参照に置き換える。Boundary Commitments の Out of Boundary に「`client/admin/` と管理画面の API」を足し、Revalidation Triggers に「権限や通知先の model を変えたら、`chat-integration-admin-ui` も確かめ直す」を足す |
-| roadmap.md | Sub-specs の表、順 8 の行 | Sub-specs の表にこの spec を足す。順 8 の対象を本 spec の範囲に広げ、完了したときにこの行を消す |
+| roadmap.md | Sub-specs の表、順 8 の行 | Sub-specs の表にこの spec を足し、`chat-integration-app` の行の責務から「管理画面」を外す。順 8 の対象を本 spec の範囲に広げ、完了したときにこの行を消す |
 
 - **Revalidation Triggers への影響**: `@growi/chat` と proxy の契約は変えないので、protocol と proxy の再検証は要らない。app には、上の表の Revalidation Triggers を足す。
 - **app の design.md を書き換える順番**: `chat-integration-agent` のタスク 7.1 は、`chat-integration-app` の design.md の管理画面の項に「権限の行の 2 つの性質（コマンドの注意書きと DM の欄）と、DM だけを許す行は `allowedChannels: 'none'` で保存されること」を書く。本 spec のタスク 7.3 は、その項ごと app の design.md から除き、この design の「権限の行」の節（DM だけを許す行は、既定の挙動に等しい `allowedChannels` で書く）への参照に置き換える。そのため、agent の 7.1 が済んでから行う。

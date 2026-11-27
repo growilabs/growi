@@ -69,7 +69,7 @@ proxy と app は互いを知らず、protocol の契約だけで話す。
 | 順 | まとまり | 含む項目 | 進め方 | 対象 |
 |---|---|---|---|---|
 | 7 | コマンドの再編 | `agent` の追加、`keep` の吸収。通知の「書いてすぐ送る」を同じ口で作り、それと同時に定期処理の間隔を延ばす。DM の先頭の `@誰か` の扱いと、Teams の `personal` 範囲を要件で決める | amend spec [chat-integration-agent](../chat-integration-agent/)。要件・設計・タスクは承認済み。実装がこれから | umbrella、protocol、proxy、app |
-| 8 | 管理画面の作り直し | 管理画面のうち、チャンネルの権限と「できること」の表 | amend spec `chat-integration-admin-ui`（名前は仮） | app |
+| 8 | 管理画面の作り直し | 管理画面のうち、チャンネルの権限と「できること」の表 | sub-spec [chat-integration-admin-ui](../chat-integration-admin-ui/)。umbrella の下に常に置く 4 つ目の sub-spec。要件・設計・タスクは承認済み。実装がこれから | app |
 | 9 | コマンドの表示の締め | スラッシュコマンドの実機確認、`help` の一覧の書き方、Discord のスレッドでの追加入力 | proxy の残タスク 12.4 | proxy |
 | 10 | URL の展開の確認フロー | 共有してよいかを本人に尋ねてから展開する | `/kiro-discovery` から着手する。`agent` の「本人にだけ届ける」しくみの上に作るので、`agent` の後 | 3 spec すべて |
 
@@ -92,7 +92,7 @@ proxy と app は互いを知らず、protocol の契約だけで話す。
   - **通知の「書き込んだ直後に送る」と、定期処理の間隔の延長**: `agent` の「あとから送る口」と同じ送り方で作り、それと同時に通知の定期処理の間隔を延ばす。邪魔をしないための今の設計は [chat-integration-app の design.md](../chat-integration-app/design.md)「書き込んだ直後に送る経路のための余地」、間隔を先に延ばさない理由と、延ばしたときの時間の変化は [chat-integration-app の research.md](../chat-integration-app/research.md)「通知の定期処理の間隔は、直後に送る経路と一緒に延ばす」。受け入れ条件には要件 2.10・2.11 を使ってよい
 - **制約（直せない。`agent` の設計で扱い方を決める）**: official proxy では Slack の会話の取り込みが事実上使えない。Slack Marketplace の外で配布するアプリは、2025-05-29 以降、`conversations.history` が 1 分に 1 回・1 回 15 件までに制限される（組織が自分で作るアプリは対象外）。GROWI が運営する 1 つのアプリを多くの workspace に導入する形では、`keep`（要件 5）がこの制限を受ける。詳しくは [chat-integration-agent の brief](../chat-integration-agent/brief.md) の「実現性の確認の結果」3
 
-### 8. 管理画面の作り直し（amend spec `chat-integration-admin-ui`、名前は仮）
+### 8. 管理画面の作り直し（sub-spec [chat-integration-admin-ui](../chat-integration-admin-ui/)）
 
 `agent` が、チャンネルの権限と能力表に `agent` の行と DM の権限を足すので、その後に作り直す。先に作り直すと、もう一度直すことになる。
 

@@ -10,7 +10,7 @@ protocol と proxy の契約は変えない。app の管理画面と、その AP
 |---|---|
 | `chat-integration-app` | 管理画面（`client/admin/`。要件 1.3・11・12.4・12.5・9.10〜9.13 の管理画面の側）と、管理画面の API（`server/admin/admin-router.ts` のルート）の受け持ちを、この spec へ移す。app の design.md からは管理画面の節（「管理画面の関係の状態」「触れない部品」、ファイル構成と API の表のうち管理画面の部分）を除き、この spec への参照に置き換える。あわせて、「触れない部品」（`CapabilityReportTable`・`ChannelPermissionsSection`・`NotificationDestinationsSection`・`UnpairButton`）の取り決めと、管理画面の文言を英語の直書きとする取り決めは無くなる（i18n 対応にする）。設定の保存・ペアリング・切断の処理と、権限や通知先の model は app に残る |
 | `chat-integration`（umbrella） | 要件は umbrella が持つ。この spec で決めた受け入れ条件（要件 1・2・9・11 への追記と、新しい要件 16）を umbrella の requirements.md へ移し、この spec は番号を参照するだけにする。新しい受け入れ条件は**末尾に足し、既存の番号は振り直さない**。spec.json の `sub_specs` にこの spec を足す |
-| roadmap.md | Sub-specs の表にこの spec を足す。順 8 の対象は今「チャンネルの権限と『できること』の表」だけなので、この spec の範囲（上の表と Scope）に広げる。順 8 の行は、完了したときに消す |
+| roadmap.md | Sub-specs の表にこの spec を足し、`chat-integration-app` の行の責務から「管理画面」を外す。順 8 の対象は今「チャンネルの権限と『できること』の表」だけなので、この spec の範囲（上の表と Scope）に広げる。順 8 の行は、完了したときに消す |
 
 - Revalidation Triggers への影響: protocol と proxy の契約は変えない（管理画面の API は app の中で完結する）。app の Revalidation Triggers に「権限や通知先の model を変えたら、`chat-integration-admin-ui` も確かめ直す」を足す。
 - 前提: roadmap は「`agent`（順 7）が権限と能力表に行を足した後に作り直す」としている。`chat-integration-agent` の task 5.8（`agent` の行、DM の欄）と 6.1（`keep` の除去）は完了済みで、この前提は満たされている。agent の残りのタスクが管理画面に触れるかは、未確認。
