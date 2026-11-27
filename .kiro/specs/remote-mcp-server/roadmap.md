@@ -18,7 +18,7 @@ GROWI 本体に MCP サーバーを組み込み、claude.ai（web 版 Claude）�
 
 ## Approach Decision
 
-- **Chosen**: Mastra の `@mastra/mcp`（`MCPServer`）を既存の Express に `POST /_api/v3/mcp` としてマウントし、GROWI 本体が OAuth 2.1 認可サーバーを兼ねる。接続方式は「カスタムコネクタ + Sign in 方式」でリリースする。
+- **Chosen**: MCP の公式の TypeScript SDK（`@modelcontextprotocol/server`）で作った MCP サーバーを既存の Express に `POST /_api/v3/mcp` としてマウントし、GROWI 本体が OAuth 2.1 認可サーバーを兼ねる。接続方式は「カスタムコネクタ + Sign in 方式」でリリースする。
 - **Why**:
   - 別サービスを立てないので、セルフホストの構成が増えない。MCP 仕様は認可サーバーとリソースサーバーの同居を認めている。
   - 公開するツールは既存の AI チャットが持つ全文検索とページ本文取得の 2 本で、処理の中身（閲覧権限の判定を含む）をそのまま使える。ツール定義（名前、説明、結果の形）は、MCP 用に別に持つ。
@@ -48,8 +48,8 @@ GROWI 本体に MCP サーバーを組み込み、claude.ai（web 版 Claude）�
 - ツールのエラー応答でも、ページの存在を「見つからない」と「権限がない」の違いで漏らさない。
 - claude.ai から到達するには、GROWI が公開 HTTPS（443 番、IPv4）で Anthropic のサーバーから見える必要がある。社内ネットワーク内だけの GROWI は対象にできない。
 - 複数インスタンス構成を前提にする。プロセス内にセッションや利用者ごとの状態を持たない。
-- `@mastra/mcp` は 2.8.0 で始める。`@mastra/core` 1.80.x のまま入る最新版で、Apache-2.0。2.9.0 以降は core 1.83 以上が要る。
-- `MCPServer` には `legacy: 'stateless'` を指定する。指定しないと 2025 年系のクライアントをすべて拒否する。claude.ai の接続確認は 2025-11-25 の `initialize` で来るという報告がある（第三者の報告。公式の記載は無い）。
+- MCP サーバーは、`@modelcontextprotocol/server` 2.4.x と `@modelcontextprotocol/node` 2.1.x で作る。discovery の時点では `@mastra/mcp` 2.8.0 を選んでいたが、Mastra の機能を使わないことが分かったので、PR のレビュー（2026-11-27）を受けて SDK の直接利用に改めた（`remote-mcp-server-route` の research.md の Decision）。
+- SDK の `createMcpHandler` には `legacy: 'stateless'` を指定する（SDK の既定値でもある）。`'reject'` にすると 2025 年系のクライアントをすべて拒否する。claude.ai の接続確認は 2025-11-25 の `initialize` で来るという報告がある（第三者の報告。公式の記載は無い）。
 
 ## Boundary Strategy
 
@@ -72,6 +72,7 @@ GROWI 本体に MCP サーバーを組み込み、claude.ai（web 版 Claude）�
 
 - **ディレクトリ掲載**: claude.ai の「人気のコネクタ」への掲載。審査要件の確認から始める。
 - **書き込み系ツール**: `change-proposal` umbrella が将来の `change-proposal-mcp` として持つ。
+- **Skills over MCP（Skills 拡張）**: 2026-11-24 に Claude と Claude Code で公開された MCP の拡張。SDK 2.4.0 は対応している。初回リリースの範囲には入れない。
 - **DCR 対応**: 下記の未決 1 で初回リリースに入れないと決めた場合、ここに残す。
 
 ## 未決の論点
@@ -82,4 +83,4 @@ GROWI 本体に MCP サーバーを組み込み、claude.ai（web 版 Claude）�
 4. ~~`remote-mcp-server-route` を単独でリリースしない方法。~~ 統合ブランチ `feat/remote-mcp-server` の運用で守ると決めた。`remote-mcp-server-oauth` が揃うまで master へ入れない。管理画面の項目を隠す仕組みは作らない。
 
 ---
-_Updated: 2026-11-25. MCP エンドポイントのパスを `/mcp` から `/_api/v3/mcp` に変えた（wiki のページのパスと衝突しないため）。Prior: 2026-11-24. リリース時の `/_api/v3/mcp` は認可サーバーが発行したトークンだけを受け付ける、と決めた。手動発行のトークンを代替手段として残す決定を取り消し、2 spec の接点と未決 1・2 を合わせて直した。Prior: 2026-11-24. discovery で作成。_
+_Updated: 2026-11-27. MCP サーバーを `@mastra/mcp` から SDK の直接利用に改め、Future に Skills 拡張を足した。Prior: 2026-11-25. MCP エンドポイントのパスを `/mcp` から `/_api/v3/mcp` に変えた（wiki のページのパスと衝突しないため）。Prior: 2026-11-24. リリース時の `/_api/v3/mcp` は認可サーバーが発行したトークンだけを受け付ける、と決めた。手動発行のトークンを代替手段として残す決定を取り消し、2 spec の接点と未決 1・2 を合わせて直した。Prior: 2026-11-24. discovery で作成。_

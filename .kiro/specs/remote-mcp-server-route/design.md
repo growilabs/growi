@@ -13,7 +13,8 @@
 - MCP 連携が有効なとき、`/_api/v3/mcp` が MCP の Streamable HTTP として、2026-07-28 版と 2025 年の各版のクライアントに応答する。
 - 利用者の特定（認証）を 1 つの差し込み口に閉じ込め、`remote-mcp-server-oauth` が、ツール・回数制限・Activity を変えずに中身を差し替えられるようにする。
 - ページの閲覧権限の判定を、エージェント用のツールと MCP 用のツールで 1 か所に保つ。
-- MCP 連携が動かない状態のときは、MCP サーバーのためのメモリを消費しない。動かない状態で起動したプロセスは、`@mastra/mcp` を読み込まない。動かない状態に戻したときは、保持している部品への参照を手放す。
+- MCP 連携が動かない状態のときは、MCP サーバーのためのメモリを消費しない。動かない状態で起動したプロセスは、MCP の SDK を読み込まない。動かない状態に戻したときは、保持している部品への参照を手放す。
+- MCP エンドポイントは、Mastra（`@mastra/*`）を読み込まない。MCP の SDK（`@modelcontextprotocol/server`）を直接使う。
 
 ### Non-Goals
 
@@ -26,7 +27,7 @@
 
 ### This Spec Owns
 
-- `/_api/v3/mcp` のリクエストの処理の流れ: MCP 連携が動く状態かどうかの判定（`isMcpAvailable`）、認証の呼び出し、利用者単位の回数制限、バッチの拒否、`MCPServer` への受け渡し。
+- `/_api/v3/mcp` のリクエストの処理の流れ: MCP 連携が動く状態かどうかの判定（`isMcpAvailable`）、認証の呼び出し、利用者単位の回数制限、バッチの拒否、MCP の SDK のハンドラへの受け渡し。
 - `/_api/v3/mcp` をマウントする位置（セッションより前）と、その結果ルートが自分で行うことになる処理: メンテナンスモードの判定、IP 単位の回数の計数、送信元（`Origin`）の検査。
 - **認証の差し込み口の型**（`McpAuth`）と、その暫定の中身（アクセストークンでの認証、チャレンジなしの 401）。
 - MCP 用のツール定義（名前・説明・annotation・出力の形）と、ツール呼び出しの Activity の記録。
@@ -45,7 +46,7 @@
 
 ### Allowed Dependencies
 
-- `@mastra/mcp` 2.8.x（新規。`~2.8.0` で固定）、`@mastra/core/tools` の `createTool`。どちらも遅延ロードの内側でだけ読み込む。
+- `@modelcontextprotocol/server` 2.4.x と `@modelcontextprotocol/node` 2.1.x（新規。MCP の公式の TypeScript SDK）。遅延ロードの内側でだけ読み込む。`@mastra/*` は使わない。
 - `AccessToken` モデルと `extractBearerToken`（暫定の認証の中身だけが使う）。
 - `features/rate-limiter` の公開の口（この spec が `consumeUserPoints` を足す）。
 - `crowi.searchService`、`crowi.activityService.createActivity`、`configManager`、`Page` モデル。
@@ -85,7 +86,7 @@
   - 6: 2026-07-28 版のリクエストは、`params._meta` に `.` を含むキーを必ず持つ。削除されると、SDK が全件を拒否する。
 - 1 の直後にマウントすれば、MCP のリクエストは 2〜7 を通らない。既存の共通処理を、MCP のために変更する必要が無い。代わりに、MCP に必要なもの（メンテナンスモードの判定、IP 単位の回数の計数、送信元の検査）を、ルートが自分で行う。静的なファイルの配信が、同じ理由でセッションより前に置かれている。
 - この位置で成り立つことは、開発サーバーに仮のルートを置いて確かめた（research.md の Decision「MCP のルートは、セッションより前にマウントする」）。素通ししたリクエストは 2 以降の通常の経路に入り、存在しないパスと同じ応答になる。
-- **既存の 2 ツール**は、モジュールの読み込み時に作られる定数で、`searchService` を requestContext から読む。`MCPServer` 経由の requestContext には `searchService` が入らない。また 2 ツールとも、例外の文面（`err.message`）をそのまま結果に入れる。
+- **既存の 2 ツール**は、Mastra の `createTool` で作られたモジュールの読み込み時の定数で、`searchService` を Mastra の requestContext から読む。MCP エンドポイントは Mastra を使わないので、そのままでは使えない。また 2 ツールとも、例外の文面（`err.message`）をそのまま結果に入れる。
 
 ### Architecture Pattern & Boundary Map
 
@@ -105,7 +106,7 @@ graph TB
     end
     subgraph Lazy[Lazy loaded on first enabled request]
         Handler[McpRequestHandler]
-        Server[GrowiMcpServer]
+        Server[MCP SDK handler and server factory]
         Tools[MCP tool declarations]
     end
     subgraph Shared[Shared core functions]
@@ -147,8 +148,8 @@ graph TB
 
 | Layer | Choice / Version | Role in Feature | Notes |
 |-------|------------------|-----------------|-------|
-| Backend | `@mastra/mcp` `~2.8.0` | `MCPServer`（Streamable HTTP、`legacy: 'stateless'`） | 新規の依存。2.9 以降は `@mastra/core` 1.83 以上を要求するので 2.8 系に固定する |
-| Backend | `@mastra/core` 1.80.x（既存） | `createTool` | 変更なし |
+| Backend | `@modelcontextprotocol/server` `~2.4.0` | `McpServer`、`createMcpHandler`（2026-07-28 版と、2025 年の各版のセッションなしの扱い） | 新規の依存。MCP の公式の TypeScript SDK |
+| Backend | `@modelcontextprotocol/node` `~2.1.2` | `toNodeHandler`（SDK のハンドラを Express の `(req, res)` に載せる） | 新規の依存。実行時に `hono` と `@hono/node-server` を伴う |
 | Backend | Express（既存） | ルーター、ミドルウェア | `express-init.js` に、MCP のルートをマウントする 1 行を足す |
 | Data | MongoDB（既存） | 設定値、回数制限の計数（`RateLimiterMongo`）、Activity | 新しいコレクションは無い |
 | Frontend | React、SWR、reactstrap（既存） | 管理画面の MCP の節 | 既存の AI 連携ページに足す |
@@ -165,7 +166,7 @@ features/mastra/
 │   └── mcp-settings.ts                  # MCP_ENDPOINT_PATH、管理 API の入出力の型（サーバーとクライアントで共有）
 ├── server/
 │   ├── routes/
-│   │   ├── mcp/                         # 軽い層。@mastra/* を静的に読み込まない
+│   │   ├── mcp/                         # 軽い層。@modelcontextprotocol/* と @mastra/* を静的に読み込まない
 │   │   │   ├── index.ts                 # McpRouter: 処理の流れを組み立てるファクトリ
 │   │   │   ├── auth/
 │   │   │   │   ├── index.ts             # mcpAuth（差し込み口の現在の中身）を公開する
@@ -176,7 +177,8 @@ features/mastra/
 │   │   │   ├── is-batch-request.ts                 # 本文が配列かどうかの判定（純粋な関数）
 │   │   │   ├── is-allowed-origin.ts                # 送信元（Origin）の検査（純粋な関数）
 │   │   │   ├── lazy-mcp-request-handler.ts         # 重い層の遅延ロードと、保持している参照の解放
-│   │   │   └── mcp-request-handler.ts              # 重い層の入口。@mastra/mcp を読み込み、startHTTP を呼ぶ
+│   │   │   ├── mcp-request-handler.ts              # 重い層の入口。SDK のハンドラを作り、リクエストを渡す
+│   │   │   └── no-eager-mcp-imports.spec.ts        # drift spec（Guard / Drift Specs）
 │   │   └── admin-mcp-settings/
 │   │       ├── index.ts                 # /_api/v3/mcp-settings のルーター
 │   │       ├── get-mcp-settings.ts
@@ -191,8 +193,8 @@ features/mastra/
 │       │   │   ├── types.ts             # McpToolDeclaration、McpToolDeps
 │       │   │   ├── search-pages-tool.ts
 │       │   │   └── get-page-content-tool.ts
-│       │   ├── build-mcp-tools.ts       # 宣言の一覧から createTool のツール群を作る（Activity、例外の封じ込め）
-│       │   └── mcp-server.ts            # createGrowiMcpServer
+│       │   ├── register-mcp-tools.ts    # 宣言の一覧を McpServer に登録する（Activity、例外の封じ込め）
+│       │   └── mcp-server-factory.ts    # createGrowiMcpServerFactory（リクエストごとに McpServer を作る）
 │       └── mastra-modules/tools/
 │           ├── search-pages.ts          # 新規: 全文検索の中身（入力スキーマを含む）
 │           └── read-page-content.ts     # 新規: ページ本文取得の中身（入力スキーマを含む）
@@ -218,7 +220,7 @@ features/mastra/
 - `interfaces/activity.ts` — アクション 3 つ、カテゴリ `Mcp`、`McpActions` を足す。
 - `client/components/Admin/AuditLog/SelectActionDropdown.tsx` — カテゴリ `Mcp` を足す。
 - `public/static/locales/{en_US,ja_JP,zh_CN,ko_KR,fr_FR}/admin.json` — MCP の節の文言、アクションとカテゴリの表示名。
-- `apps/app/package.json` — `@mastra/mcp` を足す（`dependencies` か `devDependencies` かは、ビルドして `package-dependencies` のルールで決める）。
+- `apps/app/package.json` — `@modelcontextprotocol/server` と `@modelcontextprotocol/node` を足す（`dependencies` か `devDependencies` かは、ビルドして `package-dependencies` のルールで決める）。`@mastra/mcp` は足さない。
 - `.kiro/specs/ai-agentic-search/design.md` — 2 ツールのファイル構成の記述を、取り出し後の事実に合わせる。ツールの約束は変わらないので、amend spec は作らない。
 
 ## System Flows
@@ -245,14 +247,14 @@ flowchart TD
     Batch -->|yes| R400[400 invalid request]
     Batch -->|no| Load{Load handler}
     Load -->|failed| R500[500 and retry next time]
-    Load -->|ok| Dispatch[startHTTP with caller context]
+    Load -->|ok| Dispatch[SDK handler with caller context]
 ```
 
 - IP 単位の計数は、動く状態かどうかの判定の直後に置く。送信元の検査や認証で拒否されるリクエストも、IP 単位の枠で数える（6.4）。動かない状態やパスが違うリクエストは素通しするので、通常の経路のグローバルの制限が数える。
 - 認証は、利用者単位の回数制限より前に置く。未認証のリクエストは、IP 単位の制限だけが数える。
 - バッチの拒否は、回数制限の後に置く。拒否されるリクエストも 1 回として数える。
-- GET と DELETE は、認証済みなら `startHTTP` が 405 を返す（3.6）。未認証なら 401 になる。
-- `startHTTP` は応答を自分で書いて終える。呼んだ後は、応答を書かず、`next()` も呼ばない。例外が出て、ヘッダーをまだ送っていないときだけ 500 を返す。
+- GET と DELETE は、認証済みなら SDK のハンドラが 405 を返す（3.6）。未認証なら 401 になる。
+- SDK のハンドラ（`toNodeHandler` で包んだもの）は、応答を自分で書いて終える。呼んだ後は、応答を書かず、`next()` も呼ばない。例外が出て、ヘッダーをまだ送っていないときだけ 500 を返す。
 
 ### ツール呼び出しの流れ
 
@@ -260,16 +262,16 @@ flowchart TD
 sequenceDiagram
     participant C as MCP client
     participant R as McpRouter
-    participant S as GrowiMcpServer
-    participant T as Built MCP tool
+    participant S as SDK handler
+    participant T as Registered MCP tool
     participant A as ActivityService
     participant F as Shared core function
 
     C->>R: POST tools call with Bearer token
     R->>R: authenticate and rate limit
-    R->>S: startHTTP with req.auth
-    S->>T: execute with input and context
-    T->>T: read caller context from authInfo
+    R->>S: handler with req.auth
+    S->>S: server factory reads caller from authInfo and registers tools
+    S->>T: call with input
     T->>A: createActivity with tool action
     T->>F: run with caller and deps
     F-->>T: result union
@@ -300,10 +302,10 @@ sequenceDiagram
 | 2.7, 2.8 | セッションだけ・ゲストは 401 | McpRouter、AccessTokenAuthenticator | `req.user` を見ない | 処理の流れ |
 | 2.9, 2.10 | リダイレクトしない、理由を区別しない | AuthFailureResponse | 理由によらず固定の 401 | — |
 | 2.11 | 認証を差し替えても同じ利用者を基準にする | McpAuth、McpCallerContext | `McpAuth` の型 | 両方の流れ |
-| 3.1, 3.2 | 接続確認、ツールの一覧 | GrowiMcpServer、McpToolDeclarations | `MCPServer` | — |
-| 3.3 | 2026-07-28 版と 2025 年の各版 | GrowiMcpServer、McpRouter のマウント位置 | `legacy: 'stateless'`、`mongoSanitize` より前にマウントするので本文が削られない | — |
-| 3.4, 3.5 | 状態に頼らない、複数インスタンス | GrowiMcpServer、McpRouter | プロセス内に利用者ごとの状態を持たない | — |
-| 3.6 | GET / DELETE は非対応 | McpRequestHandler | `startHTTP` の 405 | 処理の流れ |
+| 3.1, 3.2 | 接続確認、ツールの一覧 | GrowiMcpServerFactory、McpToolDeclarations | `McpServer`、`createMcpHandler` | — |
+| 3.3 | 2026-07-28 版と 2025 年の各版 | McpRequestHandler、McpRouter のマウント位置 | `createMcpHandler` の `legacy: 'stateless'`、`mongoSanitize` より前にマウントするので本文が削られない | — |
+| 3.4, 3.5 | 状態に頼らない、複数インスタンス | GrowiMcpServerFactory、McpRouter | プロセス内に利用者ごとの状態を持たない | — |
+| 3.6 | GET / DELETE は非対応 | McpRequestHandler | SDK のハンドラの 405 | 処理の流れ |
 | 3.7, 3.8 | 読み取り専用の表示、説明 | McpToolDeclarations | annotation、description | — |
 | 3.9 | 一覧は設定によらず同じ | McpToolDeclarations | 一覧は静的な宣言 | — |
 | 3.10 | メンテナンス中は 503 | McpRouter | ルーターの先頭に `unavailableWhenMaintenanceModeForApi` を置く | 処理の流れ |
@@ -313,19 +315,19 @@ sequenceDiagram
 | 4.4, 4.5 | 件数の上限、並び順 | searchPages | 入力スキーマ | — |
 | 4.6 | 0 件は正常な結果 | searchPages、SearchPagesMcpTool | `kind: 'ok'` で `hits` が空 | — |
 | 4.7 | 検索が使えない | searchPages、SearchPagesMcpTool | `kind: 'search_unavailable'` | — |
-| 4.8 | 失敗の詳細を含めない | SearchPagesMcpTool、buildMcpTools | 固定の文言 | ツール呼び出し |
+| 4.8 | 失敗の詳細を含めない | SearchPagesMcpTool、registerMcpTools | 固定の文言 | ツール呼び出し |
 | 5.1, 5.2 | ID またはパスで取得 | readPageContent | `Page.findByIdAndViewer` / `findByPathAndViewer` | ツール呼び出し |
 | 5.3, 5.4, 5.5 | ID・パス・総行数、見出し、行の範囲 | readPageContent | 既存の outline / content の動作 | — |
 | 5.6, 5.9 | 存在しない・権限なしを同じ結果に | readPageContent、GetPageContentMcpTool | `not_found_or_forbidden` の固定の出力 | — |
 | 5.7 | 入力が足りない | readPageContent、GetPageContentMcpTool | `missing_input` | — |
-| 5.8 | エラーの詳細を含めない | GetPageContentMcpTool、buildMcpTools | 失敗も `not_found_or_forbidden` の固定の出力 | — |
+| 5.8 | エラーの詳細を含めない | GetPageContentMcpTool、registerMcpTools | 失敗も `not_found_or_forbidden` の固定の出力 | — |
 | 6.1, 6.2, 6.3 | 利用者ごとに数える、429 | McpRouter、RateLimiterPoints | `consumeUserPoints` | 処理の流れ |
 | 6.4 | 未認証は送信元単位 | McpRouter、RateLimiterPoints、RateLimiterConfig | `consumeIpPoints` | 処理の流れ |
 | 6.5 | 上限の変更 | RateLimiterConfig | `API_RATE_LIMIT_*` の env | — |
 | 6.6 | 全インスタンスの合計 | RateLimiterPoints | `RateLimiterMongo` | — |
 | 6.7 | 1 リクエストで多くとも 1 回 | McpRouter、isBatchRequest | バッチの拒否 | 処理の流れ |
-| 7.1, 7.2 | ツール呼び出しの記録、区別できる形 | buildMcpTools、ActivityActions | ツールごとのアクション | ツール呼び出し |
-| 7.3 | 接続確認・一覧は記録しない | buildMcpTools | 記録はツールの `execute` の中だけ | — |
+| 7.1, 7.2 | ツール呼び出しの記録、区別できる形 | registerMcpTools、ActivityActions | ツールごとのアクション | ツール呼び出し |
+| 7.3 | 接続確認・一覧は記録しない | registerMcpTools | 記録はツールのコールバックの中だけ | — |
 | 7.4 | 認証の失敗は記録しない | McpRouter | 認証は記録より前 | 処理の流れ |
 | 7.5 | 設定変更の記録 | AdminMcpSettingsApi | `addActivity` と `activityEvent.emit` | — |
 | 7.6 | トークンの値を記録しない | McpCallerContext | 呼び出し元の情報にトークンを含めない | — |
@@ -344,9 +346,9 @@ sequenceDiagram
 |-----------|-------|--------|--------------|------------------|-----------|
 | McpRouter | Route（軽い層） | 処理の流れを組み立てる | 1.2, 1.3, 1.4, 1.8, 1.10, 1.11, 2.7, 2.8, 3.4, 3.5, 3.10, 3.11, 6.1, 6.2, 6.3, 6.7, 7.4, 8.3, 8.5, 8.6, 8.7 | McpAuth (P0)、consumeUserPoints (P0)、McpRequestHandler (P0) | API |
 | McpAuth | Route（軽い層） | 認証の差し込み口 | 2.1〜2.11, 8.4 | AccessToken モデル (P0) | Service |
-| McpRequestHandler | Route（重い層） | `MCPServer` への受け渡し | 3.6 | GrowiMcpServer (P0) | Service |
-| GrowiMcpServer | Service | `MCPServer` の組み立て | 3.1, 3.2, 3.3, 3.4, 3.5 | `@mastra/mcp` (P0)、buildMcpTools (P0) | Service |
-| McpToolDeclarations / buildMcpTools | Service | 公開するツールの宣言と、実行役 | 3.7, 3.8, 3.9, 4.2, 4.3, 4.6, 4.7, 4.8, 5.6, 5.7, 5.8, 5.9, 7.1, 7.2, 7.3 | searchPages (P0)、readPageContent (P0)、ActivityService (P1) | Service |
+| McpRequestHandler | Route（重い層） | SDK のハンドラへの受け渡し | 3.3, 3.6 | `@modelcontextprotocol/server`・`node` (P0)、GrowiMcpServerFactory (P0) | Service |
+| GrowiMcpServerFactory | Service | リクエストごとの `McpServer` の組み立て | 3.1, 3.2, 3.4, 3.5 | `@modelcontextprotocol/server` (P0)、registerMcpTools (P0) | Service |
+| McpToolDeclarations / registerMcpTools | Service | 公開するツールの宣言と、実行役 | 3.7, 3.8, 3.9, 4.2, 4.3, 4.6, 4.7, 4.8, 5.6, 5.7, 5.8, 5.9, 7.1, 7.2, 7.3 | searchPages (P0)、readPageContent (P0)、ActivityService (P1) | Service |
 | searchPages / readPageContent | Shared core | ツールの中身 | 4.1, 4.4, 4.5, 4.6, 4.7, 4.9, 5.1〜5.7, 8.1, 8.2 | SearchService (P0)、Page モデル (P0) | Service |
 | RateLimiterPoints / RateLimiterConfig | Infra | 利用者単位と IP 単位の計数、既定の設定 | 6.1〜6.6 | `rate-limiter-flexible` (P0) | Service |
 | ActivityActions | Infra | アクションとカテゴリの定義 | 7.2, 7.7, 7.8 | — | State |
@@ -371,7 +373,7 @@ sequenceDiagram
   - メンテナンスモードの判定: 既存の `unavailableWhenMaintenanceModeForApi` を、ルーターの先頭に置く（3.10）。
   - IP 単位の回数の計数: `consumeIpPoints` を呼ぶ（6.4）。
   - 送信元の検査: `isAllowedOrigin` で確かめ、許可しない `Origin` には 403 を返す。
-- `@mastra/*` を静的に読み込まない。重い層（`mcp-request-handler.ts`）の読み込みと保持は、`lazy-mcp-request-handler.ts` に任せる。
+- `@modelcontextprotocol/*` と `@mastra/*` を静的に読み込まない。重い層（`mcp-request-handler.ts`）の読み込みと保持は、`lazy-mcp-request-handler.ts` に任せる。
 - プロセス内に、利用者や接続ごとの状態を持たない。保持するのは、`lazy-mcp-request-handler.ts` が持つ、読み込んだハンドラの Promise だけである。
 - `isMcpAvailable()` が偽のリクエストを受けたら、素通しする前に `release()` を呼ぶ（8.7）。
 
@@ -382,7 +384,7 @@ sequenceDiagram
 // 初回は mcp-request-handler を動的に読み込み、以後は保持したものを返す。
 export const getMcpRequestHandler: (crowi: Crowi) => Promise<McpRequestHandler>;
 
-// 保持しているハンドラ（と、その先の MCPServer）への参照を手放す。保持していなければ何もしない。
+// 保持しているハンドラへの参照を手放し、SDK のハンドラの close() を呼ぶ。保持していなければ何もしない。
 export const release: () => void;
 ```
 
@@ -391,9 +393,9 @@ export const release: () => void;
 - `release()` を呼ぶのは 2 か所である。どちらも、動かない状態になったことを知った時点で呼ぶ（8.7）。
   - 管理 API の PUT のハンドラ: 無効として保存した直後。設定を保存したインスタンスは、ここで手放す。
   - McpRouter: `isMcpAvailable()` が偽のリクエストを受けたとき。他のインスタンスと、サイト URL が消された場合は、ここで手放す。
-- **手放せるものと、手放せないもの**: `release()` で回収の対象になるのは、ハンドラと `MCPServer` の実体、ツールの定義である。動的に読み込んだモジュールのコード（`@mastra/mcp` と、その先の依存）は、Node.js が解放できないので、プロセスを再起動するまで残る。メモリの大半は後者である。そのため、無効にしてもメモリが戻らないことを、管理画面に表示する（8.8）。
+- **手放せるものと、手放せないもの**: `release()` で回収の対象になるのは、SDK のハンドラの実体と、ツールの宣言から作ったものである。動的に読み込んだモジュールのコード（`@modelcontextprotocol/*` と、その先の依存）は、Node.js が解放できないので、プロセスを再起動するまで残る。メモリの大半は後者である。そのため、無効にしてもメモリが戻らないことを、管理画面に表示する（8.8）。
 - 再び動く状態になったら、次の認証済みのリクエストで `getMcpRequestHandler` がハンドラを作り直す。モジュールは読み込み済みなので、追加の読み込みは起きない。
-- このファイルは `@mastra/*` を静的に読み込まない。管理 API からも読み込まれるためである。
+- このファイルは `@modelcontextprotocol/*` を静的に読み込まない。管理 API からも読み込まれるためである。
 
 **Dependencies**
 
@@ -413,9 +415,9 @@ export const factory: (crowi: Crowi) => express.Router;
 | POST | `/_api/v3/mcp` | JSON-RPC 2.0 のメッセージ 1 件。`Authorization: Bearer <token>` | MCP の応答（2025 年の各版は SSE、2026-07-28 版は JSON） | 400（バッチ）、401、403（送信元）、429、500、503 |
 | GET / DELETE | `/_api/v3/mcp` | — | — | 401（未認証）、405（認証済み） |
 
-- マウント: `express-init.js` の `bodyParser.json` の直後、セッションの前に、`app.use(MCP_ENDPOINT_PATH, mcpRouteFactory(crowi))` を置く。`express-init.js` は起動時に読み込まれるので、ルーターのファイル（軽い層）は `@mastra/*` を静的に読み込んではならない。drift spec が、起動の入口からの連鎖として検査する。`app.use` は前方一致で、大文字と小文字や末尾のスラッシュも区別しないので、`/_api/v3/mcp/`、`/_api/v3/MCP`、`/_api/v3/mcp/xxx` もルーターに届く。
+- マウント: `express-init.js` の `bodyParser.json` の直後、セッションの前に、`app.use(MCP_ENDPOINT_PATH, mcpRouteFactory(crowi))` を置く。`express-init.js` は起動時に読み込まれるので、ルーターのファイル（軽い層）は `@modelcontextprotocol/*` を静的に読み込んではならない。drift spec が、起動の入口からの連鎖として検査する。`app.use` は前方一致で、大文字と小文字や末尾のスラッシュも区別しないので、`/_api/v3/mcp/`、`/_api/v3/MCP`、`/_api/v3/mcp/xxx` もルーターに届く。
 - **パスの一致の規則**: MCP エンドポイントは、パスが `MCP_ENDPOINT_PATH` と 1 文字も違わずに一致するリクエストだけである。ルーターは、最初に `req.originalUrl` のパスの部分（クエリを除く）を `MCP_ENDPOINT_PATH` と比べ、一致しなければ `next()` を呼ぶ。末尾のスラッシュつきや大文字の違いは、存在しないパスと同じ応答になる。認証・利用者単位の計数・ハンドラの読み込みには進まない。
-  - 一致しないリクエストは、素通しして通常の経路（セッション以降）に入る。他の存在しないパスと、まったく同じ扱いになる。`startHTTP` の比較（`httpPath` との完全一致）とも一致する。
+  - 一致しないリクエストは、素通しして通常の経路（セッション以降）に入る。他の存在しないパスと、まったく同じ扱いになる。SDK のハンドラは、パスを見ない。
 - `isMcpAvailable()` が偽のときは `next()` を呼ぶ。後続のルーターに一致する経路が無いので、存在しない `/_api/v3/*` のパスと同じ応答になる（1.4、1.10）。判定はリクエストごとに行うので、設定の変更は再起動なしで効く（1.2、1.3、1.11）。
 - 401・403・429・400・500 の本文は、`json-rpc-error-response.ts` が書く固定の JSON-RPC エラーである（`id` は `null`）。内部の情報を含めない。
 
@@ -496,24 +498,30 @@ export const mcpAuth: McpAuth;
 
 | Field | Detail |
 |-------|--------|
-| Intent | 重い層の入口。認証済みのリクエストを `MCPServer` に渡す |
-| Requirements | 3.6 |
+| Intent | 重い層の入口。認証済みのリクエストを、MCP の SDK のハンドラに渡す |
+| Requirements | 3.3, 3.6 |
 
 **Contracts**: Service [x]
 
 ```typescript
-export type McpRequestHandler = (
-  req: Request,
-  res: Response,
-  caller: McpCallerContext,
-) => Promise<void>;
+export type McpRequestHandler = {
+  readonly handle: (
+    req: Request,
+    res: Response,
+    caller: McpCallerContext,
+  ) => Promise<void>;
+  // SDK のハンドラの close() を呼ぶ（release() から使う）
+  readonly close: () => Promise<void>;
+};
 
 export const createMcpRequestHandler: (crowi: Crowi) => McpRequestHandler;
 ```
 
-- `createMcpRequestHandler` は、`createGrowiMcpServer` を 1 回だけ呼んでサーバーを保持する。
-- ハンドラは、`req.auth` に `toAuthInfo(caller)` を入れ、`startHTTP({ url, httpPath: MCP_ENDPOINT_PATH, req, res })` を呼ぶ。`url` は `req.originalUrl` から作る。
-- このファイルと、ここから静的に読み込まれるファイルだけが、`@mastra/mcp` と `@mastra/core/tools` を読み込む。
+- `createMcpRequestHandler` は、SDK のハンドラを 1 回だけ作って保持する。
+  - `createMcpHandler(createGrowiMcpServerFactory(deps), { legacy: 'stateless' })` で、2026-07-28 版と、2025 年の各版をセッションなしで受けるハンドラを作る。`'stateless'` は SDK の既定値だが、意図を残すために明示する。
+  - `toNodeHandler` で、Express の `(req, res)` に載せる形にする。
+- `handle` は、`req.auth` に `toAuthInfo(caller)` を入れ、`req.body`（解析済みの本文）を渡して、包んだハンドラを呼ぶ。`toNodeHandler` は `req.auth` を、SDK の `authInfo` としてファクトリに渡す。
+- このファイルと、ここから静的に読み込まれるファイルだけが、`@modelcontextprotocol/*` を読み込む。`@mastra/*` は読み込まない。
 
 ### MCP services
 
@@ -531,31 +539,33 @@ export type McpCallerContext = {
 // AuthInfo は MCP SDK の型。extra に McpCallerContext を入れて運ぶ。
 export const toAuthInfo: (caller: McpCallerContext) => AuthInfo;
 
-// ツールの実行コンテキストから取り出す。入っていなければ null。
+// SDK がファクトリに渡す authInfo から取り出す。入っていなければ null。
 export const readCallerContext: (
-  toolExecutionContext: unknown,
+  authInfo: AuthInfo | undefined,
 ) => McpCallerContext | null;
 ```
 
-- `AuthInfo.token` には、トークンの値を入れない（固定の文字列を入れる）。下流はトークンを使わないので、値を運ばなければ、記録やログに漏れる経路が無くなる（7.6）。
+- `AuthInfo.token` には、トークンの値を入れない（固定の文字列を入れる）。SDK は `authInfo` を検証せずにそのまま渡すので、固定の文字列で動く（検証で確認）。下流はトークンを使わないので、値を運ばなければ、記録やログに漏れる経路が無くなる（7.6）。
 - `readCallerContext` は、型ガードで形を確かめてから返す。型アサーションでは取り出さない。
-- `mapAuthInfoToUser` と requestContext は使わない。利用者・IP・エンドポイントを同じ 1 か所から取り出すためである。
+- 取り出すのは、リクエストごとに呼ばれるサーバーのファクトリの中の 1 か所である。ツールは、ファクトリが取り出した呼び出し元を受け取る。
 
-#### McpToolDeclarations / buildMcpTools
+#### McpToolDeclarations / registerMcpTools
 
 | Field | Detail |
 |-------|--------|
-| Intent | 公開するツールを宣言の一覧として持ち、実行役が同じ手順で `createTool` のツールにする |
+| Intent | 公開するツールを宣言の一覧として持ち、実行役が同じ手順で `McpServer` に登録する |
 | Requirements | 3.7, 3.8, 3.9, 4.2, 4.3, 4.6, 4.7, 4.8, 5.6, 5.7, 5.8, 5.9, 7.1, 7.2, 7.3 |
 
 **Responsibilities & Constraints**
 
 - `MCP_TOOL_DECLARATIONS` が、公開するツールの唯一の一覧である。ツールを足すときは、宣言を 1 つ足す。実行役は変えない。
-- `buildMcpTools(declarations, deps)` が、宣言ごとに次の手順のツールを作る。
-  1. `readCallerContext` で呼び出し元を取り出す。取り出せなければ、宣言の `fallbackOutput` を返す。
+- `registerMcpTools(server, declarations, caller, deps)` が、宣言ごとに `server.registerTool(name, { title, description, inputSchema, outputSchema, annotations }, callback)` を呼ぶ。コールバックは次の手順で動く。
+  1. `caller` が `null`（呼び出し元を取り出せなかった）なら、宣言の `fallbackOutput` を返す。
   2. `deps.recordActivity(caller, declaration.action)` を待つ。失敗しても続ける。
   3. `declaration.run(caller, input, deps)` を呼ぶ。例外が出たら、ログに残して `fallbackOutput` を返す。
-- ツールの名前は、`MCPServer` に渡すオブジェクトのキーで決まる。`buildMcpTools` は、宣言の `name` をキーにする。
+  4. 出力を、`structuredContent` と、その JSON の文字列を入れた `content`（テキスト）の両方で返す。
+- ツールの名前は、`registerTool` の第 1 引数で決まる。宣言の `name` を渡す。
+- SDK は、ツールのコールバックが例外を投げると、`err.message` をそのまま結果に入れる（検証で確認）。手順 3 の封じ込めは、これを防ぐために要る。
 - 一覧は静的な宣言なので、GROWI の全文検索の設定によって変わらない（3.9）。
 
 **Contracts**: Service [x]
@@ -587,10 +597,12 @@ export type McpToolDeclaration<TInput, TOutput> = {
   readonly fallbackOutput: TOutput;
 };
 
-export const buildMcpTools: (
+export const registerMcpTools: (
+  server: McpServer,
   declarations: readonly AnyMcpToolDeclaration[],
+  caller: McpCallerContext | null,
   deps: McpToolDeps,
-) => Record<string, MastraTool>;
+) => void;
 ```
 
 ##### 公開するツール
@@ -632,15 +644,15 @@ type GetPageContentMcpOutput =
 - `message` は、`result` ごとに決まった固定の文言である。例外の文面や内部の値を入れない。
 - `get_page_content` は、共有関数の `failed` を `not_found_or_forbidden` と同じ出力に写す。`fallbackOutput` も同じ出力にする。エラーの有無で、ページが存在するかどうかを推測できない（5.6、5.8、5.9）。
 - `search_pages` は、共有関数の `failed` を `search_failed` に写す。`fallbackOutput` も `search_failed` にする。
-- 入力が `inputSchema` に合わないとき（`pageId` も `pagePath` も無い、など）は、`MCPServer` が入力のエラーを返す。スキーマを通り抜けた場合は、共有関数が `missing_input` を返す。どちらの経路でも、入力が足りないことが結果として伝わる（5.7）。
+- 入力が `inputSchema` に合わないとき（`pageId` も `pagePath` も無い、など）は、SDK が入力のエラーを返す。スキーマを通り抜けた場合は、共有関数が `missing_input` を返す。どちらの経路でも、入力が足りないことが結果として伝わる（5.7）。
 
 **Implementation Notes**
 
-- Integration: `recordActivity` の中身は、`createGrowiMcpServer` が `crowi.activityService.createActivity` を包んで渡す。パラメータは `{ ip, endpoint, action, user: user._id, snapshot: { username } }` とする。
+- Integration: `recordActivity` の中身は、`createGrowiMcpServerFactory` が `crowi.activityService.createActivity` を包んで渡す。パラメータは `{ ip, endpoint, action, user: user._id, snapshot: { username } }` とする。
 - Validation: 宣言の一覧について、名前が重複しないことと、すべてに `readOnlyHint: true` が付くことを、単体テストで確かめる。
 - Risks: `activities` の一意の索引（`user, target, action, createdAt`）により、同じ利用者が同じミリ秒に同じツールを呼ぶと、2 件目の記録が欠ける。バッチを拒否するので、起きにくい。`createActivity` は失敗を握りつぶすので、ツールの実行は止まらない。
 
-#### GrowiMcpServer
+#### GrowiMcpServerFactory
 
 ```typescript
 export type GrowiMcpServerDeps = {
@@ -649,12 +661,19 @@ export type GrowiMcpServerDeps = {
   readonly version: string;
 };
 
-export const createGrowiMcpServer: (deps: GrowiMcpServerDeps) => MCPServer;
+// SDK の McpServerFactory。リクエストごとに呼ばれる。
+export const createGrowiMcpServerFactory: (
+  deps: GrowiMcpServerDeps,
+) => McpServerFactory;
 ```
 
-- `MCPServer` に、`buildMcpTools(MCP_TOOL_DECLARATIONS, ...)` の結果と、`legacy: 'stateless'` を渡す（3.3）。
-- `suspend()` を使うツールは公開しない。そのため `requestState.key` は指定しない。インスタンスをまたいで共有する状態が無い（3.5）。
-- エージェント、ワークフロー、リソース、プロンプトは渡さない。
+- ファクトリは、リクエストごとに次を行う。
+  1. `readCallerContext(ctx.authInfo)` で呼び出し元を取り出す。
+  2. `new McpServer({ name: 'GROWI', version }, { instructions })` を作る。
+  3. `registerMcpTools(server, MCP_TOOL_DECLARATIONS, caller, deps)` でツールを登録する。
+- `instructions` には、ツールの使い方（「`search_pages` で探してから、`get_page_content` で本文を読む」）を短く書く。`initialize` と `server/discover` の両方の応答に載る（検証で確認）。
+- サーバーはリクエストごとに作って捨てる。インスタンスをまたいで共有する状態は無い（3.4、3.5）。
+- リソース、プロンプトは登録しない。
 
 ### Shared core functions
 
@@ -878,9 +897,9 @@ HTTP の層のエラーと、ツールの結果としてのエラーを分ける
 | 利用者単位の上限を超過 | 429、固定の JSON-RPC エラー | McpRouter |
 | IP 単位の上限を超過 | 429、固定の JSON-RPC エラー | McpRouter（`consumeIpPoints`） |
 | バッチのリクエスト | 400、JSON-RPC の Invalid Request（-32600） | McpRouter |
-| ハンドラの読み込みに失敗、`startHTTP` の例外 | 500、固定の JSON-RPC エラー | McpRouter |
-| GET / DELETE（認証済み） | 405 | `MCPServer` |
-| プロトコルの不正、未知のメソッド、入力がスキーマに合わない | JSON-RPC エラー | `MCPServer` |
+| ハンドラの読み込みに失敗、SDK のハンドラの例外 | 500、固定の JSON-RPC エラー | McpRouter |
+
+| プロトコルの不正、未知のメソッド、入力がスキーマに合わない | JSON-RPC エラー | SDK のハンドラ |
 | 検索が使えない、検索に失敗、ページが見つからない・権限がない、入力が足りない | 200 の中のツールの結果（`result` と固定の `message`） | MCP 用のツール |
 
 ### Monitoring
@@ -897,7 +916,7 @@ HTTP の層のエラーと、ツールの結果としてのエラーを分ける
 - `isBatchRequest`: 配列・オブジェクト・`undefined` の判定。
 - `searchPages` / `readPageContent`: 既存のツールのテストが見ている動作（ユーザーグループの解決、抜粋、outline と content の切り替え、行の範囲）を、関数に対して確かめる。例外が `failed` になり、投げられないこと。
 - `fullTextSearchTool` / `getPageContentTool`: 既存の spec を変えずに通す。取り出しの前後で出力が同じであることの検査になる（8.1、8.2）。
-- `buildMcpTools`: 呼び出し元が取り出せないとき、`run` が例外を投げたときに、`fallbackOutput` を返し、例外の文面を含めないこと（4.8、5.8）。`recordActivity` が失敗しても `run` を呼ぶこと。`run` より前に `recordActivity` を呼ぶこと。
+- `registerMcpTools`: 呼び出し元が取り出せないとき、`run` が例外を投げたときに、`fallbackOutput` を返し、例外の文面を含めないこと（4.8、5.8）。`recordActivity` が失敗しても `run` を呼ぶこと。`run` より前に `recordActivity` を呼ぶこと。
 - MCP 用のツール: `failed` と `not_found_or_forbidden` が、同じ出力になること（5.6、5.9）。
 - `MCP_TOOL_DECLARATIONS`: 名前が重複しないこと。すべてに `readOnlyHint: true` が付くこと（3.7）。
 - `isAllowedOrigin`: `Origin` なし、サイト URL と同じオリジン、別のオリジン。
@@ -922,7 +941,7 @@ HTTP の層のエラーと、ツールの結果としてのエラーを分ける
   - ハンドラの読み込みに失敗すると 500 になり、次のリクエストで読み込みをやり直す（8.5）。
   - 動く状態から動かない状態に変えたあとのリクエストで、保持していたハンドラが手放される。再び動く状態にすると、ハンドラが作り直される（8.7）。
   - 動かない状態のあいだは、認証済みのリクエストが届いても、ハンドラの読み込みが起きない（8.3）。
-- **`MCPServer` を通した結合**（`mcp-request-handler.integ.ts`、実物の `@mastra/mcp` を使う）:
+- **SDK を通した結合**（`mcp-request-handler.integ.ts`、実物の `@modelcontextprotocol/server` を使う）:
   - `initialize`（2025 年の版）と `server/discover`（2026-07-28 版）に応答する（3.1、3.3）。
   - `tools/list` が 2 つのツールを、annotation つきで返す（3.2、3.7）。
   - `initialize` を経ていない `tools/call` に応答する（3.4）。
@@ -932,7 +951,11 @@ HTTP の層のエラーと、ツールの結果としてのエラーを分ける
 
 ### Guard / Drift Specs
 
-- `no-eager-ai-imports.spec.ts`: `features/mastra/server/routes/mcp/index.ts` と `features/mastra/server/routes/admin-mcp-settings/index.ts` を起点にして、`@mastra/*` への静的な import の連鎖が無いことを確かめる（8.3）。起点のファイルが存在することの検査も足す。コミットの前に、禁止の import をわざと足して、失敗することを確かめる。
+- `routes/mcp/no-eager-mcp-imports.spec.ts`（新設。`server-boot-imports` のルールの 2 つの起点で歩く）（8.3）:
+  - `BOOT_ENTRYPOINTS` と、`routes/mcp/index.ts`・`routes/admin-mcp-settings/index.ts` を起点にして、`@modelcontextprotocol/` への静的な import の連鎖が無いこと。`express-init.js` が MCP のルーターを静的に読み込むので、起動の入口からの連鎖も検査の対象になる。
+  - `routes/mcp/mcp-request-handler.ts` を起点にして、`@mastra/` への静的な import の連鎖が無いこと。MCP エンドポイントが Mastra を読み込まないことを守る。
+  - 起点のファイルが存在することの検査も足す。コミットの前に、禁止の import をわざと足して、失敗することを確かめる。
+- 既存の `no-eager-ai-imports.spec.ts` は変えない。
 
 ### 実機での確認
 
@@ -946,12 +969,12 @@ HTTP の層のエラーと、ツールの結果としてのエラーを分ける
 | # | 確かめること | 前提が崩れたとき |
 |---|---|---|
 | 1 | **確認済み（2026-11-27）**。`mongoSanitize` は `_meta` の `.` を含むキーを削除する。セッションより前にマウントすれば、キーはそのまま届く（開発サーバーで確認）。`_meta` の 2 つのキーが無いリクエストを SDK が 400 で拒否することは、PR のレビューで確認された | — |
-| 2 | `legacy: 'stateless'` で、`initialize` を経ていない `tools/call` に応答する | 設計の前提（3.4）を見直す |
-| 3 | `req.auth.extra` に入れた値が、ツールの実行コンテキストの `authInfo.extra` に、そのまま届く | `mapAuthInfoToUser` と requestContext で運ぶ |
-| 4 | `AuthInfo.token` に固定の文字列を入れても、`MCPServer` が受け付ける | トークンの値を入れ、ログに出ないことをテストで固定する |
+| 2 | **確認済み（2026-11-27）**。SDK の `createMcpHandler`（`legacy: 'stateless'`）は、`initialize` を経ていない `tools/list`・`tools/call` に応答する | — |
+| 3 | **確認済み（2026-11-27）**。`req.auth` は `toNodeHandler` を通って、ファクトリの `ctx.authInfo` に届き、`extra` もそのまま読める | — |
+| 4 | **確認済み（2026-11-27）**。SDK は `authInfo` を検証せずに渡すので、`token` に固定の文字列を入れても動く | — |
 | 5 | `compression()` の下で、2025 年の版の SSE の応答が遅れずに届く | `/_api/v3/mcp` を圧縮の対象から外す |
 | 6 | 本番ビルドの GROWI で、MCP の部品を読み込む前後と、リクエストを処理した後のメモリ（RSS とヒープ）。無効に戻して `release()` したあとに、どれだけ戻るか | 数値を research.md に記録する（8.3・8.7・8.8 の根拠）。単独のプロセスでの参考値は research.md にある |
-| 7 | ビルド後に、`@mastra/mcp` と `@modelcontextprotocol/*` が `.next/node_modules/` に現れるか | `dependencies` に置く |
+| 7 | ビルド後に、`@modelcontextprotocol/*`、`hono`、`@hono/node-server` が `.next/node_modules/` に現れるか | `dependencies` に置く |
 | 8 | claude.ai が送るプロトコルの版、`Origin` ヘッダーの有無、バッチの有無 | `Origin` を送るなら、`isAllowedOrigin` が許可するオリジンに足すかを、バッチを送るなら 3.11 を、利用者と相談する |
 
 ## Security Considerations
@@ -966,8 +989,8 @@ HTTP の層のエラーと、ツールの結果としてのエラーを分ける
 
 ## Performance & Scalability
 
-- **動かない状態のメモリ**: `@mastra/mcp` は、動く状態で認証済みのリクエストが最初に届くまで読み込まない。動かない状態で起動した GROWI と、未認証のリクエストしか届かない GROWI では、読み込まれない。
-- **読み込んだあとのメモリ**: 単独のプロセスでの計測では、`@mastra/mcp` の読み込みで RSS が 68〜71 MB 増える（`@mastra/core` を読み込み済みなら 7〜12 MB）。リクエストを処理すると、V8 が確保した領域のぶん、RSS がさらに増える。使用中のヒープは増えず、漏れは無い（research.md の計測）。無効に戻しても、この大半は再起動まで戻らない。GROWI の中での値は、Verification Checkpoints 6 で測る。
+- **動かない状態のメモリ**: MCP の SDK は、動く状態で認証済みのリクエストが最初に届くまで読み込まない。動かない状態で起動した GROWI と、未認証のリクエストしか届かない GROWI では、読み込まれない。
+- **読み込んだあとのメモリ**: 単独のプロセスでの計測では、SDK（`server` と `node`）の読み込みで RSS が 36〜45 MB 増える（`@mastra/mcp` なら 69 MB）。AI チャットで `@mastra/core` を読み込み済みのプロセスでは、2〜4 MB である。リクエストを処理すると、V8 が確保した領域のぶん、RSS がさらに増える。使用中のヒープは増えず、漏れは無い（research.md の計測）。無効に戻しても、この大半は再起動まで戻らない。GROWI の中での値は、Verification Checkpoints 6 で測る。
 - **複数インスタンス**: プロセス内に利用者ごとの状態を持たない。回数は MongoDB で数える。設定の反映は `configManager` に従う。
 - **認証のコスト**: リクエストごとに、トークンのハッシュでの検索が 1 回と、利用者の取得が 1 回かかる。未認証のリクエストは、上限を超えると IP 単位の制限が止めるので、トークンの検索までは進まない。
 - **セッション**: MCP のリクエストは、セッションストアを読み書きしない。

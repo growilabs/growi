@@ -9,9 +9,9 @@ GROWI の利用者は、claude.ai などの MCP クライアントから wiki �
 ## Current State
 
 - 全文検索ツールとページ本文取得ツールが `apps/app/src/features/mastra/server/services/mastra-modules/tools/` にある。GROWI のエージェントに静的に登録されている。
-- 全文検索ツールは `searchService` を requestContext から読む。`MCPServer` 経由の requestContext には `authInfo`・`user`・`traceContext` しか入らないので、そのままでは動かない。ページ本文取得ツールは `user` しか読まないので、そのまま動く。
+- 2 ツールは Mastra の `createTool` で作られ、利用者と `searchService` を Mastra の requestContext から読む。MCP サーバーからは、そのままでは使えない。
 - `accessTokenParser` は、`Authorization: Bearer` と `X-GROWI-ACCESS-TOKEN` ヘッダーに加えて、クエリとボディの `access_token` も受け付ける。取得元をヘッダーに限るオプションは無い。
-- `@mastra/mcp` は依存に入っていない。
+- MCP の SDK（`@modelcontextprotocol/*`）は依存に入っていない。
 
 ## Desired Outcome
 
@@ -23,14 +23,14 @@ GROWI の利用者は、claude.ai などの MCP クライアントから wiki �
 
 ## Approach
 
-`@mastra/mcp` 2.8.0 の `MCPServer` を、既存の Express に `POST /_api/v3/mcp` としてマウントする。
+MCP の公式の TypeScript SDK（`@modelcontextprotocol/server` と `@modelcontextprotocol/node`）で MCP サーバーを作り、既存の Express に `POST /_api/v3/mcp` としてマウントする。`@mastra/mcp` は使わない（理由は [research.md](./research.md) の Decision「MCP サーバーは SDK を直接使う」）。
 
-- **ステートレス**: 2.x は常にリクエスト単位で動く。`legacy: 'stateless'` を指定して、2025 年系のクライアントも受ける（claude.ai の接続確認が 2025-11-25 で来るという報告があるため）。
+- **ステートレス**: SDK の `createMcpHandler` は、リクエストごとにサーバーを作る。`legacy: 'stateless'` で、2025 年系のクライアントもセッションなしで受ける（claude.ai の接続確認が 2025-11-25 で来るという報告があるため）。
 - **認証**: 「リクエストから利用者を得る」処理を 1 つの差し込み口にする。この spec では、中身を、`Authorization: Bearer` のアクセストークンを AccessToken モデルで直接検証する認証にする（`accessTokenParser` は使わない。理由は [design.md](./design.md) の McpAuth）。`remote-mcp-server-oauth` が、中身を「認可サーバーが発行したトークンだけを受け付ける」ものに入れ替える。得た利用者は、IP とエンドポイントと一緒に `req.auth` の `extra` に入れ、ツールが `authInfo.extra` から取り出す。`mapAuthInfoToUser` と requestContext は使わない（[design.md](./design.md) の McpCallerContext）。
 - **未認証**: `loginRequired` は `/_api` 配下の未認証リクエストに 403 を返すので使わない。`/_api/v3/mcp` 用に 401 を返す。この時点では `WWW-Authenticate` チャレンジを付けない。
 - **全文検索ツール**: 既存の 2 ツールから処理の中身を、依存（利用者、`searchService`）を引数で受け取る関数として取り出す。エージェント用のツールと、MCP 用に別に定義するツールが、同じ関数を呼ぶ。
 - **有効化フラグ**: 管理者が切り替える。既定は無効。`aiReadyGuard` は使わない（MCP に LLM の設定は要らない）。
-- **遅延ロード**: `@mastra/mcp` は、フラグが有効なときの最初のリクエストで読み込む。起動時には読み込まない。
+- **遅延ロード**: MCP の SDK は、フラグが有効なときの最初のリクエストで読み込む。起動時には読み込まない。
 
 ## Scope
 
@@ -41,7 +41,7 @@ GROWI の利用者は、claude.ai などの MCP クライアントから wiki �
   - 全文検索・ページ本文取得の 2 ツールの公開。MCP クライアント向けの description と annotation（読み取り専用であることなど）を付ける
   - 全文検索ツールの、`searchService` を外から注入する形への作り直し
   - 管理者の有効化フラグと、管理画面での切り替え・MCP サーバー URL の表示
-  - `@mastra/mcp` の遅延ロードと、起動時に読み込まれないことの検査
+  - MCP の SDK の遅延ロードと、起動時に読み込まれないことの検査
   - `/_api/v3/mcp` の回数制限
   - Activity の記録
   - `remote-mcp-server-oauth` が 401 応答にチャレンジを足せる差し込み口
@@ -54,7 +54,7 @@ GROWI の利用者は、claude.ai などの MCP クライアントから wiki �
 ## Boundary Candidates
 
 - **ルートと認証の入口**: フラグの確認、認証の差し込み口と暫定の中身（Bearer のアクセストークンの検証）、401 応答、回数制限
-- **MCP サーバーの組み立て**: `MCPServer` の生成、ツールの登録、`req.auth` から `user` への受け渡し、遅延ロード
+- **MCP サーバーの組み立て**: SDK のハンドラとサーバーのファクトリ、ツールの登録、`req.auth` から呼び出し元への受け渡し、遅延ロード
 - **ツールの公開用の定義**: 2 ツールの description・annotation、`searchService` の注入
 - **管理者の設定**: 設定キー、管理 API、管理画面
 - **記録と制限**: Activity、利用者単位の回数制限
@@ -88,8 +88,8 @@ GROWI の利用者は、claude.ai などの MCP クライアントから wiki �
 
 ## Constraints
 
-- **採用バージョン**: `@mastra/mcp` 2.8.0。`@mastra/core` 1.80.x のまま入る最新版で、Apache-2.0。2.7.0 以降は `tsx` と `json-schema-to-typescript` を実行時の依存に持つので、`package-dependencies` のルールでの分類を設計で確かめる。
-- **遅延ロード**: `server-boot-imports` のルールに従う。既存の `no-eager-ai-imports.spec.ts` の禁止リストは `@mastra/` で始まるパッケージをすでに含むので、`/_api/v3/mcp` のルートの入口を検査の起点に足す。
+- **採用バージョン**: `@modelcontextprotocol/server` 2.4.x と `@modelcontextprotocol/node` 2.1.x。`@mastra/core` の版と無関係に上げられる。`node` は実行時に `hono` と `@hono/node-server` を伴うので、`package-dependencies` のルールでの分類を実装で確かめる。
+- **遅延ロード**: `server-boot-imports` のルールに従う。MCP のルートの横に `no-eager-mcp-imports.spec.ts` を新設し、起動の入口から `@modelcontextprotocol/` に届かないこと、MCP のハンドラから `@mastra/` に届かないことを検査する。
 - **Activity**: `activity-recording` のルールは、応答を返す前に Activity を確定することを求める。`/_api/v3/mcp` は 1 つのエンドポイントで接続確認・ツール一覧・ツール呼び出しをすべて受けるので、記録はツール呼び出しの単位とし、ツールごとのアクションで記録する。接続確認とツール一覧は記録しない（要件 7）。
 - **回数制限**: 既存のグローバルな回数制限は `accessTokenParser` より前に走るので、トークンだけのリクエストには IP 単位の制限しか効かない。claude.ai の通信は Anthropic の送信元アドレスに集まるので、IP 単位だけでは全利用者が 1 つの枠を分け合う。認証の後に、利用者単位で数える制限が要る。
 - **存在を漏らさない**: ツールのエラー応答で、ページの存在を「見つからない」と「権限がない」の違いで漏らさない。ページ本文取得ツールは、例外を捕まえたときに `err.message` を `reason` へそのまま入れている。MCP で外へ出す前に、この経路で内部の情報が出ないか確かめる。

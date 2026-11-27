@@ -352,6 +352,24 @@ umbrella 全体の調査（claude.ai の挙動、MCP の仕様、先行事例）
 - **Selected Approach**: ルーターの入口でパスを `MCP_ENDPOINT_PATH` と比べ、一致しなければ素通しする。
 - **Rationale**: 除外とセッションの設定がすでに完全一致なので、ルーターを同じ規則に揃えれば、判定を共有する関数を作らなくても、対象のリクエストの集合が一致する。
 
+#### Decision: MCP サーバーは SDK を直接使う（`@mastra/mcp` を使わない）
+
+- **Context**: discovery では `@mastra/mcp`（`MCPServer`）を使うと決めていた。設計を進めると、Mastra の機能（`mapAuthInfoToUser`、requestContext、`createOAuthMiddleware`、エージェントの公開）を 1 つも使わないことになった。PR のレビュー（2026-11-27）で、SDK を直接使う案との比較を求められた。
+- **Alternatives Considered**:
+  1. `@mastra/mcp` 2.8 系（`MCPServer` と `startHTTP`、ツールは `createTool`）。
+  2. `@modelcontextprotocol/server` 2.4 系と `@modelcontextprotocol/node` 2.1 系（`createMcpHandler` と `toNodeHandler`、ツールは `McpServer.registerTool`）。
+- **Selected Approach**: 2（2026-11-27、ユーザー確認済み）。
+- **Rationale**（検証の詳細は「`@mastra/mcp` と SDK の直接利用の比較」）:
+  - 動作は同じで、どちらも設計が求める動き（2 つの版、セッションなし、`authInfo` の受け渡し、405、`instructions`）を満たす。
+  - 読み込み時のメモリが少ない。AI を使わない GROWI で、RSS が約 30 MB 少ない。
+  - SDK の版を、Mastra の対応を待たずに上げられる。`@mastra/core` の版とも無関係になる。Skills 拡張のような新しい拡張に、早く追従できる。
+  - 使わない部品（MCP クライアント、`tsx` など）を持ち込まない。
+  - 自分で書く量はほぼ変わらない。SDK の `createMcpHandler` はリクエストごとにサーバーを作るので、リクエストごとに呼び出し元が決まる設計に素直に合う。
+- **Trade-offs**:
+  - 既存の Mastra のツール（`createTool`）をそのまま公開するには、変換を自分で書くことになる。今の設計は、MCP 用のツールを宣言の一覧として別に持つので、影響しない。Mastra のツールを大量にそのまま公開する方針になれば、見直す。
+  - コードの置き場所の理由（「Mastra を使うので `features/mastra` に置く」）が成り立たなくなった。置き場所は別に決める。
+- **Follow-up**: 本番ビルドの GROWI でのメモリと、`.next/node_modules/` に現れるパッケージを、実装で確かめる（design.md の Verification Checkpoints 6・7）。
+
 #### Decision: 動かない状態のメモリの扱い
 
 - **Context**: PR のレビュー（2026-11-27）で、「MCP 連携が無効のときは、メモリを消費しない」ことが方針として求められた。もとの要件 8.3 は「一度も有効にされていないあいだ」だけを約束しており、有効にしてから無効に戻した場合が抜けていた。
@@ -402,6 +420,59 @@ umbrella 全体の調査（claude.ai の挙動、MCP の仕様、先行事例）
 - **Build vs. Adopt**: MCP のプロトコルは `@mastra/mcp` に任せる。回数の計数、Activity、設定、閲覧権限の判定は、既存のものを使う。新しく作るのは、認証の差し込み口と、ツールの宣言と実行役だけである。
 - **Simplification**: `mapAuthInfoToUser` と requestContext、MCP 専用の管理ページ、MCP 専用の管理用スコープ、本文サイズの検査を外した。PR のレビューの後、`mongoSanitize` の除外の包みと、固定のセッション ID も外した。
 
+### `@mastra/mcp` と SDK の直接利用の比較（2026-11-27、検証）
+
+PR のレビューで、`@modelcontextprotocol/server` を直接使う案との比較を求められた。同じ内容の最小のサーバーを 2 つ書き、Express に載せて同じリクエストを送った（`@mastra/mcp` 2.8.0 + `@mastra/core` 1.80.0、`@modelcontextprotocol/server` 2.4.0 + `@modelcontextprotocol/node` 2.1.2、zod 4.6.6、Node 24.22）。検証用のコードは scratchpad に置き、リポジトリには入れていない。
+
+**動作**
+
+| 確かめたこと | `@mastra/mcp`（`legacy: 'stateless'`） | SDK（`createMcpHandler` + `toNodeHandler`） |
+|---|---|---|
+| 2025-11-25 の `initialize` | 応答する | 応答する |
+| `initialize` を経ない `tools/list`・`tools/call` | 応答する | 応答する |
+| 2026-07-28 の `server/discover`・`tools/call` | 応答する | 応答する |
+| GET | 405 | 405 |
+| `instructions` | `initialize` と `server/discover` の両方に載る | 同じ |
+| `req.auth` の `extra` をツールで読む | `context.mcp.extra.authInfo.extra` で読める | ファクトリの `ctx.authInfo.extra` で読める |
+| zod のスキーマをそのまま渡す | できる（`createTool`） | できる（`registerTool` が Standard Schema を受け取る） |
+| annotation | `createTool` の `mcp.annotations` | `registerTool` の `annotations` |
+| バッチの配列 | 受け付けて全件に応答する（200） | GROWI 側で先に拒否したので未確認 |
+| ツールが例外を投げたとき | （レビューと既存の調査によれば、`err.message` が出る） | `isError: true` で `err.message` がそのまま出る |
+
+- どちらも、GROWI の設計が求める動き（2 つの版、セッションなし、`authInfo` の受け渡し、405）を満たす。設計の Verification Checkpoints 2 と 3 は、どちらでも成り立つ。
+- どちらでも、ツールは例外を外へ出してはならない（`buildMcpTools` の封じ込めは、どちらの案でも要る）。
+
+**読み込み時のメモリ**（単独のプロセス、各 3 回、`--expose-gc`）
+
+| 読み込むもの | RSS の増加 | ヒープの増加 |
+|---|---|---|
+| SDK だけ（`@mastra/core` 未読み込み） | 36〜45 MB | 10 MB |
+| `@mastra/mcp` と `createTool`（`@mastra/core` 未読み込み） | 69 MB | 23 MB |
+| `@mastra/core` 読み込み済みの後に `@mastra/mcp` | 10〜12 MB | （GC で減少） |
+| `@mastra/core` 読み込み済みの後に SDK | 2〜4 MB | （GC で減少） |
+
+- レビューで共有された値と一致する。
+- AI を使わない GROWI（`@mastra/core` を読み込まない）では、SDK のほうが約 30 MB 少ない。AI チャットを使っている GROWI では、差は約 8 MB になる。
+
+**プロトコルへの追従と依存**
+
+- `@mastra/mcp` 2.8.0 は、`@modelcontextprotocol/server`・`core`・`client` を 2.4.0 に、`node` を 2.1.2 に完全一致で固定している。今日の時点では SDK の最新と同じ版なので、差は無い。SDK が上がったときに、GROWI 側だけで上げることはできない。
+- SDK 2.4.0 は Skills 拡張（`@modelcontextprotocol/server/ext/skills`）を持つ。`@mastra/mcp` 2.8.0 の配布物には、これを扱うコードが無い。
+- `@mastra/mcp` は、使わない部品（MCP クライアント、`@modelcontextprotocol/ext-apps`、`tsx`、`json-schema-to-typescript`）も実行時の依存として持つ。SDK の直接利用で増える依存は、`@modelcontextprotocol/server`・`core`・`node` と、`node` が使う `hono`・`@hono/node-server` である。
+- `@mastra/mcp` の 2.9 以降は `@mastra/core` 1.83 以上を要求する。SDK の直接利用は、`@mastra/core` の版と無関係である。
+
+**自分で書く量**
+
+- 検証用のサーバーは、どちらも 20〜40 行で書けた。SDK で増えるのは、`createMcpHandler(factory)` と `toNodeHandler` の組み立ての数行である。
+- SDK の `createMcpHandler` は、リクエストごとにファクトリを呼んで `McpServer` を作る。GROWI の設計（リクエストごとに呼び出し元が決まる）とは、こちらのほうが素直に合う。呼び出し元を、ファクトリの引数からツールへ渡せる。
+- 2025 年系のクライアントのセッションなしの扱いは、SDK の既定の動き（`legacy: 'stateless'` が既定）で、自分で書く部分は無い。
+- 既存の Mastra のツール定義（`createTool`）をそのまま公開する場合は、SDK では変換を自分で書くことになる。今の設計は、MCP 用のツールを宣言の一覧として別に持ち、共有関数を呼ぶので、この変換は要らない。
+
+**未確認**
+
+- 本番ビルドの GROWI の中でのメモリ（design.md の Verification Checkpoints 6）。
+- SDK の直接利用で、ビルド後に `.next/node_modules/` に現れるパッケージ。
+
 ### PR のレビューで共有された計測（2026-11-27、yuki-takei）
 
 `@mastra/mcp` 2.8.0 を、単独のプロセスで動かして測った値（Node 24、各 5 回）。GROWI の中での値ではない。
@@ -425,4 +496,4 @@ umbrella 全体の調査（claude.ai の挙動、MCP の仕様、先行事例）
 - 既存ツールからの取り出しで、AI チャットの結果が変わる — 既存の spec を変えずに通すことを、取り出しのタスクの完了条件にする。
 
 ---
-_Updated: 2026-11-27. マウントする位置の Decision（セッションより前）と検証の結果を足し、それで覆った記述（3.1、3.2、3.8、3.9）に結論を書いた。Prior: 2026-11-27. PR のレビューを受けて、動かない状態のメモリの扱いの Decision と、共有された計測値を足した。Prior: 2026-11-25. PR のレビューを受けて、後の決定で覆った記述（ギャップ分析の 2 と 3）を直し、Decision を 3 つ足した。Prior: 2026-11-25. 設計の調査と判断（Design Discovery）を足した。Prior: 2026-11-25. 置き場所を `features/mastra` にする決定を、設計への申し送りに足した。Prior: 2026-11-25. パスを `/_api/v3/mcp` にする決定を反映した（1.1 を解決済みにし、`CertifyOrigin` の制約を 3.9 に足した）。Prior: 2026-11-24. ギャップ分析を記録。_
+_Updated: 2026-11-27. `@mastra/mcp` と SDK の比較の検証と、SDK を直接使う Decision を足した。Prior: 2026-11-27. マウントする位置の Decision（セッションより前）と検証の結果を足し、それで覆った記述（3.1、3.2、3.8、3.9）に結論を書いた。Prior: 2026-11-27. PR のレビューを受けて、動かない状態のメモリの扱いの Decision と、共有された計測値を足した。Prior: 2026-11-25. PR のレビューを受けて、後の決定で覆った記述（ギャップ分析の 2 と 3）を直し、Decision を 3 つ足した。Prior: 2026-11-25. 設計の調査と判断（Design Discovery）を足した。Prior: 2026-11-25. 置き場所を `features/mastra` にする決定を、設計への申し送りに足した。Prior: 2026-11-25. パスを `/_api/v3/mcp` にする決定を反映した（1.1 を解決済みにし、`CertifyOrigin` の制約を 3.9 に足した）。Prior: 2026-11-24. ギャップ分析を記録。_

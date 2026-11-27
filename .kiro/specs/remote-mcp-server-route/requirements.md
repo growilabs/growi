@@ -6,15 +6,15 @@ umbrella `remote-mcp-server` の sub-spec。背景・範囲・制約の詳細は
 
 **誰が困っているか**: GROWI の利用者と、その利用者に AI 連携を提供したい管理者。利用者は、claude.ai などの MCP クライアントから、自分の閲覧権限の範囲で wiki を検索・閲覧したい。
 
-**現状**: GROWI 本体には MCP クライアントが接続できる入口が無い。AI チャット用の全文検索ツールとページ本文取得ツールはあるが、GROWI の中のエージェントからしか呼べない。全文検索ツールは `searchService` を requestContext から読むので、MCP サーバー経由ではそのまま動かない。`accessTokenParser` はクエリとボディの `access_token` も受け付ける。
+**現状**: GROWI 本体には MCP クライアントが接続できる入口が無い。AI チャット用の全文検索ツールとページ本文取得ツールはあるが、GROWI の中のエージェントからしか呼べない。全文検索ツールは `searchService` を Mastra の requestContext から読むので、MCP サーバーからはそのまま使えない。`accessTokenParser` はクエリとボディの `access_token` も受け付ける。
 
-**何を変えるか**: `@mastra/mcp` の `MCPServer` を、既存の Express に `POST /_api/v3/mcp` としてマウントする。
+**何を変えるか**: MCP の公式の TypeScript SDK（`@modelcontextprotocol/server`）で作った MCP サーバーを、既存の Express に `POST /_api/v3/mcp` としてマウントする。
 
 - 管理者が MCP 連携を有効にしたときだけ応答する（既定は無効。LLM の設定は要らない）。
 - アクセストークンは `Authorization: Bearer` ヘッダーでだけ受け付け、既存のアクセストークンと同じ基準（有効期限、スコープ、閲覧専用の利用者の扱い）で検証する。既存の `accessTokenParser` は、ヘッダー以外のトークンも受け付け、トークンが無効なときにログインセッションの利用者を残すので、MCP エンドポイントでは使わない。この認証は暫定で、リリース時には `remote-mcp-server-oauth` が「認可サーバーが発行したトークンだけを受け付ける」認証に差し替える。
-- 全文検索とページ本文取得の 2 ツールを、トークンの持ち主の閲覧権限の範囲で公開する。全文検索ツールは `searchService` を外から注入できる形に作り直す。
+- 全文検索とページ本文取得の 2 ツールを、トークンの持ち主の閲覧権限の範囲で公開する。2 ツールの処理の中身を、依存（利用者、`searchService`）を引数で受け取る形にして、AI チャットのツールと共有する。
 - セッションを持たず、複数インスタンス構成でどのインスタンスが受けても同じ結果を返す。
-- `@mastra/mcp` は起動時に読み込まず、有効なときの最初のリクエストで読み込む。
+- MCP の SDK は起動時に読み込まず、有効なときの最初のリクエストで読み込む。
 - `/_api/v3/mcp` に利用者単位の回数制限をかけ、Activity を記録する。
 - `/.well-known/*` と 401 の `WWW-Authenticate` チャレンジは出さない。後続の `remote-mcp-server-oauth` が、この spec のツールと、認証より後ろの処理を変更せずに足せるようにする。
 
