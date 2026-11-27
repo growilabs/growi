@@ -48,6 +48,58 @@ const validator = [
   param('id').isMongoId().withMessage('id must be a valid MongoId'),
 ];
 
+/**
+ * @swagger
+ *
+ *    /inline-comments/{id}:
+ *      delete:
+ *        tags: [Comments]
+ *        summary: Delete an inline comment
+ *        description: >
+ *          Deletes an origin inline comment together with all of its replies. Only the
+ *          creator may delete. To delete a single reply, use
+ *          DELETE /inline-comments/replies/{id}. Requires login, or an access token with
+ *          the scope `write:features:page`, and permission to view the page. Not
+ *          available through a share link. Read-only users are refused unless read-only
+ *          users are allowed to comment.
+ *        parameters:
+ *          - in: path
+ *            name: id
+ *            required: true
+ *            schema:
+ *              type: string
+ *            description: ID of the origin inline comment.
+ *        responses:
+ *          200:
+ *            description: Deleted. The body is an empty object.
+ *            content:
+ *              application/json:
+ *                schema:
+ *                  type: object
+ *          400:
+ *            description: >
+ *              Invalid input, or the caller is a read-only user (code
+ *              `validation_failed`); `id` is not an origin inline comment (code
+ *              `inline-comment-not-origin`); the comment could not be deleted (code
+ *              `inline-comment-delete-failed`).
+ *            content:
+ *              application/json:
+ *                schema:
+ *                  $ref: '#/components/schemas/ErrorV3'
+ *          403:
+ *            description: >
+ *              Not authenticated, or the access token lacks the required scope; or the
+ *              caller is not the creator of the comment (code `inline-comment-forbidden`).
+ *          404:
+ *            description: >
+ *              The comment does not exist (code `inline-comment-not-found`), or its page
+ *              does not exist or the caller may not view it (code
+ *              `notfound_or_forbidden`; these two page cases are indistinguishable).
+ *            content:
+ *              application/json:
+ *                schema:
+ *                  $ref: '#/components/schemas/ErrorV3'
+ */
 export const deleteInlineCommentRouteHandlersFactory = (
   crowi: Crowi,
 ): RequestHandler[] => {
