@@ -8,7 +8,7 @@ import { SupportedTargetModel } from '~/interfaces/activity';
 import * as pageSerializers from '~/models/serializers/in-app-notification-snapshot/page';
 import * as pageBulkExportJobSerializers from '~/models/serializers/in-app-notification-snapshot/page-bulk-export-job';
 
-const isIPage = (
+export const isIPage = (
   targetModel: string,
   target: IUser | IPage | pagebulkexportjobs | auditlogbulkexportjobs,
 ): target is IPage => {

@@ -36,9 +36,15 @@ vi.mock('~/server/models/subscription', () => ({
   },
 }));
 
-vi.mock('./in-app-notification/in-app-notification-utils', () => ({
-  generateSnapshot: vi.fn().mockResolvedValue('{"path":"/test-page"}'),
-}));
+vi.mock(
+  './in-app-notification/in-app-notification-utils',
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import('./in-app-notification/in-app-notification-utils')
+    >()),
+    generateSnapshot: vi.fn().mockResolvedValue('{"path":"/test-page"}'),
+  }),
+);
 
 const { mockFindManyAttachments } = vi.hoisted(() => ({
   mockFindManyAttachments: vi.fn(),
