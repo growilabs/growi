@@ -36,7 +36,7 @@
 - 本人だけに出す内容を入口ごとに宣言する表（`requester-only-sections.ts` の `REQUESTER_ONLY_SECTIONS`。部品が受け取る値は `{ proposalId: string }`）と、それを読み込む場所。表は `'ai-chat'` の行を持たない状態で出し、`'ai-chat'` の行（`AiRecordSection`）は `change-proposal-ai-agent` が足す
 - 本人向けの操作を入口ごとに宣言する表（`requester-action-slots.ts` の `REQUESTER_ACTION_SLOTS`。Change Proposal 全体に置く部品は `ProposalActionSlotProps = { proposal: ChangeProposalView }`、操作ごとに置く部品は `OperationActionSlotProps = { proposal: ChangeProposalView; operation: OperationView }` を受け取る）と、それを読み込む場所（`RequesterActionSlot`）。表は `'ai-chat'` の行を持たない状態で出し、`'ai-chat'` の行（`ProposalFollowUpAction` / `OperationReworkAction`）は `change-proposal-ai-agent` が足す
 - 完了と達成度の表示（`ProposalProgressLabel`）、つながりの表示（`ProposalLinkChips`）、反映されなかった操作の一覧（`RemainingOperationsList`）
-- アカウントメニューの一覧へのリンクを出すかどうかを決める画面の共通の値（`changeProposalEnabled`。SSR で `crowi.configManager.getConfig('app:changeProposalEnabled')` から作る。core の `readChangeProposalSettings()` の `isEnabled` と同じ設定キー）
+- アカウントメニューの一覧へのリンクと、印の取得を出すかどうかを決める画面の共通の値（`changeProposalEnabled`。SSR で `crowi.configManager.getConfig('app:changeProposalEnabled')` から作る。core の `readChangeProposalSettings()` の `isEnabled` と同じ設定キー）
 - 「戻せるものを全部戻す」のあとで、結果の決まっていない操作を「処理中」と表示し、決まるまで取り直す流れ（`deriveRevertProgress` と `useRevertProgress`）
 - core の変更の実装（tasks.md のグループ 8）: ページがもう無い操作を取り消しの相手にも表示のために返す見え方の決まり（core の要件 9.15。取り消しの対象は広げない）、完全な削除の操作の `path`（core の要件 9.16）、編集の操作に反映した時点のページのパスを記録すること（core の要件 6.7）、ページがもう無い操作のパスを操作の記録から決めて 1 件の取得と一覧の要約の両方で返すこと（core の要件 9.17）。決まり（契約）は core の spec が持ち、本 spec は同じ PR でそれを実装するタスクだけを持つ
 - 入口を表す言葉の表と、その翻訳のキー（`change_proposal_viewer.*`）。この表から実行時に決まるキーの `preservePatterns`
@@ -58,7 +58,7 @@
 - `change-proposal-core` の REST API: `GET /change-proposals/:id`、`GET /change-proposals/mine`、`GET /change-proposals/applied`、`POST /change-proposals/:id/revert`、`POST /change-proposals/revision-marks`
 - `change-proposal-core` の型（`features/change-proposal/interfaces/`）: `ChangeProposalView`、`OperationView`、`ChangeProposalSummaryView`、`RevisionMarkView`、`RevertResult`（`interfaces/api.ts`）、`OperationStatus`、`OperationReason`、`RevertRefusalReason`、`ProposalEntry`、`ProposalStatus`、`ChangeProposalNotificationSnapshot`、`RequesterProposalState`、`ProposalLinkView`、`BasedOn`、`CreatableEntry`。`ApplyResult` は使わない（viewer は承認の操作を持たない）
 - `change-proposal-core` のサービス: 頼む通知の API の中だけで、1 件の取得 `getForViewer` を使う。`getForViewer` は server の barrel が export する関数ではなく、core のサービス（`createChangeProposalService` が作る `ChangeProposalService`）の関数である。core の router（`server/routes/index.ts`）はサービスを最初の要求で 1 つだけ作り、それを返す `getService`（型 `GetChangeProposalService`、`server/routes/read-access.ts`）を各 route の handler を作る関数に渡す。頼む通知の route も同じ `getService` を受け取り、サービスに渡す
-- 画面の共通の値は、core の関数を呼ばずに、SSR で `crowi.configManager` から設定キー `app:changeProposalEnabled` を読む（core の design の Settings。理由は research.md の「書き込み機能が有効なときだけ、Recent Changes に一覧へのリンクを出す」）
+- 画面の共通の値は、core の関数を呼ばずに、SSR で `crowi.configManager` から設定キー `app:changeProposalEnabled` を読む（core の design の Settings。理由は research.md の「書き込み機能が有効なときだけ、アカウントメニューに一覧へのリンクを出し、印を取得する」）
 - `change-proposal-core` の画面の共通の部品（`features/change-proposal/client/shared/` の barrel）: 操作の種類・操作の状態・全体の状態・理由・戻せない理由の言葉の表（`label-keys.ts`）、段階・つながりの関係の言葉の表と達成度の文言（`PROPOSAL_LIFECYCLE_LABEL_KEYS`・`PROPOSAL_LINK_LABEL_KEYS`・`ACHIEVEMENT_LABEL_KEY`）、`toAchievementPercent`・`selectRemainingOperations`・`formatProposalShortId`・`buildProposalHref`、diff2html の設定（`diff2html-options.ts` の `buildDiff2HtmlOptions` / `useDiff2HtmlColorScheme`）
 - diff2html のあらかじめ用意した CSS: barrel からは export されていない。読み込むだけの import `import '~/features/change-proposal/client/shared/diff2html.vendor-styles.prebuilt'` で読む（ページ履歴の `client/components/PageHistory/RevisionDiff.tsx` と同じ書き方）
 - `revision-diff` の `POST /_api/v3/revisions/diff` と、その DTO の型
@@ -196,7 +196,7 @@ apps/app/src/features/change-proposal/
         ├── stores/
         │   ├── use-swrx-change-proposal.ts           # GET /change-proposals/:id
         │   ├── use-swrinfx-change-proposal-lists.ts  # GET /mine (page) and /applied (cursor)
-        │   ├── use-swrx-revision-marks.ts            # POST /revision-marks, chunked, null ids = no request
+        │   ├── use-swrx-revision-marks.ts            # POST /revision-marks, chunked, null ids or feature disabled = no request
         │   ├── use-swrx-operation-diff.ts            # POST /revisions/diff for one operation, on demand
         │   ├── proposal-actions.ts                   # revert / send revert request, plus cache refresh
         │   └── use-revert-progress.ts                # Polls the revert proposal until every sent key settles or the timeout passes
@@ -379,6 +379,7 @@ sequenceDiagram
 | 9.8 | どこでも受け取った人の言語 | ChangeProposalNotification（`commons` の名前空間） | — | — |
 | 10.1 | 見えないページを示さない | 全部品、RevertRequestService | — | — |
 | 10.2 | ゲスト・共有リンク | useSWRxRevisionMarks、CurrentRevisionProposalMark | ids が null なら問い合わせない | 印を付ける流れ |
+| 10.6 | 書き込み機能が無効のとき印を取得しない | useSWRxRevisionMarks、`changeProposalEnabledAtom` | 設定が偽なら問い合わせない | 印を付ける流れ |
 | 10.3 | 読み取り専用 | RevertAllButton、ChangeProposalDetail | `useIsReadOnlyUser` | — |
 | 10.4 | 5 言語 | locales | — | — |
 | 10.5 | 入口で振る舞いを変えない（本人向けの内容と操作の有無を除く） | 全部品、requester-only-sections、requester-action-slots | — | — |
@@ -482,6 +483,7 @@ function deriveRevertProgress(args: {
 
 **Responsibilities & Constraints**
 - ids が null（ゲスト・共有リンク）または空のときは、問い合わせない。
+- 書き込み機能が無効（`changeProposalEnabledAtom` が偽）のときも、問い合わせない（要件 10.6）。
 - 100 件ずつに分けて `POST /_api/v3/change-proposals/revision-marks` を並べて呼び、結果をまとめる。
 - `suspense` を使わない。取得中・失敗のときは空の印を返す。失敗はログに残すだけで、利用者には出さない。
 - 鍵は `['/change-proposals/revision-marks', ...並べ替えた ids]`。取り消しのあとは、この鍵の先頭で絞って一斉に取り直す。
@@ -725,7 +727,7 @@ function sendRevertRequest(args: {
 - OpenAPI の JSDoc を書く（core が `generate-spec-apiv3.sh` の対象に足すディレクトリに置くので、生成の対象に入る）。
 
 ### Existing Screen Integrations（summary）
-- **Recent Changes**: `RecentChangesContent` は、`useSWRINFxRecentlyUpdated` の 1 回分ごとに、その行の `revision` の ID を印の hook に渡す小さな部品を、行の一覧の部品と行の部品の間に置く（1 回分 = 20 件）。ゲストのときは null を渡す。`PageItem` は任意の `proposalMark` を受け取り、WIP の印の横に `ProposalMarkBadge` を出す。一覧へのリンクは Recent Changes ではなく、アカウントメニュー（`PersonalDropdown`）に、`changeProposalEnabledAtom` が真のときだけ出す（メニューはログイン中のユーザーにしか出ないので、ゲストには出ない）。一覧の取得の hook とページ送りは変えない（要件 6.4）。
+- **Recent Changes**: `RecentChangesContent` は、`useSWRINFxRecentlyUpdated` の 1 回分ごとに、その行の `revision` の ID を印の hook に渡す小さな部品を、行の一覧の部品と行の部品の間に置く（1 回分 = 20 件）。ゲストのときは null を渡し、書き込み機能が無効のときは hook が問い合わせをしない。`PageItem` は任意の `proposalMark` を受け取り、WIP の印の横に `ProposalMarkBadge` を出す。一覧へのリンクは Recent Changes ではなく、アカウントメニュー（`PersonalDropdown`）に、`changeProposalEnabledAtom` が真のときだけ出す（メニューはログイン中のユーザーにしか出ないので、ゲストには出ない）。一覧の取得の hook とページ送りは変えない（要件 6.4）。
 - **ページ履歴**: `PageRevisionTable` は、読み込んだリビジョンの ID を印の hook に渡し（全件を読んだときも hook が 100 件ずつに分ける）、`Revision` に `proposalMark` を渡す。`Revision` は「最新」の印の隣に `ProposalMarkBadge` を出す。差分のない行の簡単な表示にも同じように出す。
 - **作者の表示**: `AuthorInfo` に任意の `badge` を足し、`PageContentFooter` と `PageSideContents` は最後に更新した人の `AuthorInfo` にだけ `CurrentRevisionProposalMark` を渡す。
 - **通知**: `useModelNotification` の `??` の並びの最後に `useChangeProposalModelNotification` を足す。既読にする動きと未読の件数は既存のまま（要件 9.7）。
@@ -750,7 +752,7 @@ viewer は新しいコレクションを作らない。core の型を使い、�
 | `snapshot` | `ChangeProposalRevertRequestSnapshot` の JSON 文字列 |
 
 **画面の共通の値**
-- `CommonInitialProps.changeProposalEnabled: boolean`（`crowi.configManager.getConfig('app:changeProposalEnabled')`。core の `readChangeProposalSettings().isEnabled` と同じキーを、SSR で使える形で読む）。Recent Changes の一覧へのリンクを出すかどうかだけに使う。
+- `CommonInitialProps.changeProposalEnabled: boolean`（`crowi.configManager.getConfig('app:changeProposalEnabled')`。core の `readChangeProposalSettings().isEnabled` と同じキーを、SSR で使える形で読む）。アカウントメニューの一覧へのリンクを出すかどうかと、印を取得するかどうか（`useSWRxRevisionMarks`）に使う。
 
 **翻訳のキー**
 - `translation.json`: `change_proposal_viewer.*`（詳細ページ、一覧、印、入口の言葉、取り消しと頼む通知の画面）。操作の種類・操作の状態・全体の状態・理由・戻せない理由の言葉（`change_proposal.*`）は core が持ち、viewer は同じ意味のキーを足さない
@@ -862,7 +864,7 @@ viewer が前提にしている core の決まりを挙げる。どれも core �
 | OQ-V1 | 本人向けの内容（AI が書いた要約と会話）を出す部品の受け取る値と置き場所 | 決定。置き場所は viewer の `requester-only-sections.ts` の `REQUESTER_ONLY_SECTIONS`、部品が受け取る値は `{ proposalId: string }`。viewer は `'ai-chat'` の行を持たない表を出し、`change-proposal-ai-agent` が `AiRecordSection` を作って `'ai-chat'` の行に登録する（ai-agent のこのタスクは viewer のタスク 5.6 のあとで行う）。受け取る値を変えるときは Revalidation Triggers に従う |
 | OQ-V2 | 頼む通知の一言の長さ（500 文字）と、同じ人が送れる間隔（24 時間） | 定数として持つ。運用で変える必要が出たら設定キーにする |
 | OQ-V3 | 依頼した人が、詳細ページから承認待ちの操作を承認できるようにするか | 本 spec では承認の操作とページごとの通知の指定を変える操作を置かず、状態と指定の値だけを表示する。Vault や MCP の入口が来たときに、承認の画面をどこに置くかと一緒に決める |
-| OQ-V4 | 書き込み機能を無効にしたあと、アカウントメニューの一覧へのリンクも消してよいか | 消す（research.md の判断）。印・通知・URL からは行ける |
+| OQ-V4 | 書き込み機能を無効にしたあと、アカウントメニューの一覧へのリンクと印も消してよいか | 消す（research.md の判断）。詳細ページ・一覧・通知は URL と通知から行ける |
 | OQ-V5 | ページがもう無い編集の操作にパスを出すか | 決定。core が反映のときに編集のページのパスを記録し（core の要件 6.7）、ページがもう無いときに返す（core の要件 9.17）。記録を始める前に反映した操作だけは「ページはもうありません」と出す |
 
 その他のリスク:

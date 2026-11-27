@@ -3,11 +3,13 @@
 import type { ReactNode } from 'react';
 import { createElement } from 'react';
 import { act, renderHook, waitFor } from '@testing-library/react';
+import { createStore, Provider } from 'jotai';
 import { SWRConfig } from 'swr';
 import { vi } from 'vitest';
 import { mock } from 'vitest-mock-extended';
 
 import * as apiv3Client from '~/client/util/apiv3-client';
+import { changeProposalEnabledAtom } from '~/states/server-configurations';
 
 import type { RevisionMarkView } from '../../../interfaces';
 import {
@@ -59,8 +61,18 @@ const makeIds = (count: number): string[] => {
   );
 };
 
-const wrapper = ({ children }: { children: ReactNode }) =>
-  createElement(SWRConfig, { value: { dedupingInterval: 0 } }, children);
+const wrapperFor = (isFeatureEnabled: boolean) => {
+  const store = createStore();
+  store.set(changeProposalEnabledAtom, isFeatureEnabled);
+  return ({ children }: { children: ReactNode }) =>
+    createElement(
+      Provider,
+      { store },
+      createElement(SWRConfig, { value: { dedupingInterval: 0 } }, children),
+    );
+};
+
+const wrapper = wrapperFor(true);
 
 const echoMarks = () =>
   mockedApiv3Post.mockImplementation(async (_path, params) => {
@@ -87,6 +99,27 @@ describe('useSWRxRevisionMarks', () => {
     expect(mockedApiv3Post).not.toHaveBeenCalled();
     expect(result.current.marks.size).toBe(0);
     expect(result.current.isLoading).toBe(false);
+  });
+
+  it('sends no request while the Change Proposal feature is disabled, and the same ids do send one once it is enabled', async () => {
+    echoMarks();
+    const ids = makeIds(3);
+
+    const disabled = renderHook(() => useSWRxRevisionMarks(ids), {
+      wrapper: wrapperFor(false),
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(mockedApiv3Post).not.toHaveBeenCalled();
+    expect(disabled.result.current.marks.size).toBe(0);
+    expect(disabled.result.current.isLoading).toBe(false);
+
+    const enabled = renderHook(() => useSWRxRevisionMarks(ids), { wrapper });
+    await waitFor(() => expect(enabled.result.current.marks.size).toBe(3));
+
+    expect(mockedApiv3Post).toHaveBeenCalledTimes(1);
   });
 
   it('posts 150 ids as exactly two requests of 100 and 50', async () => {

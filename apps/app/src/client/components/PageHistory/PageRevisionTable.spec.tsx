@@ -3,10 +3,12 @@
 import type { ReactNode } from 'react';
 import type { IRevisionHasId } from '@growi/core';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { createStore, Provider } from 'jotai';
 import { SWRConfig } from 'swr';
 import { mock } from 'vitest-mock-extended';
 
 import type { apiv3Post } from '~/client/util/apiv3-client';
+import { changeProposalEnabledAtom } from '~/states/server-configurations';
 import type { useSWRxInfinitePageRevisions } from '~/stores/page';
 
 import { PageRevisionTable } from './PageRevisionTable';
@@ -67,11 +69,19 @@ const marksResponse = (
   marks: { revisionId: string; proposalId: string; isRevert: boolean }[],
 ): PostResponse => mock<PostResponse>({ data: { marks } });
 
-const wrapper = ({ children }: { children: ReactNode }) => (
-  <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0 }}>
-    {children}
-  </SWRConfig>
-);
+const wrapperFor = (isFeatureEnabled: boolean) => {
+  const store = createStore();
+  store.set(changeProposalEnabledAtom, isFeatureEnabled);
+  return ({ children }: { children: ReactNode }) => (
+    <Provider store={store}>
+      <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0 }}>
+        {children}
+      </SWRConfig>
+    </Provider>
+  );
+};
+
+const wrapper = wrapperFor(true);
 
 const MARK_NAME = 'change_proposal_viewer.mark.change_proposal';
 
@@ -190,6 +200,15 @@ describe('PageRevisionTable proposal marks', () => {
     fireEvent.click(source as HTMLElement);
     expect((source as HTMLInputElement).checked).toBe(true);
     expect(screen.getByTestId('revision-comparer')).toBeDefined();
+  });
+
+  it('sends no marks request while the Change Proposal feature is disabled and still shows the rows', () => {
+    setRevisions([{ revisions: makeRevisions(0, 3), offset: 0 }]);
+
+    render(table(), { wrapper: wrapperFor(false) });
+
+    expect(mocks.apiv3Post).not.toHaveBeenCalled();
+    expect(rowOf('rev0')).not.toBeNull();
   });
 
   it('sends no marks request for a guest and still shows the rows', () => {

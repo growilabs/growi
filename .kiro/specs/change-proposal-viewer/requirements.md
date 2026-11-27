@@ -211,6 +211,7 @@ AI や外部の仕組みが Change Proposal で多くのページを書き換え
 3. Where 見る人が読み取り専用ユーザーである場合, the Change Proposal Viewer shall 詳細ページ・一覧・印は表示し、取り消しと頼む通知の操作は表示しない。
 4. The Change Proposal Viewer shall 新しく足す文言を、GROWI が対応する 5 言語（英語・日本語・中国語・フランス語・韓国語）すべてで表示する。
 5. The Change Proposal Viewer shall 入口の種類（AI チャット・Vault・MCP・取り消し）によって、詳細ページ・一覧・印・通知の振る舞いを変えない。ただし、本人向けの内容（1.7）と本人向けの操作（13.1）の有無は、入口の spec の宣言によって変わる。
+6. Where 書き込み機能が管理者によって無効にされている場合, the Change Proposal Viewer shall ページ履歴・Recent Changes・ページの作者表示で、印を表示せず、印のための問い合わせもしない。詳細ページ・一覧・通知は、書き込み機能の設定にかかわらず表示する。書き込み機能を使っていない wiki で、ページを表示するたびの問い合わせを増やさないためである。
 
 ### Requirement 11: 完了と達成度の表示
 

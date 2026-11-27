@@ -4,10 +4,12 @@ import type { ReactNode } from 'react';
 import type { IPageHasId, IRevisionHasId } from '@growi/core';
 import { PageGrant } from '@growi/core';
 import { render, screen, waitFor } from '@testing-library/react';
+import { createStore, Provider } from 'jotai';
 import { SWRConfig } from 'swr';
 import { mock } from 'vitest-mock-extended';
 
 import type { apiv3Post } from '~/client/util/apiv3-client';
+import { changeProposalEnabledAtom } from '~/states/server-configurations';
 import type { useSWRINFxRecentlyUpdated } from '~/stores/page-listing';
 
 import { RecentChangesContent } from './RecentChangesSubstance';
@@ -78,14 +80,22 @@ const marksResponse = (
   marks: { revisionId: string; proposalId: string; isRevert: boolean }[],
 ): PostResponse => mock<PostResponse>({ data: { marks } });
 
-const wrapper = ({ children }: { children: ReactNode }) => (
-  <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0 }}>
-    {children}
-  </SWRConfig>
-);
+const wrapperFor = (isFeatureEnabled: boolean) => {
+  const store = createStore();
+  store.set(changeProposalEnabledAtom, isFeatureEnabled);
+  return ({ children }: { children: ReactNode }) => (
+    <Provider store={store}>
+      <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0 }}>
+        {children}
+      </SWRConfig>
+    </Provider>
+  );
+};
 
-const renderContent = () =>
-  render(<RecentChangesContent isSmall={false} isWipPageShown />, { wrapper });
+const renderContent = (isFeatureEnabled = true) =>
+  render(<RecentChangesContent isSmall={false} isWipPageShown />, {
+    wrapper: wrapperFor(isFeatureEnabled),
+  });
 
 describe('RecentChangesContent proposal marks', () => {
   beforeEach(() => {
@@ -209,6 +219,15 @@ describe('RecentChangesContent proposal marks', () => {
       Array.from({ length: 5 }, (_, i) => `rev${20 + i}`).sort(),
     );
     expect(screen.getByText('page24')).toBeDefined();
+  });
+
+  it('sends no marks request while the Change Proposal feature is disabled and still shows the rows', () => {
+    setListing([makeBatch(0, 3)]);
+
+    renderContent(false);
+
+    expect(mocks.apiv3Post).not.toHaveBeenCalled();
+    expect(screen.getByText('page0')).toBeDefined();
   });
 
   it('sends no marks request for a guest and still shows the rows', () => {

@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import useSWR, { mutate } from 'swr';
 
 import { apiv3Post } from '~/client/util/apiv3-client';
+import { useChangeProposalEnabled } from '~/states/server-configurations';
 import loggerFactory from '~/utils/logger';
 
 import type { RevisionMarkView } from '../../../interfaces';
@@ -41,12 +42,15 @@ const fetchRevisionMarks = async (
 export const useSWRxRevisionMarks = (
   revisionIds: readonly string[] | null,
 ): RevisionMarksState => {
+  const isFeatureEnabled = useChangeProposalEnabled();
+
   const key = useMemo<RevisionMarksKey | null>(() => {
-    if (revisionIds == null || revisionIds.length === 0) {
+    // Every page view asks for marks, so a wiki that does not use the feature sends nothing.
+    if (!isFeatureEnabled || revisionIds == null || revisionIds.length === 0) {
       return null;
     }
     return [ENDPOINT, ...[...new Set(revisionIds)].sort()];
-  }, [revisionIds]);
+  }, [isFeatureEnabled, revisionIds]);
 
   const { data, isLoading } = useSWR(key, fetchRevisionMarks, {
     revalidateOnFocus: false,

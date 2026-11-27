@@ -160,12 +160,12 @@ umbrella の判断は [../change-proposal/research.md](../change-proposal/resear
 - **Rationale**: 同じ値の言葉を 2 つの spec が別々に持つと、値が増えたときに片方だけが直り、画面ごとに言葉が食い違う。core の値の型と同じ場所に表を置けば、値が増えたときに型の検査で 1 か所の不足として分かる。
 - **Trade-offs**: 言葉を変えるときは core の表を直す。viewer の画面だけの言い回しが欲しくなったら、`change_proposal_viewer.*` に別のキーとして足す。
 
-### Decision: 書き込み機能が有効なときだけ、アカウントメニューに一覧へのリンクを出す
-- **Context**: 要件 6.7。書き込み機能は初期値で無効で、多くの wiki では Change Proposal が 1 件も無い。
-- **Selected Approach**: 書き込み機能の設定キー `app:changeProposalEnabled` を、`getServerSideCommonInitialProps` の中で `crowi` から取った `configManager` で読み（`crowi.configManager.getConfig('app:changeProposalEnabled')`）、画面の共通の値として渡す。真のときだけリンクを出す。core の `readChangeProposalSettings()` は、SSR の側から呼ばない。印・詳細ページ・一覧そのものは、設定にかかわらず動く。
-- **Rationale**: 無効にしたあとも、反映済みの Change Proposal と取り消しは残る（core 要件 5.13）。印と詳細ページは、それをたどる手段として残す必要がある。一方、一度も使っていない wiki で入口を出すと、意味の無いリンクになる。読み方を `crowi` 経由にするのは、`readChangeProposalSettings()` が `configManager` を直接 import していて、SSR の側では設定を読み込んでいない別の実体を読むためである（「core の実装との突き合わせ」。実際に初期値が返るか例外になるかは未確認）。`commons.ts` は AI の有効・無効を `crowi.isAiReady()` で、ほかの設定を `crowi` の `configManager` で読んでおり、同じ形にそろえる。
+### Decision: 書き込み機能が有効なときだけ、アカウントメニューに一覧へのリンクを出し、印を取得する
+- **Context**: 要件 6.7 と 10.6。書き込み機能は初期値で無効で、多くの wiki では Change Proposal が 1 件も無い。印は、ログイン済みのユーザーが ページを表示するたび、ページ履歴を開くたび、Recent Changes を読み込むたびに、問い合わせを 1 回送る。
+- **Selected Approach**: 書き込み機能の設定キー `app:changeProposalEnabled` を、`getServerSideCommonInitialProps` の中で `crowi` から取った `configManager` で読み（`crowi.configManager.getConfig('app:changeProposalEnabled')`）、画面の共通の値として渡す。真のときだけリンクを出し、印を取得する。印は `useSWRxRevisionMarks` が同じ値を読み、偽なら問い合わせを送らない。core の `readChangeProposalSettings()` は、SSR の側から呼ばない。詳細ページ・一覧・通知は、設定にかかわらず動く。
+- **Rationale**: 無効にしたあとも、反映済みの Change Proposal と取り消しは残る（core 要件 5.13）。詳細ページ・一覧・通知は、それをたどる手段として残す。一方、一度も使っていない wiki で入口を出すと、意味の無いリンクになる。印の問い合わせは、答えが空でも、すべてのユーザーのページ表示のたびに、サーバーが受け付けてリビジョンを検索する。使っていない wiki にその費用を払わせないため、印は設定が真のときだけ取得する。リビジョンの `proposalId` はページ情報にも Recent Changes の応答にも含まれないので、印があるかどうかをデータから先に判定して問い合わせを省くことはできない（応答に項目を足すと、公開する情報が変わる）。読み方を `crowi` 経由にするのは、`readChangeProposalSettings()` が `configManager` を直接 import していて、SSR の側では設定を読み込んでいない別の実体を読むためである（「core の実装との突き合わせ」。実際に初期値が返るか例外になるかは未確認）。`commons.ts` は AI の有効・無効を `crowi.isAiReady()` で、ほかの設定を `crowi` の `configManager` で読んでおり、同じ形にそろえる。
 - **Trade-offs**: 設定キーの名前を viewer も知ることになる。キーの名前や意味が変わったときは viewer も直す（design.md の Revalidation Triggers）。
-- **Trade-offs**: 無効にしたあとは、一覧へは通知・印・URL からしか行けない。
+- **Trade-offs**: 無効にしたあとは、過去の印もページ履歴・Recent Changes・ページの作者表示から消える。詳細ページと取り消しは残り、一覧へは通知と URL から行ける。
 - **置き場所**: 一覧の URL は `/me/change-proposals` で、自分用の画面である。Recent Changes はページの更新を並べる画面で、一覧とは役割が違うため、見出しに置くと別の機能のリンクに見える。ユーザーのアカウントメニューは `/me`（設定）と同じ並びで、自分用の画面への入口として自然なため、ここに置く。
 
 ### Decision: 本人向けの操作は、入口ごとの宣言の表から引く
