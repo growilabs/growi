@@ -51,6 +51,74 @@ const validator = [
     .withMessage('comment must be a non-empty string'),
 ];
 
+/**
+ * @swagger
+ *
+ *    /inline-comments/replies/{id}:
+ *      put:
+ *        tags: [Comments]
+ *        summary: Edit a reply to an inline comment
+ *        description: >
+ *          Changes the body of a reply to an inline comment. Only the creator may edit.
+ *          Requires login, or an access token with the scope `write:features:page`, and
+ *          permission to view the page. Not available through a share link. Read-only
+ *          users are refused unless read-only users are allowed to comment.
+ *        parameters:
+ *          - in: path
+ *            name: id
+ *            required: true
+ *            schema:
+ *              type: string
+ *            description: ID of the reply.
+ *        requestBody:
+ *          required: true
+ *          content:
+ *            application/json:
+ *              schema:
+ *                type: object
+ *                required:
+ *                  - comment
+ *                properties:
+ *                  comment:
+ *                    type: string
+ *                    minLength: 1
+ *                    description: New reply body (markdown).
+ *        responses:
+ *          200:
+ *            description: The updated reply.
+ *            content:
+ *              application/json:
+ *                schema:
+ *                  type: object
+ *                  required:
+ *                    - inlineCommentReply
+ *                  properties:
+ *                    inlineCommentReply:
+ *                      $ref: '#/components/schemas/InlineCommentReply'
+ *          400:
+ *            description: >
+ *              Invalid input, or the caller is a read-only user (code
+ *              `validation_failed`); `id` is not a reply to an inline comment (code
+ *              `inline-comment-not-reply`); the reply could not be updated (code
+ *              `inline-comment-update-failed`).
+ *            content:
+ *              application/json:
+ *                schema:
+ *                  $ref: '#/components/schemas/ErrorV3'
+ *          403:
+ *            description: >
+ *              Not authenticated, or the access token lacks the required scope; or the
+ *              caller is not the creator of the reply (code `inline-comment-forbidden`).
+ *          404:
+ *            description: >
+ *              The reply does not exist (code `inline-comment-not-found`), or its page
+ *              does not exist or the caller may not view it (code
+ *              `notfound_or_forbidden`; these two page cases are indistinguishable).
+ *            content:
+ *              application/json:
+ *                schema:
+ *                  $ref: '#/components/schemas/ErrorV3'
+ */
 export const updateInlineCommentReplyRouteHandlersFactory = (
   crowi: Crowi,
 ): RequestHandler[] => {
