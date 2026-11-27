@@ -1,4 +1,5 @@
 import { Readable } from 'node:stream';
+import type { RequestHandler } from 'express';
 import express from 'express';
 import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -123,10 +124,7 @@ function authedAdapter(userId: string, scopes: ReadonlyArray<string> = []) {
 }
 
 /** A credential-adapter middleware stub that resolves no user (no credential presented). */
-// biome-ignore lint/suspicious/noExplicitAny: minimal Express middleware stub
-function noCredentialAdapter(_req: any, _res: any, next: any) {
-  next();
-}
+const noCredentialAdapter: RequestHandler = (_req, _res, next) => next();
 
 // ---------------------------------------------------------------------------
 // Tests
