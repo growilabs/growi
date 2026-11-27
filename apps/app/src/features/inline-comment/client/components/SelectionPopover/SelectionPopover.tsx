@@ -19,6 +19,8 @@ import {
 } from './selection-virtual-element';
 import { usePopperPosition } from './use-popper-position';
 
+import styles from './SelectionPopover.module.scss';
+
 type ReferenceRect = ReturnType<VirtualElement['getBoundingClientRect']>;
 
 const isZeroRect = (rect: ReferenceRect): boolean =>
@@ -85,11 +87,7 @@ export const SelectionPopover = (
   );
 
   return createPortal(
-    // zIndex is the one style this element owns (Popper writes position/transform
-    // itself). Some page-layout ancestors set an explicit z-index with no
-    // stacking context to contain it, so without this the portal would paint
-    // behind them. 1070 mirrors Bootstrap's $zindex-popover.
-    <div ref={setPopperElement} style={{ zIndex: 1070 }}>
+    <div ref={setPopperElement} className={styles['selection-popover']}>
       {children}
     </div>,
     document.body,

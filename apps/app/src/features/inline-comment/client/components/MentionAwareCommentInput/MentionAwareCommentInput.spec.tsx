@@ -358,7 +358,7 @@ describe('MentionAwareCommentInput', () => {
     );
   });
 
-  it("raises the mention-completion popup above InlineCommentForm's own z-index, wrapped so the two-part theme extension does not get split across appendExtensions calls", () => {
+  it('raises the mention-completion popup above the popover the input sits in, wrapped so the two-part theme extension does not get split across appendExtensions calls', () => {
     render(<MentionAwareCommentInput editorKey="key-1" onSubmit={vi.fn()} />);
 
     expect(themeMock).toHaveBeenCalledWith({
