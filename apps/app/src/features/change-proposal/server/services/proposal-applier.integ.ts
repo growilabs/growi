@@ -165,6 +165,12 @@ describe('ProposalApplier.apply', () => {
     expect(operationOf(after, editKey).resultRevisionId).toBe(
       (await markedRevisions(proposal._id, editKey))[0].id,
     );
+    expect(operationOf(after, editKey)).toMatchObject({
+      appliedPagePath: edited.path,
+    });
+    expect(operationOf(after, createKey)).toMatchObject({ path: createdPath });
+    expect(operationOf(after, createKey)).not.toHaveProperty('appliedPagePath');
+    expect(operationOf(after, moveKey)).not.toHaveProperty('appliedPagePath');
     expect((await findPage(moved._id)).path).toBe(movedTo);
 
     const notifications = await aggregatedNotifications(proposal._id);
@@ -239,6 +245,32 @@ describe('ProposalApplier.apply', () => {
       ].sort((a, b) => a.path.localeCompare(b.path)),
     );
     await waitForActivities(proposal._id, 1);
+  });
+
+  it('keeps the page path recorded when an edit was applied after the page moves elsewhere', async () => {
+    const page = await createPage('recorded-path');
+    const pathAtApply = page.path;
+    const editProposal = await storeProposal([editInput(page)]);
+    const [editKey] = editProposal.operations.map((op) => op.key);
+    await newApplier().apply(editProposal._id, { kind: 'background' });
+
+    const movedTo = nextPath('recorded-path-moved');
+    const moveProposal = await storeProposal([
+      {
+        type: 'move',
+        pageId: page._id.toString(),
+        fromPath: pathAtApply,
+        toPath: movedTo,
+      },
+    ]);
+    await newApplier().apply(moveProposal._id, { kind: 'background' });
+    await waitForPageOperationsToFinish();
+
+    expect((await findPage(page._id)).path).toBe(movedTo);
+    expect(operationOf(await reload(editProposal._id), editKey)).toMatchObject({
+      status: 'applied',
+      appliedPagePath: pathAtApply,
+    });
   });
 
   it('leaves unapproved pending operations alone and keeps the proposal open', async () => {

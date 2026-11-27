@@ -14,7 +14,7 @@ import type {
   ChangeProposalDocument,
   ChangeProposalNotificationSnapshot,
 } from '../../interfaces';
-import { selectNotifiedPageIds } from '../domain';
+import { collectCreatedPaths, selectNotifiedPageIds } from '../domain';
 import { pageModel } from './operation-handlers/page-model';
 
 const logger = loggerFactory(
@@ -59,11 +59,7 @@ const findDeletedCreatedPages = (
   if (original == null) {
     return [];
   }
-  const createdPaths = new Map(
-    original.operations.flatMap((op) =>
-      op.type === 'create' ? [[op.key, op.path] as const] : [],
-    ),
-  );
+  const createdPaths = collectCreatedPaths(original.operations);
   return proposal.operations.flatMap((op) => {
     if (op.type !== 'delete-completely' || op.status !== 'applied') {
       return [];
@@ -152,9 +148,8 @@ const buildNotificationInputs = async ({
       if (pages.length === 0) {
         return null;
       }
-      // The original requester may not be able to open the revert proposal (its
-      // deleted pages are shown to the reverter only), but always sees the
-      // original, where every reverted operation is recorded.
+      // The original requester is pointed at the original, where every operation
+      // they asked for is recorded together with whether it was reverted.
       const linked = isOriginalRequester
         ? { proposalId: original._id, entry: original.entry }
         : {};

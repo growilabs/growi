@@ -1182,6 +1182,7 @@
     "CHANGE_PROPOSAL_CREATE": "Change Proposal 생성",
     "CHANGE_PROPOSAL_APPLY": "Change Proposal 반영",
     "CHANGE_PROPOSAL_REVERT": "Change Proposal 되돌리기",
+    "CHANGE_PROPOSAL_REVERT_REQUEST": "Change Proposal 되돌리기 요청",
     "CHANGE_PROPOSAL_APPROVE": "Change Proposal 승인",
     "CHANGE_PROPOSAL_REJECT": "Change Proposal 반려",
     "CHANGE_PROPOSAL_ABSTAIN": "Change Proposal 판단 기권",

@@ -1,0 +1,36 @@
+.summary {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.25rem;
+  background-color: var(--bs-tertiary-bg);
+  border: 1px solid var(--bs-border-color);
+  border-radius: var(--bs-border-radius-lg);
+}
+
+.status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  align-items: center;
+}
+
+.name {
+  font-weight: 600;
+  color: var(--bs-emphasis-color);
+}
+
+.username {
+  font-size: 0.875rem;
+  color: var(--bs-secondary-color);
+}
+
+.model {
+  font-family: var(--font-family-monospace, var(--bs-font-monospace));
+  font-size: 0.875rem;
+}
+
+.links {
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--bs-border-color-translucent);
+}

@@ -17,17 +17,18 @@ import {
   activeReviewers,
   deriveViewerRole,
   isReviewer,
-  type ReviewScopeOperation,
   type ViewerIdentity,
 } from '../domain';
 import type {
   AttributedApproval,
   ClosingLifecycle,
   CreateOperationInput,
+  LinkedOperation,
   LinkedProposalRecord,
   OriginalOperationChange,
   RecordedOutcome,
   RequesterWriteResult,
+  RevertCounterpartRecord,
   ReviewEntry,
 } from './change-proposal-types';
 import {
@@ -187,6 +188,9 @@ export const toOutcomeData = (
         ...(outcome.resultRevisionId == null
           ? {}
           : { resultRevisionId: outcome.resultRevisionId }),
+        ...(outcome.appliedPagePath == null
+          ? {}
+          : { path: outcome.appliedPagePath }),
       };
     case 'pending':
       return {
@@ -218,14 +222,18 @@ type LinkedOperationRow = {
   path: string | null;
   toPath: string | null;
   resultPageId: string | null;
+  revertedByProposalId: string | null;
 };
 
-const toLinkedOperation = (op: LinkedOperationRow): ReviewScopeOperation => {
+const toLinkedOperation = (op: LinkedOperationRow): LinkedOperation => {
   const type = toOperationType(op.type);
   const state = {
     key: op.key,
     status: toOperationStatus(op.status),
     ...(op.resultPageId == null ? {} : { resultPageId: op.resultPageId }),
+    ...(op.revertedByProposalId == null
+      ? {}
+      : { revertedByProposalId: op.revertedByProposalId }),
   };
   switch (type) {
     case 'create':
@@ -262,6 +270,20 @@ export const toLinkedProposalRecord = (row: {
     operations: row.operations.map(toLinkedOperation),
   };
 };
+
+export const toRevertCounterpartRecord = (row: {
+  id: string;
+  requester: string;
+  operations: { key: string; type: string; path: string | null }[];
+}): RevertCounterpartRecord => ({
+  id: row.id,
+  requester: row.requester,
+  operations: row.operations.map((op) => ({
+    key: op.key,
+    type: toOperationType(op.type),
+    ...(op.path == null ? {} : { path: op.path }),
+  })),
+});
 
 // Tells why a requester-scoped conditional write matched nothing.
 export const toRequesterWriteMiss = (

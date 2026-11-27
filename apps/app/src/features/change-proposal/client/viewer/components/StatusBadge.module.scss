@@ -1,0 +1,19 @@
+.status-badge {
+  display: inline-flex;
+  gap: 0.3em;
+  align-items: center;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: start;
+  white-space: normal;
+
+  .icon {
+    font-size: 1.25em;
+    line-height: 1;
+  }
+}
+
+.status-badge-md {
+  padding: 0.4em 0.8em;
+  font-size: 0.875rem;
+}

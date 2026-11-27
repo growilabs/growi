@@ -1,4 +1,4 @@
-import React, { type JSX } from 'react';
+import React, { type JSX, type ReactNode } from 'react';
 import Link from 'next/link';
 import type { IUserHasId } from '@growi/core';
 import { type IUser, isPopulated, type Ref } from '@growi/core';
@@ -30,11 +30,18 @@ type AuthorInfoProps = {
   user?: IUserHasId | Ref<IUser>;
   mode: 'create' | 'update';
   locate: 'pageSide' | 'footer';
+  proposalMark?: ReactNode;
 };
 
 export const AuthorInfo = (props: AuthorInfoProps): JSX.Element => {
   const { t } = useTranslation();
-  const { date, user, mode = 'create', locate = 'pageSide' } = props;
+  const {
+    date,
+    user,
+    mode = 'create',
+    locate = 'pageSide',
+    proposalMark,
+  } = props;
 
   const formatType = 'yyyy/MM/dd HH:mm';
 
@@ -58,6 +65,7 @@ export const AuthorInfo = (props: AuthorInfoProps): JSX.Element => {
         <UserPicture user={user} size="sm" className="border" />
       </span>
       {userLabel}
+      {proposalMark}
     </span>
   );
 
@@ -103,6 +111,7 @@ export const AuthorInfo = (props: AuthorInfoProps): JSX.Element => {
         <div className="text-secondary mb-1">
           {infoLabelForPageSide} <br className="d-lg-none" />
           {userLabel}
+          {proposalMark}
         </div>
         <div className="text-secondary text-date" data-vrt-blackout-datetime>
           {renderParsedDate()}

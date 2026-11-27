@@ -2,6 +2,7 @@ import type {
   BasedOn,
   FailureReason,
   OperationPayload,
+  OperationType,
   ProposalEntry,
   ProposalMark,
   RevertRefusalReason,
@@ -70,6 +71,8 @@ export type RecordedOutcome =
       readonly status: 'applied';
       readonly resultPageId: string;
       readonly resultRevisionId: string | null;
+      // Stored in the operation's `path` field (edit only).
+      readonly appliedPagePath?: string;
     }
   | { readonly status: 'stale'; readonly reason: StaleReason }
   | { readonly status: 'failed'; readonly reason: FailureReason }
@@ -96,8 +99,24 @@ export type LinkedProposalRecord = {
   readonly entry: ProposalEntry;
   readonly basedOn: BasedOn;
   readonly reviewers: readonly ReviewerRef[];
-  // Enough for the viewer's role in the linked proposal to decide what they see.
-  readonly operations: readonly ReviewScopeOperation[];
+  // Enough for the viewer's role in the linked proposal, and their part in its
+  // reverts, to decide what they see.
+  readonly operations: readonly LinkedOperation[];
+};
+
+export type LinkedOperation = ReviewScopeOperation & {
+  readonly revertedByProposalId?: string;
+};
+
+// `path` is the stored field: a create's target path, or an edit's page path when applied.
+export type RevertCounterpartRecord = {
+  readonly id: string;
+  readonly requester: string;
+  readonly operations: readonly {
+    readonly key: string;
+    readonly type: OperationType;
+    readonly path?: string;
+  }[];
 };
 
 export type AppliedListCursor = {

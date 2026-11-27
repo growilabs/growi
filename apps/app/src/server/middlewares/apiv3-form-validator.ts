@@ -23,7 +23,7 @@ export const apiV3FormValidator = (
   }
 
   const errs = errObjArray.array().map((err) => {
-    logger.error(`${err.location}.${err.param}: ${err.value} - ${err.msg}`);
+    logger.error(`${err.location}.${err.param}: ${err.msg}`);
     return new ErrorV3(
       `${err.param}: ${err.msg}`,
       apiV3ErrorCode.VALIDATION_FAILED,

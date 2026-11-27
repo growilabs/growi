@@ -20,11 +20,14 @@ import {
   deriveViewerRole,
   judgeRevertability,
   type LinkedProposalFacts,
-  type ReviewScopeOperation,
+  recordedPathOf,
   targetPageIdOf,
   type ViewerIdentity,
 } from '../domain';
-import type { LinkedProposalRecord } from '../models/change-proposal-types';
+import type {
+  LinkedOperation,
+  LinkedProposalRecord,
+} from '../models/change-proposal-types';
 import type { ServiceResult } from './change-proposal-service-types';
 import {
   type DeleteAuthority,
@@ -92,12 +95,14 @@ const REVERTIBILITY_STATUSES: ReadonlySet<OperationStatus> = new Set([
   'revert-refused',
 ]);
 
-// A follow-up, rework or base proposal, judged by the viewer's own role in it.
+// A follow-up, rework or base proposal, judged by the viewer's own role in it
+// and by their part in its reverts.
 type RelatedProposal = {
   readonly id: string;
   readonly requester: string;
   readonly reviewers: readonly ReviewerRef[];
-  readonly operations: readonly ReviewScopeOperation[];
+  readonly revertOf?: string;
+  readonly operations: readonly LinkedOperation[];
 };
 
 type ViewerScope = {
@@ -106,6 +111,8 @@ type ViewerScope = {
   readonly visible: readonly OperationRecord[];
   readonly viewable: ViewablePages;
   readonly relatedVisibleKeys: ReadonlyMap<string, ReadonlySet<string>>;
+  // The original's create paths when the proposal is a revert; otherwise empty.
+  readonly createdPaths: ReadonlyMap<string, string>;
 };
 
 // Non-requesters get the base link only with the base operations returned to
@@ -133,7 +140,7 @@ const toLinkedFacts = (
 
 // Every page involved — the proposal's and each related proposal's, by the
 // viewer's role in each — is checked in one viewing check, with the groups the
-// caller already read.
+// caller already read; their revert counterparts are read in one query too.
 const readViewerScope = async (
   proposal: ChangeProposalDocument,
   identity: ViewerIdentity,
@@ -142,13 +149,15 @@ const readViewerScope = async (
   const roleIn = (p: Pick<RelatedProposal, 'requester' | 'reviewers'>) =>
     deriveViewerRole(p.requester, p.reviewers, identity);
   const role = roleIn(proposal);
-  const { scopes, viewable } = await resolveReviewScopesWithPages(
+  const { scopes, viewable, counterparts } = await resolveReviewScopesWithPages(
     [proposal, ...related].map((p) => ({
       operations: p.operations,
       role: roleIn(p),
+      ...(p.revertOf == null ? {} : { revertOf: p.revertOf }),
     })),
     identity,
     pageIdsOf(proposal.operations),
+    { readsRevertCounterparts: true },
   );
   const [scope, ...relatedScopes] = scopes;
   return {
@@ -159,6 +168,7 @@ const readViewerScope = async (
     relatedVisibleKeys: new Map(
       related.map((p, i) => [p.id, relatedScopes[i].visibleKeys]),
     ),
+    createdPaths: counterparts[0].createdPaths,
   };
 };
 
@@ -238,16 +248,49 @@ const pageViewIn =
       : { id: page._id.toString(), path: page.path };
   };
 
+const isOnGonePage = (
+  op: OperationRecord,
+  deletedPageIds: ReadonlySet<string>,
+): boolean => {
+  const pageId = targetPageIdOf(op);
+  return pageId != null && deletedPageIds.has(pageId);
+};
+
+// The path returned for edit and delete-completely (requirement 9.16, 9.17).
+const suppliedPathOf = (
+  op: OperationRecord,
+  createdPaths: ReadonlyMap<string, string>,
+  deletedPageIds: ReadonlySet<string>,
+): string | undefined => {
+  switch (op.type) {
+    case 'delete-completely':
+      return recordedPathOf(op, createdPaths);
+    case 'edit':
+      return isOnGonePage(op, deletedPageIds)
+        ? recordedPathOf(op, createdPaths)
+        : undefined;
+    default:
+      return undefined;
+  }
+};
+
 // Only operations this viewer could actually revert get a judgement, so the
-// view never disagrees with what revert() would do for them (requirement 5.14).
+// view never disagrees with what revert() would do for them (requirement 5.14;
+// see the core design for why a gone page counts only for the requester).
 const readRevertabilityOf = async (
   proposal: ChangeProposalDocument,
   visible: readonly OperationRecord[],
   viewable: ViewablePages,
   deleteAuthority: DeleteAuthority,
 ): Promise<(op: OperationRecord) => Revertability | undefined> => {
+  const isRequester =
+    proposal.requester === deleteAuthority.user._id.toString();
   const candidates = isRequesterAllowed(deleteAuthority.user)
-    ? visible.filter((op) => REVERTIBILITY_STATUSES.has(op.status))
+    ? visible.filter(
+        (op) =>
+          REVERTIBILITY_STATUSES.has(op.status) &&
+          (isRequester || !isOnGonePage(op, viewable.deletedPageIds)),
+      )
     : [];
   if (candidates.length === 0) {
     return () => undefined;
@@ -343,11 +386,13 @@ const toOperationViews = (
   },
 ): OperationView[] => {
   const reviewTargets = reviewTargetsOf(viewerScope);
-  const pageOf = pageViewIn(viewerScope.viewable);
+  const { viewable, createdPaths } = viewerScope;
+  const pageOf = pageViewIn(viewable);
   return viewerScope.visible.map((op) =>
     toOperationView(op, {
       role: viewerScope.role,
       page: pageOf(op),
+      path: suppliedPathOf(op, createdPaths, viewable.deletedPageIds),
       revertability: per.revertabilityOf(op),
       linkedProposals: per.links.get(op.key),
       reviewTarget: reviewTargets.get(op.key),
@@ -359,7 +404,8 @@ const toOperationViews = (
 /**
  * Builds what one viewer may see of a proposal, by the viewer's role. Every
  * page involved — the proposal's, its follow-ups' and reworks', and its base's —
- * is checked in a single findByIdsAndViewer call, read the same way as a revert reads it.
+ * is checked in a single findByIdsAndViewer call, read the same way as a revert
+ * reads it, and their revert counterparts are read in a single query too.
  */
 export const createProposalQuery = (deps: ProposalQueryDeps): ProposalQuery => {
   const reviewQueue = createReviewQueueQuery(deps.appliedListScan);

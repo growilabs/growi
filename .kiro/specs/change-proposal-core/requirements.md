@@ -45,9 +45,10 @@ GROWI には、AI や外部の仕組みが複数のページをまとめて書�
 | Proposal 作成元 | Proposal がどこから来たか。`ai-chat` (AI チャット)、`vault` (Vault)、`mcp` (MCP)、`revert` (取り消し) のどれか |
 | 適用 | Change オペレーションを、実際のページとリビジョンに書き込むこと |
 | 取り消し | 適用した Change オペレーションを元に戻すこと。作成元が `revert` (取り消し) の Proposal を作り、それを適用する。`create` (新規作成) を戻すときは、作ったページを完全に削除する（ごみ箱には残さない）。完全に削除したページは戻せないので、この取り消しは取り消せない |
+| 取り消し対象 Proposal | 取り消しの Proposal（作成元が `revert` (取り消し) の Proposal）によって、適用した Change オペレーションを元に戻される側の Proposal。元に戻す Change オペレーションを「取り消し対象の Change オペレーション」と呼ぶ。取り消しの Proposal の作成者を「取り消した人」と呼ぶ |
 | Proposal の目的 | Proposal 作成者が作成のときに書く、Proposal を出す理由。入れなくてもよい。AI との会話や AI が書いた要約とは別のものである |
 
-「そのユーザーに返す Change オペレーション」と書くときは、Proposal を取得するユーザーの立場（Proposal 作成者・Proposal 承認者・それ以外のユーザー）に応じて、Requirement 9.11〜9.14 の決まりで選んだ Change オペレーションを指す。
+「そのユーザーに返す Change オペレーション」と書くときは、Proposal を取得するユーザーの立場（Proposal 作成者・Proposal 承認者・それ以外のユーザー）に応じて、Requirement 9.11〜9.15 の決まりで選んだ Change オペレーションを指す。
 
 **Change オペレーションの状態**
 
@@ -257,9 +258,9 @@ Change オペレーションの状態とは別に、Proposal 全体が動いて�
 6. When `create` (新規作成) の Change オペレーションを取り消す場合, the Change Proposal System shall 作ったページに子のページが無く、その Change オペレーションが作ったリビジョンがまだ最新のリビジョンであり、取り消す人がそのページを完全に削除してよいとき（5.16）だけ、そのページを完全に削除する。ごみ箱には残さない。
 7. When `move` (移動) の Change オペレーションを取り消す場合, the Change Proposal System shall 移動元のパスが空いているときだけページを移動元のパスへ戻し、移動のときに作られた、移動元から移動先への転送（リダイレクト）を消す。
 8. If 取り消そうとした Change オペレーションが、戻してよい条件（5.5〜5.7、5.16）を満たさない場合, then the Change Proposal System shall その Change オペレーションを書き込まずに `revert-refused` (取り消し不可) にし、断った理由を返す。
-9. When 取り消しの Proposal の Change オペレーションが適用された場合, the Change Proposal System shall オリジナルの Change オペレーションを `reverted` (取り消し済み) にし、その Change オペレーションに、取り消しの Proposal の ID を記録する。
+9. When 取り消しの Proposal の Change オペレーションが適用された場合, the Change Proposal System shall 取り消し対象の Change オペレーションを `reverted` (取り消し済み) にし、その Change オペレーションに、取り消しの Proposal の ID を記録する。
 10. The Change Proposal System shall 取り消しの Proposal を、自動適用の方針と承認を通さず、取り消しを求めた時点で適用する。
-11. If 取り消しの Proposal の Change オペレーションの対象が、共同編集中のページである場合, then the Change Proposal System shall その Change オペレーションを適用せずに取り消しの Proposal の中で `skipped` (スキップ) にし、オリジナルの Change オペレーションを `applied` (適用済み) のまま残して、取り消しを求めた人が後から再び求められるようにする。
+11. If 取り消しの Proposal の Change オペレーションの対象が、共同編集中のページである場合, then the Change Proposal System shall その Change オペレーションを適用せずに取り消しの Proposal の中で `skipped` (スキップ) にし、取り消し対象の Change オペレーションを `applied` (適用済み) のまま残して、取り消しを求めた人が後から再び求められるようにする。
 12. The Change Proposal System shall 取り消しの Proposal で適用した `edit` (編集) と `move` (移動) の Change オペレーションを、通常の Proposal の Change オペレーションと同じ条件で取り消せるようにする。
 13. The Change Proposal System shall 取り消しを、書き込み機能の有効化・Change オペレーションの種類ごとの有効化・件数の上限の設定にかかわらず受け付ける。
 14. When ユーザーが `applied` (適用済み) の Change オペレーションを取得した場合, the Change Proposal System shall その Change オペレーションをその時点で戻せるかどうかと、戻せない場合の理由を、Proposal を取得するユーザーごとに判定して返す。
@@ -267,7 +268,7 @@ Change オペレーションの状態とは別に、Proposal 全体が動いて�
 16. When `create` (新規作成) の Change オペレーションの取り消しでページを完全に削除する場合, the Change Proposal System shall 取り消す人が、人が画面から同じページを完全に削除するときの条件（管理者が決めた完全な削除の権限、複数のグループに公開されたページでは公開先のすべてのグループに属していること、ユーザーのホームのページでは管理者の設定と持ち主がもういないこと）と、ごみ箱へ移す権限の両方を満たすときだけ削除する。満たさないときは、その Change オペレーションを `revert-refused` (取り消し不可) にし、削除してよい権限が無いことを理由として返す。
 
 **残っている差**（自動テストでは確かめられないこと）:
-- 5.9: 取り消しの結果をオリジナルの Change オペレーションに書く処理が 3 回とも失敗すると、オリジナルの Change オペレーションは `applied` (適用済み) のまま残る。もう一度取り消しを求めれば判定し直される（research.md の決定「取り消しの結果をオリジナルの Change オペレーションに書く処理は、例外のときだけその場で 2 回までやり直す」）。
+- 5.9: 取り消しの結果を取り消し対象の Change オペレーションに書く処理が 3 回とも失敗すると、取り消し対象の Change オペレーションは `applied` (適用済み) のまま残る。もう一度取り消しを求めれば判定し直される（research.md の決定「取り消しの結果を取り消し対象の Change オペレーションに書く処理は、例外のときだけその場で 2 回までやり直す」）。
 - 5.14: 管理者がユーザーページを無効にしたあと、`/user` の下に触れる `edit` (編集)・`move` (移動) の取り消しは、5.14 の判定では「戻せる」と出ても、取り消しの Proposal の Change オペレーションを適用するときに `revert-refused` (取り消し不可)（対象のページが無い）になる（research.md の決定「適用でも、人の route と同じユーザーページの保護を通す」）。
 
 ### Requirement 6: 作った Change Proposal の記録
@@ -281,6 +282,7 @@ Change オペレーションの状態とは別に、Proposal 全体が動いて�
 4. The Change Proposal System shall リビジョンの上書き防止の確認に使われている既存の値（保存の出どころを表す `origin`）に新しい値を足さず、Change オペレーションの適用で作るリビジョンの `origin` を空にする。
 5. The Change Proposal System shall `applied` (適用済み) の Change オペレーションを含む Proposal を、activity の保存期間とは関係なく保存し続ける。
 6. The Change Proposal System shall リビジョンを返す既存の API の応答に記録の値が含まれても、そこから Proposal の中の他の Change オペレーションの数・並び順・あるかどうかが分からないようにする。
+7. When `edit` (編集) の Change オペレーションを適用した場合, the Change Proposal System shall 適用した時点の対象のページのパスを、その Change オペレーションの記録に残す。ページが後で移動・削除されても、記録したパスは変えない。
 
 **残っている差**（自動テストでは確かめられないこと）:
 - 6.6・9.5: リンクを知る人だけが見られるページは、ID を知っているログイン済みの人なら誰でも読める。そのため、そのページのリビジョンを `/revisions/list` で読むと `proposalId` が見え、その Proposal を取得すると「見つからない」になるので、開けない Proposal があることは分かる。他の Change オペレーションの数や並び順は分からない。
@@ -297,7 +299,7 @@ Change オペレーションの状態とは別に、Proposal 全体が動いて�
 5. When Proposal の Change オペレーションを適用した場合、または取り消した場合, the Change Proposal System shall 監査ログの設定にかかわらず、それを新しい種類の activity として、Proposal 作成者または取り消した人を操作者として記録する。
 6. The Change Proposal System shall 人の保存のときに出る通知と activity の振る舞いを変えない。
 7. When Proposal を作成した場合, the Change Proposal System shall 監査ログの設定で記録の対象になっているときに、それを新しい種類の activity として、Proposal 作成者を操作者として記録する。
-8. When 取り消しの Proposal の Change オペレーションを適用する処理が終わり、1 つ以上の Change オペレーションが `applied` (適用済み) になった場合, the Change Proposal System shall 完全に削除したページも通知の対象のページに含め、オリジナルの Proposal の作成者にも（取り消した人と同じでなければ）まとめたアプリ内通知を送る。中身は 7.3・7.4 と同じく、受け取る人が閲覧できるページの分だけで作る。ただし完全に削除したページは、誰も閲覧できないので、オリジナルの Proposal の作成者にだけ、その人が `create` (新規作成) を求めたときのパスで含める。オリジナルの Proposal の作成者への通知は、取り消しの Proposal ではなくオリジナルの Proposal を指す（取り消しの Proposal は、完全に削除したページの Change オペレーションを取り消した人にしか見せないので、開けないことがある）。
+8. When 取り消しの Proposal の Change オペレーションを適用する処理が終わり、1 つ以上の Change オペレーションが `applied` (適用済み) になった場合, the Change Proposal System shall 完全に削除したページも通知の対象のページに含め、取り消し対象 Proposal の作成者にも（取り消した人と同じでなければ）まとめたアプリ内通知を送る。中身は 7.3・7.4 と同じく、受け取る人が閲覧できるページの分だけで作る。ただし完全に削除したページは、誰も閲覧できないので、取り消し対象 Proposal の作成者にだけ、その人が `create` (新規作成) を求めたときのパスで含める。取り消し対象 Proposal の作成者への通知は、取り消しの Proposal ではなく取り消し対象 Proposal を指す（取り消し対象 Proposal には、その人が頼んだ Change オペレーションのすべてと、それぞれが取り消されたかどうかが記録されているため）。
 9. When Proposal を作る側が、利用者の request を受けた処理の中で Proposal を作った場合, the Change Proposal System shall 作成の activity をその request の activity として記録し、作成のための activity を別に残さない。
 10. When Change オペレーションを適用するときに、管理者の通知設定でページごとの通知が有効になっていて、かつ Proposal のページごとの通知設定が「出す」である場合, the Change Proposal System shall その Change オペレーションについて、人が画面から同じ操作をしたときと同じページごとの通知を出す。アプリ内通知の受け取る人は人の操作と同じ決め方で決め、グローバル通知は人の操作と同じく、ページの閲覧範囲によって送るかどうかを決める。
 11. The Change Proposal System shall 人が保存のたびに Slack のチャンネルを選んで送る通知を、Change オペレーションの適用では出さない。
@@ -306,7 +308,7 @@ Change オペレーションの状態とは別に、Proposal 全体が動いて�
 14. When Proposal 作成者が、ライフサイクルが `open` (進行中) の自分の Proposal について、ページごとの通知設定の変更を求めた場合, the Change Proposal System shall ページごとの通知設定を変え、変えたあとに適用する Change オペレーションにだけ使う。すでに適用した Change オペレーションについて出した通知、出さなかった通知は変えない。
 15. If Proposal 作成者以外のユーザーが、ページごとの通知設定の変更を求めた場合, then the Change Proposal System shall 変えずに、Proposal が存在しない場合と同じ応答を返す。
 16. If ライフサイクルが `open` (進行中) でない Proposal について、ページごとの通知設定の変更を求められた場合, then the Change Proposal System shall 変えずに、変えられない状態であることを返す。
-17. When 取り消しの Proposal を作る場合, the Change Proposal System shall オリジナルの Proposal のページごとの通知設定を引き継いで保存する。
+17. When 取り消しの Proposal を作る場合, the Change Proposal System shall 取り消し対象 Proposal のページごとの通知設定を引き継いで保存する。
 18. When Proposal 作成者が自分の Proposal を取得した場合（1 件の取得と一覧のどちらでも）, the Change Proposal System shall ページごとの通知設定と、管理者の通知設定でページごとの通知が有効になっているかどうかを返す。Proposal 作成者以外のユーザーへの応答には、どちらも含めない。
 19. If 読み取り専用ユーザーが、ページごとの通知設定の変更を求めた場合, then the Change Proposal System shall それを受け付けない。
 
@@ -332,13 +334,13 @@ Change オペレーションの状態とは別に、Proposal 全体が動いて�
 
 ### Requirement 9: Change Proposal の取得と、取得するユーザーごとの絞り込み
 
-**Objective:** Proposal を作る側と適用後の画面を作る開発者として、Proposal を取得する API がほしい。ただし、Proposal を取得するユーザーが閲覧できないページの存在は、どの応答からも分からないようにしたい。
+**Objective:** Proposal を作る側と適用後の画面を作る開発者として、Proposal を取得する API がほしい。ただし、Proposal を取得するユーザーが閲覧できないページの存在は、どの応答からも分からないようにしたい（ページがもう無い Change オペレーションを、Proposal 作成者、取り消した人、取り消し対象 Proposal の作成者に返す場合（9.11・9.15・9.17）は除く）。
 
 #### Acceptance Criteria
-1. When ユーザーが Proposal の ID を指定して取得を求めた場合, the Change Proposal System shall Proposal 作成者・Proposal 作成元・モデル名・作成日時・全体の状態と、そのユーザーが閲覧できるページに対する Change オペレーションだけを、Change オペレーションごとの状態とともに返す。
+1. When ユーザーが Proposal の ID を指定して取得を求めた場合, the Change Proposal System shall Proposal 作成者・Proposal 作成元・モデル名・作成日時・全体の状態と、そのユーザーが閲覧できるページに対する Change オペレーションだけを、Change オペレーションごとの状態とともに返す。ただし、ページがもう無い Change オペレーションは、Proposal 作成者に返し、取り消した人と取り消し対象 Proposal の作成者にも返す（9.11・9.15）。
 2. The Change Proposal System shall Proposal 作成者でも Proposal 承認者でもないユーザーには、そのユーザーに返す Change オペレーション（9.13）だけを返し、それを 1 つも含まない Proposal を返さない。そのため、そうしたユーザーに返す全体の状態は `pending` (適用待ち) や `partially-applied` (一部を適用) にならない。Proposal 承認者への返し方は Requirement 19 で定める。
 3. If 指定された Proposal が存在しない場合、またはそのユーザーに返す Change オペレーションを 1 つも含まない場合, then the Change Proposal System shall どちらの場合も同じ「見つからない」応答を返す。
-4. The Change Proposal System shall 応答に、そのユーザーが閲覧できない Change オペレーションの件数や、閲覧できない Change オペレーションがあることを示す情報を含めない。
+4. The Change Proposal System shall 応答に、そのユーザーが閲覧できない Change オペレーションの件数や、閲覧できない Change オペレーションがあることを示す情報を含めない。ただし、ページがもう無い Change オペレーションを、Proposal 作成者、取り消した人、取り消し対象 Proposal の作成者に返す場合（9.11・9.15・9.17）は除く。
 5. The Change Proposal System shall Proposal 作成者以外のユーザーへの応答では、リンクを知る人だけが見られるページに対する Change オペレーションを含めない。
 6. When ユーザーが自分の作った Proposal の一覧を求めた場合, the Change Proposal System shall 自分が Proposal 作成者である Proposal を、新しい順に、ページ送りできる形で返す。
 7. When ユーザーが、自分が閲覧できるページを含む、Change オペレーションを適用した Proposal の一覧を求めた場合, the Change Proposal System shall そのユーザーに返す Change オペレーションのうち状態が `applied` (適用済み)・`reverted` (取り消し済み)・`revert-refused` (取り消し不可) のものを 1 つ以上含む Proposal を、新しい順に、ページ送りできる形で返す。Proposal 作成者以外のユーザーには、リンクを知る人だけが見られるページだけを含む Proposal を返さない。
@@ -349,8 +351,15 @@ Change オペレーションの状態とは別に、Proposal 全体が動いて�
 12. The Change Proposal System shall Proposal 承認者には、`applied` (適用済み)・`reverted` (取り消し済み)・`revert-refused` (取り消し不可) の Change オペレーションを 9.13 と同じ決まりで返す。`pending` (適用待ち)・`failed` (適用失敗)・`stale` (見送り)・`skipped` (スキップ) の Change オペレーションは、承認権限チェックを通ったときだけ返す。
 13. The Change Proposal System shall Proposal 作成者でも Proposal 承認者でもないユーザーには、閲覧できるページ（リンクを知る人だけが見られるページを除く）に対する Change オペレーションのうち、`applied` (適用済み)・`reverted` (取り消し済み)・`revert-refused` (取り消し不可) のものだけを返す。`pending` (適用待ち)・`failed` (適用失敗)・`stale` (見送り)・`skipped` (スキップ) の Change オペレーションは返さない。
 14. The Change Proposal System shall 9.11〜9.13 でどの Change オペレーションを返すかを、Proposal のライフサイクル（`open` (進行中)・`settled` (完了)・`discarded` (破棄)・`expired` (期限切れ)・`withdrawn` (取り下げ)）によって変えない。
+15. If Change オペレーションの対象のページがもう存在しない場合, then the Change Proposal System shall その Change オペレーションを、Proposal 作成者のほかに、次の人にも返す。取り消し対象 Proposal の Change オペレーションは、その Change オペレーションを取り消した人に返す。取り消しの Proposal の Change オペレーションは、取り消し対象 Proposal の作成者に返す。この 2 つの決まりで返す人には、`applied` (適用済み)・`reverted` (取り消し済み)・`revert-refused` (取り消し不可) の Change オペレーションだけを返す。Proposal 作成者でもなく、この 2 つの決まりのどちらにも当たらないユーザーには、Proposal 承認者であっても返さない。取り消した人と取り消し対象 Proposal の作成者に返すのは、表示のためである。その人が取り消しを求めたときの対象には、この Change オペレーションを入れない（取り消しの対象は 5.2〜5.4 のとおり、閲覧できるページの Change オペレーションから選ぶ。Proposal 作成者の扱いも変えない）。この決まりも、Proposal のライフサイクルによって変えない。
+16. When 取り消しの Proposal の `delete-completely` (完全な削除) の Change オペレーションを返す場合, the Change Proposal System shall 削除したページのパスとして、その Change オペレーションが取り消した、取り消し対象の `create` (新規作成) の Change オペレーションのパスを付けて返す。
+17. When ページがもう無い Change オペレーションを、Proposal 作成者、取り消した人、取り消し対象 Proposal の作成者のどれかに返す場合, the Change Proposal System shall 1 件の取得の Change オペレーションと、一覧の要約のページの一覧の両方で、そのページのパスを Change オペレーションの記録から決めて返す。`create` (新規作成) は作るときのパス、`move` (移動) は移動先のパス、`delete-completely` (完全な削除) は 9.16 のパス、`edit` (編集) は 6.7 で記録したパスとする。記録にパスが無い Change オペレーションは、一覧の要約のページの一覧に、パスを付けずにページの ID だけで入れる。ページがもう無い Change オペレーションのパスと ID は、Proposal 作成者と、9.15 で返す 2 人（取り消した人と取り消し対象 Proposal の作成者）のほかには返さない。
+
+**今の制限**（決まった扱いがまだ無いこと）:
+- 9.17: 6.7 の記録を始める前に適用した `edit` (編集) の Change オペレーションは、記録にパスを持たない。そのような Change オペレーションは、ページがもう無いと、1 件の取得ではパスの無い Change オペレーションとして返り、一覧の要約のページの一覧にはパスの無い項目（ページの ID だけ）として入る。画面は、どちらでもパスの代わりに「ページはもうありません」と出す。
 
 **残っている差**（自動テストでは確かめられないこと）:
+- 9.15: 取り消しの結果を取り消し対象の Change オペレーションに書く処理が 3 回とも失敗すると（5.9 の残っている差）、取り消し対象の Change オペレーションは、取り消した Proposal の ID を持たないまま `applied` (適用済み) で残る。そのため、`create` (新規作成) を取り消した人は、取り消し対象 Proposal のその Change オペレーションを（ページがもう無いので）見られない。また、取り消しの Proposal の適用では、取り消しの Change オペレーションの結果を書いてから、取り消し対象の Change オペレーションに印を書く（`proposal-applier.ts` の `applyOne`）。その 2 つの書き込みの間に取り消した人が取り消し対象 Proposal を取得すると、ページが消えた `create` の Change オペレーションはまだ印を持たないので返らない（ほかに見える Change オペレーションが無ければ「見つからない」）。取り消しの結果が応答に入っている場合は、応答の前に両方の書き込みが終わっているので、これは起きない。
 - 9.7: Change オペレーションを適用した Proposal の一覧の続きの位置（cursor）は「時刻-ID」の平文なので、最後に読んだ文書が、取得するユーザーに見えない Proposal のとき、その ID と最後に適用した時刻が分かる。パス・件数・中身は分からない。また、一覧は保存した最後の適用の日時の順に読むので、見えない Change オペレーションがあとから適用されたことが、並び順の食い違いから分かることがある（design の Security Considerations の「対策せずに受け入れる危険」）。
 
 ### Requirement 10: 人の保存への影響
@@ -393,7 +402,7 @@ Change オペレーションの状態とは別に、Proposal 全体が動いて�
 3. If オリジナルの Change オペレーションが 1 つも指定されていない場合、指定されたオリジナルの Change オペレーションがオリジナルの Proposal に無い場合、またはオリジナルの Change オペレーションの状態が関係に合わない場合, then the Change Proposal System shall その Proposal を保存せず、合わない Change オペレーションを示す結果を返す。関係に合う状態は、`follow-up` (後続) では `stale` (見送り)・`failed` (適用失敗)・`skipped` (スキップ)、`rework` (見直し) では `applied` (適用済み)・`revert-refused` (取り消し不可) とする。
 4. Where 関係が `rework` (見直し) である場合, the Change Proposal System shall 自動適用の方針にかかわらず、作成の直後にどの Change オペレーションも適用せず、すべてを `pending` (適用待ち) のまま、Proposal 作成者または Proposal 承認者の承認を待たせる。
 5. The Change Proposal System shall `follow-up` (後続) Proposal・`rework` (見直し) Proposal を作ったときも、その Change オペレーションを適用したときも、オリジナルの Change オペレーションの状態を変えない。
-6. The Change Proposal System shall オリジナルの Change オペレーションを `reverted` (取り消し済み) にするのを、取り消しの Proposal の Change オペレーションの適用（Requirement 5）だけにする。`rework` (見直し) Proposal の Change オペレーションの適用では `reverted` にしない。
+6. The Change Proposal System shall オリジナルの Change オペレーションを `reverted` (取り消し済み) にするのを、取り消しの Proposal の Change オペレーションの適用（Requirement 5）だけにする。このとき、オリジナルの Change オペレーションは、その取り消しの Proposal から見た取り消し対象の Change オペレーションである。`rework` (見直し) Proposal の Change オペレーションの適用では `reverted` にしない。
 7. Where 関係が `follow-up` (後続) である場合, the Change Proposal System shall 自動適用と承認を、通常の Proposal と同じに扱う。`follow-up` (後続) Proposal・`rework` (見直し) Proposal がオリジナルの Proposal の Proposal 承認者の指定を引き継ぐことと、Proposal 作成者以外の Proposal 承認者がいるときに作成の直後に適用しないことは、Requirement 22.4・22.5 による。
 
 ### Requirement 14: つながりの取得と、取得するユーザーごとの絞り込み
@@ -486,7 +495,7 @@ Change オペレーションの状態とは別に、Proposal 全体が動いて�
 3. The Change Proposal System shall Proposal 作成者でも Proposal 承認者でもないユーザーには、`pending` (適用待ち) の Change オペレーションを返さない。
 4. If Proposal 承認者が、`open` (進行中) の Proposal を取得しようとしたときに、そのユーザーに返す Change オペレーションが 1 つも無い場合, then the Change Proposal System shall Proposal が存在しない場合と同じ「見つからない」応答を返す。
 5. When ユーザーが、自分が Proposal 承認者である `open` (進行中) の Proposal の一覧を求めた場合, the Change Proposal System shall 承認権限チェックを通った `pending` (適用待ち) の Change オペレーションを 1 つ以上含む `open` の Proposal を、作成が古い順（期限は作成時に決まるので、期限が近い順と同じになる）に、ページ送りできる形で返す。
-6. The Change Proposal System shall Proposal 承認者に返す Change オペレーションを、そのユーザーが閲覧できるページ（リンクを知る人だけが見られるページを除く）に対する Change オペレーションだけにする。閲覧できない Change オペレーションの件数や、閲覧できない Change オペレーションがあることを示す情報を含めない。
+6. The Change Proposal System shall Proposal 承認者に返す Change オペレーションを、そのユーザーが閲覧できるページ（リンクを知る人だけが見られるページを除く）に対する Change オペレーションだけにする。閲覧できない Change オペレーションの件数や、閲覧できない Change オペレーションがあることを示す情報を含めない。ただし、Proposal 承認者が、9.15 の取り消した人または取り消し対象 Proposal の作成者でもあるときは、ページがもう無い Change オペレーションを 9.15・9.17 のとおり返す。
 7. The Change Proposal System shall Proposal 承認者への応答に、Proposal 承認者の指定の一覧（ユーザーの名前とグループの名前）、承認・却下・放棄した人、Proposal 承認者を追加・削除した人を含める。ただし、そのユーザーが見られないページの存在を示す情報は含めない。
 8. The Change Proposal System shall Proposal 作成者にだけ返している内容（Proposal のライフサイクルと適用率、ページごとの通知設定、AI が書いた要約や会話、Proposal を作る側が用意する Proposal 作成者向けの内容など）を、Proposal 承認者には返さない。Proposal の目的は、Proposal 承認者にも返す。
 9. While あるユーザーが、Proposal 承認者に指定されたグループに所属していることによって Proposal 承認者である場合, the Change Proposal System shall 所属が外れたあとは、そのユーザーを Proposal 承認者として扱わない。

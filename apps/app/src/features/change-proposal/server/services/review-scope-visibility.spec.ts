@@ -280,6 +280,35 @@ describe('decideReviewScope for the requester and other viewers', () => {
   });
 });
 
+describe('decideReviewScope for an operation whose page is gone (Req 9.15)', () => {
+  const ops = [
+    { ...edit('reverted', 'reverted', 'gone'), revertedByProposalId: 'rv1' },
+    edit('pending', 'pending', 'gone'),
+  ];
+  const gone = facts({ deleted: ['gone'] });
+  const asCounterpart = {
+    ...gone,
+    counterpart: {
+      isOriginalRequester: false,
+      revertProposalIdsByViewer: new Set(['rv1']),
+    },
+  };
+
+  it.each<ViewerRole>([
+    'reviewer',
+    'other',
+  ])('returns the applied-at-least-once operation to a %s who is its revert counterpart', (role) => {
+    expect(decide(ops, role, asCounterpart).visible).toEqual(['reverted']);
+  });
+
+  it.each<ViewerRole>([
+    'reviewer',
+    'other',
+  ])('returns nothing to a %s who is not a revert counterpart', (role) => {
+    expect(decide(ops, role, gone).visible).toEqual([]);
+  });
+});
+
 describe('what the resolver loads', () => {
   const ops = [
     create('c', 'pending', '/x/y/new'),

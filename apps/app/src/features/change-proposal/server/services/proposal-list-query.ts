@@ -7,7 +7,12 @@ import {
   type ChangeProposalSummaryView,
   type ViewerRole,
 } from '../../interfaces';
-import { selectVisibleOperations, targetPageIdOf } from '../domain';
+import {
+  recordedPathOf,
+  selectVisibleOperations,
+  targetPageIdOf,
+  type ViewerIdentity,
+} from '../domain';
 import type { AppliedListCursor } from '../models/change-proposal-types';
 import type {
   ChangeProposalSummary,
@@ -15,11 +20,16 @@ import type {
 } from '../models/to-change-proposal-document';
 import { loadViewablePages, type ViewablePages } from './current-page-facts';
 import {
+  loadRevertCounterparts,
   type ProposalHeaderView,
   pageIdsOf,
   readRequesters,
   toProposalHeaderView,
 } from './proposal-view-parts';
+import type {
+  RevertCounterpartFacts,
+  RevertCounterpartSource,
+} from './revert-counterparts';
 import { loadViewerIdentity } from './reviewer-identity';
 import { readChangeProposalSettings } from './settings';
 
@@ -84,20 +94,69 @@ type VisibleSummary = {
   readonly pages: ChangeProposalSummaryView['pages'];
 };
 
+type SummaryPage = ChangeProposalSummaryView['pages'][number];
+
+// A page that is gone is named by the path recorded on the operation, if any.
+const pageOf = (
+  op: OperationSummaryRecord,
+  viewable: ViewablePages,
+  createdPaths: ReadonlyMap<string, string>,
+): SummaryPage | undefined => {
+  const pageId = targetPageIdOf(op);
+  if (pageId == null) {
+    return undefined;
+  }
+  const page = viewable.pages.get(pageId);
+  if (page != null) {
+    return { id: pageId, path: page.path };
+  }
+  if (!viewable.deletedPageIds.has(pageId)) {
+    return undefined;
+  }
+  const path = recordedPathOf(op, createdPaths);
+  return path == null ? { id: pageId } : { id: pageId, path };
+};
+
 export const visiblePagesOf = (
   visible: readonly OperationSummaryRecord[],
   viewable: ViewablePages,
+  createdPaths: ReadonlyMap<string, string>,
 ): ChangeProposalSummaryView['pages'] => {
   const seen = new Set<string>();
   return visible.flatMap((op) => {
-    const pageId = targetPageIdOf(op);
-    const page = pageId == null ? undefined : viewable.pages.get(pageId);
-    if (pageId == null || page == null || seen.has(pageId)) {
+    const page = pageOf(op, viewable, createdPaths);
+    if (page == null || seen.has(page.id)) {
       return [];
     }
-    seen.add(pageId);
-    return [{ id: pageId, path: page.path }];
+    seen.add(page.id);
+    return [page];
   });
+};
+
+// What filtering one read of summaries needs, loaded once for all of them.
+type SummaryVisibility = {
+  readonly viewable: ViewablePages;
+  readonly counterpartsOf: (
+    proposal: RevertCounterpartSource,
+  ) => RevertCounterpartFacts;
+};
+
+const loadSummaryVisibility = async (
+  rows: readonly ChangeProposalSummary[],
+  viewer: IUserHasId,
+  identity?: ViewerIdentity,
+): Promise<SummaryVisibility> => {
+  const viewable = await loadViewablePages(
+    rows.flatMap((row) => pageIdsOf(row.operations)),
+    viewer,
+    identity,
+  );
+  const counterpartsOf = await loadRevertCounterparts(
+    rows,
+    viewer._id.toString(),
+    viewable.deletedPageIds,
+  );
+  return { viewable, counterpartsOf };
 };
 
 // These lists apply the other-viewer rule to reviewers too, and say so in the
@@ -105,13 +164,21 @@ export const visiblePagesOf = (
 const toVisibleSummary = (
   summary: ChangeProposalSummary,
   role: ViewerRole,
-  viewable: ViewablePages,
+  { viewable, counterpartsOf }: SummaryVisibility,
 ): VisibleSummary => {
+  const counterpart = counterpartsOf(summary);
   const visible = selectVisibleOperations(summary.operations, {
     ...viewable,
     isRequester: role === 'requester',
+    isOriginalRequester: counterpart.isOriginalRequester,
+    revertProposalIdsByViewer: counterpart.revertProposalIdsByViewer,
   });
-  return { summary, role, visible, pages: visiblePagesOf(visible, viewable) };
+  return {
+    summary,
+    role,
+    visible,
+    pages: visiblePagesOf(visible, viewable, counterpart.createdPaths),
+  };
 };
 
 // Requester names and the admin setting are read once for the whole list.
@@ -175,18 +242,14 @@ const scanAppliedVisible = async (
       position,
       take,
     );
-    const viewable = await loadViewablePages(
-      rows.flatMap((row) => pageIdsOf(row.operations)),
-      viewer,
-      identity,
-    );
+    const visibility = await loadSummaryVisibility(rows, viewer, identity);
     for (const row of rows) {
       scanned += 1;
       position = positionOf(row);
       const entry = toVisibleSummary(
         row,
         row.requester === viewerId ? 'requester' : 'other',
-        viewable,
+        visibility,
       );
       if (hasAppliedOperation(entry)) {
         matched.push(entry);
@@ -216,13 +279,10 @@ export const createProposalListQuery = (
       take: limit + 1,
     });
     const pageRows = rows.slice(0, limit);
-    const viewable = await loadViewablePages(
-      pageRows.flatMap((row) => pageIdsOf(row.operations)),
-      viewer,
-    );
+    const visibility = await loadSummaryVisibility(pageRows, viewer);
     // Every row is the viewer's own proposal.
     const items = await toSummaryViews(
-      pageRows.map((row) => toVisibleSummary(row, 'requester', viewable)),
+      pageRows.map((row) => toVisibleSummary(row, 'requester', visibility)),
     );
     return { items, hasNext: rows.length > limit };
   },

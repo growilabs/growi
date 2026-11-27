@@ -1181,6 +1181,7 @@
     "CHANGE_PROPOSAL_CREATE": "创建 Change Proposal",
     "CHANGE_PROPOSAL_APPLY": "反映 Change Proposal",
     "CHANGE_PROPOSAL_REVERT": "撤销 Change Proposal",
+    "CHANGE_PROPOSAL_REVERT_REQUEST": "请求撤销 Change Proposal",
     "CHANGE_PROPOSAL_APPROVE": "批准 Change Proposal",
     "CHANGE_PROPOSAL_REJECT": "驳回 Change Proposal",
     "CHANGE_PROPOSAL_ABSTAIN": "对 Change Proposal 弃权",

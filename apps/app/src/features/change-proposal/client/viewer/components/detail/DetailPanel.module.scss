@@ -1,0 +1,73 @@
+// Shared by the requester's "not applied" list and the revert result list:
+// a quiet panel of "path — state" rows.
+.panel {
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--bs-border-color);
+  border-radius: var(--bs-border-radius-lg);
+}
+
+.title {
+  display: flex;
+  gap: 0.375rem;
+  align-items: center;
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.title-icon {
+  font-size: 1.25rem;
+  color: var(--bs-secondary-color);
+}
+
+.rows {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  align-items: flex-start;
+  padding: 0.5rem 0;
+
+  & + & {
+    border-top: 1px solid var(--bs-border-color-translucent);
+  }
+}
+
+// Nested to outrank the app-wide inline-code frame (code:not([class^='language-'])).
+.panel .path {
+  min-width: 0;
+  padding: 0;
+  font-size: 0.875rem;
+  color: var(--bs-emphasis-color);
+  overflow-wrap: anywhere;
+  background: none;
+  border: 0;
+}
+
+.page-gone {
+  font-style: italic;
+  color: var(--bs-secondary-color);
+}
+
+.result {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.5rem;
+  align-items: center;
+  font-size: 0.875rem;
+}
+
+.reason {
+  color: var(--bs-secondary-color);
+}
+
+.note {
+  margin: 0.75rem 0 0;
+  font-size: 0.875rem;
+  color: var(--bs-secondary-color);
+}

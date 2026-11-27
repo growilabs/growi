@@ -1,5 +1,6 @@
 export * from './build-proposal-links';
 export * from './build-revert-operations';
+export * from './collect-created-paths';
 export * from './compute-achievement';
 export * from './derive-proposal-status';
 export * from './derive-visible-stage';
@@ -7,6 +8,7 @@ export * from './expand-approval-targets';
 export * from './is-movable-source-path';
 export * from './judge-revertability';
 export * from './plan-apply-order';
+export * from './recorded-path-of';
 export * from './review-scope';
 export * from './reviewer-model';
 export * from './select-auto-apply-targets';

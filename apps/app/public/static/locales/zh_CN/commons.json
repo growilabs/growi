@@ -87,6 +87,12 @@
     "filter_all": "全部",
     "no_news": "暂无公告",
     "view_detail": "查看详情",
+    "change_proposal": {
+      "applied": "反映了 Change Proposal",
+      "reverted": "已撤销 Change Proposal",
+      "revert_requested": "请求您撤销 Change Proposal",
+      "other_pages": "还有其他页面"
+    },
     "page_duplicate_interrupted": {
       "summary": "{{fromPath}} 下共有 {{sourcePageCount}} 个页面，位于 {{toPath}} 的副本只复制了其中 {{copiedPageCount}} 个，内容不完整。",
       "advice": "您可以删除这份不完整的副本，或使用其他名称重新复制。"

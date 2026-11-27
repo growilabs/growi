@@ -1,0 +1,26 @@
+.empty-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 2.5rem 1rem;
+  text-align: center;
+  text-wrap: pretty;
+  border: 1px dashed var(--bs-border-color);
+  border-radius: var(--bs-border-radius-lg);
+}
+
+.empty-icon {
+  font-size: 2.5rem;
+  color: var(--bs-secondary-color);
+}
+
+.error-panel {
+  margin-bottom: 1rem;
+}
+
+.error-icon {
+  flex: none;
+  font-size: 1.25rem;
+  line-height: 1.5;
+}

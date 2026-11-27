@@ -1,0 +1,22 @@
+.unified-diff-view {
+  overflow: hidden;
+  table-layout: fixed;
+  border: 1px solid var(--bs-border-color);
+  border-radius: var(--bs-border-radius);
+
+  // Keep the line number column in place while the diff scrolls sideways.
+  :global(.d2h-wrapper) {
+    position: relative;
+  }
+
+  // The operation card already shows the page path above the diff.
+  :global(.d2h-file-header) {
+    display: none;
+  }
+
+  :global(.d2h-file-wrapper) {
+    margin-bottom: 0;
+    border: 0;
+    border-radius: 0;
+  }
+}

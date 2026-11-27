@@ -2,6 +2,11 @@ import type { ViewerRole } from '../../interfaces';
 import type { ReviewScopeOperation, ViewerIdentity } from '../domain';
 import { loadViewablePages, type ViewablePages } from './current-page-facts';
 import { pageModel } from './operation-handlers/page-model';
+import { loadRevertCounterparts } from './proposal-view-parts';
+import {
+  NO_REVERT_COUNTERPART,
+  type RevertCounterpartFacts,
+} from './revert-counterparts';
 import {
   ancestorPathsToLoad,
   decideReviewScope,
@@ -41,23 +46,58 @@ const loadNonEmptyPageIdByPath = async (
 };
 
 export type ReviewScopeSubject = {
-  readonly operations: readonly ReviewScopeOperation[];
+  readonly operations: readonly (ReviewScopeOperation & {
+    readonly revertedByProposalId?: string;
+  })[];
   readonly role: ViewerRole;
+  readonly revertOf?: string;
+};
+
+export type ReviewScopeOptions = {
+  // Only a view that shows operations on gone pages to their revert
+  // counterparts reads them; every other caller judges without them.
+  readonly readsRevertCounterparts?: boolean;
+};
+
+const NO_COUNTERPART_FACTS: RevertCounterpartFacts = {
+  ...NO_REVERT_COUNTERPART,
+  createdPaths: new Map(),
+};
+
+const readCounterparts = async (
+  subjects: readonly ReviewScopeSubject[],
+  viewer: ViewerIdentity,
+  viewable: ViewablePages,
+  { readsRevertCounterparts = false }: ReviewScopeOptions,
+): Promise<readonly RevertCounterpartFacts[]> => {
+  if (!readsRevertCounterparts) {
+    return subjects.map(() => NO_COUNTERPART_FACTS);
+  }
+  const counterpartsOf = await loadRevertCounterparts(
+    subjects,
+    viewer.userId,
+    viewable.deletedPageIds,
+  );
+  return subjects.map(counterpartsOf);
 };
 
 /**
  * resolveReviewScope for several proposals at once, each by the viewer's role
  * in it, with `alsoCheckPageIds` checked in the same viewing check and every
  * page it read handed back, for a caller that shows pages next to the
- * operations without checking them a second time.
+ * operations without checking them a second time. With
+ * `readsRevertCounterparts`, each subject's revert counterparts are read in one
+ * more query and handed back too.
  */
 export const resolveReviewScopesWithPages = async (
   subjects: readonly ReviewScopeSubject[],
   viewer: ViewerIdentity,
   alsoCheckPageIds: readonly string[],
+  options: ReviewScopeOptions = {},
 ): Promise<{
   readonly scopes: readonly ReviewScopeResult[];
   readonly viewable: ViewablePages;
+  readonly counterparts: readonly RevertCounterpartFacts[];
 }> => {
   const nonEmptyPageIdByPath = await loadNonEmptyPageIdByPath([
     ...new Set(
@@ -74,14 +114,22 @@ export const resolveReviewScopesWithPages = async (
     { _id: viewer.userId },
     viewer,
   );
+  const counterparts = await readCounterparts(
+    subjects,
+    viewer,
+    viewable,
+    options,
+  );
   return {
-    scopes: subjects.map((s) =>
+    scopes: subjects.map((s, i) =>
       decideReviewScope(s.operations, s.role, {
         viewable,
         nonEmptyPageIdByPath,
+        counterpart: counterparts[i],
       }),
     ),
     viewable,
+    counterparts,
   };
 };
 

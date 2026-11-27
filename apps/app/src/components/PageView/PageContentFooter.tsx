@@ -1,6 +1,9 @@
 import type { JSX } from 'react';
 import dynamic from 'next/dynamic';
-import type { IPage, IPagePopulatedToShowRevision } from '@growi/core';
+import type { IPageHasId, IPagePopulatedToShowRevision } from '@growi/core';
+
+// biome-ignore lint/style/noRestrictedImports: SSR-safe marks entry, rendered only inside the client-only AuthorInfo
+import { CurrentRevisionProposalMark } from '~/features/change-proposal/client/viewer/marks';
 
 import styles from './PageContentFooter.module.scss';
 
@@ -12,7 +15,7 @@ const AuthorInfo = dynamic(
 );
 
 export type PageContentFooterProps = {
-  page: IPage | IPagePopulatedToShowRevision;
+  page: IPageHasId | IPagePopulatedToShowRevision;
 };
 
 export const PageContentFooter = (
@@ -41,6 +44,7 @@ export const PageContentFooter = (
           date={updatedAt}
           mode="update"
           locate="footer"
+          proposalMark={<CurrentRevisionProposalMark pageId={page._id} />}
         />
       </div>
     </div>

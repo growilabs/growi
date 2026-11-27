@@ -10,6 +10,14 @@ import type { RendererConfig } from '~/interfaces/services/renderer';
 export const aiEnabledAtom = atom<boolean>(false);
 
 /**
+ * Atom for change proposal write feature enabled status
+ */
+export const changeProposalEnabledAtom = atom<boolean>(false);
+
+export const useChangeProposalEnabled = () =>
+  useAtomValue(changeProposalEnabledAtom);
+
+/**
  * Atom for users homepage deletion enabled status
  */
 export const isUsersHomepageDeletionEnabledAtom = atom<boolean>(false);

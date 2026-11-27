@@ -79,7 +79,9 @@ const toQueueEntries = async (
       const visible = summary.operations.filter((op) =>
         scope.visibleKeys.has(op.key),
       );
-      const pages = visiblePagesOf(visible, viewable);
+      // No revert counterparts are read here: no operation on a gone page is
+      // visible to a reviewer, so no recorded path is needed.
+      const pages = visiblePagesOf(visible, viewable, new Map());
       return [[summary.id, { summary, visible, pages }] as const];
     }),
   );

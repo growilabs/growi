@@ -12,6 +12,10 @@ import {
   type VisibilityContext,
   type VisibleStage,
 } from '../domain';
+import {
+  NO_REVERT_COUNTERPART,
+  type RevertCounterpartValues,
+} from './revert-counterparts';
 
 export type ReviewScopeResult = {
   // The operations returned to the viewer, whatever their status.
@@ -23,7 +27,13 @@ export type ReviewScopeResult = {
 };
 
 export type ReviewScopeFacts = {
-  readonly viewable: Omit<VisibilityContext, 'isRequester'>;
+  readonly viewable: Omit<
+    VisibilityContext,
+    'isRequester' | keyof RevertCounterpartValues
+  >;
+  // Left out by callers that do not show operations on gone pages to revert
+  // counterparts; they then see none.
+  readonly counterpart?: RevertCounterpartValues;
   // Only non-empty pages, so resolveAncestors skips empty ones. Every page on a
   // path is kept: pages outside the tree can share one, and all of them decide.
   readonly nonEmptyPageIdByPath: ReadonlyMap<string, readonly string[]>;
@@ -107,6 +117,7 @@ export const decideReviewScope = (
   const byCurrentRule = new Set(
     selectVisibleOperations(operations, {
       ...facts.viewable,
+      ...(facts.counterpart ?? NO_REVERT_COUNTERPART),
       isRequester: role === 'requester',
     }),
   );

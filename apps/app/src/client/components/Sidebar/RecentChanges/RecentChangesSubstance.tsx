@@ -1,5 +1,6 @@
-import { type JSX, memo, useCallback, useEffect } from 'react';
+import { type JSX, memo, useCallback, useEffect, useMemo } from 'react';
 import { type IPageHasId, isPopulated } from '@growi/core';
+import { getIdStringForRef } from '@growi/core/dist/interfaces';
 import { DevidedPagePath } from '@growi/core/dist/models';
 import { UserPicture } from '@growi/ui/dist/components';
 import { useTranslation } from 'react-i18next';
@@ -7,7 +8,13 @@ import { useTranslation } from 'react-i18next';
 import { FormattedDistanceDate } from '~/client/components/FormattedDistanceDate';
 import InfiniteScroll from '~/client/components/InfiniteScroll';
 import { PagePathHierarchicalLink } from '~/components/Common/PagePathHierarchicalLink';
+import {
+  ProposalMarkBadge,
+  useSWRxRevisionMarks,
+} from '~/features/change-proposal/client/viewer/marks';
+import type { RevisionMarkView } from '~/features/change-proposal/interfaces';
 import { LinkedPagePath } from '~/models/linked-page-path';
+import { useIsGuestUser } from '~/states/context';
 import { useSetSearchKeyword } from '~/states/search';
 import { useSWRINFxRecentlyUpdated } from '~/stores/page-listing';
 import loggerFactory from '~/utils/logger';
@@ -28,6 +35,7 @@ type PageItemLowerProps = {
 type PageItemProps = PageItemLowerProps & {
   isSmall: boolean;
   onClickTag?: (tagName: string) => void;
+  proposalMark?: RevisionMarkView;
 };
 
 const PageItemLower = memo(({ page }: PageItemLowerProps): JSX.Element => {
@@ -94,7 +102,7 @@ const PageTags = memo((props: PageTagsProps): JSX.Element => {
 PageTags.displayName = 'PageTags';
 
 const PageItem = memo(
-  ({ page, isSmall, onClickTag }: PageItemProps): JSX.Element => {
+  ({ page, isSmall, onClickTag, proposalMark }: PageItemProps): JSX.Element => {
     const dPagePath = new DevidedPagePath(page.path, false, true);
     const linkedPagePathFormer = new LinkedPagePath(dPagePath.former);
     const linkedPagePathLatter = new LinkedPagePath(dPagePath.latter);
@@ -142,6 +150,11 @@ const PageItem = memo(
                     WIP
                   </span>
                 )}
+                {proposalMark != null && (
+                  <span className="ms-2">
+                    <ProposalMarkBadge mark={proposalMark} size="sm" />
+                  </span>
+                )}
                 {locked}
               </h6>
 
@@ -166,6 +179,51 @@ const PageItem = memo(
   },
 );
 PageItem.displayName = 'PageItem';
+
+type PageItemBatchProps = {
+  pages: IPageHasId[];
+  isSmall: boolean;
+  onClickTag: (tagName: string) => void;
+};
+
+// One marks request per batch of the list, so loading more never refetches earlier batches
+const PageItemBatch = ({
+  pages,
+  isSmall,
+  onClickTag,
+}: PageItemBatchProps): JSX.Element => {
+  const isGuestUser = useIsGuestUser();
+
+  const revisionIds = useMemo(
+    () =>
+      isGuestUser
+        ? null
+        : pages.flatMap((page) =>
+            page.revision == null ? [] : [getIdStringForRef(page.revision)],
+          ),
+    [isGuestUser, pages],
+  );
+
+  const { marks } = useSWRxRevisionMarks(revisionIds);
+
+  return (
+    <>
+      {pages.map((page) => (
+        <PageItem
+          key={page._id}
+          page={page}
+          isSmall={isSmall}
+          onClickTag={onClickTag}
+          proposalMark={
+            page.revision == null
+              ? undefined
+              : marks.get(getIdStringForRef(page.revision))
+          }
+        />
+      ))}
+    </>
+  );
+};
 
 type HeaderProps = {
   isSmall: boolean;
@@ -291,6 +349,10 @@ export const RecentChangesContent = ({
   const { data } = swrInifinitexRecentlyUpdated;
 
   const setSearchKeyword = useSetSearchKeyword();
+  const onClickTag = useCallback(
+    (tagName: string) => setSearchKeyword(`tag:${tagName}`),
+    [setSearchKeyword],
+  );
   const isEmpty = data?.[0]?.pages.length === 0;
   const lastPageIndex = data?.length ? data.length - 1 : 0;
   const isReachingEnd =
@@ -306,17 +368,14 @@ export const RecentChangesContent = ({
           swrInifiniteResponse={swrInifinitexRecentlyUpdated}
           isReachingEnd={isReachingEnd}
         >
-          {data != null &&
-            data
-              .flatMap((apiResult) => apiResult.pages)
-              .map((page) => (
-                <PageItem
-                  key={page._id}
-                  page={page}
-                  isSmall={isSmall}
-                  onClickTag={(tagName) => setSearchKeyword(`tag:${tagName}`)}
-                />
-              ))}
+          {data?.map((apiResult) => (
+            <PageItemBatch
+              key={apiResult.offset}
+              pages={apiResult.pages}
+              isSmall={isSmall}
+              onClickTag={onClickTag}
+            />
+          ))}
         </InfiniteScroll>
       </ul>
     </div>

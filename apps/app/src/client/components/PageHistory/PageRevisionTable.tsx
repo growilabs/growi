@@ -1,7 +1,9 @@
-import React, { type JSX, useEffect, useRef, useState } from 'react';
+import React, { type JSX, useEffect, useMemo, useRef, useState } from 'react';
 import type { IRevisionHasId } from '@growi/core';
 import { useTranslation } from 'next-i18next';
 
+import { useSWRxRevisionMarks } from '~/features/change-proposal/client/viewer/marks';
+import { useIsGuestUser } from '~/states/context';
 import { useSWRxInfinitePageRevisions } from '~/stores/page';
 
 import { RevisionComparer } from '../RevisionComparer/RevisionComparer';
@@ -45,6 +47,18 @@ export const PageRevisionTable = (
   const { data, size, error, setSize, isValidating } = swrInifiniteResponse;
 
   const revisions = data?.[0].revisions;
+
+  const isGuestUser = useIsGuestUser();
+  const loadedRevisionIds = useMemo(
+    () =>
+      isGuestUser || data == null
+        ? null
+        : data.flatMap((apiResult) =>
+            apiResult.revisions.map((revision) => revision._id),
+          ),
+    [isGuestUser, data],
+  );
+  const { marks } = useSWRxRevisionMarks(loadedRevisionIds);
   const oldestRevision = revisions?.[revisions.length - 1];
 
   // First load
@@ -137,6 +151,7 @@ export const PageRevisionTable = (
               revision={revision}
               isLatestRevision={revision === latestRevision}
               hasDiff={hasDiff}
+              proposalMark={marks.get(revisionId)}
               currentPageId={currentPageId}
               currentPagePath={currentPagePath}
               key={`revision-history-rev-${revisionId}`}

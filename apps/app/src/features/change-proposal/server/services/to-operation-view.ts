@@ -13,6 +13,8 @@ import type {
 export type OperationViewExtras = {
   readonly role: ViewerRole;
   readonly page?: { readonly id: string; readonly path: string };
+  // Returned as `path` for edit and delete-completely only; create keeps its own path.
+  readonly path?: string;
   readonly revertability?: Revertability;
   readonly linkedProposals?: readonly ProposalLinkView[];
   // Set by the caller only for a reviewer's decision target.
@@ -23,11 +25,14 @@ export type OperationViewExtras = {
 const typeSpecificFields = (
   op: OperationRecord,
   showsBody: boolean,
+  path: string | undefined,
 ): Partial<OperationView> => {
+  const suppliedPath = path == null ? {} : { path };
   switch (op.type) {
     case 'edit':
       return {
         baseRevisionId: op.baseRevisionId,
+        ...suppliedPath,
         ...(showsBody ? { proposedBody: op.body } : {}),
       };
     case 'create':
@@ -38,7 +43,7 @@ const typeSpecificFields = (
     case 'move':
       return { fromPath: op.fromPath, toPath: op.toPath };
     case 'delete-completely':
-      return {};
+      return suppliedPath;
   }
 };
 
@@ -76,7 +81,7 @@ export const toOperationView = (
   op: OperationRecord,
   extras: OperationViewExtras,
 ): OperationView => {
-  const { role, page, revertability, linkedProposals } = extras;
+  const { role, page, path, revertability, linkedProposals } = extras;
   const showsBody =
     role === 'requester' ||
     (role === 'reviewer' && extras.reviewTarget != null);
@@ -87,7 +92,7 @@ export const toOperationView = (
     ...(op.reason == null ? {} : { reason: op.reason }),
     ...(op.appliedAt == null ? {} : { appliedAt: op.appliedAt.toISOString() }),
     ...(page == null ? {} : { page }),
-    ...typeSpecificFields(op, showsBody),
+    ...typeSpecificFields(op, showsBody, path),
     ...(op.resultRevisionId == null
       ? {}
       : { resultRevisionId: op.resultRevisionId }),

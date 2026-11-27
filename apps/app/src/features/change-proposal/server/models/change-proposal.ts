@@ -31,6 +31,7 @@ import {
   toOriginalOperationData,
   toOutcomeData,
   toRequesterWriteMiss,
+  toRevertCounterpartRecord,
   toReviewerWriteMiss,
   UNSET_APPROVAL,
   unapprovedOperation,
@@ -53,6 +54,7 @@ import type {
   OriginalOperationChange,
   RecordedOutcome,
   RequesterWriteResult,
+  RevertCounterpartRecord,
   ReviewEntry,
 } from './change-proposal-types';
 import { runConditionalWrite } from './conditional-write';
@@ -646,11 +648,35 @@ export const extension = Prisma.defineExtension((client) => {
                   path: true,
                   toPath: true,
                   resultPageId: true,
+                  revertedByProposalId: true,
                 },
               },
             },
           });
           return rows.map(toLinkedProposalRecord);
+        },
+
+        /** Reads, in one query, what deciding revert counterparts needs of each proposal. */
+        async findRevertCounterparts(
+          ids: readonly string[],
+        ): Promise<RevertCounterpartRecord[]> {
+          const validIds = [...new Set(ids)].filter((id) =>
+            isValidObjectId(id),
+          );
+          if (validIds.length === 0) {
+            return [];
+          }
+          const context =
+            Prisma.getExtensionContext<typeof prisma.changeproposals>(this);
+          const rows = await context.findMany({
+            where: { id: { in: validIds } },
+            select: {
+              id: true,
+              requester: true,
+              operations: { select: { key: true, type: true, path: true } },
+            },
+          });
+          return rows.map(toRevertCounterpartRecord);
         },
 
         countCreatedSince(requesterId: string, since: Date): Promise<number> {
