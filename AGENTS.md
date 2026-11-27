@@ -65,7 +65,7 @@ rule bodies under `.cursor/`.
 | **github-actions-workflows** | A comment inside a workflow's `if: \|` block is literal expression text, not a YAML comment — a possessive apostrophe there can break the whole file's parse; how to test an `if:` fix correctly |
 | **devcontainer** | Compose services are reachable by hostname (no connectivity checks); `mongosh` is absent — query via the bundled driver; never run `pnpm install` concurrently with a build/test |
 | **kiro-impl-orchestration** | How `/kiro-impl` distributes work across models (mode selection, implementer model by difficulty, adversarial final review); outranks the generated skill's argument-derived default |
-| **spec-lifecycle** | A spec that amends an already-completed spec's contract (an amend spec) is a temporary vehicle: it must port its changes back into the target spec and delete itself as its final task |
+| **spec-lifecycle** | A spec that amends an already-completed spec's contract (an amend spec) is a temporary vehicle: it must port its changes back into the target spec and delete itself as its final task, unless the part it changes needs its own spec and is worth maintaining after its tasks are done, in which case it takes over that part and stays |
 
 Path-scoped rules load only when the work touches matching files:
 

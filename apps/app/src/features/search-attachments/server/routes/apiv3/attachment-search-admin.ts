@@ -2,7 +2,10 @@
  * Admin API endpoints for attachment full-text search configuration.
  *
  * GET  /_api/v3/admin/attachment-search/config    — read current config values
+ *      (`useOnlyEnvVars`: true when the 4 keys are pinned by environment variables)
  * PUT  /_api/v3/admin/attachment-search/config    — update config values
+ *      (409 `config_locked_by_env_vars` while the settings are pinned by
+ *      environment variables; nothing is saved)
  * GET  /_api/v3/admin/attachment-search/failures  — list recent extraction failures
  *
  * Every route: accessTokenParser([SCOPE.*.ADMIN.FULL_TEXT_SEARCH]) +
@@ -155,6 +158,27 @@ const TIMEOUT_MS_MAX = 600_000;
 const MAX_FILE_SIZE_BYTES_MAX = 500 * 1024 * 1024;
 const EXTRACTOR_TOKEN_MAX_LENGTH = 1024;
 
+// Runs before the validators so no input, valid or not, can reach the save
+// path while the environment variables win (research.md 14.5).
+const refuseWhenPinnedByEnvVars: express.RequestHandler = (
+  _req,
+  res: ApiV3Response,
+  next,
+) => {
+  if (
+    configManager.getConfig('env:useOnlyEnvVars:app:attachmentFullTextSearch')
+  ) {
+    return res.apiv3Err(
+      new ErrorV3(
+        'Attachment full-text search settings are pinned by environment variables and cannot be changed here',
+        'config_locked_by_env_vars',
+      ),
+      409,
+    );
+  }
+  return next();
+};
+
 const putConfigValidator = [
   // The URI itself is checked in the handler, which answers invalid_extractor_uri
   body('extractorUri')
@@ -245,6 +269,10 @@ export const attachmentSearchAdminFactory = (crowi: Crowi): express.Router => {
           'app:attachmentFullTextSearch:maxFileSizeBytes',
         );
 
+        const useOnlyEnvVars = configManager.getConfig(
+          'env:useOnlyEnvVars:app:attachmentFullTextSearch',
+        );
+
         const isEnabled = isAttachmentFullTextSearchEnabled(
           crowi.searchService?.isConfigured === true,
         );
@@ -258,6 +286,7 @@ export const attachmentSearchAdminFactory = (crowi: Crowi): express.Router => {
           maxFileSizeBytes,
           isAttachmentFullTextSearchEnabled: isEnabled,
           requiresReindex,
+          useOnlyEnvVars,
         };
 
         return res.apiv3({ config });
@@ -280,6 +309,7 @@ export const attachmentSearchAdminFactory = (crowi: Crowi): express.Router => {
     loginRequiredStrictly,
     adminRequired,
     addActivity,
+    refuseWhenPinnedByEnvVars,
     putConfigValidator,
     apiV3FormValidator,
     async (req, res: ApiV3Response) => {

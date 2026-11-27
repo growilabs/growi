@@ -1,8 +1,41 @@
 # Changelog
 
-## [Unreleased](https://github.com/growilabs/compare/v8.0.11...HEAD)
+## [Unreleased](https://github.com/growilabs/compare/v8.0.12...HEAD)
 
 *Please do not manually update this file. We've automated the process.*
+
+## [v8.0.12](https://github.com/growilabs/compare/v8.0.11...v8.0.12) - 2026-11-25
+
+### 💎 Features
+
+> [!NOTE]
+The attachment full-text search (#12197, with the attachment-text-extractor changes in #12304) and the change proposal review (#12288) land the foundation of features planned for the next minor release. They are explicitly disabled in this version and cannot be used yet. The attachment-text-extractor service itself runs when started, but GROWI does not call its API in this version, so there is no need to deploy it.
+
+* feat(attachment-search): full-text search for attachments (specs, extractor service, partial app implementation) (#12197) @yuki-takei
+* feat(attachment-search): Add the caller app ID to the log, a /metrics endpoint and limit fixes to attachment-text-extractor 1.1.0 (#12304) @yuki-takei
+* feat(change-proposal): Let reviewers approve, reject and abstain on change proposals (#12288) @yuki-takei
+
+### 🚀 Improvement
+
+* imprv(duplicate): memory-flat descendant duplication with stall recovery (#12315) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix(s2c-message): stop sending the editor's password hash and API token in page update events (#12270) @miya
+* fix(bookmarks): Require view permission on the page for GET /bookmarks/info (#12327) @miya
+* fix: Page search shows body snippets of "Specified users only" pages to anyone and hides group page snippets from members (#12277) @yuki-takei
+* fix(math): Render math with the same KaTeX version as the bundled CSS (#12263) @hamataku
+* fix: reject POST /_api/v3/invited from users who are not INVITED (#12282) @miya
+* fix: Users are sent back to the login page right after logging in (#12274) @yuki-takei
+* fix: answer a refused duplicate instead of leaving the request unanswered (#12284) @yuki-takei
+
+### 🧰 Maintenance
+
+* support: Read the tag of a published version from the remote in the release workflows (#12314) @yuki-takei
+* support(flaky-ci): attribute flaky Playwright tests from the end-of-run list instead of annotations (#12275) @yuki-takei
+* ci(deps): Bump next from 16.4.1 to 16.4.6 (#12272) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci: Publish the attachment-text-extractor image to Docker Hub (#12291) @yuki-takei
+* docs(change-proposal-core): Reword the core spec with self-explanatory terms (#12292) @yuki-takei
 
 ## [v8.0.11](https://github.com/growilabs/compare/v8.0.10...v8.0.11) - 2026-11-17
 

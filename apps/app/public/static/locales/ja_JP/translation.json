@@ -878,11 +878,17 @@
     "new_password": "新しいパスワード",
     "confirm_new_password": "新しいパスワードの確認",
     "email_is_required": "メールを入力してください",
-    "success_to_send_email": "メールを送信しました",
+    "email_sent_if_account_exists": "そのメールアドレスのアカウントが存在する場合、パスワードリセット用のメールを送信しました。",
     "feature_is_unavailable": "この機能を利用することはできません。",
     "incorrect_token_or_expired_url": "トークンが正しくないか、URLの有効期限が切れています。 以下のリンクからパスワードリセットリクエストを再送信してください。",
     "password_and_confirm_password_does_not_match": "パスワードと確認パスワードが一致しません",
-    "please_enable_mailer_alert": "メール設定が完了していないため、パスワード再設定機能が無効になっています。メール設定を完了させるよう管理者に依頼してください。"
+    "please_enable_mailer_alert": "メール設定が完了していないため、パスワード再設定機能が無効になっています。メール設定を完了させるよう管理者に依頼してください。",
+    "email_address": "メールアドレス",
+    "error_notice_after_send": "送信後、システム上で問題が発生した場合は{{seconds}}秒以内にこの画面でお知らせします。",
+    "check_spam_folder_notice": "数分たってもメールが届かない場合は、迷惑メールフォルダをご確認のうえ、もう一度送信してください。",
+    "request_failed": "エラーが発生しました。時間をおいて再度お試しください。それでも解決しない場合は管理者にお問い合わせください。",
+    "password_reset_disabled": "パスワードリセット機能が無効です。管理者にお知らせください。",
+    "invalid_input_format": "入力形式が無効です"
   },
   "maintenance_mode": {
     "maintenance_mode": "メンテナンスモード",

@@ -1,8 +1,10 @@
 import type { IUserHasId } from '@growi/core';
-import type { Handler, Request } from 'express';
+import { ErrorV3 } from '@growi/core/dist/models';
+import type { Handler, Request, Response } from 'express';
 import md5 from 'md5';
 import type { RateLimiterRes } from 'rate-limiter-flexible';
 
+import { rateLimitErrorCode } from '~/interfaces/errors/rate-limit';
 import loggerFactory from '~/utils/logger';
 
 import {
@@ -80,6 +82,22 @@ const consumePointsByIp = async (
   return consumePoints(method, key, customizedConfig, maxRequestsMultiplier);
 };
 
+const APIV3_PATH_PREFIX = '/_api/v3/';
+
+// apiv3 clients read the error code from the `errors` envelope; other routes
+// keep the plain status response.
+const respondTooManyRequests = (endpoint: string, res: Response): void => {
+  if (endpoint.startsWith(APIV3_PATH_PREFIX)) {
+    res.status(429).json({
+      errors: [
+        new ErrorV3('Too many requests', rateLimitErrorCode.TOO_MANY_REQUESTS),
+      ],
+    });
+    return;
+  }
+  res.sendStatus(429);
+};
+
 export const middlewareFactory = (): Handler => {
   return async (req: Request & { user?: IUserHasId }, res, next) => {
     const endpoint = normalizeEndpointPath(req.path);
@@ -110,7 +128,7 @@ export const middlewareFactory = (): Handler => {
         await consumePointsByUser(req.method, keyForUser, customizedConfig);
       } catch {
         logger.error(`${req.user._id}: too many request at ${endpoint}`);
-        return res.sendStatus(429);
+        return respondTooManyRequests(endpoint, res);
       }
     }
 
@@ -119,7 +137,7 @@ export const middlewareFactory = (): Handler => {
       await consumePointsByIp(req.method, keyForIp, customizedConfig);
     } catch {
       logger.error(`${req.ip}: too many request at ${endpoint}`);
-      return res.sendStatus(429);
+      return respondTooManyRequests(endpoint, res);
     }
 
     return next();

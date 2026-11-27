@@ -69,26 +69,14 @@ export const setup = (crowi: Crowi, app) => {
   };
 
   /**
-   * facet=all|attachments while attachment search is enabled. The viewer is
+   * facet=attachments while attachment search is enabled. The viewer is
    * always the requesting user (guest when not logged in); `sort` / `order`
    * / `type` are not applied (relevance order only). `limit` / `offset`
    * are re-read from the raw query (parseFacetPagination); an invalid value
    * is answered like the other parameter errors of this route:
    * `{ ok: false, code: 400 }` with HTTP 200.
    */
-  const searchByFacet = async (
-    req,
-    res,
-    {
-      q,
-      facet,
-      resolve,
-    }: {
-      q: string;
-      facet: 'all' | 'attachments';
-      resolve: 'primary' | 'full';
-    },
-  ) => {
+  const searchAttachments = async (req, res, q: string) => {
     const pagination = parseFacetPagination(req.query);
     if (!pagination.ok) {
       return res.json(ApiResponse.error(pagination.message, 400));
@@ -97,19 +85,14 @@ export const setup = (crowi: Crowi, app) => {
     let result: IFacetedSearchResult;
     try {
       const viewer = await resolveAttachmentSearchViewer(req.user);
-      const primary = await crowi.searchService.searchByFacet(
+      const { primary, items } = await crowi.searchService.searchByFacet(
         decodeURIComponent(q),
         viewer,
-        {
-          facet,
-          from: pagination.from,
-          size: pagination.size,
-          resolve,
-        },
+        { from: pagination.from, size: pagination.size },
       );
-      result = toFacetedSearchResult(facet, primary);
+      result = toFacetedSearchResult(primary, items);
     } catch (err) {
-      logger.error('Failed to search by facet', err);
+      logger.error('Failed to search attachments', err);
 
       if (isSearchError(err)) {
         const { unavailableTermsKeys } = err;
@@ -156,23 +139,27 @@ export const setup = (crowi: Crowi, app) => {
    *         - in: query
    *           name: facet
    *           description: |
-   *             Optional. `all` / `attachments` include attachment hits while
-   *             attachment full-text search is enabled; the response meta then
-   *             carries `facet`, a nullable `total` and an optional
-   *             `primaryResultIncomplete`; `limit` must then be
-   *             an integer from 1 to 200 and `offset` a non-negative integer,
-   *             otherwise the answer is `{ ok: false, code: 400 }`. Omitted,
-   *             `pages`, combined with `nq`, or with the feature disabled, the
-   *             response is the plain page search.
+   *             Optional. `attachments` searches attachment content only while
+   *             attachment full-text search is enabled; the data then lists
+   *             the parent pages of the hits in relevance order. Each item's
+   *             `data` is the same page document the page search returns,
+   *             and its `meta` carries `attachmentHits` and, only when the
+   *             page itself (path, body or comments) also matches the query,
+   *             the page search's `elasticSearchResult` (left out when that
+   *             snippet search fails or times out). Items whose page no
+   *             longer exists are left out. The response meta carries
+   *             `facet`, `total` (always null), `hitsCount` (the number of
+   *             items before pages that no longer exist were left out; fewer
+   *             than `limit` means no more items) and
+   *             `primaryResultIncomplete`; `limit` must then be an integer
+   *             from 1 to 200 and `offset` a non-negative integer. While the
+   *             feature is enabled, any other value than `pages` /
+   *             `attachments` is answered `{ ok: false, code: 400 }`.
+   *             Omitted, `pages`, combined with `nq`, or with the feature
+   *             disabled, the response is the plain page search.
    *           schema:
    *             type: string
-   *             enum: [all, pages, attachments]
-   *         - in: query
-   *           name: resolve
-   *           description: Optional, only read with `facet`. `full` also attaches attachment hits to pages after the first result page.
-   *           schema:
-   *             type: string
-   *             enum: [primary, full]
+   *             enum: [pages, attachments]
    *       responses:
    *         200:
    *           description: Succeeded to get list of pages.
@@ -236,17 +223,16 @@ export const setup = (crowi: Crowi, app) => {
       return res.json(ApiResponse.error('SearchService is not reachable.'));
     }
 
-    // While attachment search is disabled, facet / resolve stay unread, as
-    // they were before the feature existed.
+    // While attachment search is disabled, facet stays unread, as it was
+    // before the feature existed.
     if (isAttachmentFullTextSearchEnabled(searchService.isConfigured)) {
       const facetParams = parseFacetSearchParams(req.query);
       if (!facetParams.ok) {
         return res.json(ApiResponse.error(facetParams.message, 400));
       }
-      const { facet, resolve } = facetParams;
       // A named query runs on another delegator, which has no attachment index.
-      if ((facet === 'all' || facet === 'attachments') && nq == null) {
-        return searchByFacet(req, res, { q, facet, resolve });
+      if (facetParams.facet === 'attachments' && nq == null) {
+        return searchAttachments(req, res, q);
       }
     }
 

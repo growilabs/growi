@@ -895,11 +895,17 @@
     "new_password": "New Password",
     "confirm_new_password": "Confirm the new password",
     "email_is_required": "Email is required",
-    "success_to_send_email": "Success to send email",
+    "email_sent_if_account_exists": "If an account with that email address exists, a password reset email has been sent.",
     "feature_is_unavailable": "This feature is unavailable.",
     "incorrect_token_or_expired_url": "The token is incorrect or the URL has expired. Please resend a password reset request via the link below.",
     "password_and_confirm_password_does_not_match": "Password and confirm password does not match",
-    "please_enable_mailer_alert": "The password reset feature is disabled because email setup has not been completed. Please ask administrator to complete the email setup."
+    "please_enable_mailer_alert": "The password reset feature is disabled because email setup has not been completed. Please ask administrator to complete the email setup.",
+    "email_address": "Email address",
+    "error_notice_after_send": "If a system problem occurs after sending, we will notify you on this screen within {{seconds}} seconds.",
+    "check_spam_folder_notice": "If you don't receive an email within a few minutes, please check your spam folder and try sending again.",
+    "request_failed": "An error occurred. Please try again later. If the problem persists, please contact your administrator.",
+    "password_reset_disabled": "Password reset is disabled. Please contact your administrator.",
+    "invalid_input_format": "Invalid input format"
   },
   "maintenance_mode": {
     "maintenance_mode": "Maintenance Mode",

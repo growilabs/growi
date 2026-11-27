@@ -15,7 +15,7 @@ import { searchWithTopLevelParams } from './search-with-top-level-params';
 export type CreateAttachmentSearchResultAggregatorArgs = {
   searchService: Pick<
     SearchService,
-    'searchFormattedPages' | 'fullTextSearchDelegator' | 'canShowSnippet'
+    'fullTextSearchDelegator' | 'canShowSnippet'
   >;
   esClient: ElasticsearchClientDelegator;
   attachmentIndexName: string;
@@ -40,9 +40,7 @@ export const createAttachmentSearchResultAggregator = ({
     createFindSnippetVisiblePageIds(searchService),
   );
 
-  // The page list comes from the regular page search pipeline for the same viewer.
   return new AttachmentSearchResultAggregator(
-    (input, options) => searchService.searchFormattedPages(input, options),
     {
       searchAttachments: async (body) =>
         (await searchWithTopLevelParams(esClient, {

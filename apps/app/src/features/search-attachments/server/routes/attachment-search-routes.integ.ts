@@ -54,6 +54,8 @@ const RUN =
     (d) => 'abcdefghij'[Number(d)],
   );
 const TOKEN = `zzattroute${RUN}`;
+// Only in the attachments, never in a page's path or body.
+const ATTACHMENT_ONLY_TOKEN = `zzattonly${RUN}`;
 const PAGE_INDEX = `fix_attroute_pages_${RUN}`;
 const ATTACHMENT_NAMES = attachmentIndexNames(PAGE_INDEX);
 const ATTACHMENT_INDEX = ATTACHMENT_NAMES.alias;
@@ -83,9 +85,10 @@ type SearchBody = {
   ok: boolean;
   code?: number;
   data?: Array<{
-    data: { _id: string };
+    data: { _id: string; path?: string };
     meta?: {
       elasticSearchResult?: { snippet?: string | null };
+      bookmarkCount?: number;
       attachmentHits?: unknown[];
     };
   }>;
@@ -296,7 +299,7 @@ describe.skipIf(esUri == null)(
               fileFormat: 'pdf',
               fileSize: 100,
               attachmentType: 'WIKI_PAGE',
-              content: `attached file for ${TOKEN}`,
+              content: `attached file for ${TOKEN} and ${ATTACHMENT_ONLY_TOKEN}`,
               created_at: now,
               updated_at: now,
             },
@@ -389,7 +392,10 @@ describe.skipIf(esUri == null)(
       it('get nothing from either search while guests may not read', async () => {
         guestAllowed = false;
 
-        const facet = await search('guest', { q: TOKEN, facet: 'all' });
+        const facet = await search('guest', {
+          q: TOKEN,
+          facet: 'attachments',
+        });
         const legacy = await search('guest', { q: TOKEN });
         const enrichment = await secondary('guest', {
           q: TOKEN,
@@ -432,7 +438,7 @@ describe.skipIf(esUri == null)(
       it('both searches run as the token owner', async () => {
         const facet = await request(crowi.express)
           .get('/_api/search')
-          .query({ q: TOKEN, facet: 'all', access_token: token() });
+          .query({ q: TOKEN, facet: 'attachments', access_token: token() });
         const enrichment = await request(crowi.express)
           .get('/_api/v3/search/attachments')
           .query({
@@ -463,9 +469,11 @@ describe.skipIf(esUri == null)(
       const legacy = await request(crowi.express)
         .get('/_api/search')
         .query({ q: TOKEN, access_token: otherScopeToken });
-      const facet = await request(crowi.express)
-        .get('/_api/search')
-        .query({ q: TOKEN, facet: 'all', access_token: otherScopeToken });
+      const facet = await request(crowi.express).get('/_api/search').query({
+        q: TOKEN,
+        facet: 'attachments',
+        access_token: otherScopeToken,
+      });
       const enrichment = await request(crowi.express)
         .get('/_api/v3/search/attachments')
         .query({
@@ -492,25 +500,6 @@ describe.skipIf(esUri == null)(
         expect(await pagesWithSnippet(viewer)).toEqual(expected);
       });
 
-      it('facet=all lists the page search pages and attaches hits only to those', async () => {
-        const legacy: SearchBody = (await search(viewer, { q: TOKEN })).body;
-        const res = await search(viewer, { q: TOKEN, facet: 'all' });
-        const body: SearchBody = res.body;
-
-        expect(body.ok).toBe(true);
-        expect(body.meta?.facet).toBe('all');
-        expect(kinds((body.data ?? []).map((i) => i.data._id))).toEqual(
-          kinds((legacy.data ?? []).map((i) => i.data._id)),
-        );
-        expect(
-          kinds(
-            (body.data ?? [])
-              .filter((i) => (i.meta?.attachmentHits?.length ?? 0) > 0)
-              .map((i) => i.data._id),
-          ),
-        ).toEqual(expected);
-      });
-
       it('facet=attachments lists only pages the page search shows', async () => {
         const body: SearchBody = (
           await search(viewer, { q: TOKEN, facet: 'attachments' })
@@ -533,20 +522,118 @@ describe.skipIf(esUri == null)(
       });
     });
 
+    describe('facet=attachments items carry what the page search shows', () => {
+      it('the page document, and the snippet of a page whose body also matches', async () => {
+        const body: SearchBody = (
+          await search('creator', { q: TOKEN, facet: 'attachments' })
+        ).body;
+
+        expect(kinds((body.data ?? []).map((i) => i.data._id))).toEqual([
+          'owner',
+          'public',
+        ]);
+        for (const item of body.data ?? []) {
+          expect(item.data.path).toBe(
+            `/attroute/${RUN}/${kindOf.get(item.data._id)}`,
+          );
+          expect(item.meta?.elasticSearchResult?.snippet).toContain(
+            `<em class="highlighted-keyword">${TOKEN}</em>`,
+          );
+          expect(typeof item.meta?.bookmarkCount).toBe('number');
+        }
+      });
+
+      it('no snippet for a page that matches only through its attachment', async () => {
+        const body: SearchBody = (
+          await search('creator', {
+            q: ATTACHMENT_ONLY_TOKEN,
+            facet: 'attachments',
+          })
+        ).body;
+
+        expect(kinds((body.data ?? []).map((i) => i.data._id))).toEqual([
+          'owner',
+          'public',
+        ]);
+        for (const item of body.data ?? []) {
+          expect(item.meta).not.toHaveProperty('elasticSearchResult');
+          expect(item.meta).not.toHaveProperty('bookmarkCount');
+          expect(item.meta?.attachmentHits).not.toHaveLength(0);
+        }
+      });
+    });
+
+    // `took` is Elasticsearch's own timing and differs between requests.
+    const withoutTook = (body: SearchBody) => ({
+      ...body,
+      meta: { ...body.meta, took: undefined },
+    });
+
+    describe('the page search while the feature is enabled', () => {
+      const attachmentIndices: readonly string[] = [
+        ATTACHMENT_INDEX,
+        ...ATTACHMENT_NAMES.indices,
+      ];
+      // The indices Elasticsearch was asked to search while `act` ran.
+      const indicesSearchedDuring = async <T>(
+        act: () => Promise<T>,
+      ): Promise<{ result: T; indices: string[] }> => {
+        const esSearch = vi.spyOn(esClient, 'search');
+        try {
+          const result = await act();
+          const indices = esSearch.mock.calls.flatMap(([params]) => {
+            const index = params?.index;
+            return index == null ? [] : [index].flat();
+          });
+          return { result, indices };
+        } finally {
+          esSearch.mockRestore();
+        }
+      };
+
+      it.each<Record<string, string>>([
+        {},
+        { facet: 'pages' },
+      ])('answers %o exactly as with the feature disabled, without touching the attachment index', async (params) => {
+        featureEnabled = false;
+        const disabled = await search('creator', { q: TOKEN, ...params });
+        featureEnabled = true;
+
+        const { result: enabled, indices } = await indicesSearchedDuring(() =>
+          search('creator', { q: TOKEN, ...params }),
+        );
+
+        expect(disabled.body.ok).toBe(true);
+        expect((disabled.body as SearchBody).data?.length).toBeGreaterThan(0);
+        expect(withoutTook(enabled.body)).toEqual(withoutTook(disabled.body));
+        expect(JSON.stringify(enabled.body)).not.toContain('attachmentHits');
+        expect(indices.length).toBeGreaterThan(0);
+        expect(
+          indices.filter((index) => attachmentIndices.includes(index)),
+        ).toEqual([]);
+      });
+
+      it('facet=attachments does search the attachment index (the check above is not vacuous)', async () => {
+        const { result: res, indices } = await indicesSearchedDuring(() =>
+          search('creator', { q: TOKEN, facet: 'attachments' }),
+        );
+
+        expect(res.body.ok).toBe(true);
+        expect(indices).toContain(ATTACHMENT_INDEX);
+      });
+    });
+
     describe('while the feature is disabled', () => {
       beforeEach(() => {
         featureEnabled = false;
       });
 
-      // `took` is Elasticsearch's own timing and differs between requests.
-      const withoutTook = (body: SearchBody) => ({
-        ...body,
-        meta: { ...body.meta, took: undefined },
-      });
-
-      it('answers facet=all with the plain page search', async () => {
+      it('answers facet=attachments with the plain page search', async () => {
         const legacy = await search('creator', { q: TOKEN });
-        const facet = await search('creator', { q: TOKEN, facet: 'all' });
+        const facet = await search('creator', {
+          q: TOKEN,
+          facet: 'attachments',
+        });
 
         expect(legacy.status).toBe(200);
         expect(legacy.body.ok).toBe(true);
@@ -675,7 +762,8 @@ describe.skipIf(esUri == null)(
 
       it.each<Record<string, string>>([
         { facet: 'secret' },
-        { facet: 'all', resolve: 'secret' },
+        { facet: 'all' },
+        { facet: 'all', nq: 'secret' },
       ])('the page search rejects %o', async (params) => {
         const res = await search('creator', { q: TOKEN, ...params });
 

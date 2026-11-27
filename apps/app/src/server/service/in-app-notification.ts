@@ -70,6 +70,7 @@ export class InAppNotificationService {
         activity: ActivityDocument,
         target: IUser | IPage | pagebulkexportjobs | auditlogbulkexportjobs,
         preNotify: PreNotify,
+        snapshot?: string,
       ) => {
         try {
           const shouldNotification =
@@ -79,7 +80,12 @@ export class InAppNotificationService {
               activity.action,
             );
           if (shouldNotification) {
-            await this.createInAppNotification(activity, target, preNotify);
+            await this.createInAppNotification(
+              activity,
+              target,
+              preNotify,
+              snapshot,
+            );
           }
         } catch (err) {
           logger.error('Create InAppNotification failed', err);
@@ -351,6 +357,7 @@ export class InAppNotificationService {
     activity: ActivityDocument,
     target: IUser | IPage | pagebulkexportjobs | auditlogbulkexportjobs,
     preNotify: PreNotify,
+    prebuiltSnapshot?: string,
   ): Promise<void> {
     const shouldNotification =
       activity != null &&
@@ -359,7 +366,8 @@ export class InAppNotificationService {
 
     const targetModel = activity.targetModel;
 
-    const snapshot = await generateSnapshot(targetModel, target);
+    const snapshot =
+      prebuiltSnapshot ?? (await generateSnapshot(targetModel, target));
 
     if (shouldNotification) {
       const props = preNotifyService.generateInitialPreNotifyProps();

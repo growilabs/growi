@@ -875,11 +875,17 @@
     "new_password": "新密码",
     "confirm_new_password": "确认新密码",
     "email_is_required": "电子邮件是必需的",
-    "success_to_send_email": "我发了一封电子邮件",
+    "email_sent_if_account_exists": "如果该邮箱地址对应的账户存在，重置密码的邮件已发送。",
     "feature_is_unavailable": "此功能不可用",
     "incorrect_token_or_expired_url": "令牌不正确或 URL 已过期。 请通过以下链接重新发送密码重置请求",
     "password_and_confirm_password_does_not_match": "密码和确认密码不匹配",
-    "please_enable_mailer_alert": "密码重置功能被禁用，因为电子邮件设置尚未完成。请要求管理员完成电子邮件的设置。"
+    "please_enable_mailer_alert": "密码重置功能被禁用，因为电子邮件设置尚未完成。请要求管理员完成电子邮件的设置。",
+    "email_address": "电子邮件地址",
+    "error_notice_after_send": "发送后，如果系统出现问题，我们将在 {{seconds}} 秒内在此页面通知您。",
+    "check_spam_folder_notice": "如果几分钟后仍未收到邮件，请检查垃圾邮件文件夹，然后重新发送。",
+    "request_failed": "发生错误。请稍后重试。如果问题仍然存在，请联系管理员。",
+    "password_reset_disabled": "密码重置功能已禁用。请通知管理员。",
+    "invalid_input_format": "输入格式无效"
   },
   "maintenance_mode": {
     "maintenance_mode": "维护模式",

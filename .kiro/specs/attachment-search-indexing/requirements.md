@@ -22,7 +22,7 @@ GROWI の Elasticsearch 連携では Page の `path` / `body` / `comments` の�
 - 既存添付を一括でインデックス化する admin 操作を提供 (`rebuildIndex` 拡張)。作り直しは HTTP 応答を待たせずに裏で進め、完了・失敗は Socket.io で通知する。親 Page が不在の添付 doc は orphan sweeper が cleanup する
 - 個別添付を再抽出する apiv3 エンドポイントを提供
 - 抽出失敗が MongoDB に永続化され admin が参照可能
-- 検索クエリが Page index と添付 index の両方を使い、**添付ヒットは、親ページの権限を検索時に page_index と MongoDB で確かめて通ったものだけ**を、親ページ単位に集約した応答型で返す
+- ページと添付の点数を混ぜた順位は作らない。ページ検索は機能導入前のまま動き、その結果のページに付ける添付ヒットは別の要求で返す。添付だけを対象にした検索も別に用意する。どちらでも、**添付ヒットは、親ページの権限を検索時に page_index と MongoDB で確かめて通ったものだけ**を、親ページ単位に集約した応答型で返す
 - 検索演算子 (`prefix:` / `tag:` / `author:` / `editor:` / `group:` と各否定形) は親ページの絞り込み条件として添付ヒットにも適用され、演算子のトークンは添付本文の検索語として使われない
 - 抽出サービス到達不可時も apps/app の添付保存と既存検索は継続動作
 - 機能無効時は既存検索 API の挙動が機能導入前と完全一致 (非互換ゼロ)
@@ -57,7 +57,7 @@ GROWI の Elasticsearch 連携では Page の `path` / `body` / `comments` の�
 
 ## Introduction
 
-本 spec は GROWI の添付ファイル全文検索機能のうち、**apps/app サーバ側の統合層**を定義する。具体的には、上流の抽出マイクロサービス (`attachment-search-text-extractor`) が提供する OpenAPI を orval で TypeScript クライアント化し、添付アップロード・削除・親ページ権限変更といった既存イベントにフックして Elasticsearch への書き込みを行う。さらに、一括再インデックス・個別再抽出・抽出失敗の永続化といった運用系 API を提供し、検索実行時には Page index と添付専用 index の両方を検索し、親ページの権限を確かめたうえで、親ページ単位に集約した応答を返す。
+本 spec は GROWI の添付ファイル全文検索機能のうち、**apps/app サーバ側の統合層**を定義する。具体的には、上流の抽出マイクロサービス (`attachment-search-text-extractor`) が提供する OpenAPI を orval で TypeScript クライアント化し、添付アップロード・削除・親ページ権限変更といった既存イベントにフックして Elasticsearch への書き込みを行う。さらに、一括再インデックス・個別再抽出・抽出失敗の永続化といった運用系 API を提供し、検索実行時には、ページ検索の結果のページに付ける添付ヒットと、添付だけを対象にした検索を、ページ検索とは別の要求として返す。どちらも親ページの権限を確かめたうえで、親ページ単位に集約した応答を返す。
 
 本 spec は上流 `attachment-search-text-extractor` spec の API 契約 (`POST /extract` のリクエスト/レスポンス schema、エラーコード体系) に依存し、下流 `attachment-search-ui` spec に対して apiv3 エンドポイント契約と `IPageWithSearchMeta.meta.attachmentHits[]` 応答型を提供する。UI コンポーネント・admin 画面の描画・ユーザ向けガイダンス文言は本 spec の責務外であり、下流 spec に委譲する。
 
@@ -152,7 +152,7 @@ GROWI の Elasticsearch 連携では Page の `path` / `body` / `comments` の�
 2. When 親ページの権限が変更された後に検索クエリが実行される, the apps/app shall 次回検索時の permission lookup が更新後の page_index を参照するため、追加の sync 処理なしに更新後の権限に基づいて添付ヒットの可視性を制御する <!-- derived from umbrella R8.2 -->
 3. The 添付検索の権限判定 shall 既存 `filterPagesByViewer` と**同一の権限モデル (grant 種別・granted users・granted groups) を page_index 側で (ES 上で) 適用**し、さらにページ検索が本文の抜粋を見せる条件 (`canShowSnippetForGrant`) も満たすページに限る。添付側に独自の権限実装を持たない。検索演算子 (`prefix:` など) と `security:disableUserPages` も親ページへの条件として同じ判定に含める <!-- derived from umbrella R8.3 -->
 4. If 親ページが既に削除されている添付が ES に残存する, the apps/app shall query-time permission lookup において当該 pageId が page_index に存在しない → アクセス不可と判定し、当該添付ヒットを検索結果から除外する (orphan sweeper による eventual cleanup が実行されるまでの間も漏洩は発生しない) <!-- derived from umbrella R8.4 -->
-5. When 検索クエリに検索演算子 (`prefix:` / `-prefix:` / `tag:` / `-tag:` / `author:` / `-author:` / `editor:` / `-editor:` / `group:` / `-group:`) が含まれる, the apps/app shall どの facet でも、添付ヒットを「同じ演算子で通常のページ検索をしたときに返りうるページ」に属するものに限定する
+5. When 検索クエリに検索演算子 (`prefix:` / `-prefix:` / `tag:` / `-tag:` / `author:` / `-author:` / `editor:` / `-editor:` / `group:` / `-group:`) が含まれる, the apps/app shall 検索結果のページに付ける添付ヒットでも、添付だけを対象にした検索でも、添付ヒットを「同じ演算子で通常のページ検索をしたときに返りうるページ」に属するものに限定する
 6. The apps/app shall 検索演算子のトークンを添付本文 (`content`) の検索語として使わず、添付本文には演算子を除いた検索語 (通常語・否定語・フレーズ) だけを当てる
 7. The apps/app shall ページ検索の本文の抜粋と添付ヒットに、同じ表示規則を使う: 公開ページ (公開範囲の値を持たない古いページを含む) は誰にでも、グループ限定ページはそのグループに属する利用者に、自分のみ・指定ユーザー限定のページは権限を与えられた利用者にだけ見せ、リンク共有限定のページと、未知の公開範囲の値を持つページは誰にも見せない。この規則は、添付全文検索の有効・無効にかかわらず、ページ検索の抜粋に適用する
 
@@ -168,6 +168,8 @@ GROWI の Elasticsearch 連携では Page の `path` / `body` / `comments` の�
 4. Where `extractorUri` が未設定または空である (すなわち算出値 `isAttachmentFullTextSearchEnabled` が false), the apps/app shall 添付ヒットを検索結果に含めず、抽出サービスへの新規呼び出しを行わない <!-- derived from umbrella R9.4 -->
 5. When `extractorUri` が未設定または空である期間中に新規添付がアップロードされる, the apps/app shall 添付の保存を継続し、`extractorUri` 再設定後の一括再インデックスで取り込めるようにする <!-- derived from umbrella R9.5 -->
 6. When 設定 API (`PUT /_api/v3/admin/attachment-search/config`) で設定が更新される, the apps/app shall 監査ログに `ADMIN_ATTACHMENT_SEARCH_SETTINGS_UPDATE` を記録する。記録にトークンの値を含めない。更新が拒否されたか失敗した場合、記録は `UNSETTLED` のままにする
+7. The apps/app shall 設定 API 応答 (`GET /_api/v3/admin/attachment-search/config`) に、4 つの Config キーが環境変数で固定されているか (`env:useOnlyEnvVars:app:attachmentFullTextSearch`) を `useOnlyEnvVars: boolean` として含める
+8. When 4 つの Config キーが環境変数で固定されているときに設定 API (`PUT /_api/v3/admin/attachment-search/config`) が呼ばれる, the apps/app shall 設定を何も保存せず、409 `config_locked_by_env_vars` を返す
 
 ### Requirement 6: 一括再インデックスのサーバ処理 <!-- derived from umbrella R10.2, R10.4 -->
 
@@ -219,3 +221,7 @@ GROWI の Elasticsearch 連携では Page の `path` / `body` / `comments` の�
 2. The 添付 ES インデックス構成 shall 既存 Page インデックスの検索クエリ応答時間を `extractorUri` 設定前と比べて意味ある程度に劣化させない <!-- derived from umbrella R14.4 -->
 3. When `extractorUri` 設定前後で検索 API が呼ばれる, the apps/app shall 既存クライアントが破壊的変更なしに応答を解釈できるよう API の後方互換を保つ <!-- derived from umbrella R14.5 -->
 4. The apps/app shall `IPageWithSearchMeta.meta.attachmentHits` を optional フィールドとして追加し、既存の必須フィールド形状を変更しない
+5. Where 機能が有効である, the apps/app shall 既存のキーワード検索 API (`GET /_api/search`) を、`facet` を付けないとき、または `facet=pages` のとき、機能が無効のときと同じ処理・同じ応答 (並べ替え・件数・ページ送りを含む) にする。`facet=attachments` は添付だけを対象にした検索とし、それ以外の `facet` の値は `{ ok: false, code: 400 }` で断る。ページ検索の結果のページに付ける添付ヒットは、ページ ID を受け取る別の要求 (`GET /_api/v3/search/attachments`) で返し、ページと添付の点数を混ぜた順位は作らない
+6. If ページ検索の結果のページに付ける添付ヒットの取得 (`GET /_api/v3/search/attachments`) で、権限確認か添付の検索が失敗するか時間の上限を超える, the apps/app shall 空の結果で隠さず、エラーを返す
+7. When 添付だけを対象にした検索 (`GET /_api/search?facet=attachments`) が結果を返す, the apps/app shall 各項目の `data` に、ページ検索と同じ形のページ文書を入れる。MongoDB に無いページの項目は返さず、`meta.hitsCount` は除く前の項目数にする。ページのパス・本文・コメントも検索語に一致する項目には、ページ検索と同じ強調表示付きの抜粋 (`meta.elasticSearchResult`) を、ページ検索と同じ条件で入れる。抜粋の取得が失敗するか時間の上限を超えたときは、抜粋を付けずに項目を返す
+8. When 添付だけを対象にした検索の項目に抜粋を入れる, the apps/app shall その項目に、ページ検索と同じブックマーク数 (`meta.bookmarkCount`) も入れる

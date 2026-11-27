@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { initializeLoggerFactory, loggerFactory } from './logger-factory.js';
 import type { LoggerConfig } from './types.js';
 
 // ---------------------------------------------------------------------------
@@ -136,6 +135,25 @@ describe('initializeLoggerFactory + loggerFactory', () => {
     default: 'info',
     'growi:debug:*': 'debug',
   };
+
+  let initializeLoggerFactory: typeof import('./logger-factory.js')['initializeLoggerFactory'];
+  let loggerFactory: typeof import('./logger-factory.js')['loggerFactory'];
+
+  // The dev transport targets dev/bunyan-format.js, which exists only in the
+  // build output; run from src, its worker thread fails after the test ends.
+  beforeEach(async () => {
+    vi.doMock('./transport-factory.js', async (importOriginal) => ({
+      ...(await importOriginal<typeof import('./transport-factory.js')>()),
+      createNodeTransportOptions: () => ({}),
+    }));
+    ({ initializeLoggerFactory, loggerFactory } = await import(
+      './logger-factory.js'
+    ));
+  });
+
+  afterEach(() => {
+    vi.doUnmock('./transport-factory.js');
+  });
 
   it('returns a logger with info() method', () => {
     initializeLoggerFactory({ config });
