@@ -44,7 +44,6 @@ Returning to a build that cannot verify scrypt is handled by restoring the datab
 - **Replacing password-set detection based on the `password == null` proxy with `isPasswordSet()`**: the 3 locations `login.js`, `personal-setting/index.js`, and `user-activation.ts` (to prevent misjudging passwordHash-only users)
 - **Preventing `passwordHash` leakage in API responses**: add `passwordHash` to `omitInsecureAttributes()` in `@growi/core`, and add `passwordHash?: string` to the `IUser` interface
 - One read-only migrate-mongo migration that reports the user count per credential format
-- **The shared password-reset mail flow** (`src/server/service/password-reset/`): extracting `createAndSendPasswordResetOrder` and `sendPasswordResetTemplateEmail` out of `forgot-password.js`. The reset flow is the recovery path this feature's users depend on — a user whose credential cannot be verified after a rollback recovers only through it (Req 4.1) — so this spec owns the extraction even though a single route consumes it
 - **The login endpoint's rate-limit key** (`features/rate-limiter/config/index.ts`): correcting it to the fully-mounted path. The key matched nothing before, which only became load-bearing once each unauthenticated attempt costs a ~128MiB / ~100ms scrypt on the libuv pool
 - Self-describing encoding of the scrypt hash (`scrypt$N$r$p$salt$hash`) and parameter management (no new dependency; scrypt is built into `node:crypto`)
 
@@ -52,7 +51,7 @@ Returning to a build that cannot verify scrypt is handled by restoring the datab
 
 - Password handling for external authentication providers (LDAP, OAuth, SAML, Passkey)
 - Hashing of the `apiToken` field
-- The `PasswordResetOrder` model and the mail service themselves (this spec wraps them; it does not change how they work)
+- The password-reset request flow (`service/password-reset/`, `routes/apiv3/forgot-password.js`) and the `PasswordResetOrder` model behind it. It is the recovery path Req 4.1 relies on, but it is owned and maintained elsewhere — this feature only depends on it continuing to work
 - Forced migration of all users (lazy migration only; users who never log in remain on SHA-256)
 - **The upgrade guide that Requirement 4.1 calls for**: it is documentation delivered outside this change, so no task in this spec produces it. This spec only guarantees that the behaviour the guide describes is what the code does
 - Deprecation of the `PASSWORD_SEED` environment variable. It must stay set for as long as any user still holds a legacy hash, which — because a hash is only removed when that user next uses their local password — may be indefinitely
@@ -62,7 +61,7 @@ Returning to a build that cannot verify scrypt is handled by restoring the datab
 - `node:crypto` (built-in): scrypt (new hash generation and verification) + the SHA-256 legacy verification path + `timingSafeEqual`. **No new dependency is added**
 - `crypto.randomBytes` (built-in): generation of the per-user salt
 - `migrate-mongo` (the existing migration infrastructure, for the status migration only)
-- The existing `PasswordResetOrder` model and mail service, reached only through the shared password-reset module above
+- `service/password-reset`'s `processPasswordResetRequest` and the `PasswordResetOrder` model behind it, as the recovery path for a user whose credential can no longer be verified (Req 4.1). Used as-is; not modified
 - `features/rate-limiter`'s existing config shape (a key correction only; no change to the limiter's mechanism)
 
 ### Revalidation Triggers
@@ -137,12 +136,7 @@ apps/app/src/server/models/user/
                                                 # truth for classifying a user document
 
 apps/app/src/server/service/
-├── password-hash.ts                           # PasswordHashService (scrypt + legacy verify, hash)
-└── password-reset/                            # shared password-reset mail flow used by the apiv3
-    ├── index.ts                               # forgot-password route: createAndSendPasswordResetOrder
-    └── send-password-reset-email.ts           # (PasswordResetOrder creation + mail) and
-                                                # sendPasswordResetTemplateEmail (template allowlist +
-                                                # subject + template vars)
+└── password-hash.ts                           # PasswordHashService (scrypt + legacy verify, hash)
 
 apps/app/src/migrations/
 └── 20260724000001-password-hash-status.js     # Req 3.1, 3.2: hash format count report (read-only, migrate-mongo)
@@ -175,11 +169,6 @@ apps/app/src/server/models/user/index.prisma.ts
     must select and then strip passwordHash. Selecting it is required: an omitted field
     cannot be stripped, and the raw scrypt hash otherwise reaches API responses that read
     users through Prisma (e.g. /bookmarks/info)
-
-apps/app/src/server/routes/apiv3/forgot-password.js
-  — Both mail sends delegate to the shared password-reset service
-    (createAndSendPasswordResetOrder for the request flow, sendPasswordResetTemplateEmail
-    for the "reset succeeded" mail)
 
 apps/app/src/features/rate-limiter/config/index.ts
   — Correct the login rate-limit key to the fully-mounted path '/_api/v3/login'.

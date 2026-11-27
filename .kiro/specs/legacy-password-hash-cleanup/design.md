@@ -314,7 +314,7 @@ noPassword   : どちらも なし                        — パスワード未
 - 一覧は `legacyOnly` を `lastLoginAt` 降順で読む。全ユーザーを対象とした `lastLoginAt` の索引では、未移行者が走査の最後尾に来るため実質的に全件を読む。**旧形式保持者のみを含む部分索引**を用意し、走査を未移行者の集合に限定する
 - 部分索引の条件は `{ password: { $exists: true } }` とする。`partialFilterExpression` は `$exists: false` を受け付けないため「`passwordHash` が無い」を条件に含められないが、両形式を同時に持つユーザーが存在しない以上、「`password` がある」は旧形式保持者と一致する。一覧側のクエリの述語はこの条件の部分集合になるため、索引は選択されうる
 - 件数側は `lastLoginAt` を条件に含まないためこの索引は効かない。件数は `$facet` による単一走査で賄う
-- **索引の作成は migrate-mongo のマイグレーションで行い、Mongoose スキーマには定義しない。** `.claude/rules/model.md` は「Prisma 移行が完了するまで索引作成は Mongoose が持つ」と記しているが、その趣旨は索引作成を Prisma 側へ早期に移さないことであり、リポジトリには既にマイグレーションで索引を作る前例がある（`20260619120000-add-unique-key-index-to-auditlog-es-sync-collections.js`）。一方で Mongoose スキーマに `partialFilterExpression` を書いた前例は無い。前例のある側に合わせる
+- **索引の作成は migrate-mongo のマイグレーションで行い（`collection.createIndex(...)`）、同じ `map:` 名で `schema.prisma` にも `@@index` として宣言する。Mongoose スキーマには定義しない。** `.claude/rules/model.md` の `## Indexes` がこの形を定めている。deploy は `prisma db push` を実行しないため `schema.prisma` の宣言だけでは索引は作られず、逆に Mongoose スキーマだけに書くとそのスキーマが消えた時点で新規インストールに索引が作られなくなる。マイグレーションはどちらの ORM が残っても機能する。前例: `apps/app/src/migrations/20260619120000-add-unique-key-index-to-auditlog-es-sync-collections.js`
 
 ## Error Handling
 
