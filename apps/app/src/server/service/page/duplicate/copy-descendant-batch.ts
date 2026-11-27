@@ -1,4 +1,5 @@
 import { getIdStringForRef, type IPage, type IUserHasId } from '@growi/core';
+import { convertToNewAffiliationPath } from '@growi/core/dist/utils/page-path-utils';
 import mongoose, { Types } from 'mongoose';
 
 import type { PageDocument, PageModel } from '~/server/models/page';
@@ -17,7 +18,7 @@ const logger = loggerFactory(
 
 export interface DescendantBatchInput {
   readonly pages: readonly PageDocument[]; // lean documents from the cursor
-  readonly oldPathPrefix: RegExp; // in-process only; never sent to MongoDB
+  readonly oldPathPrefix: string;
   readonly newPathPrefix: string;
   readonly user: IUserHasId;
   readonly onlyDuplicateUserRelatedResources: boolean;
@@ -95,7 +96,11 @@ const planCopies = (
         // No parent here: the sub operation attaches copies to the page tree.
         newPage: {
           _id: newPageId,
-          path: page.path.replace(input.oldPathPrefix, input.newPathPrefix),
+          path: convertToNewAffiliationPath(
+            input.oldPathPrefix,
+            input.newPathPrefix,
+            page.path,
+          ),
           creator: input.user._id,
           lastUpdateUser: input.user._id,
           grant: page.grant,

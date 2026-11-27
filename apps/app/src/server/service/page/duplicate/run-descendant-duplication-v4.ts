@@ -54,13 +54,10 @@ export async function runDescendantDuplicationV4(
   let cursor: DescendantCursor | undefined;
   try {
     cursor = await openDescendantCursor(sourcePath, user);
-    // in-process only (never sent to MongoDB), so RegExp.escape is safe here
-    const oldPathPrefix = new RegExp(`^${RegExp.escape(sourcePath)}`, 'i');
-
     const copyBatch = async (pages: PageDocument[]): Promise<number> => {
       const { insertedPageCount } = await copyDescendantBatch(deps, {
         pages,
-        oldPathPrefix,
+        oldPathPrefix: sourcePath,
         newPathPrefix: newPagePath,
         user,
         // A v4 duplicate copies every editable descendant regardless of this option (Req 6.3).

@@ -63,9 +63,6 @@ async function duplicateDescendants(
     sourcePage,
     true,
   ).generateIterable();
-  // in-process only (never sent to MongoDB), so RegExp.escape is safe here
-  const oldPathPrefix = new RegExp(`^${RegExp.escape(sourcePage.path)}`, 'i');
-
   let insertedPageCount = 0;
   for await (const pages of inBatches<PageDocument>(
     descendants,
@@ -75,7 +72,7 @@ async function duplicateDescendants(
     await progress();
     const result = await copyDescendantBatch(deps, {
       pages,
-      oldPathPrefix,
+      oldPathPrefix: sourcePage.path,
       newPathPrefix: newPagePath,
       user,
       onlyDuplicateUserRelatedResources:
