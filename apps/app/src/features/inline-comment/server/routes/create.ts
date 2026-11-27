@@ -1,5 +1,6 @@
 /**
- * POST /_api/v3/inline-comments — origin (anchored) inline comment creation.
+ * POST /_api/v3/inline-comments — origin (anchored) inline comment creation,
+ * from an anchor or from a part of the page markdown (requirement 26).
  *
  * `certifySharedPage` is intentionally NOT applied — this route must be
  * unreachable from a share-link context. `addActivity` is also intentionally
@@ -18,7 +19,7 @@
 
 import assert from 'node:assert';
 import type { IUser } from '@growi/core';
-import { isIPageNotFoundInfo, SCOPE } from '@growi/core';
+import { getIdStringForRef, isIPageNotFoundInfo, SCOPE } from '@growi/core';
 import { ErrorV3 } from '@growi/core/dist/models';
 import type { Request, RequestHandler } from 'express';
 import { body } from 'express-validator';
@@ -35,8 +36,19 @@ import { isRevisionOfPage } from '~/server/util/is-revision-of-page';
 import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 
-import type { CreateInlineCommentRequestBody } from '../../interfaces/dto/create-inline-comment';
-import { InlineCommentService } from '../service/inline-comment-service';
+import type {
+  CreateInlineCommentByAnchorRequestBody,
+  CreateInlineCommentByMarkdownQuoteRequestBody,
+  CreateInlineCommentRequestBody,
+} from '../../interfaces/dto/create-inline-comment';
+import {
+  type CreateInlineCommentInput,
+  InlineCommentService,
+} from '../service/inline-comment-service';
+import {
+  type MarkdownQuoteAnchorResolution,
+  resolveMarkdownQuoteAnchor,
+} from '../service/markdown-quote-anchor';
 import { updatePageCommentCount } from '../update-page-comment-count';
 
 const logger = loggerFactory('growi:routes:apiv3:inline-comments:create');
@@ -49,23 +61,62 @@ type Req = Request<
   user?: HydratedDocument<IUser>;
 };
 
+// The two input modes are told apart by the presence of `markdownQuote`.
+const isAnchorMode = () => body('markdownQuote').not().exists();
+const isMarkdownQuoteMode = () => body('markdownQuote').exists();
+
 const validator = [
   body('pageId').isMongoId().withMessage('pageId must be a valid MongoId'),
+  body('comment').isString().withMessage('comment must be a string'),
   body('anchorOriginRevisionId')
+    .if(isAnchorMode())
     .isMongoId()
     .withMessage('anchorOriginRevisionId must be a valid MongoId'),
-  body('comment').isString().withMessage('comment must be a string'),
-  body('anchor').isObject().withMessage('anchor must be an object'),
-  body('anchor.quote').isString().withMessage('anchor.quote must be a string'),
+  body('anchor')
+    .if(isAnchorMode())
+    .isObject()
+    .withMessage('anchor must be an object'),
+  body('anchor.quote')
+    .if(isAnchorMode())
+    .isString()
+    .withMessage('anchor.quote must be a string'),
   body('anchor.prefix')
+    .if(isAnchorMode())
     .isString()
     .withMessage('anchor.prefix must be a string'),
   body('anchor.suffix')
+    .if(isAnchorMode())
     .isString()
     .withMessage('anchor.suffix must be a string'),
   body('anchor.approxOffset')
+    .if(isAnchorMode())
     .isInt({ min: 0 })
     .withMessage('anchor.approxOffset must be a non-negative integer'),
+  body('markdownQuote')
+    .if(isMarkdownQuoteMode())
+    .isString()
+    .withMessage('markdownQuote must be a string')
+    .bail()
+    .isLength({ min: 1 })
+    .withMessage('markdownQuote must not be empty'),
+  body('markdownOffset')
+    .if(isMarkdownQuoteMode())
+    .optional()
+    .isInt({ min: 0 })
+    .withMessage('markdownOffset must be a non-negative integer')
+    .toInt(),
+  body('revisionId')
+    .if(isMarkdownQuoteMode())
+    .optional()
+    .isMongoId()
+    .withMessage('revisionId must be a valid MongoId'),
+  body(['anchor', 'anchorOriginRevisionId'])
+    .if(isMarkdownQuoteMode())
+    .not()
+    .exists()
+    .withMessage(
+      'anchor and anchorOriginRevisionId cannot be sent together with markdownQuote',
+    ),
 ];
 
 /**
@@ -198,7 +249,217 @@ const validator = [
  *          updatedAt:
  *            type: string
  *            format: date-time
+ *      CreateInlineCommentByAnchorRequest:
+ *        description: >
+ *          Creation with an anchor measured against the rendered page text, the way
+ *          the browser creates an inline comment from a text selection.
+ *        type: object
+ *        required:
+ *          - pageId
+ *          - anchorOriginRevisionId
+ *          - comment
+ *          - anchor
+ *        properties:
+ *          pageId:
+ *            type: string
+ *            description: ID of the page.
+ *          anchorOriginRevisionId:
+ *            type: string
+ *            description: >
+ *              ID of the page revision the anchor was taken from: the latest
+ *              revision when the passage was chosen.
+ *          comment:
+ *            type: string
+ *            description: Comment body (markdown).
+ *          anchor:
+ *            $ref: '#/components/schemas/InlineCommentAnchor'
+ *      CreateInlineCommentByMarkdownQuoteRequest:
+ *        description: >
+ *          Creation with a part of the page body markdown, for callers that have the
+ *          markdown but not the rendered text (for example an AI agent through the
+ *          GROWI MCP server). The server looks for `markdownQuote` in the body of the
+ *          latest revision by plain string matching, renders the body, and computes
+ *          the anchor (`quote`, `prefix`, `suffix`, `approxOffset`) from the rendered
+ *          text of the chosen occurrence. The stored `quote` is therefore the rendered
+ *          text (markdown syntax removed), not `markdownQuote` itself, and
+ *          `anchorOriginRevisionId` is the latest revision. Must not be combined with
+ *          `anchor` or `anchorOriginRevisionId`.
+ *        type: object
+ *        required:
+ *          - pageId
+ *          - comment
+ *          - markdownQuote
+ *        properties:
+ *          pageId:
+ *            type: string
+ *            description: ID of the page.
+ *          comment:
+ *            type: string
+ *            description: Comment body (markdown).
+ *          markdownQuote:
+ *            type: string
+ *            minLength: 1
+ *            description: >
+ *              An exact substring of the page body markdown, markdown syntax included
+ *              (for example `**bold** text`).
+ *          markdownOffset:
+ *            type: integer
+ *            minimum: 0
+ *            description: >
+ *              UTF-16 index in the body where the chosen occurrence of `markdownQuote`
+ *              starts. Required only when `markdownQuote` occurs more than once: send
+ *              back the `offset` of one of the candidates returned with the error
+ *              `inline-comment-quote-ambiguous`, rather than counting characters.
+ *          revisionId:
+ *            type: string
+ *            description: >
+ *              ID of the revision the caller read `markdownQuote` from. When given and
+ *              it is not the latest revision, the request is refused with 409.
+ *      InlineCommentQuoteCandidate:
+ *        description: One occurrence of `markdownQuote` in the page body markdown.
+ *        type: object
+ *        required:
+ *          - offset
+ *          - line
+ *          - snippet
+ *        properties:
+ *          offset:
+ *            type: integer
+ *            description: >
+ *              UTF-16 index in the body where the occurrence starts; send it as
+ *              `markdownOffset` to choose this occurrence.
+ *          line:
+ *            type: integer
+ *            description: 1-based line number of the occurrence.
+ *          snippet:
+ *            type: string
+ *            description: The occurrence with a little of the markdown around it.
  */
+
+type CreateTarget = Pick<
+  CreateInlineCommentInput,
+  'anchorOriginRevisionId' | 'anchor'
+>;
+
+type CreateTargetResolution =
+  | { readonly kind: 'resolved'; readonly target: CreateTarget }
+  | {
+      readonly kind: 'refused';
+      readonly error: ErrorV3;
+      readonly status: number;
+    };
+
+const refused = (
+  message: string,
+  code: string,
+  status: number,
+  args?: Record<string, unknown>,
+): CreateTargetResolution => ({
+  kind: 'refused',
+  error: new ErrorV3(message, code, undefined, args),
+  status,
+});
+
+const targetFromAnchor = async (
+  requestBody: CreateInlineCommentByAnchorRequestBody,
+): Promise<CreateTargetResolution> => {
+  const { pageId, anchorOriginRevisionId, anchor } = requestBody;
+
+  // A revision of another page must not be linked; an unknown id is harmless anchor metadata.
+  const anchorRevision = await prisma.revisions.findUnique({
+    where: { id: anchorOriginRevisionId },
+    select: { pageId: true },
+  });
+  if (anchorRevision != null && !isRevisionOfPage(anchorRevision, pageId)) {
+    return refused(
+      'The revision does not belong to this page.',
+      'inline-comment-create-failed',
+      400,
+    );
+  }
+  return { kind: 'resolved', target: { anchorOriginRevisionId, anchor } };
+};
+
+const MARKDOWN_QUOTE_REFUSALS: Record<
+  Exclude<MarkdownQuoteAnchorResolution['kind'], 'anchored'>,
+  { readonly message: string; readonly code: string }
+> = {
+  'not-found': {
+    message: 'markdownQuote does not occur in the latest revision of the page.',
+    code: 'inline-comment-quote-not-found',
+  },
+  ambiguous: {
+    message:
+      'markdownQuote occurs more than once; send markdownOffset with the offset of one of the candidates.',
+    code: 'inline-comment-quote-ambiguous',
+  },
+  'offset-mismatch': {
+    message: 'No occurrence of markdownQuote starts at markdownOffset.',
+    code: 'inline-comment-quote-offset-mismatch',
+  },
+  'not-anchorable': {
+    message:
+      'The selected part of the markdown shows no text on the page, or is drawn as a diagram.',
+    code: 'inline-comment-quote-not-anchorable',
+  },
+};
+
+const refusedMarkdownQuote = (
+  resolution: Exclude<MarkdownQuoteAnchorResolution, { kind: 'anchored' }>,
+): CreateTargetResolution => {
+  const { message, code } = MARKDOWN_QUOTE_REFUSALS[resolution.kind];
+  return refused(
+    message,
+    code,
+    400,
+    'candidates' in resolution
+      ? { candidates: resolution.candidates }
+      : undefined,
+  );
+};
+
+const targetFromMarkdownQuote = async (
+  requestBody: CreateInlineCommentByMarkdownQuoteRequestBody,
+  latestRevisionId: string | null,
+): Promise<CreateTargetResolution> => {
+  const { markdownQuote, markdownOffset, revisionId } = requestBody;
+
+  if (revisionId != null && revisionId !== latestRevisionId) {
+    return refused(
+      'The page was updated after the given revision.',
+      'inline-comment-revision-outdated',
+      409,
+    );
+  }
+
+  const latestRevision =
+    latestRevisionId == null
+      ? null
+      : await prisma.revisions.findUnique({
+          where: { id: latestRevisionId },
+          select: { body: true },
+        });
+  if (latestRevisionId == null || latestRevision == null) {
+    // A page without a body cannot contain the (non-empty) quote.
+    return refusedMarkdownQuote({ kind: 'not-found' });
+  }
+
+  const resolution = await resolveMarkdownQuoteAnchor(
+    latestRevision.body,
+    markdownQuote,
+    markdownOffset,
+  );
+  if (resolution.kind !== 'anchored') {
+    return refusedMarkdownQuote(resolution);
+  }
+  return {
+    kind: 'resolved',
+    target: {
+      anchorOriginRevisionId: latestRevisionId,
+      anchor: resolution.anchor,
+    },
+  };
+};
 
 /**
  * @swagger
@@ -208,37 +469,23 @@ const validator = [
  *        tags: [Comments]
  *        summary: Create an inline comment
  *        description: >
- *          Creates an origin inline comment anchored to a passage of the page body. See
- *          `InlineCommentAnchor` for how the anchor is measured and how it is used when
- *          the page is displayed. Requires login, or an access token with the scope
- *          `write:features:page`, and permission to view the page. Not available
- *          through a share link. Read-only users are refused unless read-only users are
- *          allowed to comment.
+ *          Creates an origin inline comment anchored to a passage of the page body. The
+ *          passage is given in one of two ways: an anchor measured against the rendered
+ *          text (`CreateInlineCommentByAnchorRequest`; see `InlineCommentAnchor` for how
+ *          the anchor is measured and used when the page is displayed), or a part of the
+ *          body markdown, from which the server computes the anchor
+ *          (`CreateInlineCommentByMarkdownQuoteRequest`). Requires login, or an access
+ *          token with the scope `write:features:page`, and permission to view the page.
+ *          Not available through a share link. Read-only users are refused unless
+ *          read-only users are allowed to comment.
  *        requestBody:
  *          required: true
  *          content:
  *            application/json:
  *              schema:
- *                type: object
- *                required:
- *                  - pageId
- *                  - anchorOriginRevisionId
- *                  - comment
- *                  - anchor
- *                properties:
- *                  pageId:
- *                    type: string
- *                    description: ID of the page.
- *                  anchorOriginRevisionId:
- *                    type: string
- *                    description: >
- *                      ID of the page revision the anchor was taken from: the latest
- *                      revision when the passage was chosen.
- *                  comment:
- *                    type: string
- *                    description: Comment body (markdown).
- *                  anchor:
- *                    $ref: '#/components/schemas/InlineCommentAnchor'
+ *                oneOf:
+ *                  - $ref: '#/components/schemas/CreateInlineCommentByAnchorRequest'
+ *                  - $ref: '#/components/schemas/CreateInlineCommentByMarkdownQuoteRequest'
  *        responses:
  *          201:
  *            description: The created inline comment.
@@ -253,20 +500,46 @@ const validator = [
  *                      $ref: '#/components/schemas/InlineComment'
  *          400:
  *            description: >
- *              Invalid input, or the caller is a read-only user (code
- *              `validation_failed`); an empty `anchor.quote`, or an
- *              `anchorOriginRevisionId` of a revision of another page (code
- *              `inline-comment-create-failed`).
+ *              Invalid input, both `anchor` and `markdownQuote` sent, or the caller is
+ *              a read-only user (code `validation_failed`); an empty `anchor.quote`, or
+ *              an `anchorOriginRevisionId` of a revision of another page (code
+ *              `inline-comment-create-failed`). With `markdownQuote`: it does not occur in
+ *              the latest revision (code `inline-comment-quote-not-found`); it occurs
+ *              more than once and `markdownOffset` is not given (code
+ *              `inline-comment-quote-ambiguous`); no occurrence starts at
+ *              `markdownOffset` (code `inline-comment-quote-offset-mismatch`); the chosen
+ *              range shows no text on the page (an image, a formula or markup only) or
+ *              reaches into a code block drawn as a diagram (`drawio`, `mermaid`,
+ *              `plantuml`) (code `inline-comment-quote-not-anchorable`). The ambiguous
+ *              and offset-mismatch errors list every occurrence in `args.candidates`.
  *            content:
  *              application/json:
  *                schema:
- *                  $ref: '#/components/schemas/ErrorV3'
+ *                  allOf:
+ *                    - $ref: '#/components/schemas/ErrorV3'
+ *                    - type: object
+ *                      properties:
+ *                        args:
+ *                          type: object
+ *                          properties:
+ *                            candidates:
+ *                              type: array
+ *                              items:
+ *                                $ref: '#/components/schemas/InlineCommentQuoteCandidate'
  *          403:
  *            description: Not authenticated, or the access token lacks the required scope.
  *          404:
  *            description: >
  *              The page does not exist, or the caller may not view it. The two cases
  *              are deliberately indistinguishable (code `notfound_or_forbidden`).
+ *            content:
+ *              application/json:
+ *                schema:
+ *                  $ref: '#/components/schemas/ErrorV3'
+ *          409:
+ *            description: >
+ *              With `markdownQuote`: `revisionId` is not the latest revision of the page
+ *              (code `inline-comment-revision-outdated`). Read the page again and retry.
  *            content:
  *              application/json:
  *                schema:
@@ -295,16 +568,17 @@ export const createInlineCommentRouteHandlersFactory = (
         'commentService must be initialized',
       );
 
-      const { pageId, anchorOriginRevisionId, comment, anchor } = req.body;
+      const requestBody = req.body;
+      const { pageId, comment } = requestBody;
 
       // Viewer-filtered lookup; uniform 404 on any failure, page missing or
       // forbidden — see apps/app/.claude/rules/page-write-action-403-404.md.
-      const { meta } = await findPageAndMetaDataByViewer(
+      const { data: page, meta } = await findPageAndMetaDataByViewer(
         pageService,
         pageGrantService,
         { pageId, path: null, user, basicOnly: true },
       );
-      if (isIPageNotFoundInfo(meta)) {
+      if (page == null || isIPageNotFoundInfo(meta)) {
         return res.apiv3Err(
           new ErrorV3(
             'Page is not found or forbidden',
@@ -314,19 +588,27 @@ export const createInlineCommentRouteHandlersFactory = (
         );
       }
 
-      // A revision of another page must not be linked; an unknown id is harmless anchor metadata.
-      const anchorRevision = await prisma.revisions.findUnique({
-        where: { id: anchorOriginRevisionId },
-        select: { pageId: true },
-      });
-      if (anchorRevision != null && !isRevisionOfPage(anchorRevision, pageId)) {
+      let resolution: CreateTargetResolution;
+      try {
+        resolution =
+          requestBody.markdownQuote != null
+            ? await targetFromMarkdownQuote(
+                requestBody,
+                page.revision == null ? null : getIdStringForRef(page.revision),
+              )
+            : await targetFromAnchor(requestBody);
+      } catch (err) {
+        logger.error('Failed to resolve the inline comment anchor', err);
         return res.apiv3Err(
           new ErrorV3(
-            'The revision does not belong to this page.',
+            'Failed to create inline comment',
             'inline-comment-create-failed',
           ),
-          400,
+          500,
         );
+      }
+      if (resolution.kind === 'refused') {
+        return res.apiv3Err(resolution.error, resolution.status);
       }
 
       const service = new InlineCommentService({
@@ -337,7 +619,7 @@ export const createInlineCommentRouteHandlersFactory = (
 
       try {
         const inlineComment = await service.create(
-          { pageId, anchorOriginRevisionId, comment, anchor },
+          { pageId, comment, ...resolution.target },
           user._id.toString(),
         );
         return res.apiv3({ inlineComment }, 201);
