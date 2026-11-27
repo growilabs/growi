@@ -1,0 +1,6 @@
+@use '@growi/core-styles/scss/bootstrap/init' as bs;
+
+// Shared by SelectionPopover and InlineCommentPreviewPopover, both portaled to
+// document.body: above the fixed header and sidebars, below the modal backdrop
+// (see the popover stacking-order decision in .kiro/specs/inline-comment/research.md).
+$popover-z-index: bs.$zindex-modal-backdrop - 10;

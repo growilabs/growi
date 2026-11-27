@@ -3,6 +3,7 @@ import { isImportOptionForPages } from '~/models/admin/import-option-for-pages';
 
 import type { OverwriteParams } from '../import-settings';
 import { overwriteParams as overwriteParamsForAttachmentFilesChunks } from './attachmentFiles.chunks';
+import { generateOverwriteParams as generateForCommentReactions } from './comment-reactions';
 import { generateOverwriteParams as generateForPages } from './pages';
 import { generateOverwriteParams as generateForRevisions } from './revisions';
 
@@ -27,6 +28,8 @@ export const generateOverwriteParams = <OPT extends GrowiArchiveImportOption>(
       return generateForRevisions(operatorUserId, option);
     case 'attachmentFiles.chunks':
       return overwriteParamsForAttachmentFilesChunks;
+    case 'commentreactions':
+      return generateForCommentReactions();
     default:
       return {};
   }

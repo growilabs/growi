@@ -2,14 +2,15 @@
 
 ## Overview
 
-**Purpose**: コメントを API で読む利用者(GROWI MCP、外部スクリプト、GROWI 自身の画面)に、通常コメントとインラインコメントを1回の呼び出しで取得できる経路を提供する。あわせて、ページのコメント件数にインラインコメントを含める。
+**Purpose**: コメントを API で読む利用者(GROWI MCP、外部スクリプト、GROWI 自身の画面)に、通常コメントとインラインコメントを1回の呼び出しで取得できる経路を提供する。あわせて、一覧の各コメントにそのコメントの絵文字リアクションを含め、コメントを1件だけ取得する経路を提供する。ページのコメント件数にインラインコメントを含める。
 
-**Users**: MCP と外部スクリプトは `GET /_api/v3/comments` を呼ぶ。GROWI の画面は、末尾のコメント欄と本文のインラインコメントの取得を、この API に切り替える。
+**Users**: MCP と外部スクリプトは `GET /_api/v3/comments` と `GET /_api/v3/comments/:id` を呼ぶ。GROWI の画面は、末尾のコメント欄と本文のインラインコメントの取得を、一覧 API に切り替える。
 
-**Impact**: 画面は新 API でコメントを取得し、見え方は旧 API の画面と同じである。旧 `GET /_api/comments.get` の応答の形は固定で、非推奨である。インライン専用の一覧取得 `GET /_api/v3/inline-comments` はなく、404 を返す。`Page.commentCount` は「通常コメントとインラインコメントの合計」である。
+**Impact**: 画面は新 API でコメントを取得し、見え方は旧 API の画面と同じである。旧 `GET /_api/comments.get` の応答の形は固定で、非推奨である。インライン専用の一覧取得 `GET /_api/v3/inline-comments` はなく、404 を返す。`Page.commentCount` は「通常コメントとインラインコメントの合計」である。一覧の各コメントと単体取得の応答は `reactions` を持ち、空の配列(リアクション無し)と `null`(取得できなかった)を区別する。
 
 ### Goals
 - 通常コメントとインラインコメントを返す、apiv3 の一覧取得 API を1本にする(1.x、2.x、3.x、4.x)
+- 一覧の各コメントにリアクションを含め、コメントを1件取得する API を提供する(1.10、1.11、9.x)
 - 旧 API を壊さずに非推奨にする(5.x)
 - 画面の取得を新 API に切り替え、見え方を保つ(6.x)
 - 件数にインラインコメントを合算する(7.x)
@@ -25,7 +26,9 @@
 
 ### This Spec Owns
 - `GET /_api/v3/comments` の契約(入力、応答、認可、版を指定したときの意味、エラー)
-- コメント1件の応答の形(`ICommentListItem`)と、その整形(共通の項目の整形は旧 API と共有し、投稿者の整形だけを API ごとに分ける)
+- `GET /_api/v3/comments/:id` の契約(入力、応答、認可、エラー)。応答は一覧の1件と同じ形
+- 2つの取得 API が共有する、コメントを読める範囲の判定(`canViewCommentsOfPage`)
+- コメント1件の応答の形(`ICommentListItem`。`reactions` を含む)と、その整形(共通の項目の整形は旧 API と共有し、投稿者の整形だけを API ごとに分ける)
 - ページのコメント件数(`Page.commentCount`)の数え方と、インラインコメントの書き込みに伴う更新、既存ページの再計算
 - 画面側のコメント一覧の取得(共有の取得フックと、通常コメント用、インラインコメント用の2つの見え方)
 
@@ -33,16 +36,21 @@
 - 通常コメントの作成、編集、削除(旧 API の `comments.add` / `update` / `remove`)
 - インラインコメントの作成、返信、編集、削除、解決の挙動(`inline-comment` が持つ。件数の更新呼び出しの追加だけ、本 spec の変更として入れる)
 - コメントのイベント(`CommentEvent`)と、それを購読する検索の再索引
+- リアクションのデータ、キーの形式、集計の規則、結果の型(`ReactionChip`)、追加・解除の API(`comment-reactions` が持つ。本 spec は、集計済みのリアクションを応答に載せるだけ)
 - MCP サーバーと SDK
 - 共有リンク画面と検索結果プレビューでのインラインコメント UI
 
 ### Allowed Dependencies
 - Prisma の `comments` と `revisions`、`certifySharedPage`、`accessTokenParser`、`loginRequired`、`apiV3FormValidator`、`findPageAndMetaDataByViewer`
 - `inline-comment` の型(`InlineCommentWithReplies` など)。依存の向きは「`inline-comment` → `comment`」のみ。`comment` が `inline-comment` を import してはいけない
+- `comment-reaction` のリアクションのローダー `loadReactionChips` と型 `ReactionChip`。依存の向きは「`comment` → `comment-reaction`」のサーバー側の取得だけ(`features/comment/server/` の service、serializers、routes)。`comment-reaction` の中核は `comment` を import しない。リアクションした利用者の整形(`toCreatorSummary`)は、`comment` が関数として渡す。`features/comment/interfaces` が import するのは、型 `ReactionChip` だけ
+- `comment` は、`comment-reaction` のリアクション追加・解除の route と client に、`getCommentListItem`、`notFoundOrForbidden`、`useSWRxCommentList`、`ICommentListItem` を使わせる。逆向きの依存は、この4つに限る
 - `InlineCommentService` から件数を更新するときは、`Page` モデルを import せず、依存として渡された関数を呼ぶ
 
 ### Revalidation Triggers
-- `ICommentListItem` の項目の追加、削除、名前の変更(MCP、SDK、画面、外部利用者に影響する)
+- `ICommentListItem` の項目の追加、削除、名前の変更(MCP、SDK、画面、外部利用者に影響する)。`reactions` の中身(`ReactionChip`)の変更も含む
+- `getCommentListItem`、`notFoundOrForbidden` の戻り値や応答の本体の変更(`comment-reaction` のリアクション追加・解除の応答に影響する)
+- `GET /_api/v3/comments/:id` の入力と応答、アクセスの判定(`canViewCommentsOfPage`)の変更(一覧の判定も同じ関数を使うので、両方に影響する)
 - 新 API の `creator` に返す項目の追加(共有リンクのゲストにも届く。要件 1.9)
 - 画面の取得フックのキー `['/comments', pageId, shareLinkId]` の変更(末尾のスレッドと本文のインラインコメントが一緒に更新される前提が壊れる)
 - 件数の数え方の変更(サイドバー、ページ側面、Slack の展開に影響する)
@@ -71,8 +79,12 @@ graph TB
   end
   subgraph Server
     Route[list route]
+    GetRoute[get route]
     Service[listComments]
+    GetService[getCommentListItem]
     Mapper[toCommentListItem]
+    Authz[canViewCommentsOfPage]
+    Loader[loadReactionChipsOrNull]
     ApiV1[comments.get apiv1]
     InlineSvc[InlineCommentService]
   end
@@ -80,6 +92,7 @@ graph TB
     Comments[(comments)]
     Revisions[(revisions)]
     Pages[(pages commentCount)]
+    Reactions[(commentreactions)]
   end
   Page --> NormalView
   Page --> InlineView
@@ -89,6 +102,14 @@ graph TB
   SharedList --> Route
   Route --> Service
   Route --> Mapper
+  Route --> Authz
+  Route --> Loader
+  GetRoute --> Authz
+  GetRoute --> GetService
+  GetService --> Mapper
+  GetService --> Loader
+  GetService --> Comments
+  Loader --> Reactions
   ApiV1 --> Mapper
   Service --> Comments
   Service --> Revisions
@@ -98,8 +119,9 @@ graph TB
 
 **Architecture Integration**:
 - 採用する形: 既存の apiv3 の機能別構成(`features/comment/` に `interfaces`、`server`、`client`)。
-- 整形の共通部分は1つの関数(`createCommentListItemMapper`)にまとめ、投稿者の整形のしかたを引数で受け取る。新 API は `toCommentListItem`、旧 API は `toLegacyCommentListItem` を使う。
-- 依存の向き(サーバー): `interfaces` → `server/serializers` → `server/service` → `server/routes`。
+- 整形の共通部分は1つの関数(`createCommentListItemMapper`)にまとめ、投稿者の整形のしかたを引数で受け取る。新 API は `toCommentListItem`(行と、そのコメントのリアクションを受け取る)、旧 API は `toLegacyCommentListItem`(リアクションを持たない)を使う。
+- 一覧と単体取得は、コメントを読める範囲の判定(`canViewCommentsOfPage`)、見つからない場合の応答(`notFoundOrForbidden`)、リアクションの取り込み(`loadReactionChipsOrNull`)を共有する。
+- 依存の向き(サーバー): `interfaces` → `server/serializers` → `server/service` → `server/routes`。`server/authorization` は route だけが使う。
 - 依存の向き(画面): `interfaces` → `client/stores/comment-list` → 各 feature の store → 部品。
 - 新しい部品が必要な理由は、すべて要件に対応する。投機的な抽象は入れない。
 
@@ -121,12 +143,18 @@ apps/app/src/features/comment/
 │   ├── comment-list.ts            # ICommentListItem、リクエストのクエリ、応答の型
 │   └── index.ts                   # barrel
 ├── server/
+│   ├── authorization/
+│   │   └── can-view-comments-of-page.ts  # canViewCommentsOfPage: 共有リンクまたはページの閲覧権限でコメントを読めるか
 │   ├── serializers/
 │   │   └── to-comment-list-item.ts   # 行 → 応答の1件(新 API 用と旧 API 用。共通部分は1か所)と、入力の行の型 CommentListRow
 │   ├── service/
-│   │   └── comment-list.ts           # listComments: 版の範囲の決定と取得
+│   │   ├── comment-list.ts           # listComments: 版の範囲の決定と取得
+│   │   ├── comment-get.ts            # getCommentListItem: コメント1件の取得とリアクションの取り込み
+│   │   └── load-reaction-chips-or-null.ts  # リアクションの取り込み。失敗したら記録して null
 │   └── routes/
-│       └── list.ts                   # GET /_api/v3/comments(@swagger を含む)
+│       ├── list.ts                   # GET /_api/v3/comments(@swagger を含む)
+│       ├── get.ts                    # GET /_api/v3/comments/:id(@swagger を含む)
+│       └── not-found-or-forbidden.ts # 見つからない、権限が無いの共通の 404 の本体
 └── client/
     └── stores/
         └── comment-list.ts           # useSWRxCommentList(共有の取得フック)
@@ -143,8 +171,8 @@ apps/app/src/migrations/
 - `apps/app/src/features/comment/server/models/comment.ts` — `countCommentByPageId` は `isInline` で絞らず、インラインコメントも数える。`findCommentsByPageId` / `findCommentsByRevisionId` は `isInline` が `true` の行を除いて返す
 - `apps/app/src/features/comment/server/models/comment.integ.ts` — インラインコメントを含む件数のテストを持つ
 - `apps/app/src/server/routes/comment.js` — `comments.get` の応答を `toLegacyCommentListItem` で整形する。`@swagger` に `deprecated: true` と置き換え先の案内がある
-- `apps/app/src/server/routes/apiv3/index.js` — `/comments` を登録している。インラインコメントの一覧を返すルートは無く、`GET /inline-comments` は JSON の 404(`not_found`)を返す
-- `apps/app/bin/openapi/generate-spec-apiv3.sh` — `src/features/comment/server/routes/*.ts` を OpenAPI の生成対象に含める
+- `apps/app/src/server/routes/apiv3/index.js` — `/comments` に `GET /` と `GET /:id` を登録している(同じルーターのリアクションの追加・解除は `comment-reactions` が持つ)。インラインコメントの一覧を返すルートは無く、`GET /inline-comments` は JSON の 404(`not_found`)を返す
+- `apps/app/bin/openapi/generate-spec-apiv3.sh` — `src/features/comment/server/routes/*.ts` を OpenAPI の生成対象に含める(一覧と単体取得の両方)
 - `apps/app/src/features/inline-comment/server/service/inline-comment-service.ts` — 依存に `updateCommentCount` を持ち、作成、返信の作成、削除、返信の削除のあとに呼ぶ。一覧を返す機能は持たない
 - `apps/app/src/features/inline-comment/server/routes/{create,create-reply,update,update-reply,delete,delete-reply,resolve}.ts` — サービスを作るときに `updateCommentCount` を渡す(依存は必須なので、7つのルートすべてが渡す)
 - `apps/app/src/features/inline-comment/server/routes/routing.integ.ts` — 一覧取得(`GET /inline-comments`)の 404 について、2つのことを確かめるテスト(8.3)を持つ。1つ目は、テスト用の Express アプリに本番と同じ形の JSON の 404 を登録し、その応答が JSON の 404(`not_found`)になること。2つ目は、本物の `apiv3/index.js` のソースを文字列として読み、`GET /inline-comments` の 404 の登録があり、一覧を返すハンドラーが無いこと。本物のルーターを組み立てて `GET /inline-comments` を送るテストは無い
@@ -176,8 +204,11 @@ sequenceDiagram
   end
   S->>DB: コメントを作成日時の新しい順に取得
   S-->>R: コメント一覧 or 版が見つからない
+  R->>DB: 一覧の全コメントのリアクションを1回の呼び出しで取得(失敗したら null)
   R-->>C: 200 comments or 404
 ```
+
+**単体取得の流れ**: `GET /comments/:id?pageId&shareLinkId?` は、入力検証、共有リンクの判定、認証、`canViewCommentsOfPage` による閲覧権限の確認(一覧と同じ順序と規則)のあと、`getCommentListItem` が `where: { id, pageId }` でコメントを1件引く。見つからなければ、ページが見えない場合と同じ 404 を返す。見つかれば、そのコメントのリアクションを取り込んで、一覧の1件と同じ形で返す。
 
 **版の範囲の決定**:
 - 指定した版を `pageId` つきで取得する。存在しない、または別ページの版なら 404(ページが見えない場合と同じ応答)。
@@ -194,6 +225,7 @@ sequenceDiagram
 | 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7 | 通常とインラインの一括取得、項目、並び順、安全な投稿者 | listComments、toCommentListItem、list route | API Contract、ICommentListItem | System Flows |
 | 1.8 | ページ ID の形式検証 | list route(express-validator) | API Contract(400) | — |
 | 1.9 | 投稿者は画面が使う4項目だけ | toCommentListItem(投稿者の整形 `toCreatorSummary`) | ICommentCreatorSummary、OpenAPI(CommentListItem.creator) | — |
+| 1.10, 1.11 | 一覧の各コメントのリアクション、空と null の区別 | list route、loadReactionChipsOrNull、toCommentListItem | API Contract、ICommentListItem、OpenAPI(CommentListItem.reactions) | System Flows |
 | 2.1, 2.2, 2.3 | 次の版より前のコメント | listComments | listComments のサービスの仕様 | 版の範囲の決定 |
 | 2.4 | 版が存在しない、または別ページ | listComments、list route | API Contract(404) | System Flows |
 | 2.5 | 共有リンクでは版を無視 | list route | API Contract | 版の範囲の決定 |
@@ -213,14 +245,24 @@ sequenceDiagram
 | 7.4 | 作成、削除での更新 | InlineCommentService、Page.updateCommentCount の修正 | サービスの依存 | 件数の更新 |
 | 7.5 | 既存ページの再計算 | 再計算の移行 | 移行 | — |
 | 8.1, 8.2, 8.3 | インライン一覧の廃止 | apiv3/index.js、routing.integ.ts | ルーティング | — |
+| 9.1, 9.2, 9.8 | 1件の取得(一覧の1件と同じ形、投稿者は4項目) | get route、getCommentListItem、toCommentListItem | API Contract、ICommentListItem | 単体取得の流れ |
+| 9.3, 9.4, 9.5 | ページ ID が必須、別ページや無いコメントは 404 | get route、getCommentListItem、canViewCommentsOfPage | API Contract(404) | 単体取得の流れ |
+| 9.6 | 一覧と同じアクセスの判定 | get route(certifySharedPage、loginRequired)、canViewCommentsOfPage | API Contract | 単体取得の流れ |
+| 9.7 | 版による絞り込みを持たない | get route | API Contract | — |
+| 9.9, 9.10 | 入力の検証、予期しない失敗 | get route | API Contract(400、500) | — |
+| 9.11 | 公開仕様 | get route の @swagger、生成スクリプト | OpenAPI | — |
 
 ## Components and Interfaces
 
 | Component | Domain/Layer | Intent | Req Coverage | Key Dependencies (P0/P1) | Contracts |
 |-----------|--------------|--------|--------------|--------------------------|-----------|
-| list route | Server / Route | 入力検証、認証、閲覧権限、応答 | 1.8, 2.4, 2.5, 3.x, 4.x | certifySharedPage(P0)、loginRequired(P0)、listComments(P0) | API |
+| list route | Server / Route | 入力検証、認証、閲覧権限、応答 | 1.8, 1.10, 1.11, 2.4, 2.5, 3.x, 4.x | certifySharedPage(P0)、loginRequired(P0)、canViewCommentsOfPage(P0)、listComments(P0)、loadReactionChipsOrNull(P1) | API |
+| get route | Server / Route | 1件取得の入力検証、認証、閲覧権限、応答 | 9.x | certifySharedPage(P0)、loginRequired(P0)、canViewCommentsOfPage(P0)、getCommentListItem(P0) | API |
+| canViewCommentsOfPage | Server / Authorization | コメントを読める範囲の判定 | 3.1-3.5, 9.5, 9.6 | findPageAndMetaDataByViewer(P0) | Service |
+| getCommentListItem | Server / Service | コメント1件の取得とリアクションの取り込み | 9.1, 9.2, 9.4 | Prisma(P0)、loadReactionChipsOrNull(P1) | Service |
+| loadReactionChipsOrNull | Server / Service | リアクションを取り込み、失敗したら `null` | 1.10, 1.11 | loadReactionChips(P0) | Service |
 | listComments | Server / Service | 版の範囲を決め、コメントを取得する | 1.1-1.6, 2.1-2.4 | Prisma(P0) | Service |
-| toCommentListItem / toLegacyCommentListItem | Server / Serializer | 行を応答の1件に整形する | 1.2, 1.3, 1.7, 1.9, 5.1, 5.2, 5.4 | なし | Service |
+| toCommentListItem / toLegacyCommentListItem | Server / Serializer | 行を応答の1件に整形する | 1.2, 1.3, 1.7, 1.9, 1.10, 1.11, 5.1, 5.2, 5.4 | なし | Service |
 | countCommentByPageId | Server / Model | 件数に全コメントを数える | 7.1-7.3, 7.6 | Prisma(P0) | Service |
 | InlineCommentService の拡張 | Server / Service | 書き込み後に件数を更新する | 7.4 | updateCommentCount(P1) | Service |
 | 再計算の移行 | Server / Migration | 既存ページの件数を直す | 7.5 | Prisma(P0) | Batch |
@@ -236,13 +278,14 @@ sequenceDiagram
 | Field | Detail |
 |-------|--------|
 | Intent | `GET /_api/v3/comments` の入口 |
-| Requirements | 1.8, 2.4, 2.5, 3.1-3.9, 4.1-4.3 |
+| Requirements | 1.8, 1.10, 1.11, 2.4, 2.5, 3.1-3.9, 4.1-4.3 |
 
 **Responsibilities & Constraints**
 - ミドルウェアは、次の順に並べる。`accessTokenParser([SCOPE.READ.FEATURES.PAGE], { acceptLegacy: true })` → 入力検証 → `apiV3FormValidator` → `certifySharedPage` → `loginRequired`(ゲストを許可する版)。入力の検証を `certifySharedPage` より前に置くのは、旧 API と同じ理由(不正な値を共有リンクの照会に流さない)。
-- 共有リンクでないときは、`findPageAndMetaDataByViewer(..., { basicOnly: true })` でページを引き、見えないか存在しなければ、区別せず 404(`notfound_or_forbidden`)を返す(`page-write-action-403-404` 規約)。
+- 閲覧可否は `canViewCommentsOfPage` で判定する。見えないか存在しなければ、区別せず 404(`notfound_or_forbidden`。本体は `notFoundOrForbidden()`)を返す(`page-write-action-403-404` 規約)。
 - 共有リンクのときは、閲覧権限の確認を省き、`revisionId` を `listComments` に渡さない。共有リンクの ID とページ ID が一致しないときは、`certifySharedPage` が共有リンクとして認めないので、通常のアクセスとして判定される(未ログインで、ゲスト閲覧も許可されていなければ 403)。
 - ゲスト閲覧を許可しているサイトでは、`loginRequired`(ゲストを許可する版)が未ログインの閲覧者を通し、ページの閲覧権限の確認がゲストに対して行われる(旧 API と同じ)。
+- コメントを取得したあと、一覧の全コメントの ID を渡して、リアクションを1回の呼び出しで取り込む(`loadReactionChipsOrNull`)。要求者の ID はログイン済みなら `req.user` の ID、そうでなければ `null`。取り込みが失敗したときは、全コメントの `reactions` を `null` にして一覧を返す。取り込みの結果にそのコメントの項目が無ければ `[]` にする。
 - コメントの変更はしない(読み取り専用)。
 
 **Contracts**: API [x]
@@ -254,6 +297,51 @@ sequenceDiagram
 
 - ID は文字列のスカラーであることを `isString().bail().isMongoId()` で検証する(配列、オブジェクトを弾く)。
 - 500 の応答は内部の詳細を含めない。
+
+#### get route
+
+| Field | Detail |
+|-------|--------|
+| Intent | `GET /_api/v3/comments/:id` の入口 |
+| Requirements | 9.1-9.11 |
+
+**Responsibilities & Constraints**
+- ミドルウェアの順序は list route と同じ(`accessTokenParser` → 入力検証 → `apiV3FormValidator` → `certifySharedPage` → `loginRequired`(ゲストを許可する版))。入力は `param('id').isMongoId()`、`query('pageId').isString().bail().isMongoId()`、`query('shareLinkId').optional().isString().bail().isMongoId()`。
+- 閲覧可否は `canViewCommentsOfPage` で判定し、見えなければ 404(`notfound_or_forbidden`)。続いて `getCommentListItem` を呼び、`null`(コメントが無い、または別ページのコメント)も同じ 404 にする。ページが見えない場合とコメントが無い場合の応答は同一で、どちらが原因かを知らせない。
+- `revisionId` は入力として扱わない。版による絞り込みは一覧だけが持つ。
+- コメントの変更はしない(読み取り専用)。
+
+**Contracts**: API [x]
+
+##### API Contract
+| Method | Endpoint | Request | Response | Errors |
+|--------|----------|---------|----------|--------|
+| GET | /_api/v3/comments/:id | path: `id`(コメントの ID、MongoId)、query: `pageId`(必須、MongoId)、`shareLinkId`(任意、MongoId。共有リンクの判定にだけ使う) | `{ comment: ICommentListItem }` | 400(入力が不正)、403(未認証。`loginRequired` の既存の応答)、404(`notfound_or_forbidden`)、500(`comment-get-failed`) |
+
+- 500 の応答は内部の詳細を含めない。
+
+#### canViewCommentsOfPage
+
+| Field | Detail |
+|-------|--------|
+| Intent | 要求者がページのコメントを読めるかを判定する |
+| Requirements | 3.1-3.5, 9.5, 9.6 |
+
+**Contracts**: Service [x]
+
+##### Service Interface
+```typescript
+export const canViewCommentsOfPage = (
+  deps: { readonly pageService: IPageService; readonly pageGrantService: IPageGrantService },
+  input: {
+    readonly req: { readonly user?: HydratedDocument<IUser>; readonly isSharedPage?: boolean };
+    readonly pageId: string;
+  },
+): Promise<boolean>;
+```
+- `req.isSharedPage === true` なら真(閲覧権限の確認を省く)。それ以外は `findPageAndMetaDataByViewer(..., { pageId, path: null, user: req.user, basicOnly: true })` の結果が「ページが無い」でなければ真
+- 信頼するのは `certifySharedPage` が立てる `isSharedPage` だけで、共有リンクの ID が対象ページのものだと確認済みであることを前提にする。リクエストの `shareLinkId` の値そのものは使わない
+- 一覧の route と単体取得の route が共有する。判定を2か所に書かないことで、2つの API のアクセス規則が食い違わない
 
 #### listComments
 
@@ -296,13 +384,16 @@ export const listComments = (
 | Field | Detail |
 |-------|--------|
 | Intent | 行を応答の1件に整形する純粋関数(新 API 用と旧 API 用) |
-| Requirements | 1.2, 1.3, 1.7, 1.9, 5.1, 5.2, 5.4 |
+| Requirements | 1.2, 1.3, 1.7, 1.9, 1.10, 1.11, 5.1, 5.2, 5.4 |
 
 **Contracts**: Service [x]
 
 ##### Service Interface
 ```typescript
-type CommentListItemWith<TCreator> = Omit<ICommentListItem, 'creator'> & {
+type CommentListItemWith<TCreator> = Omit<
+  ICommentListItem,
+  'creator' | 'reactions'
+> & {
   creator: TCreator | string | null;
 };
 
@@ -311,17 +402,69 @@ const createCommentListItemMapper: <TCreator>(
   formatCreator: (user: CreatorRow) => TCreator,
 ) => (row: CommentListRow) => CommentListItemWith<TCreator>;
 
-// GET /_api/v3/comments
-export const toCommentListItem: (row: CommentListRow) => ICommentListItem;
-// GET /_api/comments.get
+// GET /_api/v3/comments and GET /_api/v3/comments/:id.
+// `chips` is null when the reactions could not be loaded.
+export const toCommentListItem: (
+  row: CommentListRow,
+  chips: readonly ReactionChip[] | null,
+) => ICommentListItem;
+// GET /_api/comments.get (has no `reactions`)
 export const toLegacyCommentListItem: (
   row: CommentListRow,
 ) => CommentListItemWith<LegacyCommentCreator>;
 ```
 - 共通の出力: 行のすべての列(文書の版の番号 `v` を含む)と、クライアント拡張が足す `__v`(`v` と同じ値)に加えて、`_id`(= `id`)、`page`(= `pageId`)、`revision`(= `revisionId`)、`replyTo`(= `replyToId`)、`creator`。投稿者の行が無いときの `creator` は `creatorId`(投稿者の無いコメントでは `null`)
+- `toCommentListItem` は、共通の出力に `reactions: chips` を含める。`chips` の中身は加工しない。旧 API の `toLegacyCommentListItem` は `reactions` を持たない(旧 API の出力を変えないため)
 - `toCommentListItem` の投稿者の整形(`toCreatorSummary`)は、`_id`、`username`、`name`、`imageUrlCached` の4つだけを、項目を1つずつ指定して取り出す(行を展開してから項目を除く書き方はしない。ユーザーの列が増えても応答に漏れないようにするため)
 - `toLegacyCommentListItem` の投稿者の整形(`toLegacyCreator`)は、ユーザーの行からパスワード、API トークン、メールアドレスを除き、本人がメールアドレスを公開しているときだけ `email` を戻す(`null` でも戻す)。旧 API(`comment.js`)はこちらを使う(要件 5.1、5.4)
 - 4つの項目を残す理由は、画面がそれぞれを読むため。`username` は `Username`(ユーザーのページへのリンク)、`UserPicture`(リンクとツールチップ)、`Comment.tsx` の自分のコメントかどうかの判定が読む。`name` は `Username` と `UserPicture` が表示名として読む。`imageUrlCached` は `UserPicture` が画像の URL として読む。`_id` は画面が実行時には読まないが、`Username` が受ける型と `isPopulated` による型の絞り込みが `_id` を持つオブジェクトを前提にしており、API の利用者がユーザーを識別するのにも使う。自分のコメントかどうかの判定は、通常コメントとインラインコメントで読む項目が違う。通常コメント(`Comment.tsx`)は `creator.username` とログイン中の利用者の `username` を比べる。インラインコメント(`InlineCommentItem.tsx`、`InlineCommentReplies.tsx`、`InlineCommentPreviewPopover.tsx`)は `creatorId` とログイン中の利用者の `_id` を比べ、判定には `creator` を読まない(表示では読む)。画面は `creator` のほかの項目(アカウントの状態、Gravatar の設定など)を読まない
+
+#### getCommentListItem
+
+| Field | Detail |
+|-------|--------|
+| Intent | コメントを1件取得し、一覧の1件と同じ形にする |
+| Requirements | 9.1, 9.2, 9.4 |
+
+**Contracts**: Service [x]
+
+##### Service Interface
+```typescript
+export interface GetCommentListItemInput {
+  readonly commentId: string;
+  readonly pageId: string;
+  /** `null` for a guest. */
+  readonly viewerId: string | null;
+}
+
+export const getCommentListItem = (
+  deps: { readonly prisma: Pick<PrismaClient, 'comments' | 'commentreactions' | 'users'> },
+  input: GetCommentListItemInput,
+): Promise<ICommentListItem | null>;
+```
+- `prisma.comments.findFirst({ where: { id: commentId, pageId }, include: { creator: true } })` で引く。`pageId` も条件に含めるので、別ページのコメントには届かない。行が無ければ `null`(「無い」を表す)
+- 行があれば、`loadReactionChipsOrNull` でそのコメント1件のリアクションを取り込み、`toCommentListItem` で整形する。取り込みの失敗は `reactions: null`、取り込みの結果に項目が無ければ `[]`
+- 通常コメントとインラインコメント、返信を区別しない(`isInline` で絞らない)
+- `comment-reactions` のリアクション追加・解除の API も、応答のコメントを作るためにこの関数を使う
+
+#### loadReactionChipsOrNull
+
+| Field | Detail |
+|-------|--------|
+| Intent | コメントの ID の集合のリアクションを取り込み、失敗してもコメントを隠さない |
+| Requirements | 1.10, 1.11 |
+
+**Contracts**: Service [x]
+
+##### Service Interface
+```typescript
+export const loadReactionChipsOrNull = (
+  deps: { readonly prisma: Pick<typeof prisma, 'commentreactions' | 'users'> },
+  input: { readonly commentIds: readonly string[]; readonly viewerId: string | null },
+): Promise<ReadonlyMap<string, readonly ReactionChip[]> | null>;
+```
+- `comment-reaction` の `loadReactionChips` を、利用者の整形に `toCreatorSummary` を渡して呼ぶ。リアクションした利用者の4項目は、コメントの `creator` と同じ規則になる(要件 1.9、1.10)
+- 失敗したら、`logger.error` に記録して `null` を返す。呼び出し元はそれを全コメントの `reactions: null` にする。一覧や1件の取得を失敗にしない
 
 #### countCommentByPageId(モデルの拡張)
 - `where: { pageId }` にする(件数の集計は `isInline` で絞らない)。返信も1行として数える。解決済みも数える
@@ -426,6 +569,8 @@ export interface ICommentListItem {
   anchorOriginRevisionId: string | null;
   resolvedById: string | null;
   resolvedAt: Date | null;
+  // null: the reactions could not be loaded; []: the comment has no reactions
+  reactions: readonly ReactionChip[] | null;
 }
 
 export interface ListCommentsRequestQuery {
@@ -437,18 +582,30 @@ export interface ListCommentsRequestQuery {
 export interface ListCommentsResponseBody {
   comments: ICommentListItem[];
 }
+
+export interface GetCommentRequestQuery {
+  pageId: string;
+  shareLinkId?: string;
+}
+
+export interface GetCommentResponseBody {
+  comment: ICommentListItem;
+}
 ```
 - `ICommentListItem` の旧 API 由来の項目(`page`、`revision`、`replyTo`、`commentPosition`、`_id`、`__v`、`createdAt`、`updatedAt`、`comment`)は、旧 API の出力と同じ値を持つ。`creator` だけは、旧 API より項目が少ない(下記)。型は単独で定義する(`ICommentHasId` を継承しない)。`ICommentHasId` は画面の通常コメント部品の型で、`page` や `revision` を `Ref` で持ち、インライン用の項目を持たないため
 - 型の食い違いは `as` で隠さない。`ICommentHasId` は実データに合わせて、`revision` と `replyTo` に null を許し、`creator` を `Ref<IUser> | ICommentCreatorSummary | null` にしてある。これにより `ICommentListItem` を `as` なしで通常コメントの部品に渡せる
 - 通常コメントでは、インライン用の項目は `null`(`isInline` は `false`)
+- `reactions` の要素 `ReactionChip` は `comment-reaction` が定義する `{ emoji, count, reactedByMe, users }`。`emoji` は正規形のリアクションキー、`count` はその絵文字でリアクションした人数(利用者の情報が無い人も数える)、`reactedByMe` は要求者自身がリアクションしているか(ゲストは常に偽)、`users` はリアクションした順の利用者(4項目の `ICommentCreatorSummary`、利用者の情報が無いときは ID の文字列)。並びは、絵文字ごとに最も早く残っているリアクションの時刻順。`reactions` の意味は、公開仕様(`CommentListItem.reactions`、`CommentReactionChip`)に記述する
+- `GetCommentResponseBody.comment` は、一覧の `comments` の1件と同じ型で、同じ値を持つ
 - `v` と `__v` は文書の版の番号(Prisma の列 `v` と、拡張が足す同じ値の `__v`)。整形は行を展開して作るので応答に入る。画面は読まない。旧 API と共通の整形の出力を変えないため、取り除かずに型と OpenAPI に載せている
 - `creator` の型は `ICommentCreatorSummary | string | null`。`ICommentCreatorSummary` は `{ _id: string; username: string; name: string | null; imageUrlCached: string | null }` で、`features/comment/interfaces` に置く。画面のコメント部品(`CommentCard`、`IInlineComment` と返信の `creator`、`ICommentHasId.creator`)はこの型を受ける。旧 API の投稿者の型(`LegacyCommentCreator`)は整形のファイルの中だけで使い、公開しない
-- スキーマ(`comments`、`revisions`)に変更は無い。`pages.commentCount` の値の意味が変わる
+- スキーマ(`comments`、`revisions`)に変更は無い。リアクションは `commentreactions` を読むだけで、書き込まない。`pages.commentCount` の値の意味が変わる
 
 ## Error Handling
 
 ### Error Strategy
-- 入力の不正は 400。ページが見えない、存在しない、版が存在しない、版が別ページのもの、は区別せず 404(`notfound_or_forbidden`)。予期しない失敗は 500(内部の詳細を含めず、サーバーのログに残す)
+- 入力の不正は 400。ページが見えない、存在しない、版が存在しない、版が別ページのもの、単体取得でコメントが存在しない、コメントが別ページのもの、は区別せず 404(`notfound_or_forbidden`)。予期しない失敗は 500(内部の詳細を含めず、サーバーのログに残す)
+- リアクションの取り込みの失敗は、一覧や1件の取得を失敗にしない。ログに残して、該当するコメントの `reactions` を `null` にして返す(空の配列とは区別する)。
 - 件数の更新の失敗は、コメントの書き込みを失敗にしない。ログに残して続行する。次の件数の更新か、再計算の移行で補正される
 
 ## Testing Strategy
@@ -458,6 +615,7 @@ export interface ListCommentsResponseBody {
 ### Unit Tests
 - `toCommentListItem`: 通常コメントとインラインコメントの行が、旧 API と同じ別名の項目を持つ。`creator` は4つの項目だけを持つ(投稿者の行に外部サービスの ID、最終ログイン日時、管理者かどうかの値があっても出ない。メールアドレスは本人が公開していても出ない)。`creator` が無いときは `creatorId` になる
 - `toLegacyCommentListItem`: 共通の項目が `toCommentListItem` と同じになる。`creator` はパスワード、API トークン、非公開のメールアドレスだけを除いた形になり、公開しているメールアドレス(`null` を含む)は残る
+- `toCommentListItem` の `reactions`: 渡したリアクションがそのまま入る。空の配列は空の配列、`null` は `null` になる。`toLegacyCommentListItem` は `reactions` を持たない
 - `groupInlineComments`: 起点と返信が親子になる。入力の順が保たれる。壊れた起点と親の無い返信が除かれる。通常コメントの行は無視される
 - `useSWRxPageComment`: インラインコメントの行を混ぜない(`isInline` が `true` の行を除く)
 
@@ -467,6 +625,10 @@ export interface ListCommentsResponseBody {
 - `GET /comments`: 投稿者の項目。ログイン済みの利用者と共有リンクのゲストのどちらへの応答でも、`creator` の項目が4つだけで、投稿者に入れた外部サービスの ID、最終ログイン日時、メールアドレスが応答のどこにも出ない(1.9)
 - `GET /comments`: 共有リンク。ゲストにも両方が返る。別ページの共有リンクは無効扱いになり、未ログインなら 403。`revisionId` は無視される(3.3, 3.4, 2.5)
 - `GET /comments`: ログイン済み、アクセストークン、未認証(ゲスト閲覧の許可あり、なし)。見えないページと存在しないページが同じ応答になる。不正な ID は 400(3.1, 3.2, 3.5, 3.6, 3.7, 1.8)
+- `GET /comments` のリアクション: 各コメントにリアクションが付き、リアクションが無いコメントは `[]` になる。`reactedByMe` は、ログイン済みの利用者、アクセストークン、共有リンクのゲストのそれぞれの視点で正しく、ゲストは常に偽。リアクションした利用者は4項目だけになる。リアクションを取り込めないときは、全コメントが `reactions: null` で一覧が返る(1.10、1.11)
+- `GET /comments/:id`: 一覧の1件と同じ内容(リアクションを含む)が返る。通常コメント、インラインコメント、返信を返す。ページが見えない、コメントが無い、別ページのコメントは同じ 404。共有リンクでは対象ページのコメントを返し、別ページの共有リンクは無効扱いになる。ログイン済み、アクセストークン、ゲスト(閲覧の許可あり、なし)の扱いは一覧と一致する。不正な ID は 400。予期しない失敗は内部の詳細を含まない 500(9.1-9.10)
+- `getCommentListItem`: 投稿者が4項目だけになる。`reactedByMe` は要求者だけが真になる。別ページのコメントと存在しないコメントは `null`。リアクションを取り込めないときは `reactions: null` で返す(9.1、9.4、1.11)
+- `canViewCommentsOfPage`: ログイン済み、ゲスト、アクセストークン、共有リンクのそれぞれで、閲覧できるページだけを許可する。ページ ID を別のページに向けた共有リンクは許可しない(3.1-3.5、9.6)
 - 旧 `comments.get`: インラインコメントを返さない。応答の形が変わらない(5.1, 5.2)。投稿者の外部サービスの ID、最終ログイン日時、管理者かどうか、アカウントの状態を返す(5.4)。既存の `comment.integ.ts` を残す
 - 件数: `countCommentByPageId` が通常、インライン、返信、解決済みを全部数える。`InlineCommentService` の作成、返信、削除、返信の削除のあとに、`Page.commentCount` が合計に一致する(`updateCommentCount` が書き込みの完了を待つので、待ち合わせなしで確かめられる)。更新の失敗でもコメントの書き込みは成功する(7.1-7.4)
 - 移行: インラインコメントを持つページの件数が直り、持たないページは変わらない。2回実行しても同じ(7.5)
@@ -478,11 +640,13 @@ export interface ListCommentsResponseBody {
 - 共有リンクの画面にインラインコメントが出ない(6.5)
 
 ### API 仕様
-- `pnpm run lint:openapi:apiv3` が通り、新 API の `operationId` が付く(`assert-operation-ids`)(4.1-4.3)。`pnpm run lint:openapi:apiv1` が通り、旧 API が `deprecated` になる(5.3)
+- `pnpm run lint:openapi:apiv3` が通り、一覧と単体取得の新 API の `operationId` が付く(`assert-operation-ids`)(4.1-4.3、9.11)。`pnpm run lint:openapi:apiv1` が通り、旧 API が `deprecated` になる(5.3)
 
 ## Security Considerations
 - 共有リンクの判定は `certifySharedPage` に任せ、新しい認可を並行して作らない。閲覧権限の確認を省くのは、ID が一致する共有リンクが確認できたときだけ
 - 新 API の応答の投稿者は、`toCreatorSummary` で4つの項目(ID、ユーザー名、表示名、プロフィール画像の URL)だけにする。新 API は共有リンクのゲストにも投稿者を返すので、メールアドレス、外部サービスのアカウントの ID(`googleId`、`slackMemberId`)、最終ログイン日時、管理者かどうか、アカウントの状態などを、ページの閲覧者に渡さない(要件 1.9。理由は `research.md`)
+- 応答の `reactions` の利用者も、投稿者と同じ `toCreatorSummary` で4項目だけにする(共有リンクのゲストにも届くため)。`reactedByMe` は、ログインしていない閲覧者には常に偽である
+- 単体取得は、ページ ID を必須にして `where: { id, pageId }` で引く。コメントの ID だけでは引かないので、閲覧できるページの ID を指定して、別ページのコメントを読むことはできない。ページが見えない場合とコメントが無い場合の応答は同一である(要件 9.4、9.5)
 - 旧 API の応答の投稿者は、`toLegacyCreator` でパスワード、API トークン、非公開のメールアドレスだけを除く。旧 API の出力を変えないため(要件 5.1、5.4)で、それ以外のユーザーの項目は旧 API からは読める
 - 共有リンクでインラインコメントを返すことの可否は、要件 3.3 で決めた。根拠は、共有リンクの閲覧者が `GET /_api/v3/revisions/*` から過去の版の本文をすでに読めること(`research.md`)。UI で過去の版が見えない作りと API の差は、本 spec の範囲外
 

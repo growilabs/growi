@@ -81,6 +81,8 @@ export const ACTION_COMMENT_CREATE = 'COMMENT_CREATE';
 const ACTION_COMMENT_UPDATE = 'COMMENT_UPDATE';
 const ACTION_COMMENT_REMOVE = 'COMMENT_REMOVE';
 const ACTION_COMMENT_MENTION = 'COMMENT_MENTION';
+const ACTION_COMMENT_REACTION_ADD = 'COMMENT_REACTION_ADD';
+const ACTION_COMMENT_REACTION_REMOVE = 'COMMENT_REACTION_REMOVE';
 const ACTION_INLINE_COMMENT_CREATE = 'INLINE_COMMENT_CREATE';
 const ACTION_INLINE_COMMENT_REPLY = 'INLINE_COMMENT_REPLY';
 const ACTION_INLINE_COMMENT_RESOLVE = 'INLINE_COMMENT_RESOLVE';
@@ -354,6 +356,8 @@ export const SupportedAction = {
   ACTION_COMMENT_UPDATE,
   ACTION_COMMENT_REMOVE,
   ACTION_COMMENT_MENTION,
+  ACTION_COMMENT_REACTION_ADD,
+  ACTION_COMMENT_REACTION_REMOVE,
   ACTION_INLINE_COMMENT_CREATE,
   ACTION_INLINE_COMMENT_REPLY,
   ACTION_INLINE_COMMENT_RESOLVE,
@@ -614,6 +618,8 @@ export const MediumActionGroup = {
   ACTION_COMMENT_CREATE,
   ACTION_COMMENT_UPDATE,
   ACTION_COMMENT_REMOVE,
+  ACTION_COMMENT_REACTION_ADD,
+  ACTION_COMMENT_REACTION_REMOVE,
   ACTION_SHARE_LINK_CREATE,
   ACTION_SHARE_LINK_DELETE,
   ACTION_SHARE_LINK_DELETE_BY_PAGE,
@@ -854,6 +860,12 @@ export type AttachmentSnapshot = {
 };
 
 /**
+ * Snapshot variant of ACTION_COMMENT_REACTION_ADD / ACTION_COMMENT_REACTION_REMOVE.
+ * `emoji` is the ReactionKey string.
+ */
+export type CommentReactionSnapshot = DefaultSnapshot & { emoji: string };
+
+/**
  * Backward-compatible alias kept for existing importers
  * (snapshot-viewer and the REMOVE builder predate the canonical name).
  */
@@ -877,6 +889,7 @@ export type ChangeProposalReviewSnapshot = {
 export type ISnapshot =
   | DefaultSnapshot
   | AttachmentSnapshot
+  | CommentReactionSnapshot
   | ChangeProposalReviewSnapshot;
 
 export type IActivity = {

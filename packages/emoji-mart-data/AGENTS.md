@@ -74,6 +74,17 @@ Therefore one category-ordered file satisfies both consumers:
 
 ---
 
+## Output shape
+
+- `default` export: `name -> { skins }`, in category order. `skins[0]` is the default
+  glyph; emojis that support skin tones carry 6 skins (`skins[1..5]` are the
+  U+1F3FB..U+1F3FF variants, i.e. `skin-tone-2..6`), all others carry 1.
+- Named export `aliases`: alias -> canonical emoji id (targets always exist in `default`).
+- The extraction logic lives in `bin/build-lookup.ts` (pure, unit-tested via `pnpm run test`);
+  `bin/extract.ts` only reads the source JSON and writes `dist/`.
+
+---
+
 ## Maintenance
 
 Whenever `@emoji-mart/data` is upgraded, regenerate the lookup:

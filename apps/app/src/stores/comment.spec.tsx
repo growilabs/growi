@@ -70,6 +70,7 @@ const buildRow = (
   anchorOriginRevisionId: null,
   resolvedById: null,
   resolvedAt: null,
+  reactions: [],
   ...overrides,
 });
 

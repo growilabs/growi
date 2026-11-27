@@ -59,8 +59,15 @@ export const deleteCompletelyOperation = async (
     );
   }
 
-  // Delete reply comments first, then top-level comments, to avoid foreign key constraint violations.
+  // Children first (reactions -> replies -> comments); the reply/comment order avoids foreign key constraint violations.
   await prisma.$transaction([
+    prisma.commentreactions.deleteMany({
+      where: {
+        pageId: {
+          in: pageIdStrings,
+        },
+      },
+    }),
     prisma.comments.deleteMany({
       where: {
         pageId: {

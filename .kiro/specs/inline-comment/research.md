@@ -112,7 +112,18 @@ v1の実装後、ユーザー提供の実装UIモックアップ（テキスト�
 jsdomにはレイアウト・ペイントエンジインが無いため、ユニットテストでは検出できない種類の不具合が実ブラウザでの検証（統合タスク・E2Eタスク）で2件見つかった。
 
 - **`mousedown`の既定動作によるボタンの取りこぼし**: `SelectionActionButton`はポータル経由で本文コンテナの外（`document.body`直下）に描画される。`mousedown`の既定動作（文書選択の解除）を止めないと、`mousedown`と`click`の間に選択が消えて状態が`idle`に落ち、ボタンが外れて`onCommit`が発火しない。`SelectionCapture`が`SelectionActionButton`だけを包む要素を置き、その`onMouseDown`で`preventDefault`して対処した（`InlineCommentForm`側には適用せず、入力欄へのカーソル配置を妨げないようにしている）。
-- **スタッキングコンテキストの脱出によるクリック不能**: `SelectionPopover`のポータルは`document.body`直下に描画されるが、`.wiki`ページレイアウトの祖先要素（Bootstrapの`.z-1`クラスを持つflexアイテム。`position: static`でもflexアイテムとしてスタッキングコンテキストを形成する）の背後に回り込み、見た目は前面にあるのに実際にはクリック不能になっていた（`elementFromPoint`が背後の要素を指す）。ポータルの直下要素に`zIndex: 1070`（Bootstrapの`$zindex-popover`相当）を明示指定して解決した。
+- **スタッキングコンテキストの脱出によるクリック不能**: `SelectionPopover`のポータルは`document.body`直下に描画されるが、`.wiki`ページレイアウトの祖先要素（Bootstrapの`.z-1`クラスを持つflexアイテム。`position: static`でもflexアイテムとしてスタッキングコンテキストを形成する）の背後に回り込み、見た目は前面にあるのに実際にはクリック不能になっていた（`elementFromPoint`が背後の要素を指す）。ポータルの直下要素にz-indexを明示指定して解決した（値の決め方は次節）。
+
+### ポップオーバーの重なり順は、固定ヘッダー・サイドバーより上、モーダルの背景より下に置く
+
+`SelectionPopover`と`InlineCommentPreviewPopover`はどちらも`document.body`直下に描画され、同じSCSS変数`$popover-z-index`（`client/components/_popover-z-index.scss`、`bs.$zindex-modal-backdrop - 10`＝1040）を、それぞれのCSS Moduleで使う。前節の`.z-1`（z-index 1）の背後に回り込まないためには、1より大きければ足りる。そのうえで値を次の範囲に置いた。値をTSの定数ではなくBootstrapの変数から書くのは、Bootstrap側の値が変わっても範囲の関係が保たれ、根拠がコードに残るため（同じ層の値は`Sidebar.module.scss`なども同じ書き方をしている）。
+
+- **固定ヘッダー（Bootstrapの`$zindex-fixed`、1030）とサイドバー（`$zindex-fixed + 2`）より上**: スクロールやサイドバーとの重なりで、ポップオーバーが隠れないようにするため
+- **モーダルの背景（`$zindex-modal-backdrop`、1050）より下**: ポップオーバーから開くモーダル（`comment-reactions`の絵文字ピッカーなど）が、開いた元のポップオーバーより手前に出るようにするため。狭い画面で開くサイドバー（`$zindex-modal`）も、ポップオーバーより手前に出る
+
+Bootstrapのpopover層（`$zindex-popover`、1070）は使わない。この層はモーダルより上にあるため、ポップオーバーから開いたモーダルがポップオーバーの背後に隠れる。モーダルの側のz-indexを個別に上げる案も検討したが、採らなかった。共有部品（`packages/editor`の`EmojiPicker`）に呼び出し元の事情を持ち込むことになり、ポップオーバーから開くモーダルが増えるたびに同じ対応が要るため。
+
+ポップオーバー内の入力欄のメンション補完（`.cm-tooltip-autocomplete`）も`document.body`直下に描画されるので、Bootstrapの`$zindex-tooltip`と同じ1080を指定してポップオーバーより手前に出す。モーダル（絵文字ピッカー）よりも手前になるが、両者が同時に開くことはない（ピッカーを開くボタンを押すとエディタからフォーカスが外れ、補完は閉じる）。reactstrapの`Popover`・`Tooltip`（リアクションした人の一覧など）は既定の1070・1080のままで、ポップオーバーより手前に出る。
 
 ### Visual Verification（モックアップとの目視比較）は自動ゲート化しない
 
@@ -253,6 +264,14 @@ jsdomにはレイアウト・ペイントエンジインが無いため、ユニ
 ### ポップオーバーの解決トグルを、一覧側（`InlineCommentItem`）と共通コンポーネント化しなかった理由
 
 一覧（`InlineCommentItem.tsx`）とポップオーバー（`InlineCommentPreviewPopover.tsx`）は、解決する切り替えボタンをそれぞれ持っている。2つのボタンは、クラス名・翻訳キー・判定（`resolvedAt != null`）が同じで、違うのは `data-testid` と、一覧側だけが外側を `icon-button-container` で包んでいる点である（このため一覧側のボタンはカードにホバーしたときだけ表示され、ポップオーバー側は常に表示される）。状態バッジは一覧側にしかなく、ポップオーバーには無い。それでも共有コンポーネントへ切り出さなかったのは、この改修のスコープが一覧側のロジックを触らないことを前提にしていたためで、共有化すると一覧側のファイルにも手が入ってしまう。加えて2箇所の周囲のレイアウト（一覧の`headerEnd`とポップオーバー本文内）が異なり、エラー表示の置き場所の要件も違うため、抽象化してもパラメータ化のコストに見合う再利用が今のところない。同じ見た目のマークアップが2箇所に存在する状態は許容し、3箇所目の利用が現れた時点で切り出しを検討する。
+
+### 外側クリックの判定は、DOMの範囲ではなくReactのツリーで行う
+
+ポップオーバー（`InlineCommentPreviewPopover`）と入力フォーム（`InlineCommentForm`）は、外側の`mousedown`で閉じる（Requirement 15.4、15.9）。ポップオーバーの中から開くUIの一部は、ポータルで`document.body`直下に描画される（`comment-reactions`の絵文字ピッカーのモーダル、リアクションした人の一覧、ツールチップ）。DOMの`contains()`で判定すると、これらを押した瞬間にポップオーバーが閉じ、押したUIごとアンマウントされて操作が完了しない。
+
+そこで「内側」をReactのツリーで定義した。共通のフック`useCloseOnOutsideMouseDown`は、閉じる対象の最上位の要素に`onMouseDownCapture`を付けさせ、そこを通った`mousedown`だけに印を付ける。Reactはルートとポータル先のコンテナでイベントを配送するため、印は`document`のcaptureリスナー（印を消す）より後、`document`のbubbleリスナー（印を読んで閉じるか決める）より前に付く。ポータルの子孫も、React以外が描画した子孫のDOM（CodeMirrorの中身）も、Reactのツリー上で最上位の要素の下にあるので内側になる。
+
+DOMの`contains()`に例外のセレクタを足していく案は採らなかった。ポータルで開くUIが増えるたびに例外を足す必要があり、足し忘れると「押した瞬間に閉じる」不具合になる。例外として残るのは、Reactのツリーに属さないメンション補完（CodeMirrorが`document.body`直下に描画する`.cm-tooltip-autocomplete`）だけである。
 
 ## 起点コメント・返信の編集・削除（amend spec `inline-comment-edit-delete` より統合）
 

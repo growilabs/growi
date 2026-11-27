@@ -13,6 +13,7 @@ const excludeFiles = [
   '**/components/playground/*',
   '**/main.tsx',
   '**/vite-env.d.ts',
+  '**/*.spec.tsx',
 ];
 
 const devWebSocketPlugin = (): Plugin => ({

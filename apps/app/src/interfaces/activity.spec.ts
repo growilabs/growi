@@ -6,6 +6,7 @@ import type {
   AttachmentRemoveSnapshot,
   AttachmentSnapshot,
   ChangeProposalReviewSnapshot,
+  CommentReactionSnapshot,
   DefaultSnapshot,
   IActivity,
   ISnapshot,
@@ -20,6 +21,7 @@ import {
   AllSupportedTargetModels,
   AttachmentActions,
   ChangeProposalActions,
+  CommentActions,
   isAttachmentAddActivity,
   isAttachmentDownloadActivity,
   isAttachmentReextractActivity,
@@ -543,6 +545,58 @@ describe('ISnapshot union', () => {
     expectTypeOf<AttachmentRemoveSnapshot['fileSize']>().toEqualTypeOf<
       number | undefined
     >();
+  });
+});
+
+describe('comment reaction actions', () => {
+  const reactionActions = [
+    SupportedAction.ACTION_COMMENT_REACTION_ADD,
+    SupportedAction.ACTION_COMMENT_REACTION_REMOVE,
+  ];
+
+  it('defines the two action values', () => {
+    expect(reactionActions).toEqual([
+      'COMMENT_REACTION_ADD',
+      'COMMENT_REACTION_REMOVE',
+    ]);
+  });
+
+  it('records them in the same audit levels as the other comment operations (Medium and Large, not Small)', () => {
+    for (const action of reactionActions) {
+      expect(AllSupportedActions).toContain(action);
+      expect(AllMediumGroupActions).toContain(action);
+      expect(AllLargeGroupActions).toContain(action);
+      expect(AllSmallGroupActions).not.toContain(action);
+    }
+  });
+
+  it('does not make them notification targets', () => {
+    for (const action of reactionActions) {
+      expect(AllEssentialActions).not.toContain(action);
+    }
+  });
+
+  it('lists them under the audit log "comment" category', () => {
+    expect(CommentActions).toEqual(expect.arrayContaining(reactionActions));
+  });
+});
+
+describe('CommentReactionSnapshot', () => {
+  it('carries a required emoji next to the optional username', () => {
+    expectTypeOf<CommentReactionSnapshot['emoji']>().toEqualTypeOf<string>();
+    expectTypeOf<CommentReactionSnapshot['username']>().toEqualTypeOf<
+      string | undefined
+    >();
+  });
+
+  it('is a member of the ISnapshot union', () => {
+    const snapshot: CommentReactionSnapshot = {
+      username: 'alice',
+      emoji: 'thumbsup',
+    };
+    const asUnion: ISnapshot = snapshot;
+
+    expect(asUnion).toBe(snapshot);
   });
 });
 

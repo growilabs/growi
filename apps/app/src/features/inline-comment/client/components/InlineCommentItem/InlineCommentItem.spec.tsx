@@ -29,6 +29,33 @@ import type { InlineCommentWithReplies } from '../../../interfaces';
 // replies subtree is a separate component with its own spec.
 // ---------------------------------------------------------------------------
 
+vi.mock('~/features/comment-reaction/client', () => ({
+  CommentReactionBar: (props: {
+    pageId: string;
+    commentId: string;
+    isReadOnly: boolean;
+  }) => (
+    <div
+      data-testid="comment-reaction-bar"
+      data-page-id={props.pageId}
+      data-comment-id={props.commentId}
+      data-read-only={String(props.isReadOnly)}
+    />
+  ),
+  CommentReactionHeaderButton: (props: {
+    pageId: string;
+    commentId: string;
+    isReadOnly: boolean;
+  }) => (
+    <span
+      data-testid="comment-reaction-header-button"
+      data-page-id={props.pageId}
+      data-comment-id={props.commentId}
+      data-read-only={String(props.isReadOnly)}
+    />
+  ),
+}));
+
 // `inline-comment-quote` is declared as `:global(.inline-comment-quote)` in the
 // real SCSS, so CSS Modules never adds it to the JS-side lookup table — the
 // mock must not fabricate that key, or a regression where the component reads
@@ -1357,5 +1384,80 @@ describe('InlineCommentItem', () => {
         screen.getByText('inline_comment.resolve').closest('button'),
       ).toBeDisabled();
     });
+  });
+});
+
+describe('InlineCommentItem — reaction bar', () => {
+  it('shows the reaction bar for the origin comment', () => {
+    const { container } = renderItem();
+
+    const bar = screen.getByTestId('comment-reaction-bar');
+    expect(bar).toHaveAttribute('data-page-id', 'page1');
+    expect(bar).toHaveAttribute('data-comment-id', 'comment1');
+    expect(bar).toHaveAttribute('data-read-only', 'false');
+    expect(getMain(container)).toContainElement(bar);
+  });
+
+  it('does not show the reaction bar in the collapsed resolved display', () => {
+    renderItem(
+      {
+        resolvedById: 'user1',
+        resolvedAt: new Date('2026-01-02T00:00:00.000Z'),
+      },
+      {},
+      { collapsed: true },
+    );
+
+    expect(screen.queryByTestId('comment-reaction-bar')).toBeNull();
+  });
+});
+
+describe('InlineCommentItem — add-reaction button', () => {
+  const headerOf = (container: HTMLElement) =>
+    getMain(container)?.querySelector('.d-flex.align-items-center');
+
+  it('sits in the header row right after the history link on a desktop viewport', () => {
+    isLargerThanMdRef.current = true;
+    const { container } = renderItem();
+
+    const button = screen.getByTestId('comment-reaction-header-button');
+    const historyLink = document.getElementById(
+      'page-comment-revision-comment1',
+    );
+    expect(headerOf(container)).toContainElement(button);
+    expect(
+      (historyLink as Element).compareDocumentPosition(button) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    // `.icon-button-container` hides with `visibility`, which would drop it from the tab order.
+    expect(historyLink?.closest('.ms-2')).not.toContainElement(button);
+    expect(button).toHaveAttribute('data-comment-id', 'comment1');
+    expect(button).toHaveAttribute('data-page-id', 'page1');
+    expect(button).toHaveAttribute('data-read-only', 'false');
+  });
+
+  it('sits in the header row, before the three-dot menu, on a narrow viewport where history lives in the menu', () => {
+    isLargerThanMdRef.current = false;
+    const { container } = renderItem();
+
+    const button = screen.getByTestId('comment-reaction-header-button');
+    const menu = screen.getByTestId('inline-comment-item-menu-toggle');
+    expect(headerOf(container)).toContainElement(button);
+    expect(
+      button.compareDocumentPosition(menu) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it('is not shown in the collapsed resolved display', () => {
+    renderItem(
+      {
+        resolvedById: 'user1',
+        resolvedAt: new Date('2026-01-02T00:00:00.000Z'),
+      },
+      {},
+      { collapsed: true },
+    );
+
+    expect(screen.queryByTestId('comment-reaction-header-button')).toBeNull();
   });
 });

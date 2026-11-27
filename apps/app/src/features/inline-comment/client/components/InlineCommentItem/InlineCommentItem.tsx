@@ -52,6 +52,10 @@ import { CommentEditor } from '~/client/components/PageComment/CommentEditor';
 import { CommentRevisionLink } from '~/client/components/PageComment/CommentRevisionLink';
 import { DeleteConfirmAlert } from '~/client/components/PageComment/DeleteConfirmAlert';
 import RevisionRenderer from '~/components/PageView/RevisionRenderer';
+import {
+  CommentReactionBar,
+  CommentReactionHeaderButton,
+} from '~/features/comment-reaction/client';
 import type { RendererOptions } from '~/interfaces/renderer-options';
 import { useCurrentUser } from '~/states/global';
 import { useDeviceLargerThanMd } from '~/states/ui/device';
@@ -264,6 +268,12 @@ export const InlineCommentItem: FC<InlineCommentItemProps> = (
           revisionId={comment.anchorOriginRevisionId}
         />
       </span>
+      <CommentReactionHeaderButton
+        pageId={comment.pageId}
+        commentId={comment.id}
+        isReadOnly={false}
+        className={`ms-1 ${styles['reaction-add-control']}`}
+      />
       {/* Order left-to-right: edit/delete, resolve/reopen, collapse (resolved
           only), status badge. Edit/delete and resolve share
           `.icon-button-container` (hover-revealed). The badge stays outside
@@ -307,6 +317,13 @@ export const InlineCommentItem: FC<InlineCommentItemProps> = (
 
   const narrowHeaderEnd = (
     <span className="ms-auto d-flex align-items-center gap-2">
+      {/* History lives in the menu here, so the add button takes the right side instead. */}
+      <CommentReactionHeaderButton
+        pageId={comment.pageId}
+        commentId={comment.id}
+        isReadOnly={false}
+        className={styles['reaction-add-control']}
+      />
       {!isDeleteConfirmOpen && (
         <InlineCommentListMenu
           items={narrowMenuItems}
@@ -357,6 +374,11 @@ export const InlineCommentItem: FC<InlineCommentItemProps> = (
           }
           footer={
             <>
+              <CommentReactionBar
+                pageId={comment.pageId}
+                commentId={comment.id}
+                isReadOnly={false}
+              />
               {resolveError != null && (
                 <span
                   className="text-danger d-block"

@@ -13,7 +13,10 @@
   :global(.page-comment) {
     :global(.bg-comment) { @extend %bg-comment; }
     :global(.user-picture) { @extend %user-picture; }
-    :global(.page-comment-main) { @extend %comment-section; }
+    :global(.page-comment-main) {
+      @extend %comment-section;
+      @include comment-inheritance.reveal-reaction-add-control;
+    }
 
     // Same gray as normal comments' date / history link
     // (`Comment.module.scss` extends the same placeholder).

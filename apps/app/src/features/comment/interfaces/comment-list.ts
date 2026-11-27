@@ -1,3 +1,4 @@
+import type { ReactionChip } from '~/features/comment-reaction/interfaces';
 import type { users } from '~/generated/prisma/client';
 
 /**
@@ -36,6 +37,8 @@ export interface ICommentListItem {
   anchorOriginRevisionId: string | null;
   resolvedById: string | null;
   resolvedAt: Date | null;
+  /** `null` when the reactions could not be loaded, which differs from `[]` (no reactions). */
+  reactions: readonly ReactionChip[] | null;
 }
 
 export interface ListCommentsRequestQuery {
@@ -46,4 +49,13 @@ export interface ListCommentsRequestQuery {
 
 export interface ListCommentsResponseBody {
   comments: ICommentListItem[];
+}
+
+export interface GetCommentRequestQuery {
+  pageId: string;
+  shareLinkId?: string;
+}
+
+export interface GetCommentResponseBody {
+  comment: ICommentListItem;
 }

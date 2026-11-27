@@ -26,7 +26,7 @@
  * entry owns its own edit / delete-confirmation state, which is why editing
  * one no longer hides the rest of the thread.
  */
-import { type FC, type JSX, useEffect, useMemo, useRef, useState } from 'react';
+import { type FC, type JSX, useMemo, useRef, useState } from 'react';
 import { UserPicture } from '@growi/ui/dist/components';
 import type { VirtualElement } from '@popperjs/core';
 import { createPortal } from 'react-dom';
@@ -37,6 +37,7 @@ import type { RendererOptions } from '~/interfaces/renderer-options';
 import { useCurrentUser } from '~/states/global';
 
 import type { InlineCommentWithReplies } from '../../../interfaces';
+import { useCloseOnOutsideMouseDown } from '../../hooks/use-close-on-outside-mouse-down';
 import { MentionPickerButton } from '../InlineCommentForm/MentionPickerButton';
 import { MentionAwareCommentInput } from '../MentionAwareCommentInput/MentionAwareCommentInput';
 import { useCommentInputControls } from '../MentionAwareCommentInput/use-comment-input-controls';
@@ -109,8 +110,7 @@ export const InlineCommentPreviewPopover: FC<
   );
 
   // A state-backed callback ref (not useRef): `usePopperPosition` takes the
-  // popper element as an effect dependency, and the same node also serves as
-  // the outside-click boundary below.
+  // popper element as an effect dependency.
   const [popperElement, setPopperElement] = useState<HTMLDivElement | null>(
     null,
   );
@@ -136,35 +136,7 @@ export const InlineCommentPreviewPopover: FC<
 
   usePopperPosition(virtualElement, popperElement);
 
-  // A click/mousedown outside the popover closes it -- SelectionPopover has
-  // no such behavior, so it's implemented directly here.
-  useEffect(() => {
-    const handlePointerDown = (event: MouseEvent): void => {
-      const target = event.target as Node | null;
-      if (
-        popperElement != null &&
-        target != null &&
-        popperElement.contains(target)
-      ) {
-        return;
-      }
-      // The mention-completion popup (typing "@" inside any
-      // MentionAwareCommentInput in this popover -- an edit form or the
-      // reply composer) is portaled to document.body, outside popperElement,
-      // exactly like InlineCommentForm.tsx's own outside-click guard has to
-      // account for.
-      if (
-        target instanceof Element &&
-        target.closest('.cm-tooltip-autocomplete') != null
-      ) {
-        return;
-      }
-      onClose();
-    };
-
-    document.addEventListener('mousedown', handlePointerDown);
-    return () => document.removeEventListener('mousedown', handlePointerDown);
-  }, [popperElement, onClose]);
+  const { onMouseDownCapture } = useCloseOnOutsideMouseDown(onClose);
 
   const [resolveError, setResolveError] = useState<string>();
   const isResolved = comment.resolvedAt != null;
@@ -206,12 +178,10 @@ export const InlineCommentPreviewPopover: FC<
   const replyEditorKey = `inline_comment_preview_popover_new_reply_${comment.id}`;
 
   return createPortal(
-    // zIndex 1070 mirrors SelectionPopover's own portal (Bootstrap's $zindex-popover).
     // biome-ignore lint/a11y/noStaticElementInteractions: not an interactive element -- onMouseEnter only reports "pointer arrived" so the caller can lock the popover open
     <div
       ref={setPopperElement}
       data-testid="inline-comment-preview-popover"
-      style={{ zIndex: 1070 }}
       // `card` gives the mockup's own surface color and 1px border; the
       // corner radius and the diffuse drop shadow are its `--radius-lg`
       // (14px -> Bootstrap's 1rem `rounded-4`, the nearest step) and
@@ -221,11 +191,13 @@ export const InlineCommentPreviewPopover: FC<
       // flat on this surface instead of in a box of its own.
       className={`card rounded-4 shadow ${styles['inline-comment-preview-popover-styles']}`}
       onMouseEnter={onPointerEnter}
+      onMouseDownCapture={onMouseDownCapture}
     >
       <div className="card-body">
         <div data-testid="inline-comment-preview-popover-origin">
           <InlineCommentPopoverEntry
             id={comment.id}
+            pageId={comment.pageId}
             creator={comment.creator}
             createdAt={comment.createdAt}
             commentText={comment.comment}
@@ -310,6 +282,7 @@ export const InlineCommentPreviewPopover: FC<
               >
                 <InlineCommentPopoverEntry
                   id={reply.id}
+                  pageId={comment.pageId}
                   creator={reply.creator}
                   createdAt={reply.createdAt}
                   commentText={reply.comment}

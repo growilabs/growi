@@ -107,8 +107,8 @@ export const MentionAwareCommentInput = (
     );
   }, [codeMirrorEditor]);
 
-  // 1080 is one step above Bootstrap's $zindex-popover (1070), so this popup
-  // paints above SelectionPopover's portal instead of behind it.
+  // 1080 is Bootstrap's $zindex-tooltip, so this popup paints above the popover
+  // the input sits in.
   const tooltipZIndexTheme = useMemo(
     () =>
       EditorView.theme({

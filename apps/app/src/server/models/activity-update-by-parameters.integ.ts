@@ -124,6 +124,27 @@ describe('updateByParameters — snapshot persistence (read back from DB)', () =
     expect(persisted.snapshot.id).toBe(unsettled.snapshot.id);
   });
 
+  it('persists the emoji passed on update and keeps the existing snapshot._id and username', async () => {
+    const unsettled = await arrangeUnsettledActivity({
+      userId: new Types.ObjectId().toHexString(),
+      username: 'erin',
+    });
+
+    await prisma.activities.updateByParameters(unsettled.id, {
+      action: SupportedAction.ACTION_COMMENT_REACTION_REMOVE,
+      snapshot: { emoji: 'tada' },
+    });
+
+    const persisted = await prisma.activities.findUniqueOrThrow({
+      where: { id: unsettled.id },
+    });
+    expect(persisted.snapshot).toMatchObject({
+      username: 'erin',
+      emoji: 'tada',
+    });
+    expect(persisted.snapshot.id).toBe(unsettled.snapshot.id);
+  });
+
   it('req 2.2 — an update snapshot that omits username leaves the middleware-written username intact', async () => {
     // Arrange
     const unsettled = await arrangeUnsettledActivity({

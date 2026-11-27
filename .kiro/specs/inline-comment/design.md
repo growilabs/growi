@@ -90,6 +90,8 @@
 - `InlineCommentItem` は折りたたみの状態を自分で持たず、`collapsed`／`onExpand`／`onCollapse` を親から受け取る。`InlineCommentItem` を使う呼び出し元（現在は `PageComment` のみ）が増えたときは、その呼び出し元でも `use-resolved-collapse` を通して状態を渡しているか再確認する
 - 「解決済みは既定で折りたたむ」という表示規則があるため、一覧で解決済みコメントの本文・返信が見えている前提の機能（一覧からハイライトへのスクロール、E2E）を足すときは、折りたたみ中でも成り立つか再確認する。折りたたみ中も引用文は押せてスクロールできる
 - `SelectionPopover` は `cursorEdge` を渡すと選択範囲の上側・その端に、渡さないと選択範囲全体の下側・中央に配置する。`SelectionPopover` の呼び出し元を足すときは、どちらの配置にするかを決める
+- `SelectionPopover`・`InlineCommentPreviewPopover` の重なり順（`client/components/_popover-z-index.scss`）は、固定ヘッダー・サイドバー（`$zindex-fixed + 2`）より上、モーダルの背景（`$zindex-modal-backdrop`）より下に置いている（理由は `research.md` の「ポップオーバーの重なり順」）。アプリの固定ヘッダー・サイドバーの z-index を上げるとき、またはポップオーバーからモーダル以外の `document.body` 直下の UI を開くときは、ポップオーバーとの前後関係を再確認する
+- `InlineCommentPreviewPopover` と `InlineCommentForm` は、外側の `mousedown` で閉じる判定を共通のフック（`client/hooks/use-close-on-outside-mouse-down.ts`）で行う。「内側」は DOM の範囲ではなく React のツリーで、ポータルで `document.body` 直下に描画される子孫（絵文字ピッカー、リアクションした人の一覧、ツールチップ）も内側として扱う。React が描画しない `document.body` 直下の UI はこの判定では内側にならず、メンション補完（`.cm-tooltip-autocomplete`）だけを個別の例外にしている（理由は `research.md` の「外側クリックの判定」）。ポップオーバーやフォームから、React を介さずに `document.body` 直下へ UI を描画する部品を足すときは、例外を足す必要があるか確認する
 - `PageComment` の途中で描画を終える分岐（コメント0件などの早期 return）を動かすときは、`useResolvedCollapse` の呼び出しがその分岐より前に残っているか確認する（Rules of Hooks）
 
 ## Architecture
@@ -384,7 +386,7 @@ sequenceDiagram
     Body->>Popover: 表示するコメント・Rangeを決定
     Popover->>Popover: rangeToVirtualElement + usePopperPosition で配置（document.bodyへポータル）
     Popover-->>User: 投稿者・投稿日時・本文・既存の返信＋簡易返信欄を表示
-    User->>Popover: 外側をクリック、または閉じる操作
+    User->>Popover: 外側をクリック（ポップオーバーのReactツリーの外。ポータル先のUIは内側）、または閉じる操作
     Popover->>Body: onClose（pinnedIdをクリアし、直前の当たり判定結果を一時的に抑制）
 ```
 
