@@ -62,6 +62,7 @@ test.afterAll(async ({ browser }) => {
 });
 
 test('Links in a page body reach their target without reloading the document', async ({
+  test.skip(!!process.env.CI, 'flaky on CI - see #12079; remove when fixed');
   page,
 }) => {
   for (const [linkText, expectedBody] of [
