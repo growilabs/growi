@@ -93,7 +93,7 @@
 - **Rationale**: 全ユーザー対象の `lastLoginAt` 索引では、未移行者が降順走査の最後尾に来るため、1 ページ目を埋めるだけで実質全件を読む
 - **Trade-offs**: 索引が 1 つ増える。移行が完了すれば対象行は 0 件に近づくため、索引自体も小さくなる
 - **制約**: `partialFilterExpression` は `$exists: false` を受け付けないため、条件は `{ password: { $exists: true } }` とする。両形式を同時に持つユーザーが存在しないため、これは旧形式保持者と一致する
-- **Follow-up**: 索引の作成は migrate-mongo のマイグレーションで行い、同じ `map:` 名で `schema.prisma` にも `@@index` を宣言する。`.claude/rules/model.md` の `## Indexes` がこの両方を要求している（deploy は `prisma db push` を実行しないので宣言だけでは作られず、Mongoose スキーマだけに書くとスキーマ削除時に静かに失われるため）。
+- **Follow-up**: 索引は migrate-mongo のマイグレーションで作る。キーは `{ lastLoginAt: -1, _id: 1 }`、`partialFilterExpression` は `{ password: { $exists: true } }`、名前は `lastLoginAt_-1__id_1`。`password` を先頭キーにする案は成立しない（抽出条件が範囲述語なので後続キーが整列に使えず、`_id` も索引に含まれない）。`.claude/rules/model.md` が求める `schema.prisma` への `@@index` 宣言は、Prisma が `partialFilterExpression` を表現できないため**この索引では行わない**。
 
 ### Decision: 件数と一覧のエラー状態を分ける
 

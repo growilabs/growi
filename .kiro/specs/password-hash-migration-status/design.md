@@ -109,6 +109,11 @@ graph TB
 apps/app/src/
 ├── interfaces/
 │   └── password-hash-status.ts              # 2 つのレスポンス型と件数の型
+├── migrations/
+│   └── <timestamp>-add-legacy-password-index-to-users.js
+│                                             # 部分索引 lastLoginAt_-1__id_1 を作る。
+│                                             # タイムスタンプは既存の最新（20261117120000）より
+│                                             # 後にする。既存の add-indexes-to-* と同じ命名
 ├── server/
 │   ├── service/
 │   │   ├── password-hash-status.ts          # 3 区分の件数を 1 回の走査で集計
@@ -312,9 +317,10 @@ noPassword   : どちらも なし                        — パスワード未
 ### Physical Data Model
 
 - 一覧は `legacyOnly` を `lastLoginAt` 降順で読む。全ユーザーを対象とした `lastLoginAt` の索引では、未移行者が走査の最後尾に来るため実質的に全件を読む。**旧形式保持者のみを含む部分索引**を用意し、走査を未移行者の集合に限定する
-- 部分索引の条件は `{ password: { $exists: true } }` とする。`partialFilterExpression` は `$exists: false` を受け付けないため「`passwordHash` が無い」を条件に含められないが、両形式を同時に持つユーザーが存在しない以上、「`password` がある」は旧形式保持者と一致する。一覧側のクエリの述語はこの条件の部分集合になるため、索引は選択されうる
+- **キーの順序が一覧の並び順と一致していることが要点である。** 一覧の整列は `lastLoginAt` 降順 + `_id` 昇順なので、索引のキーを同じ順序にすることで整列済みの走査になり、ブロッキングソートが起きない。`password` を先頭キーに置く案は成立しない — 抽出条件の `password` は `{ $exists: true, $nin: [null, ''] }` という範囲述語であり、先頭キーが範囲で縛られると後続キーは整列キーとして使えないうえ、`_id` が索引に含まれないためである
+- 絞り込みは `partialFilterExpression` が担う。`$exists: false` は受け付けられないため「`passwordHash` が無い」を条件に含められないが、両形式を同時に持つユーザーが存在しない以上「`password` がある」は旧形式保持者と一致する。一覧側のクエリの述語 `{ $exists: true, $nin: [null, ''] }` はこの条件の部分集合になるため、索引は選択されうる
 - 件数側は `lastLoginAt` を条件に含まないためこの索引は効かない。件数は `$facet` による単一走査で賄う
-- **索引の作成は migrate-mongo のマイグレーションで行い（`collection.createIndex(...)`）、同じ `map:` 名で `schema.prisma` にも `@@index` として宣言する。Mongoose スキーマには定義しない。** `.claude/rules/model.md` の `## Indexes` がこの形を定めている。deploy は `prisma db push` を実行しないため `schema.prisma` の宣言だけでは索引は作られず、逆に Mongoose スキーマだけに書くとそのスキーマが消えた時点で新規インストールに索引が作られなくなる。マイグレーションはどちらの ORM が残っても機能する。前例: `apps/app/src/migrations/20260619120000-add-unique-key-index-to-auditlog-es-sync-collections.js`
+- **索引は migrate-mongo のマイグレーションで `collection.createIndex(...)` により作り、Mongoose スキーマには定義しない。** キーは **`{ lastLoginAt: -1, _id: 1 }`**、`partialFilterExpression` は **`{ password: { $exists: true } }`**、名前は `lastLoginAt_-1__id_1`。`createIndex` は同じ索引に対して no-op なので、マイグレーションは再実行しても安全である。`.claude/rules/model.md` の `## Indexes` は `schema.prisma` にも同じ `map:` 名で `@@index` を宣言することを求めているが、**この索引については宣言しない**。Prisma には `partialFilterExpression` を表現する構文が無く（`schema.prisma` 全体で前例ゼロ）、宣言すると全件索引という別物の記述になるためである。規約の趣旨は「宣言だけでは索引は作られず、マイグレーションが正」という点にあるので、宣言を省いても索引は作られる。前例: `apps/app/src/migrations/20260619120000-add-unique-key-index-to-auditlog-es-sync-collections.js`
 
 ## Error Handling
 
