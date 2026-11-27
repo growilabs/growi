@@ -55,6 +55,20 @@ These rules are versioned (v1) and are **immutable after the first release**.
 
 ---
 
+## Cloning requires a Personal Access Token
+
+Every `git clone` / `git fetch` must carry a GROWI Personal Access Token (PAT) whose scopes include `read:features:page` (a broader scope such as `read:features:*` or `write:features:page` also covers it). A request without credentials is answered with `401` and `WWW-Authenticate: Basic realm="GROWI Vault"`, on every site, including sites that allow guest reading. There is no credential-less (guest) clone.
+
+A user issues a PAT in GROWI under **User Settings** (`/me`, opened from **Settings** in the user menu) > **API settings** > **Access token settings**. Pass it as the password of HTTP Basic authentication (the username is ignored):
+
+```bash
+git clone https://<any-username>:<PAT>@<site-url>/vault.git
+```
+
+Each user receives a view containing only the pages that user may read.
+
+---
+
 ## Excluding `/user` pages from a clone
 
 To clone a vault without the personal pages stored under `user/`:

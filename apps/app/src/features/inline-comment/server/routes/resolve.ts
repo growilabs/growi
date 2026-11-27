@@ -55,6 +55,73 @@ const validator = [
   body('resolved').isBoolean().withMessage('resolved must be a boolean'),
 ];
 
+/**
+ * @swagger
+ *
+ *    /inline-comments/{id}/resolve:
+ *      put:
+ *        tags: [Comments]
+ *        summary: Resolve or unresolve an inline comment thread
+ *        description: >
+ *          Marks an origin inline comment as resolved or unresolved. Only origin
+ *          comments have a resolved state. Anyone who may comment on the page may do
+ *          this, not only the creator. Requires login, or an access token with the scope
+ *          `write:features:page`, and permission to view the page. Not available through
+ *          a share link. Read-only users are refused unless read-only users are allowed
+ *          to comment.
+ *        parameters:
+ *          - in: path
+ *            name: id
+ *            required: true
+ *            schema:
+ *              type: string
+ *            description: ID of the origin inline comment.
+ *        requestBody:
+ *          required: true
+ *          content:
+ *            application/json:
+ *              schema:
+ *                type: object
+ *                required:
+ *                  - resolved
+ *                properties:
+ *                  resolved:
+ *                    type: boolean
+ *                    description: true to resolve the thread, false to reopen it.
+ *        responses:
+ *          200:
+ *            description: The updated inline comment.
+ *            content:
+ *              application/json:
+ *                schema:
+ *                  type: object
+ *                  required:
+ *                    - inlineComment
+ *                  properties:
+ *                    inlineComment:
+ *                      $ref: '#/components/schemas/InlineComment'
+ *          400:
+ *            description: >
+ *              Invalid input, or the caller is a read-only user (code
+ *              `validation_failed`); `id` is not an origin inline comment (code
+ *              `inline-comment-not-origin`); the state could not be changed (code
+ *              `inline-comment-resolve-failed`).
+ *            content:
+ *              application/json:
+ *                schema:
+ *                  $ref: '#/components/schemas/ErrorV3'
+ *          403:
+ *            description: Not authenticated, or the access token lacks the required scope.
+ *          404:
+ *            description: >
+ *              The comment does not exist (code `inline-comment-not-found`), or its page
+ *              does not exist or the caller may not view it (code
+ *              `notfound_or_forbidden`; these two page cases are indistinguishable).
+ *            content:
+ *              application/json:
+ *                schema:
+ *                  $ref: '#/components/schemas/ErrorV3'
+ */
 export const resolveInlineCommentRouteHandlersFactory = (
   crowi: Crowi,
 ): RequestHandler[] => {

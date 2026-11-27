@@ -17,7 +17,9 @@ import {
 } from './services/reconcile';
 import { createHistoryStore } from './services/reconcile/reconcile-history-store';
 import { isStaleBootstrapRunner } from './services/resilience';
+import { resolveRevisionId } from './services/resolve-revision-id';
 import { createVaultBootstrapper } from './services/vault-bootstrapper';
+import { subscribeToDescendantsRename } from './services/vault-descendants-rename-handler';
 import { createVaultDispatcher } from './services/vault-dispatcher';
 import { vaultNamespaceMapper } from './services/vault-namespace-mapper';
 import {
@@ -284,16 +286,7 @@ export const initializeVaultFeature = async (crowi: any): Promise<void> => {
     pageEvent.on(
       'create',
       (page: IPage & { _id: { toString(): string } }, _user: unknown) => {
-        // Resolve revisionId from the populated page object.
-        // page.revision may be an ObjectId or a populated Revision document.
-        const revisionId =
-          page.revision != null
-            ? typeof page.revision === 'object' && '_id' in page.revision
-              ? (
-                  page.revision as { _id: { toString(): string } }
-                )._id.toString()
-              : page.revision.toString()
-            : undefined;
+        const revisionId = resolveRevisionId(page.revision);
 
         dispatcher
           .onPageChanged({ type: 'create', page, revisionId })
@@ -347,8 +340,7 @@ export const initializeVaultFeature = async (crowi: any): Promise<void> => {
     //   namespace tree as a blob (`<name>.md`), not a directory, so a
     //   rename-prefix (subtree move) cannot relocate it. We model the rename
     //   as remove(oldPath) + upsert(newPath) via onPageRenamed instead.
-    //   Descendant relocation is handled separately by the 'updateMany'
-    //   subscriber's rename-prefix path.
+    //   Descendants are relocated separately by the 'updateMany' subscriber.
     pageEvent.on(
       'rename',
       (payload?: {
@@ -369,14 +361,7 @@ export const initializeVaultFeature = async (crowi: any): Promise<void> => {
           return;
         }
         const { page } = payload;
-        const revisionId =
-          page.revision != null
-            ? typeof page.revision === 'object' && '_id' in page.revision
-              ? (
-                  page.revision as { _id: { toString(): string } }
-                )._id.toString()
-              : (page.revision as { toString(): string }).toString()
-            : undefined;
+        const revisionId = resolveRevisionId(page.revision);
         dispatcher
           .onPageRenamed({
             page,
@@ -393,85 +378,10 @@ export const initializeVaultFeature = async (crowi: any): Promise<void> => {
       },
     );
 
-    // 'updateMany' (bulk rename of descendants): GROWI core was extended to
-    // carry a 4th argument { oldPagePathPrefix, newPagePathPrefix }. When
-    // present, we emit a single rename-prefix instruction per affected
-    // namespace — that collapses N descendant updates into M (= namespace
-    // count) instructions. When absent (legacy callers / non-rename emits),
-    // we fall back to per-page upserts so behaviour is at least correct, if
-    // less efficient.
-    //
-    // Coalesce safety: dispatcher.onPageChanged() coalesces high-frequency
-    // upserts on the same namespace into bulk-upsert instructions, so the
-    // fallback path is safe at scale.
-    pageEvent.on(
-      'updateMany',
-      (
-        pages: Array<
-          IPage & {
-            _id: { toString(): string };
-            revision?: unknown;
-          }
-        >,
-        _user: unknown,
-        extras?: { oldPagePathPrefix?: string; newPagePathPrefix?: string },
-      ) => {
-        if (!Array.isArray(pages) || pages.length === 0) return;
+    subscribeToDescendantsRename(pageEvent, dispatcher, vaultNamespaceMapper);
 
-        // Stage 2 fast path: GROWI core sent us prefix info → rename-prefix.
-        if (
-          extras?.oldPagePathPrefix != null &&
-          extras?.newPagePathPrefix != null
-        ) {
-          // The namespaces a bulk rename affects are the union of the
-          // namespaces of every descendant page. Grant is unchanged by a
-          // rename, so we can read it off the (unchanged) in-memory pages.
-          const namespaceSet = new Set<string>();
-          for (const page of pages) {
-            const { current } =
-              vaultNamespaceMapper.computePageNamespaces(page);
-            for (const ns of current) namespaceSet.add(ns);
-          }
-          if (namespaceSet.size === 0) return;
-          dispatcher
-            .onBulkOperation({
-              type: 'rename-prefix',
-              namespaces: Array.from(namespaceSet),
-              oldPrefix: extras.oldPagePathPrefix,
-              newPrefix: extras.newPagePathPrefix,
-            })
-            .catch((err) => {
-              logger.warn(
-                { err },
-                'vault-dispatcher: error handling updateMany (rename-prefix)',
-              );
-            });
-          return;
-        }
-
-        // Fallback: per-page upsert.
-        for (const page of pages) {
-          if (page.revision == null) continue;
-          const revisionId =
-            typeof page.revision === 'object' && '_id' in page.revision
-              ? (
-                  page.revision as { _id: { toString(): string } }
-                )._id.toString()
-              : (page.revision as { toString(): string }).toString();
-          dispatcher
-            .onPageChanged({ type: 'update', page, revisionId })
-            .catch((err) => {
-              logger.warn(
-                { err },
-                'vault-dispatcher: error handling updateMany entry',
-              );
-            });
-        }
-      },
-    );
-
-    // syncDescendantsUpdate fires after a bulk rename completes. Now that
-    // Stage 2 routes the bulk rename via 'updateMany' + rename-prefix, this
+    // syncDescendantsUpdate fires after a bulk rename completes. The bulk
+    // rename reaches the vault via 'updateMany', so this
     // signal is informational only — vault has already been updated by the
     // time this fires. Kept as a debug log so operators can correlate logs
     // during incident response.
@@ -558,15 +468,7 @@ export const initializeVaultFeature = async (crowi: any): Promise<void> => {
             grantedUsers: item.newGrantedUsers,
           };
 
-          const revisionId =
-            item.page.revision == null
-              ? undefined
-              : typeof item.page.revision === 'object' &&
-                  '_id' in (item.page.revision as object)
-                ? (
-                    item.page.revision as { _id: { toString(): string } }
-                  )._id.toString()
-                : (item.page.revision as { toString(): string }).toString();
+          const revisionId = resolveRevisionId(item.page.revision);
 
           dispatcher
             .onPageChanged({

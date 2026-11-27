@@ -32,6 +32,7 @@ swagger-jsdoc \
   "${APP_PATH}/src/features/growi-plugin/server/routes/apiv3/**/*.ts" \
   "${APP_PATH}/src/features/revision-diff/server/routes/*.ts" \
   "${APP_PATH}/src/features/comment/server/routes/*.ts" \
+  "${APP_PATH}/src/features/inline-comment/server/routes/*.ts" \
   "${APP_PATH}/src/features/change-proposal/server/routes/*.ts" \
   "${APP_PATH}/src/features/change-proposal/server/routes/admin/*.ts" \
   "${APP_PATH}/src/server/routes/apiv3/**/*.{js,ts}" \

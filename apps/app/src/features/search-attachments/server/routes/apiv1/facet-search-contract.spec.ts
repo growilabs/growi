@@ -43,28 +43,48 @@ describe('parseFacetSearchParams', () => {
 });
 
 describe('toFacetedSearchResult', () => {
-  const item: IPageWithSearchMeta = {
-    data: mock<IPageWithSearchMeta['data']>({ _id: 'page-1' }),
+  const primaryItem = (pageId: string): IPageWithSearchMeta => ({
+    data: mock<IPageWithSearchMeta['data']>({ _id: pageId }),
     meta: { attachmentHits: [] },
-  };
+  });
 
   it.each([
     false,
     true,
-  ])('answers facet=attachments with a null total and primaryResultIncomplete=%s', (primaryResultIncomplete) => {
-    const items = primaryResultIncomplete ? [] : [item];
+  ])('answers the given items with a null total and primaryResultIncomplete=%s', (primaryResultIncomplete) => {
+    const items = [primaryItem('page-1-with-document')];
 
     expect(
-      toFacetedSearchResult({ items, meta: { primaryResultIncomplete } }),
+      toFacetedSearchResult(
+        { items: [primaryItem('page-1')], meta: { primaryResultIncomplete } },
+        items,
+      ),
     ).toEqual({
       data: items,
       meta: {
         facet: 'attachments',
         total: null,
-        hitsCount: items.length,
+        hitsCount: 1,
         primaryResultIncomplete,
       },
     });
+  });
+
+  it('counts hitsCount before the items whose page is gone were dropped', () => {
+    const primary = {
+      items: [
+        primaryItem('page-1'),
+        primaryItem('page-2'),
+        primaryItem('page-3'),
+      ],
+      meta: { primaryResultIncomplete: false },
+    };
+    const remaining = [primaryItem('page-1')];
+
+    const result = toFacetedSearchResult(primary, remaining);
+
+    expect(result.data).toEqual(remaining);
+    expect(result.meta.hitsCount).toBe(3);
   });
 });
 

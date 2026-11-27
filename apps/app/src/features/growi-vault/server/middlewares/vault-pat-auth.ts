@@ -3,12 +3,14 @@ import type { IUserSerializedSecurely } from '@growi/core/dist/models/serializer
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import type { NextFunction, Request, Response } from 'express';
 
-import { SupportedAction } from '~/interfaces/activity';
 // extractAccessToken / X_GROWI_ACCESS_TOKEN_HEADER_NAME are NOT re-exported by the
 // access-token-parser barrel — import them directly from the file (PR #11244).
 import { extractAccessToken } from '~/server/middlewares/access-token-parser/extract-access-token';
 import { AccessToken } from '~/server/models/access-token';
 import loggerFactory from '~/utils/logger';
+
+import type { VaultActivityRecorder } from '../interfaces/vault-activity-recorder';
+import { createVaultAuthChallenge } from './vault-auth-challenge';
 
 const logger = loggerFactory(
   'growi:features:growi-vault:middleware:vault-pat-auth',
@@ -17,19 +19,6 @@ const logger = loggerFactory(
 // ============================================================================
 // Types
 // ============================================================================
-
-/**
- * Audit-logger callback shape (subset of activityService.createActivity).
- * Wired by the router so the credential adapter can record auth-failure events
- * without depending on the full Crowi object.
- */
-export type VaultCredentialAdapterAudit = (params: {
-  ip: string | undefined;
-  endpoint: string;
-  action: string;
-  user: string | undefined;
-  snapshot: { username?: string };
-}) => Promise<void>;
 
 /**
  * The Express request shape the credential adapter populates on success.
@@ -128,35 +117,6 @@ const resolvePatUser = async (
   return { user, scopes };
 };
 
-/**
- * Send the git-compatible 401 challenge, end the response, and record an
- * auth-failure activity. The body intentionally carries no page content / list
- * / existence information (req 2.3). Recorded as VAULT_AUTH_FAILURE for
- * brute-force detection (req 10.4).
- */
-const rejectWithChallenge = (
-  req: Request,
-  res: Response,
-  audit: VaultCredentialAdapterAudit | undefined,
-): void => {
-  if (!res.headersSent) {
-    res.setHeader('WWW-Authenticate', 'Basic realm="GROWI Vault"');
-    res.status(401).end();
-  } else {
-    res.end();
-  }
-
-  audit?.({
-    ip: req.ip,
-    endpoint: req.originalUrl,
-    action: SupportedAction.ACTION_VAULT_AUTH_FAILURE,
-    user: undefined,
-    snapshot: {},
-  }).catch((err) =>
-    logger.warn({ err }, 'Failed to record auth-failure activity'),
-  );
-};
-
 // ============================================================================
 // Credential adapter (seam #1)
 // ============================================================================
@@ -166,9 +126,9 @@ const rejectWithChallenge = (
  *
  * This is the ONLY git-specific authentication seam: it translates the git HTTP
  * Basic transport into the `req.user` shape the standard middleware chain
- * expects, then defers the guest / user-required decision to the downstream
+ * expects, then defers the user-required decision to the downstream
  * `loginRequiredFactory` (the single source of truth — req 11). It does NOT
- * decide guest access itself.
+ * reject a request that carries no credential itself.
  *
  * Token resolution shares the GROWI single source of truth (req 2.6):
  *   PAT = extractAccessToken(req)                  // Bearer > X-GROWI-ACCESS-TOKEN > query > body
@@ -178,21 +138,18 @@ const rejectWithChallenge = (
  * still authenticates with `Authorization: Basic base64(x:PAT)`.
  *
  * Behaviour:
- *  - No credential from ANY source → leave `req.user` unset (anonymous
- *    candidate) and call next(). The guest gate (loginRequiredFactory +
- *    aclService) decides.
+ *  - No credential from ANY source → leave `req.user` unset and call next().
+ *    loginRequiredFactory then answers 401.
  *  - Present but invalid / revoked / expired credential → respond 401 +
  *    `WWW-Authenticate: Basic realm="GROWI Vault"`, record VAULT_AUTH_FAILURE,
- *    and END (do not call next, do not fall through to anonymous). req 2.2 —
- *    loginRequiredFactory alone cannot do this: it would treat the missing user
- *    as anonymous and admit it when guests are allowed.
+ *    and END (do not call next). req 2.2
  *  - Valid credential → populate `req.user = serializeUserSecurely(user)` and
  *    stash `req.vaultScopes`, then call next(). Read-only users are allowed
  *    (intentional deviation — see resolvePatUser).
  */
-export const createVaultCredentialAdapter = (
-  audit?: VaultCredentialAdapterAudit,
-) => {
+export const createVaultCredentialAdapter = (audit?: VaultActivityRecorder) => {
+  const rejectWithChallenge = createVaultAuthChallenge(audit);
+
   return async (
     req: VaultAuthenticatedReq,
     res: Response,
@@ -219,23 +176,22 @@ export const createVaultCredentialAdapter = (
     // password so proxy-less clients keep working (req 2.6).
     const pat = extractAccessToken(req) ?? extractPatFromBasicAuth(authHeader);
 
-    // No credential from any source: anonymous candidate. The downstream guest
-    // gate owns the final decision — the adapter must not pre-empt it.
+    // No credential from any source: leave `req.user` unset; the downstream
+    // loginRequiredFactory owns the 401.
     if (pat == null) {
       next();
       return;
     }
 
     // A credential IS present. Any failure from here is a present-but-invalid
-    // credential and MUST fail closed with a 401 challenge (req 2.2) rather than
-    // silently degrading to anonymous.
+    // credential and MUST fail closed with a 401 challenge (req 2.2).
 
     let resolved: Awaited<ReturnType<typeof resolvePatUser>>;
     try {
       resolved = await resolvePatUser(pat);
     } catch (err) {
       logger.warn({ err }, 'Vault PAT resolution failed unexpectedly');
-      rejectWithChallenge(req, res, audit);
+      rejectWithChallenge(req, res);
       return;
     }
 
@@ -243,7 +199,7 @@ export const createVaultCredentialAdapter = (
       logger.debug(
         'Vault PAT authentication failed: token not found, expired, or revoked',
       );
-      rejectWithChallenge(req, res, audit);
+      rejectWithChallenge(req, res);
       return;
     }
 

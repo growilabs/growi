@@ -4,6 +4,7 @@ import mongoose from 'mongoose';
 import { checkMongoConnection } from './preflight.js';
 import { Server } from './server.js';
 import { createVaultInstructionWatcher } from './services/vault-instruction-watcher.js';
+import { removeLegacyAnonymousView } from './services/vault-legacy-anonymous-view.js';
 import { getSchedulerInstance } from './services/vault-maintenance-scheduler-instance.js';
 import { init as initRepo } from './services/vault-repo-storage.js';
 import {
@@ -37,6 +38,8 @@ export async function startServer(): Promise<VaultManagerServer> {
 
   // Bare repo path is derived from VAULT_REPO_PATH at first call.
   await initRepo();
+
+  await removeLegacyAnonymousView();
 
   // The published partial-clone filter specs have to be present before the
   // first clone can name one, and re-anchored on every boot so a gc between

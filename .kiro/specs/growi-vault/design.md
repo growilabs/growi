@@ -171,9 +171,9 @@ graph TB
 
 - **Endpoint**: `POST /internal/compose-view`(vault-manager)
 - **Auth**: `Authorization: Bearer ${VAULT_MANAGER_INTERNAL_SECRET}`
-- **Request**: `{ userId: string | null, namespaces: ReadonlyArray<Namespace> }`
+- **Request**: `{ userId: string, namespaces: ReadonlyArray<Namespace> }`
 - **Response**: `{ viewRef: string, commitOid: string }`
-- **匿名アクセス**: `userId: null` のとき、namespace 集合は `['public']` で gateway が呼び出し、manager は `'anonymous-view'` ref を返す
+- **利用者**: `userId` は gateway が特定した利用者の ID である。利用者を特定できない要求に対して、gateway はこの RPC を呼ばない（要件 3.4）。manager は `userId` が空でない文字列でない依頼を 400 で拒否し、view を作らない。view ref は常に `user-<uid>-view` で、1 本の view は 1 人の利用者にだけ対応する
 
 ### 2.1 `storage-stats` RPC(admin UI 観測用)
 
@@ -196,7 +196,6 @@ refs/namespaces/restricted-link/refs/heads/main          # anyone-with-link tree
 refs/namespaces/group-<gid>/refs/heads/main             # グループ ACL ページ tree
 refs/namespaces/user-<uid>-only-me/refs/heads/main      # only-me ページ tree
 refs/namespaces/user-<uid>-view/refs/heads/main         # per-user 合成 view ref
-refs/namespaces/anonymous-view/refs/heads/main          # 匿名 view ref
 ```
 
 衝突解消優先順位(per-user view 合成時): `user-<uid>-only-me` > `group-*` > `restricted-link` > `public`
@@ -233,7 +232,7 @@ refs/namespaces/anonymous-view/refs/heads/main          # 匿名 view ref
 | 6 | shared secret は env var only(DB 保存なし) | research.md Decision 6 |
 | 7 | 監査ログは既存 audit log collection を再利用 | research.md Decision 7 |
 | 8 | パスマッピング・ACL 規則は v1 確定後 immutable | research.md Decision 8 |
-| 9 | 単一 writer は StatefulSet replicas=1 で物理保証(leader election 機構なし) | 子 spec design.md / research.md |
+| 9 | 単一 writer は StatefulSet replicas=1 で物理保証(leader election 機構なし) | growi-vault-manager design.md「スケーラビリティ」 |
 | 10 | GROWI Cloud は Filestore(POSIX NFS)必須・GCSFuse 非対応 | 子 spec design.md "Storage Requirements" |
 
 ---

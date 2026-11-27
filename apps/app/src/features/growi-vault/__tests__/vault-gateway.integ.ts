@@ -148,7 +148,7 @@ describe('GROWI Vault — gateway contracts', () => {
       expect(res.headers.get('retry-after')).toBeNull();
     });
 
-    it('returns 404 for anonymous info/refs when VAULT_ENABLED=false', async () => {
+    it('returns 404 for a credential-less info/refs when VAULT_ENABLED=false', async () => {
       const res = await probeInfoRefs({});
       expect(res.status).toBe(404);
     });
@@ -242,6 +242,38 @@ describe('GROWI Vault — gateway contracts', () => {
     tmpDirs.push(dir);
     const files = await listFiles(dir);
     expect(files).toContain(VAULT_E2E_PAGES.publicRoot.mappedFile);
+  });
+
+  // ----------------------------------------------------------------------
+  // Contract: a request without a credential is refused with 401 and the git
+  // challenge, and its body carries nothing. This fixture mounts the gateway
+  // without crowi, so the refusal comes from the handler itself.
+  // ----------------------------------------------------------------------
+  describe('credential-less request at steady state', () => {
+    it('returns 401 with a Basic challenge for info/refs', async () => {
+      const res = await probeInfoRefs({});
+      expect(res.status).toBe(401);
+      expect(res.headers.get('www-authenticate')).toBe(
+        'Basic realm="GROWI Vault"',
+      );
+    });
+
+    it('returns 401 with an empty body for git-upload-pack', async () => {
+      const res = await fetch(
+        `${VAULT_E2E_CONFIG.baseUrl}/vault.git/git-upload-pack`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-git-upload-pack-request' },
+          body: '0011want abc\n0000',
+          redirect: 'manual',
+        },
+      );
+      expect(res.status).toBe(401);
+      expect(res.headers.get('www-authenticate')).toBe(
+        'Basic realm="GROWI Vault"',
+      );
+      expect(await res.text()).toBe('');
+    });
   });
 
   // ----------------------------------------------------------------------

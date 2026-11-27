@@ -53,7 +53,7 @@
 | view ref を 5,000 本にしたときの検査 1 回 | 1 ms（変化なし） |
 | 同条件の `upload-pack --advertise-refs`（既存経路） | 1 ms（変化なし） |
 
-**規模が増えても悪化しない理由**: `merge-base` が読むのは commit だけで、tree も blob も開かない。したがってページ数は無関係。commit chain の長さは squash で有界（既定 1 時間 or 1000 commit、要件 6）。ビューの数（＝利用者数）は ref 名の解決だけに関わり、`packed-refs` の二分探索なので 5,000 本でも変わらない。長期運用で伸びるのは object の総数だが、commit の解決は pack index の探索 1 回で済む（loose object 蓄積による劣化は既存の gc が受け持つ）。
+**規模が増えても悪化しない理由**: `merge-base` が読むのは commit だけで、tree も blob も開かない。したがってページ数は無関係。commit chain の長さは squash で有界（既定 1 時間 or 1000 commit、要件 6）。ビューの数（＝利用者数）は ref 名の解決だけに関わり、解決は loose ref のファイルを 1 つ読むだけなので 5,000 本でも変わらない（ref は常に loose で保つ。design.md の VaultMaintenanceScheduler を参照）。長期運用で伸びるのは object の総数だが、commit の解決は pack index の探索 1 回で済む（loose object 蓄積による劣化は既存の gc が受け持つ）。
 
 **未計測**: 同時 clone が多数走るときのスループット、GB 規模の object store（計測に用いた pack は 1.85 MiB）。前者は追加コストが POST 1 回あたり直列 1 プロセス（約 2 ms）で、同経路の `upload-pack` 本体（clone 1 回あたり数百 ms）より小さいという推論にとどまる。
 
@@ -92,6 +92,25 @@
 
 - `--filter=sparse:oid` に他人のページの blob を指定すると応答サイズが変わる（正規のパターン 4,815,099 B / 他人のページを指定 488,217 B / 何にも一致しないパターン 488,167 B）。object の ID を知っている相手に、その内容についてのわずかな手がかりを与える。
 - `sparse:path`（サーバ上のパスをクライアントが指定する形式）は git 側で削除済み（`fatal: sparse:path filters support has been dropped`）。同じ理由（クライアントがサーバ上の任意のファイルを名指しできる）による。
+
+---
+
+### gc と object の再利用（2026-11-25 実測 / git 2.55.0 / isomorphic-git 1.38.6）
+
+**調べたこと**: 書き込みが既存の object を再利用した後、ref がそれを指す前に `git gc --prune=2.weeks.ago` が走ると、その object が消されるか。
+
+**方法**: bare repo に blob を書き、loose ファイルの更新時刻を 3 週間前にしてから、同じ内容をもう一度 `writeBlob` し、どの ref からも参照しないまま gc を実行した。
+
+| 場合 | gc の後 |
+|---|---|
+| loose ファイルがあり、書き込みが再利用した（修正前） | **消えた** |
+| pack の中にだけあり（`gc --prune=never` で cruft pack に入れた）、書き込みが再利用した | 残った |
+| loose ファイルがあり、どの書き込みも再利用しなかった（対照） | 消えた |
+
+**分かったこと**:
+- isomorphic-git の `writeObjectLoose` は、loose ファイルがあれば書き込みを省き、更新時刻も変えない。gc は更新時刻だけで古さを判定するので、再利用された object を「2 週間使われていない」と扱う
+- pack の中にしかない object は、isomorphic-git が pack を見ずに loose ファイルを新しく書く。git は loose ファイルと cruft pack の記録のうち新しい方の時刻を使うので、消されない
+- git は、新しい object からたどれる object も残す。そのため、tree と commit（毎回新しく作られる）を書いた後に gc が走る場合は、再利用した blob も残る。消えるのは、再利用の確認から commit の書き込みまでの間に gc の判定が入った場合に限られる
 
 ---
 
@@ -152,6 +171,45 @@
 - **Rationale**: clone の時点で 1 行で止まり、次に何をすればよいかが分かる。同じ判定が、公開していない object を `sparse:oid` に指定して応答サイズの差から内容を推し量る余地も塞ぐ
 - **Trade-offs**: 応答の文言がサーバの対応状況を明かす。ただしこれはリポジトリの保持内容ではないため要件 2.3 には触れない
 
+### Decision F: ゲスト用ビューの片付けは vault-manager の起動時に行う
+
+- **Context**: 以前の版は、認証情報のないクローンのために、ゲスト用のビュー（`anonymous-view` の ref と HEAD、および `userId` が null の `vault_user_views` 記録）を持っていた。gateway はゲストを通さないが、これらが残っている限り、履歴に過去の public の内容を抱えたまま残る。
+- **Alternatives Considered**:
+  1. 起動のたびに消す（なければ何もしない）
+  2. 管理者が Vault を再構築したときに消す
+  3. migrate-mongo の migration で消す
+- **Selected Approach**: 案 1。`vault-legacy-anonymous-view.ts` の `removeLegacyAnonymousView()` を起動時に呼ぶ。
+- **Rationale**: 案 2 は、再構築するまで古いビューが残る。案 3 は、migration が apps/app の側で動くので、vault-manager の持つ bare repo に手が届かない。案 1 は、更新した時点で消え、管理者の操作が要らない。
+- **Where the knowledge lives**: 旧ゲスト用ビューに関する知識（namespace 名、記録の消し方）は `vault-legacy-anonymous-view.ts` の 1 ファイルに閉じる。次のメジャー版で、このファイルと呼び出しを削除するだけで済ませるため。モデルに static は足さない。`VaultRepoStorage` には namespace 名を引数に取る汎用の `deleteNamespace` だけを足し、`anonymous-view` という名前は持たせない。
+- **記録の消し方**: `VaultUserViewModel.deleteMany({ userId: { $type: "null" } })` を直接呼ぶ。`userId: null` という単純な条件だと、フィールドが存在しない文書にも一致してしまうので、値が null で保存された記録だけに一致する `$type: "null"` を使う。
+- **Trade-offs**: 更新が行き渡った後は何もしない処理が、起動のたびに動く。git の起動 1 回とファイルの削除 1 回、記録の削除 1 回なので、負担は小さい。
+
+### Decision G: 片付けが失敗しても起動を続ける
+
+- **Rationale**: gateway がゲストを通さないので、ref が残っていても内容は配られない。一方、vault-manager が起動しないと、ログインユーザーのクローンが止まる。`removeLegacyAnonymousView()` は例外を投げず、失敗を error ログに残して、次の起動でやり直す。
+
+### Decision H: ref の削除は `git update-ref -d` で行い、ファイルの削除だけにしない
+
+- **Context**: `deleteNamespace`（`vault-repo-storage.ts`）が、1 つの namespace の ref と HEAD を消す。
+- **Findings**:
+  - `VaultRepoStorage` は ref を loose ファイルとして直接読み書きし、`packed-refs` は読まない。
+  - 以前の版の `git gc` は ref を既定で `packed-refs` にまとめるため、その環境では ref が `packed-refs` の中にある。loose ファイルだけを消すと、ref が残る。
+  - `git update-ref -d` は、loose の ref も `packed-refs` の中の ref も消す。vault-manager は gc と upload-pack のためにすでに git を起動しているので、新しい依存は増えない。
+- **Selected Approach**: `git update-ref -d refs/namespaces/<namespace>/refs/heads/main` で ref を消し、その後で namespace のディレクトリ（HEAD を含む）を削除する。
+- **現在の gc との関係**: vault-manager の gc は `gc.packRefs=false` で動くので、vault-manager が `packed-refs` を作ることはない（過去の版の gc や手作業の gc が残したものはありうる）。`packed-refs` が残っている repo は、再構築が必要な状態として扱われる（`init()` が error ログを出し、`readRef` が例外を投げる）。`git update-ref -d` は `packed-refs` から対象の行だけを消し、ほかの行は変えない（`vault-repo-storage.spec.ts` の `keeps other namespaces and sparse-filter refs (packed)` で固定）。ほかに packed の ref がある限りファイルも残るので、再構築が必要な状態は片付けの後も残る。対象が唯一の packed の ref だった場合にファイルが残るかどうかは git の版による（git 2.55.0 ではヘッダーだけのファイルが残った。テストでは固定していない）。その場合はほかに packed の ref がないので、隠れる状態もない。
+
+### Decision I: `rename-prefix` は移動先のディレクトリと合成し、同名の項目は移動先の側を残す
+
+- **Context**: `rename-prefix` は `oldFilePrefix` のディレクトリを `newFilePrefix` へ移す。移動先のディレクトリが、その namespace にすでにあることがある。GROWI は、改名先のパスにページがなく（empty page）、その配下にだけページがある場合の改名を許すためである。
+- **Alternatives Considered**:
+  1. 移動先のディレクトリを、移動してきたディレクトリで置き換える
+  2. 再帰的に合成し、同名の項目は移動してきた側を残す
+  3. 再帰的に合成し、同名の項目は移動先にすでにある側を残す
+- **Selected Approach**: 3。片側にしかない項目はどちらも残す。ディレクトリ同士は中へ再帰する。それ以外で名前がぶつかったら、移動先にすでにある項目を残す。
+- **Rationale**: 1 は、移動先にもとからあったページのファイルを Vault から消す。同名の項目がぶつかるのは、2 つのページが同じファイルの位置に対応する場合で、どちらか一方しか残せない。3 は、すでにそこにある内容を消さない。移動してきた側は改名の前に書かれた内容であり、移動先の側は別のページか、改名の後に新しいパスへ書かれた内容である。
+- **自分の配下への改名（`/a` → `/a/b`）**: 改名したページ自身のファイル（`a/b.md`）は、移動元のディレクトリ `a/` の中に書かれる。ディレクトリごと移すと `a/b/b.md` へ運ばれてしまうので、このファイルは移動の対象から外し、元の位置に残す。ページ自身のファイルを書く指示と `rename-prefix` のどちらが先に適用されるかは決まっていないため、適用の順番に頼らず、vault-manager の側で外す。
+- **Trade-offs**: 移動先が移動元の配下にある `rename-prefix` は、2 回適用すると結果が変わる（1 回目で作られた `a/` がもう一度動き、`a/b/b/` になる）。gateway は 1 回の改名につき namespace ごとに 1 件だけ発行するので、通常はこれが起きない（growi-vault-gateway の research.md、Decision 9）。ただし、中断した改名の再開（新しい `operation` になる）と、適用後に処理済みの記録だけが失敗した指示の再実行では起きうる（要件 2.7 の注記）。
+
 ---
 
 ## 実装知見（Post-Implementation Discoveries）
@@ -177,6 +235,8 @@ upload-pack 自身が拒否時に返す形と同じなので、git クライア�
 | 公開する sparse filter のパターンを変えて README を直し忘れる | パターンから object ID を計算する単体テストが README を突き合わせる（`vault-sparse-filter.spec.ts`） |
 | gc が公開した filter の blob を消し、README の clone コマンドが解決できなくなる | `refs/vault/sparse-filters/<name>` から参照させ、起動ごとに再設置する。ref 経由の blob が `gc --prune=now` を越えて残ることを単体テストで固定 |
 | protocol v2 を通すと本文が解釈できず全拒否になる | 同上。gateway が `Git-Protocol` を転送しない現状が前提条件であることを明記 |
+| 旧ゲスト用ビューの片付けが失敗し、ref や記録が残る | gateway がゲストを通さないので内容は配られない。失敗は error ログに残し、次の起動で再実行する（Decision G） |
+| ref をファイルの削除だけで消して、`packed-refs` の中に残す | `git update-ref -d` を使う（Decision H） |
 | git の内部挙動（commit の到達性判定）に依存している | 到達性判定は自前の `merge-base` で行い、git 側の暗黙の挙動には依存しない。他ビューの commit 拒否は結合試験で固定 |
 
 ---

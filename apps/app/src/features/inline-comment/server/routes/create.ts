@@ -68,6 +68,210 @@ const validator = [
     .withMessage('anchor.approxOffset must be a non-negative integer'),
 ];
 
+/**
+ * @swagger
+ *
+ *  components:
+ *    schemas:
+ *      InlineCommentAnchor:
+ *        description: >
+ *          Where an inline comment points in the page body. Every value is measured
+ *          against the page body as rendered in the browser, as plain text (the text
+ *          a reader sees and selects, without markdown syntax), not against the
+ *          markdown source. When the page is displayed, the passage is searched for
+ *          again with `quote` and `approxOffset`: an exact match first, then the
+ *          closest approximate match; if neither is found the comment is still shown,
+ *          only without a highlight.
+ *        type: object
+ *        required:
+ *          - quote
+ *          - prefix
+ *          - suffix
+ *          - approxOffset
+ *        properties:
+ *          quote:
+ *            type: string
+ *            description: >
+ *              The commented passage, exactly as it appears in the rendered text. Must
+ *              not be empty. The server does not check that it occurs in the page.
+ *          prefix:
+ *            type: string
+ *            description: >
+ *              Text right before the passage. Stored, but not used to find the passage
+ *              again. May be empty.
+ *          suffix:
+ *            type: string
+ *            description: >
+ *              Text right after the passage. Stored, but not used to find the passage
+ *              again. May be empty.
+ *          approxOffset:
+ *            type: integer
+ *            minimum: 0
+ *            description: >
+ *              Rough position of the start of the passage in the rendered text, in
+ *              UTF-16 code units. Used only to choose among several occurrences of
+ *              the same `quote`.
+ *      InlineComment:
+ *        description: >
+ *          An origin inline comment: a comment anchored to a passage of the page body.
+ *          Only origin comments carry an anchor and a resolved state; replies are
+ *          `InlineCommentReply`.
+ *        type: object
+ *        required:
+ *          - id
+ *          - pageId
+ *          - creatorId
+ *          - creator
+ *          - comment
+ *          - anchorOriginRevisionId
+ *          - anchor
+ *          - resolvedById
+ *          - resolvedAt
+ *          - createdAt
+ *          - updatedAt
+ *        properties:
+ *          id:
+ *            type: string
+ *          pageId:
+ *            type: string
+ *          creatorId:
+ *            type: string
+ *          creator:
+ *            type: object
+ *            nullable: true
+ *            description: Always null in the responses of the write operations. GET /comments returns the creator.
+ *          comment:
+ *            type: string
+ *            description: Comment body (markdown).
+ *          anchorOriginRevisionId:
+ *            type: string
+ *            description: The revision of the page the anchor was taken from. Never changes after creation.
+ *          anchor:
+ *            $ref: '#/components/schemas/InlineCommentAnchor'
+ *          resolvedById:
+ *            type: string
+ *            nullable: true
+ *            description: The user who resolved the thread. Null while unresolved.
+ *          resolvedAt:
+ *            type: string
+ *            format: date-time
+ *            nullable: true
+ *            description: When the thread was resolved. Null while unresolved.
+ *          createdAt:
+ *            type: string
+ *            format: date-time
+ *          updatedAt:
+ *            type: string
+ *            format: date-time
+ *      InlineCommentReply:
+ *        description: A reply to an origin inline comment. Has no anchor and no resolved state.
+ *        type: object
+ *        required:
+ *          - id
+ *          - pageId
+ *          - creatorId
+ *          - creator
+ *          - comment
+ *          - replyToId
+ *          - createdAt
+ *          - updatedAt
+ *        properties:
+ *          id:
+ *            type: string
+ *          pageId:
+ *            type: string
+ *          creatorId:
+ *            type: string
+ *          creator:
+ *            type: object
+ *            nullable: true
+ *            description: Always null in the responses of the write operations. GET /comments returns the creator.
+ *          comment:
+ *            type: string
+ *            description: Comment body (markdown).
+ *          replyToId:
+ *            type: string
+ *            description: The origin inline comment this reply belongs to.
+ *          createdAt:
+ *            type: string
+ *            format: date-time
+ *          updatedAt:
+ *            type: string
+ *            format: date-time
+ */
+
+/**
+ * @swagger
+ *
+ *    /inline-comments:
+ *      post:
+ *        tags: [Comments]
+ *        summary: Create an inline comment
+ *        description: >
+ *          Creates an origin inline comment anchored to a passage of the page body. See
+ *          `InlineCommentAnchor` for how the anchor is measured and how it is used when
+ *          the page is displayed. Requires login, or an access token with the scope
+ *          `write:features:page`, and permission to view the page. Not available
+ *          through a share link. Read-only users are refused unless read-only users are
+ *          allowed to comment.
+ *        requestBody:
+ *          required: true
+ *          content:
+ *            application/json:
+ *              schema:
+ *                type: object
+ *                required:
+ *                  - pageId
+ *                  - anchorOriginRevisionId
+ *                  - comment
+ *                  - anchor
+ *                properties:
+ *                  pageId:
+ *                    type: string
+ *                    description: ID of the page.
+ *                  anchorOriginRevisionId:
+ *                    type: string
+ *                    description: >
+ *                      ID of the page revision the anchor was taken from: the latest
+ *                      revision when the passage was chosen.
+ *                  comment:
+ *                    type: string
+ *                    description: Comment body (markdown).
+ *                  anchor:
+ *                    $ref: '#/components/schemas/InlineCommentAnchor'
+ *        responses:
+ *          201:
+ *            description: The created inline comment.
+ *            content:
+ *              application/json:
+ *                schema:
+ *                  type: object
+ *                  required:
+ *                    - inlineComment
+ *                  properties:
+ *                    inlineComment:
+ *                      $ref: '#/components/schemas/InlineComment'
+ *          400:
+ *            description: >
+ *              Invalid input, or the caller is a read-only user (code
+ *              `validation_failed`); an empty `anchor.quote`, or an
+ *              `anchorOriginRevisionId` of a revision of another page (code
+ *              `inline-comment-create-failed`).
+ *            content:
+ *              application/json:
+ *                schema:
+ *                  $ref: '#/components/schemas/ErrorV3'
+ *          403:
+ *            description: Not authenticated, or the access token lacks the required scope.
+ *          404:
+ *            description: >
+ *              The page does not exist, or the caller may not view it. The two cases
+ *              are deliberately indistinguishable (code `notfound_or_forbidden`).
+ *            content:
+ *              application/json:
+ *                schema:
+ *                  $ref: '#/components/schemas/ErrorV3'
+ */
 export const createInlineCommentRouteHandlersFactory = (
   crowi: Crowi,
 ): RequestHandler[] => {

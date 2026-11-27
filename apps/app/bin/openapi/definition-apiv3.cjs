@@ -79,6 +79,7 @@ module.exports = {
         'Bookmarks',
         'BookmarkFolders',
         'ChangeProposals',
+        'Comments',
         'Page',
         'Pages',
         'PageListing',

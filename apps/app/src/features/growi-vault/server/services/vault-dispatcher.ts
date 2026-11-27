@@ -109,8 +109,8 @@ export interface BulkPageOperationEvent {
  * rename of the page's own path cannot be expressed as a directory-subtree
  * `rename-prefix` (that op only relocates `type === 'tree'` entries). We model
  * a single-page rename as remove(oldPath) + upsert(newPath) instead, which
- * correctly moves the blob. Descendant relocation is still handled by the
- * `rename-prefix` instruction emitted from the 'updateMany' event.
+ * correctly moves the blob. On the v5 page tree, descendants are relocated by
+ * the `rename-prefix` instruction emitted from the 'updateMany' event.
  */
 export interface PageRenamedEvent {
   /** The page object reflecting the current (post-rename) state. */
@@ -352,6 +352,31 @@ export const createVaultDispatcher = (
     }
   };
 
+  /**
+   * Point the upserts still waiting in the coalesce window at the new prefix.
+   * They are written after the rename-prefix, when the directory has already
+   * moved, and would otherwise recreate the file at the old path.
+   */
+  const retargetPendingUpserts = (
+    namespaces: ReadonlyArray<Namespace>,
+    oldPrefix: string,
+    newPrefix: string,
+  ): void => {
+    for (const ns of namespaces) {
+      const buf = coalesceMap.get(ns);
+      if (buf != null) {
+        buf.entries = buf.entries.map((entry) =>
+          entry.pagePath.startsWith(`${oldPrefix}/`)
+            ? {
+                ...entry,
+                pagePath: `${newPrefix}${entry.pagePath.slice(oldPrefix.length)}`,
+              }
+            : entry,
+        );
+      }
+    }
+  };
+
   return {
     async onPageChanged(event: PageChangedEvent): Promise<void> {
       const { type, page } = event;
@@ -506,6 +531,13 @@ export const createVaultDispatcher = (
 
     async onBulkOperation(event: BulkPageOperationEvent): Promise<void> {
       if (event.type === 'rename-prefix') {
+        if (event.oldPrefix != null && event.newPrefix != null) {
+          retargetPendingUpserts(
+            event.namespaces,
+            event.oldPrefix,
+            event.newPrefix,
+          );
+        }
         // One rename-prefix instruction per affected namespace, written concurrently.
         await Promise.all(
           event.namespaces.map((ns) =>

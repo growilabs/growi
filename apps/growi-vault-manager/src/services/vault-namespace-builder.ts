@@ -21,9 +21,11 @@ import type { VaultInstructionDoc } from '@growi/core/dist/interfaces/vault';
 import { loggerFactory } from '@growi/logger';
 
 import { RevisionModel } from '../models/revision.js';
+import { VaultInstructionModel } from '../models/vault-instruction.js';
 import { VaultNamespaceStateModel } from '../models/vault-namespace-state.js';
 import { VaultUserViewModel } from '../models/vault-user-view.js';
 import * as VaultBlobHasher from './vault-blob-hasher.js';
+import { withNamespaceLock } from './vault-namespace-lock.js';
 import * as VaultPathMapper from './vault-path-mapper.js';
 import type { TreeEntry } from './vault-repo-storage.js';
 import * as VaultRepoStorage from './vault-repo-storage.js';
@@ -252,6 +254,61 @@ async function mountSubtreeInTree(
     .filter((e) => e.path !== head)
     .concat([{ mode: '040000', path: head, oid: childTreeOid, type: 'tree' }]);
   return VaultRepoStorage.writeTree(updated);
+}
+
+/**
+ * Merges the `moved` tree into the `destination` tree recursively and returns
+ * the OID of the merged tree.
+ */
+async function mergeTrees(
+  destinationOid: string,
+  movedOid: string,
+): Promise<string> {
+  const [destination, moved] = await Promise.all([
+    VaultRepoStorage.readTree(destinationOid),
+    VaultRepoStorage.readTree(movedOid),
+  ]);
+
+  const movedByName = new Map(moved.map((entry) => [entry.path, entry]));
+  const destinationNames = new Set(destination.map((entry) => entry.path));
+
+  const mergedSameNames = await Promise.all(
+    destination.map(async (entry): Promise<TreeEntry> => {
+      const counterpart = movedByName.get(entry.path);
+      if (
+        counterpart != null &&
+        entry.type === 'tree' &&
+        counterpart.type === 'tree'
+      ) {
+        return { ...entry, oid: await mergeTrees(entry.oid, counterpart.oid) };
+      }
+      // Any other name conflict means two pages map to one file and only one
+      // can stay; the entry already there is kept so existing content is never
+      // deleted (see research.md, Decision I).
+      return entry;
+    }),
+  );
+  const movedOnly = moved.filter((entry) => !destinationNames.has(entry.path));
+
+  return VaultRepoStorage.writeTree([...mergedSameNames, ...movedOnly]);
+}
+
+/**
+ * Returns the OID of the blob at `segments` depth, or null when absent.
+ */
+async function findBlobOid(
+  rootEntries: ReadonlyArray<TreeEntry>,
+  segments: string[],
+): Promise<string | null> {
+  const [head, ...rest] = segments;
+  if (rest.length === 0) {
+    return (
+      rootEntries.find((e) => e.path === head && e.type === 'blob')?.oid ?? null
+    );
+  }
+  const dir = rootEntries.find((e) => e.path === head && e.type === 'tree');
+  if (dir == null) return null;
+  return findBlobOid(await VaultRepoStorage.readTree(dir.oid), rest);
 }
 
 /**
@@ -526,8 +583,16 @@ async function applyBulkUpsert(
   await commitAndUpdateRef(namespace, newTreeOid, message);
 }
 
+/** Reads the entries of a tree OID, treating null (an emptied tree) as empty. */
+function readTreeOrEmpty(
+  oid: string | null,
+): Promise<ReadonlyArray<TreeEntry>> {
+  return oid != null ? VaultRepoStorage.readTree(oid) : Promise.resolve([]);
+}
+
 /**
- * Handles op === 'rename-prefix': move a subtree within the same namespace.
+ * Handles op === 'rename-prefix': move a subtree within the same namespace,
+ * merging it into the destination directory when that already exists.
  * Blobs are not re-written — only tree objects change.
  */
 async function applyRenamePrefix(
@@ -543,32 +608,50 @@ async function applyRenamePrefix(
 
   const oldFilePrefix = VaultPathMapper.mapPrefix(oldPrefix);
   const newFilePrefix = VaultPathMapper.mapPrefix(newPrefix);
-
-  const rootEntries = await readRootTree(namespace);
   const oldSegments = oldFilePrefix.split('/');
+  const newSegments = newFilePrefix.split('/');
 
-  // Extract the subtree at oldFilePrefix.
+  let rootEntries = await readRootTree(namespace);
+
+  // When renaming under itself (/a -> /a/b), the renamed page's own file
+  // (a/b.md) lies inside the moved directory. GROWI refuses to rename onto an
+  // existing page, so that file can only be the renamed page itself: keep it
+  // where it is instead of carrying it along to a/b/b.md.
+  const ownFileSegments = VaultPathMapper.map(newPrefix).split('/');
+  const ownFileOid = newFilePrefix.startsWith(`${oldFilePrefix}/`)
+    ? await findBlobOid(rootEntries, ownFileSegments)
+    : null;
+  if (ownFileOid != null) {
+    rootEntries = await readTreeOrEmpty(
+      await removeEntryFromTree(rootEntries, ownFileSegments),
+    );
+  }
+
   const subtreeOid = await getSubtreeOid(rootEntries, oldSegments);
-
-  // Remove the old prefix location.
   const afterRemoveOid = await removeSubtreeFromTree(rootEntries, oldSegments);
-  const afterRemoveEntries: ReadonlyArray<TreeEntry> =
-    afterRemoveOid != null
-      ? await VaultRepoStorage.readTree(afterRemoveOid)
-      : [];
+  const afterRemoveEntries = await readTreeOrEmpty(afterRemoveOid);
 
-  // Mount the subtree at newFilePrefix (if subtree existed).
   let newTreeOid: string;
   if (subtreeOid != null) {
-    const newSegments = newFilePrefix.split('/');
+    const destinationOid = await getSubtreeOid(afterRemoveEntries, newSegments);
     newTreeOid = await mountSubtreeInTree(
       afterRemoveEntries,
       newSegments,
-      subtreeOid,
+      destinationOid != null
+        ? await mergeTrees(destinationOid, subtreeOid)
+        : subtreeOid,
     );
   } else {
     // Source prefix did not exist — tree is already in desired state.
     newTreeOid = afterRemoveOid ?? (await VaultRepoStorage.writeTree([]));
+  }
+
+  if (ownFileOid != null) {
+    newTreeOid = await upsertEntryInTree(
+      await VaultRepoStorage.readTree(newTreeOid),
+      ownFileSegments,
+      ownFileOid,
+    );
   }
 
   const message =
@@ -640,25 +723,23 @@ async function applyGrantChangePrefix(
 }
 
 /**
- * Handles op === 'reset-all': delete every namespace ref and clear
+ * Handles op === 'reset-all': delete every namespace ref on disk, including
+ * view refs and refs vault_namespace_state has no record of, and clear
  * vault_namespace_state + vault_user_views.  The object pool is preserved.
+ * Instructions still pending from before the wipe are superseded by it: the
+ * rebuild that follows re-derives their effect from the database.
  */
-async function applyResetAll(): Promise<void> {
-  // Collect all known namespaces from vault_namespace_state.
-  // Lean query to get all namespace strings without loading full docs.
-  const allDocs = await VaultNamespaceStateModel.find(
-    {},
-    { namespace: 1 },
-  ).lean<{ namespace: string }[]>();
-
-  // Delete every namespace ref from the bare repository.
-  await Promise.all(
-    allDocs.map((doc) => VaultRepoStorage.deleteRef(nsRef(doc.namespace))),
-  );
+async function applyResetAll(instruction: VaultInstructionDoc): Promise<void> {
+  await VaultRepoStorage.deleteAllNamespaceRefs();
 
   // Clear MongoDB state collections.
   await VaultNamespaceStateModel.deleteAll();
   await VaultUserViewModel.deleteAll();
+  await VaultInstructionModel.supersedeUnprocessedBefore(instruction.issuedAt);
+
+  // Last: packed-refs is what keeps refs unreadable, so a wipe that fails
+  // halfway must leave it in place (see design.md, VaultMaintenanceScheduler).
+  await VaultRepoStorage.dropPackedNamespaceRefs();
 }
 
 // ---------------------------------------------------------------------------
@@ -681,6 +762,29 @@ async function applyResetAll(): Promise<void> {
 export async function applyInstruction(
   instruction: VaultInstructionDoc,
 ): Promise<void> {
+  const namespaces = await namespacesWrittenBy(instruction);
+  await withNamespaceLock(namespaces, () => dispatchOp(instruction));
+}
+
+/**
+ * Returns the namespaces whose ref the instruction may write. reset-all
+ * locks every namespace that has a vault_namespace_state document: the only
+ * other writer it can overlap with is a squash, which locks by that document.
+ */
+async function namespacesWrittenBy(
+  instruction: VaultInstructionDoc,
+): Promise<string[]> {
+  if (instruction.op === 'reset-all') {
+    const docs = await VaultNamespaceStateModel.find({}, { namespace: 1 }).lean<
+      { namespace: string }[]
+    >();
+    return docs.map((doc) => doc.namespace);
+  }
+  const { namespace, fromNamespace } = instruction.payload;
+  return [namespace, fromNamespace].filter((ns): ns is string => ns != null);
+}
+
+async function dispatchOp(instruction: VaultInstructionDoc): Promise<void> {
   switch (instruction.op) {
     case 'upsert':
       await applyUpsert(instruction);
@@ -698,7 +802,7 @@ export async function applyInstruction(
       await applyGrantChangePrefix(instruction);
       break;
     case 'reset-all':
-      await applyResetAll();
+      await applyResetAll(instruction);
       break;
     default: {
       // TypeScript exhaustiveness check

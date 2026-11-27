@@ -1,4 +1,5 @@
 import { Readable } from 'node:stream';
+import type { RequestHandler } from 'express';
 import express from 'express';
 import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -37,10 +38,10 @@ vi.mock('../services/vault-manager-client', () => ({
   },
 }));
 
-// IMPORTANT: loginRequiredFactory is intentionally NOT mocked. The guest /
+// IMPORTANT: loginRequiredFactory is intentionally NOT mocked. The
 // user-required decision MUST run through the real standard middleware so the
-// gateway shares the single source of truth (aclService.isGuestAllowedToRead)
-// instead of re-implementing authz (req 11). The crowi stub drives the inputs.
+// gateway shares the single source of truth instead of re-implementing authz
+// (req 11). The crowi stub drives the inputs.
 
 // ---------------------------------------------------------------------------
 // Import mocked modules so tests can configure them
@@ -64,16 +65,13 @@ function buildApp(deps: Parameters<typeof createVaultGatewayRouter>[0] = {}) {
 
 /**
  * Build a crowi stub that drives the REAL loginRequiredFactory and
- * maintenance-mode middleware. Only the members those middlewares touch are
- * overridden; mock<Crowi> auto-stubs everything else (type-safe, no cast).
+ * maintenance-mode middleware. Guests may read, so a credential-less request
+ * is refused only because the gateway does not admit guests.
  */
-function buildCrowi(opts: {
-  isGuestAllowedToRead: boolean;
-  isMaintenanceMode?: boolean;
-}) {
+function buildCrowi(opts: { isMaintenanceMode?: boolean } = {}) {
   return mock<Crowi>({
     aclService: {
-      isGuestAllowedToRead: vi.fn().mockReturnValue(opts.isGuestAllowedToRead),
+      isGuestAllowedToRead: vi.fn().mockReturnValue(true),
     },
     appService: {
       isMaintenanceMode: vi
@@ -125,12 +123,8 @@ function authedAdapter(userId: string, scopes: ReadonlyArray<string> = []) {
   };
 }
 
-/** A credential-adapter middleware stub that resolves no user (anonymous). */
-// biome-ignore lint/suspicious/noExplicitAny: minimal Express middleware stub
-function anonymousAdapter(req: any, _res: any, next: any) {
-  req.vaultScopes = undefined;
-  next();
-}
+/** A credential-adapter middleware stub that resolves no user (no credential presented). */
+const noCredentialAdapter: RequestHandler = (_req, _res, next) => next();
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -340,10 +334,7 @@ describe('VaultGatewayRouter', () => {
       ).mockResolvedValue(enabledSettings);
       mockSyncStateDone();
 
-      const crowi = buildCrowi({
-        isGuestAllowedToRead: true,
-        isMaintenanceMode: true,
-      });
+      const crowi = buildCrowi({ isMaintenanceMode: true });
 
       const app = buildApp({ crowi, vaultPatAuth: authedAdapter('u') });
       const res = await request(app).get(
@@ -361,191 +352,74 @@ describe('VaultGatewayRouter', () => {
   });
 
   // -------------------------------------------------------------------------
-  // Guest / anonymous gate via the REAL loginRequiredFactory (req 2.4 / 2.4a / 11)
+  // Credential-less request via the REAL loginRequiredFactory (req 2.4 / 11)
   // -------------------------------------------------------------------------
 
-  describe('standard middleware chain: guest gate (no credential)', () => {
+  describe('standard middleware chain: request without a credential', () => {
     beforeEach(() => {
       (
         vaultSettingsService.getSettings as ReturnType<typeof vi.fn>
       ).mockResolvedValue(enabledSettings);
-      mockSyncStateDone();
-      (
-        vaultNamespaceMapper.computeAccessibleNamespaces as ReturnType<
-          typeof vi.fn
-        >
-      ).mockResolvedValue(['public']);
-      (
-        vaultManagerClient.composeView as ReturnType<typeof vi.fn>
-      ).mockResolvedValue({ viewRef: 'guest-view', commitOid: 'abc' });
-      (
-        vaultManagerClient.proxyGitRequest as ReturnType<typeof vi.fn>
-      ).mockResolvedValue(
-        makeProxyOkResponse('application/x-git-upload-pack-advertisement'),
-      );
-    });
-
-    describe('when isGuestAllowedToRead() === false (default restrictGuestMode=Deny / private wiki)', () => {
-      it('GET /info/refs returns 401 + WWW-Authenticate and exposes no page info', async () => {
-        const crowi = buildCrowi({ isGuestAllowedToRead: false });
-        const createActivity = vi.fn().mockResolvedValue(undefined);
-        const app = buildApp({
-          crowi,
-          vaultPatAuth: anonymousAdapter,
-          createActivity,
-        });
-
-        const res = await request(app).get(
-          '/vault.git/info/refs?service=git-upload-pack',
-        );
-
-        expect(res.status).toBe(401);
-        expect(res.headers['www-authenticate']).toBe(
-          'Basic realm="GROWI Vault"',
-        );
-        // Must not leak any public page content / list / existence info (req 2.3)
-        expect(res.text).not.toMatch(/\/|page|path|exist/i);
-
-        // Anonymous access must be denied BEFORE namespace computation / view
-        // composition / upstream proxying (req 2.3 / 3.2).
-        expect(
-          vaultNamespaceMapper.computeAccessibleNamespaces,
-        ).not.toHaveBeenCalled();
-        expect(vaultManagerClient.composeView).not.toHaveBeenCalled();
-        expect(vaultManagerClient.proxyGitRequest).not.toHaveBeenCalled();
-
-        // The single source of truth was consulted (req 11).
-        expect(crowi.aclService.isGuestAllowedToRead).toHaveBeenCalled();
-        // Recorded as an auth failure in the audit log (req 10.4).
-        expect(createActivity).toHaveBeenCalledWith(
-          expect.objectContaining({ action: 'VAULT_AUTH_FAILURE' }),
-        );
-      });
-
-      it('POST /git-upload-pack returns 401 + WWW-Authenticate and exposes no page info', async () => {
-        const crowi = buildCrowi({ isGuestAllowedToRead: false });
-        const createActivity = vi.fn().mockResolvedValue(undefined);
-        const app = buildApp({
-          crowi,
-          vaultPatAuth: anonymousAdapter,
-          createActivity,
-        });
-
-        const res = await request(app)
-          .post('/vault.git/git-upload-pack')
-          .set('Content-Type', 'application/x-git-upload-pack-request')
-          .send(Buffer.from('0011want abc\n0000'));
-
-        expect(res.status).toBe(401);
-        expect(res.headers['www-authenticate']).toBe(
-          'Basic realm="GROWI Vault"',
-        );
-        expect(res.text).not.toMatch(/\/|page|path|exist/i);
-
-        expect(vaultManagerClient.composeView).not.toHaveBeenCalled();
-        expect(vaultManagerClient.proxyGitRequest).not.toHaveBeenCalled();
-        expect(createActivity).toHaveBeenCalledWith(
-          expect.objectContaining({ action: 'VAULT_AUTH_FAILURE' }),
-        );
+      // A request let through would get the 503 readiness answer, so a 401
+      // shows it was refused before the gateway looked at its own state.
+      (VaultSyncState.findById as ReturnType<typeof vi.fn>).mockReturnValue({
+        lean: vi.fn().mockResolvedValue({ bootstrapState: 'pending' }),
       });
     });
 
-    describe('when isGuestAllowedToRead() === true (public wiki / restrictGuestMode=Readonly)', () => {
-      it('GET /info/refs proceeds anonymously with userId=null (public namespaces only)', async () => {
-        const crowi = buildCrowi({ isGuestAllowedToRead: true });
-        const app = buildApp({ crowi, vaultPatAuth: anonymousAdapter });
-
-        const res = await request(app).get(
-          '/vault.git/info/refs?service=git-upload-pack',
-        );
-
-        expect(res.status).toBe(200);
-        // computeAccessibleNamespaces(null) yields ['public'] only.
-        expect(
-          vaultNamespaceMapper.computeAccessibleNamespaces,
-        ).toHaveBeenCalledWith(null, undefined);
-        expect(vaultManagerClient.composeView).toHaveBeenCalledWith({
-          userId: null,
-          namespaces: ['public'],
-        });
-      });
-
-      it('POST /git-upload-pack proceeds anonymously with userId=null', async () => {
-        (
-          vaultManagerClient.proxyGitRequest as ReturnType<typeof vi.fn>
-        ).mockResolvedValue(
-          makeProxyOkResponse('application/x-git-upload-pack-result'),
-        );
-        const crowi = buildCrowi({ isGuestAllowedToRead: true });
-        const app = buildApp({ crowi, vaultPatAuth: anonymousAdapter });
-
-        const res = await request(app)
-          .post('/vault.git/git-upload-pack')
-          .set('Content-Type', 'application/x-git-upload-pack-request')
-          .send(Buffer.from('0011want abc\n0000'));
-
-        expect(res.status).toBe(200);
-        expect(
-          vaultNamespaceMapper.computeAccessibleNamespaces,
-        ).toHaveBeenCalledWith(null, undefined);
-        expect(vaultManagerClient.composeView).toHaveBeenCalledWith({
-          userId: null,
-          namespaces: ['public'],
-        });
-      });
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // Authenticated PAT: user resolved by the credential adapter (req 2 / 11)
-  // -------------------------------------------------------------------------
-
-  describe('standard middleware chain: authenticated PAT', () => {
-    beforeEach(() => {
-      (
-        vaultSettingsService.getSettings as ReturnType<typeof vi.fn>
-      ).mockResolvedValue(enabledSettings);
-      mockSyncStateDone();
-    });
-
-    it('resolves the user and computes namespaces even when guests are denied (PAT bypasses guest gate)', async () => {
-      // Guests are denied — a valid PAT must still clone successfully because
-      // loginRequiredFactory lets an ACTIVE req.user through before the guest check.
-      const crowi = buildCrowi({ isGuestAllowedToRead: false });
-      (
-        vaultNamespaceMapper.computeAccessibleNamespaces as ReturnType<
-          typeof vi.fn
-        >
-      ).mockResolvedValue(['public', 'group-eng']);
-      (
-        vaultManagerClient.composeView as ReturnType<typeof vi.fn>
-      ).mockResolvedValue({ viewRef: 'user-1-view', commitOid: 'abc' });
-      (
-        vaultManagerClient.proxyGitRequest as ReturnType<typeof vi.fn>
-      ).mockResolvedValue(
-        makeProxyOkResponse('application/x-git-upload-pack-advertisement'),
-      );
-
+    it('GET /info/refs returns 401 + WWW-Authenticate before any namespace or view work', async () => {
+      const createActivity = vi.fn().mockResolvedValue(undefined);
       const app = buildApp({
-        crowi,
-        vaultPatAuth: authedAdapter('user-1', ['read:features:page']),
+        crowi: buildCrowi(),
+        vaultPatAuth: noCredentialAdapter,
+        createActivity,
       });
 
       const res = await request(app).get(
         '/vault.git/info/refs?service=git-upload-pack',
       );
 
-      expect(res.status).toBe(200);
-      // userId resolved from req.user._id; scopes forwarded from req.vaultScopes.
+      expect(res.status).toBe(401);
+      expect(res.headers['www-authenticate']).toBe('Basic realm="GROWI Vault"');
       expect(
         vaultNamespaceMapper.computeAccessibleNamespaces,
-      ).toHaveBeenCalledWith('user-1', ['read:features:page']);
-      expect(vaultManagerClient.composeView).toHaveBeenCalledWith({
-        userId: 'user-1',
-        namespaces: ['public', 'group-eng'],
+      ).not.toHaveBeenCalled();
+      expect(vaultManagerClient.composeView).not.toHaveBeenCalled();
+      expect(vaultManagerClient.proxyGitRequest).not.toHaveBeenCalled();
+      expect(createActivity).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({
+          action: 'VAULT_AUTH_FAILURE',
+          endpoint: '/vault.git/info/refs?service=git-upload-pack',
+        }),
+      );
+    });
+
+    it('POST /git-upload-pack returns 401 + WWW-Authenticate before any namespace or view work', async () => {
+      const createActivity = vi.fn().mockResolvedValue(undefined);
+      const app = buildApp({
+        crowi: buildCrowi(),
+        vaultPatAuth: noCredentialAdapter,
+        createActivity,
       });
-      // Guest gate is not the deciding factor for an authenticated user.
-      expect(crowi.aclService.isGuestAllowedToRead).not.toHaveBeenCalled();
+
+      const res = await request(app)
+        .post('/vault.git/git-upload-pack')
+        .set('Content-Type', 'application/x-git-upload-pack-request')
+        .send(Buffer.from('0011want abc\n0000'));
+
+      expect(res.status).toBe(401);
+      expect(res.headers['www-authenticate']).toBe('Basic realm="GROWI Vault"');
+      expect(
+        vaultNamespaceMapper.computeAccessibleNamespaces,
+      ).not.toHaveBeenCalled();
+      expect(vaultManagerClient.composeView).not.toHaveBeenCalled();
+      expect(vaultManagerClient.proxyGitRequest).not.toHaveBeenCalled();
+      expect(createActivity).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({
+          action: 'VAULT_AUTH_FAILURE',
+          endpoint: '/vault.git/git-upload-pack',
+        }),
+      );
     });
   });
 
@@ -560,7 +434,7 @@ describe('VaultGatewayRouter', () => {
       ).mockResolvedValue(enabledSettings);
       mockSyncStateDone();
 
-      const crowi = buildCrowi({ isGuestAllowedToRead: true });
+      const crowi = buildCrowi();
       const app = buildApp({ crowi, vaultPatAuth: authedAdapter('user1') });
       const res = await request(app).get(
         '/vault.git/info/refs?service=git-receive-pack',
@@ -604,7 +478,7 @@ describe('VaultGatewayRouter', () => {
         makeProxyOkResponse('application/x-git-upload-pack-advertisement'),
       );
 
-      const crowi = buildCrowi({ isGuestAllowedToRead: false });
+      const crowi = buildCrowi();
       const createActivity = vi.fn().mockResolvedValue(undefined);
 
       const app = buildApp({
@@ -641,7 +515,7 @@ describe('VaultGatewayRouter', () => {
       );
 
       const mockScopes = ['read:features:page'];
-      const crowi = buildCrowi({ isGuestAllowedToRead: false });
+      const crowi = buildCrowi();
       const app = buildApp({
         crowi,
         vaultPatAuth: authedAdapter(mockUserId, mockScopes),
@@ -660,7 +534,7 @@ describe('VaultGatewayRouter', () => {
         makeProxyOkResponse('application/x-git-upload-pack-result'),
       );
 
-      const crowi = buildCrowi({ isGuestAllowedToRead: false });
+      const crowi = buildCrowi();
       const createActivity = vi.fn().mockResolvedValue(undefined);
 
       const app = buildApp({
@@ -698,7 +572,7 @@ describe('VaultGatewayRouter', () => {
       );
 
       const mockScopes = ['read:features:page'];
-      const crowi = buildCrowi({ isGuestAllowedToRead: false });
+      const crowi = buildCrowi();
       const app = buildApp({
         crowi,
         vaultPatAuth: authedAdapter(mockUserId, mockScopes),
@@ -715,10 +589,51 @@ describe('VaultGatewayRouter', () => {
   });
 
   // -------------------------------------------------------------------------
-  // Legacy test mode: crowi omitted → auth middleware skipped (no regression)
+  // crowi omitted (as the vault E2E fixture mounts it): only the credential
+  // adapter runs in front of the handlers
   // -------------------------------------------------------------------------
 
-  describe('test mode (crowi omitted): auth middleware is skipped', () => {
+  describe('when crowi is omitted (no maintenance / loginRequired middleware)', () => {
+    it('refuses a request without a credential with 401 and never reaches namespace computation', async () => {
+      (
+        vaultSettingsService.getSettings as ReturnType<typeof vi.fn>
+      ).mockResolvedValue(enabledSettings);
+      mockSyncStateDone();
+      const createActivity = vi.fn().mockResolvedValue(undefined);
+
+      const app = buildApp({
+        vaultPatAuth: noCredentialAdapter,
+        createActivity,
+      });
+      const infoRefs = await request(app).get(
+        '/vault.git/info/refs?service=git-upload-pack',
+      );
+      const uploadPack = await request(app)
+        .post('/vault.git/git-upload-pack')
+        .set('Content-Type', 'application/x-git-upload-pack-request')
+        .send(Buffer.from('0011want abc\n0000'));
+
+      for (const res of [infoRefs, uploadPack]) {
+        expect(res.status).toBe(401);
+        expect(res.headers['www-authenticate']).toBe(
+          'Basic realm="GROWI Vault"',
+        );
+      }
+      expect(
+        vaultNamespaceMapper.computeAccessibleNamespaces,
+      ).not.toHaveBeenCalled();
+      expect(vaultManagerClient.composeView).not.toHaveBeenCalled();
+      expect(vaultManagerClient.proxyGitRequest).not.toHaveBeenCalled();
+      expect(createActivity.mock.calls).toEqual(
+        [
+          '/vault.git/info/refs?service=git-upload-pack',
+          '/vault.git/git-upload-pack',
+        ].map((endpoint) => [
+          expect.objectContaining({ action: 'VAULT_AUTH_FAILURE', endpoint }),
+        ]),
+      );
+    });
+
     it('GET /info/refs proceeds without maintenance/loginRequired when crowi is not provided', async () => {
       (
         vaultSettingsService.getSettings as ReturnType<typeof vi.fn>
