@@ -165,8 +165,8 @@ export const createVaultGatewayRouter = (
   const credentialAdapter =
     deps.vaultPatAuth ?? createVaultCredentialAdapter(createActivity);
 
-  // Also the loginRequired fallback (seam #2): a git client cannot follow the
-  // standard redirect to /login.
+  // Shared by the loginRequired fallback (seam #2: a git client cannot follow
+  // the /login redirect) and the handlers' no-identity check.
   const rejectWithChallenge = createVaultAuthChallenge(createActivity);
   const router = express.Router();
 

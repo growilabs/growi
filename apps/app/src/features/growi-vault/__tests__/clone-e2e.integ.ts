@@ -13,8 +13,6 @@
  * They do NOT assert on:
  *  - "any markdown file exists" (fixture-dependent generic check)
  *  - Filenames the implementation never produces (e.g. 'root.md')
- *  - git's auth-fallback behaviour (this is a git client property,
- *    not a vault gateway contract — verified at the HTTP layer below)
  */
 
 import { execFile } from 'node:child_process';
@@ -40,25 +38,15 @@ const execFileAsync = promisify(execFile);
 
 const vaultRepoUrl = (): string => `${VAULT_E2E_CONFIG.baseUrl}/vault.git`;
 
-/**
- * Clone the vault repo with an explicit Authorization header.
- *
- * git issues the first `/info/refs` request WITHOUT credentials and only
- * retries with the credentials embedded in the URL after a 401. Injecting the
- * header via `http.extraheader` makes every HTTP request issued by
- * `git clone` carry the PAT, so the gateway resolves the user and ACL filters
- * the view (including the user's GRANT_OWNER pages) from the first request.
- */
+/** Clone with the PAT as URL credentials; git sends them after the gateway's 401 challenge. */
 async function cloneAuthenticated(pat: string): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), 'growi-vault-clone-'));
-  const auth = Buffer.from(`x:${pat}`).toString('base64');
-  await execFileAsync('git', [
-    '-c',
-    `http.extraheader=Authorization: Basic ${auth}`,
-    'clone',
-    vaultRepoUrl(),
-    dir,
-  ]);
+  const url = new URL(vaultRepoUrl());
+  url.username = 'x';
+  url.password = pat;
+  await execFileAsync('git', ['clone', url.toString(), dir], {
+    env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+  });
   return dir;
 }
 
@@ -340,10 +328,9 @@ describe('GROWI Vault — clone E2E contract', () => {
   // Contract: the gateway authenticates against the PAT supplied in HTTP
   // Basic Auth. An invalid PAT must yield 401.
   //
-  // We probe the HTTP layer directly because `git clone` will silently
-  // retry without credentials after a 401 — that's a git client property,
-  // not a vault contract. The vault contract is "Authorization: Basic
-  // <bad-pat> → 401".
+  // We probe the HTTP layer directly: the vault contract is
+  // "Authorization: Basic <bad-pat> → 401", while a failing `git clone`
+  // would only show how the git client reports it.
   // ----------------------------------------------------------------------
   it('HTTP request with invalid PAT returns 401', async () => {
     const url = `${VAULT_E2E_CONFIG.baseUrl}/vault.git/info/refs?service=git-upload-pack`;

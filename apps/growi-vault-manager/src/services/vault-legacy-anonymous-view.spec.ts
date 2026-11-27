@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockDeleteNamespace, mockDeleteAnonymous, mockLoggerError } =
-  vi.hoisted(() => ({
+const { mockDeleteNamespace, mockDeleteMany, mockLoggerError } = vi.hoisted(
+  () => ({
     mockDeleteNamespace: vi.fn(),
-    mockDeleteAnonymous: vi.fn(),
+    mockDeleteMany: vi.fn(),
     mockLoggerError: vi.fn(),
-  }));
+  }),
+);
 
 vi.mock('./vault-repo-storage.js', () => ({
   deleteNamespace: mockDeleteNamespace,
@@ -13,7 +14,7 @@ vi.mock('./vault-repo-storage.js', () => ({
 
 vi.mock('../models/vault-user-view.js', () => ({
   VaultUserViewModel: {
-    deleteAnonymous: mockDeleteAnonymous,
+    deleteMany: mockDeleteMany,
   },
 }));
 
@@ -32,14 +33,15 @@ describe('removeLegacyAnonymousView', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockDeleteNamespace.mockResolvedValue(undefined);
-    mockDeleteAnonymous.mockResolvedValue(undefined);
+    mockDeleteMany.mockResolvedValue({ deletedCount: 1 });
   });
 
-  it('removes the anonymous-view namespace and its record without logging an error', async () => {
+  it('removes the anonymous-view namespace and only the null-user record without logging an error', async () => {
     await expect(removeLegacyAnonymousView()).resolves.toBeUndefined();
 
     expect(mockDeleteNamespace).toHaveBeenCalledWith('anonymous-view');
-    expect(mockDeleteAnonymous).toHaveBeenCalledOnce();
+    expect(mockDeleteMany).toHaveBeenCalledOnce();
+    expect(mockDeleteMany).toHaveBeenCalledWith({ userId: { $type: 'null' } });
     expect(mockLoggerError).not.toHaveBeenCalled();
   });
 
@@ -54,12 +56,12 @@ describe('removeLegacyAnonymousView', () => {
       expect.objectContaining({ err: failure }),
       expect.any(String),
     );
-    expect(mockDeleteAnonymous).not.toHaveBeenCalled();
+    expect(mockDeleteMany).not.toHaveBeenCalled();
   });
 
   it('resolves and logs at error level when removing the record fails', async () => {
     const failure = new Error('mongo unavailable');
-    mockDeleteAnonymous.mockRejectedValue(failure);
+    mockDeleteMany.mockRejectedValue(failure);
 
     await expect(removeLegacyAnonymousView()).resolves.toBeUndefined();
 

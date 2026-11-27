@@ -82,12 +82,6 @@ export interface IVaultUserViewModel extends Model<IVaultUserViewDocument> {
    * Called during reset-all instruction processing.
    */
   deleteAll(): Promise<void>;
-
-  /**
-   * Removes the shared anonymous-view record (`userId: null`) that
-   * credential-less clones created. A no-op when it does not exist.
-   */
-  deleteAnonymous(): Promise<void>;
 }
 
 // ---- Schema ----
@@ -171,14 +165,6 @@ vaultUserViewSchema.statics.deleteAll = function (
   this: IVaultUserViewModel,
 ): Promise<void> {
   return this.deleteMany({}).then(() => {
-    /* intentionally empty — caller only needs the settled signal */
-  });
-};
-
-vaultUserViewSchema.statics.deleteAnonymous = function (
-  this: IVaultUserViewModel,
-): Promise<void> {
-  return this.deleteMany({ userId: { $type: 'null' } }).then(() => {
     /* intentionally empty — caller only needs the settled signal */
   });
 };

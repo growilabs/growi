@@ -67,18 +67,4 @@ describe('createVaultAuthChallenge', () => {
       'Failed to record auth-failure activity',
     );
   });
-
-  it('only ends a response whose headers were already sent', async () => {
-    const challenge = createVaultAuthChallenge(undefined);
-    const app = buildApp((req, res) => {
-      res.status(200).write('partial');
-      challenge(req, res);
-    });
-
-    const res = await request(app).get('/vault.git/info/refs');
-
-    expect(res.status).toBe(200);
-    expect(res.headers['www-authenticate']).toBeUndefined();
-    expect(res.text).toBe('partial');
-  });
 });

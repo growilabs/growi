@@ -64,17 +64,13 @@ function buildApp(deps: Parameters<typeof createVaultGatewayRouter>[0] = {}) {
 
 /**
  * Build a crowi stub that drives the REAL loginRequiredFactory and
- * maintenance-mode middleware. The aclService stub exists only so a 401 test
- * can represent a site that allows guest reading.
+ * maintenance-mode middleware. Guests may read, so a credential-less request
+ * is refused only because the gateway does not admit guests.
  */
-function buildCrowi(
-  opts: { isGuestAllowedToRead?: boolean; isMaintenanceMode?: boolean } = {},
-) {
+function buildCrowi(opts: { isMaintenanceMode?: boolean } = {}) {
   return mock<Crowi>({
     aclService: {
-      isGuestAllowedToRead: vi
-        .fn()
-        .mockReturnValue(opts.isGuestAllowedToRead ?? false),
+      isGuestAllowedToRead: vi.fn().mockReturnValue(true),
     },
     appService: {
       isMaintenanceMode: vi
@@ -366,7 +362,11 @@ describe('VaultGatewayRouter', () => {
       (
         vaultSettingsService.getSettings as ReturnType<typeof vi.fn>
       ).mockResolvedValue(enabledSettings);
-      mockSyncStateDone();
+      // A request let through would get the 503 readiness answer, so a 401
+      // shows it was refused before the gateway looked at its own state.
+      (VaultSyncState.findById as ReturnType<typeof vi.fn>).mockReturnValue({
+        lean: vi.fn().mockResolvedValue({ bootstrapState: 'pending' }),
+      });
     });
 
     it('GET /info/refs returns 401 + WWW-Authenticate before any namespace or view work', async () => {
@@ -422,26 +422,6 @@ describe('VaultGatewayRouter', () => {
           endpoint: '/vault.git/git-upload-pack',
         }),
       );
-    });
-
-    it('returns 401, not the readiness answer, on a site where guests may read', async () => {
-      // A gateway that is not ready answers 503 to anyone it lets through, so
-      // a 401 here shows the request was refused before the gateway looked at
-      // its own state, exactly as on a site that denies guests.
-      (VaultSyncState.findById as ReturnType<typeof vi.fn>).mockReturnValue({
-        lean: vi.fn().mockResolvedValue({ bootstrapState: 'pending' }),
-      });
-      const app = buildApp({
-        crowi: buildCrowi({ isGuestAllowedToRead: true }),
-        vaultPatAuth: noCredentialAdapter,
-      });
-
-      const res = await request(app).get(
-        '/vault.git/info/refs?service=git-upload-pack',
-      );
-
-      expect(res.status).toBe(401);
-      expect(res.headers['www-authenticate']).toBe('Basic realm="GROWI Vault"');
     });
   });
 

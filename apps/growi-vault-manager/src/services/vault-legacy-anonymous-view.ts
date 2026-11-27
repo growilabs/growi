@@ -16,7 +16,9 @@ const LEGACY_ANONYMOUS_NAMESPACE = 'anonymous-view';
 export async function removeLegacyAnonymousView(): Promise<void> {
   try {
     await deleteNamespace(LEGACY_ANONYMOUS_NAMESPACE);
-    await VaultUserViewModel.deleteAnonymous();
+    // Matches only the record stored with `userId: null`; a bare `userId: null`
+    // filter would also match a document that lacks the field.
+    await VaultUserViewModel.deleteMany({ userId: { $type: 'null' } });
   } catch (err) {
     logger.error(
       { err },

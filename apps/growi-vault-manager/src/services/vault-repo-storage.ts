@@ -479,8 +479,8 @@ export async function ensureNamespaceHead(namespace: string): Promise<void> {
  * Removes one namespace's ref and HEAD. A no-op when neither exists.
  *
  * The ref goes through `git update-ref -d` because it may live in
- * `packed-refs` after a gc, where deleting the loose file would leave it
- * behind (see design.md, vault-repo-storage.ts).
+ * `packed-refs` after an earlier version's gc, where deleting the loose file
+ * would leave it behind (see design.md, vault-repo-storage.ts).
  *
  * @param namespace - A single path segment under `refs/namespaces/`.
  */
