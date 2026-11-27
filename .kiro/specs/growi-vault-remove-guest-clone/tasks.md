@@ -71,19 +71,19 @@
   - 完了の目安: README に追記があり、PR の説明文の下書きがタスクの報告にある
   - _Requirements: 4.1, 4.2, 4.3_
 - [ ] 6. 変更を元の spec に書き戻し、この spec を削除する
-- [ ] 6.1 growi-vault-gateway の requirements.md と design.md を書き直す
+- [x] 6.1 growi-vault-gateway の requirements.md と design.md を書き直す
   - 設計書の「Amend target」の表のとおりに直す。要件の番号は変えない（2.4a と 3.2 は番号を残す）。「以前はこうだった」という経緯は書かず、今の事実だけを書く
   - Revalidation Triggers から、`security:restrictGuestMode` / `security:wikiMode` の仕様変更を消す
   - _Requirements: 1.1, 1.2, 1.5_
-- [ ] 6.2 growi-vault と growi-vault-manager の requirements.md と design.md を書き直す
+- [x] 6.2 growi-vault と growi-vault-manager の requirements.md と design.md を書き直す
   - growi-vault の要件 3.4 と、design.md の `anonymous-view` の記述を直す
   - growi-vault-manager の要件 4.7 と、design.md の `userId: string | null`・`anonymous-view`・`vault_user_views` の匿名の記録を直す
   - 起動時の片付けは、growi-vault-manager の requirements.md の末尾に新しい要件として足し、design.md にも書く。既存の要件の番号は変えない
   - _Requirements: 2.1, 3.1_
-- [ ] 6.3 設計の判断を、元の spec の research.md に移す
+- [x] 6.3 設計の判断を、元の spec の research.md に移す
   - この spec の research.md の Decision 1〜4 と「漏れの経路」を、growi-vault-gateway の research.md（なければ作る）に移す。起動時の片付けと ref の消し方は、growi-vault-manager の research.md に移す
   - _Requirements: 1.1, 3.1_
-- [ ] 6.4 3 つの spec の spec.json の `updated_at` を更新する（`phase` と `approvals` は変えない）
+- [x] 6.4 3 つの spec の spec.json の `updated_at` を更新する（`phase` と `approvals` は変えない）
   - _Requirements: 1.1_
 - [ ] 6.5 roadmap.md にこの spec の行があれば消し、`.kiro/specs/growi-vault-remove-guest-clone/` を削除する
   - 削除の前に、`.claude/rules/spec-lifecycle.md` の Checklist を上から確かめる（brief.md と design.md に「Amend target」があること、元の spec の本文に改訂の注記を書き込んでいないこと、を含む）

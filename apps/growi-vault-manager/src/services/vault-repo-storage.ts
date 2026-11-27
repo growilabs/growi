@@ -480,7 +480,7 @@ export async function ensureNamespaceHead(namespace: string): Promise<void> {
  *
  * The ref goes through `git update-ref -d` because it may live in
  * `packed-refs` after an earlier version's gc, where deleting the loose file
- * would leave it behind (see design.md, vault-repo-storage.ts).
+ * would leave it behind (see design.md, VaultRepoStorage).
  *
  * @param namespace - A single path segment under `refs/namespaces/`.
  */
