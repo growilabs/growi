@@ -9,7 +9,6 @@ import {
   mergedMetadata,
   ownerOnlyPage,
   PAGE_READ_LIMIT,
-  PARTIAL_FINAL_TEXT,
   parseSse,
   revisionlessPage,
   shortPage,
@@ -105,7 +104,7 @@ describe('POST /summary — request handling', () => {
       );
     });
 
-    it('streams the cut-off to the client, followed by the partial summary', async () => {
+    it('streams the limit_exceeded cut-off to the client before the summary text', async () => {
       const response = await request(route.app)
         .post('/summary')
         .send({ pageId: longPage._id.toString() })
@@ -121,7 +120,6 @@ describe('POST /summary — request handling', () => {
       expect(
         chunks.findIndex((chunk) => chunk.type === 'text-delta'),
       ).toBeGreaterThan(lastToolOutputAt);
-      expect(textOf(chunks)).toBe(PARTIAL_FINAL_TEXT);
     });
 
     it('withdraws tools from every later step once the budget is spent', async () => {
@@ -160,7 +158,7 @@ describe('POST /summary — request handling', () => {
       ]);
 
       for (const response of responses) {
-        expect(textOf(parseSse(response.text))).toBe(PARTIAL_FINAL_TEXT);
+        expect(textOf(parseSse(response.text))).toBe(FINAL_TEXT);
       }
       const [first, second] = route.streamCalls;
       expect(second.options.requestContext).not.toBe(

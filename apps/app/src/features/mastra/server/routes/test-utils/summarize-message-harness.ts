@@ -248,10 +248,6 @@ export const MODEL_CALL_USAGE = {
 export const FINAL_TEXT =
   'This page is a test fixture.\n- point one\n- point two\n- point three';
 
-// What the instructions tell the model to write once reading was cut off.
-export const PARTIAL_FINAL_TEXT =
-  'This summary is based on only part of the page.\n- point one\n- point two\n- point three';
-
 // --- Fake agent loop -------------------------------------------------------
 
 type ToolResult =
@@ -323,14 +319,7 @@ const buildUiChunks = (toolOutputs: ToolResult[]): unknown[] => [
     { type: 'tool-output-available', toolCallId: `call-${i}`, output },
   ]),
   { type: 'text-start', id: 'text-1' },
-  {
-    type: 'text-delta',
-    id: 'text-1',
-    delta:
-      toolOutputs.at(-1)?.result === 'limit_exceeded'
-        ? PARTIAL_FINAL_TEXT
-        : FINAL_TEXT,
-  },
+  { type: 'text-delta', id: 'text-1', delta: FINAL_TEXT },
   { type: 'text-end', id: 'text-1' },
   { type: 'finish-step' },
   { type: 'finish' },
