@@ -166,6 +166,24 @@ describe('resolveMarkdownQuoteAnchor', () => {
         'before  after',
       ],
       [
+        'quotes the label of a [[...]] link',
+        'pukiwikiLink',
+        'see [[Foo]] for',
+        'see Foo for',
+      ],
+      [
+        'quotes the label of a [[label>path]] link',
+        'pukiwikiLinkWithLabel',
+        '[[label>/path]]',
+        'label',
+      ],
+      [
+        'skips a growi directive the browser does not show',
+        'growiDirectiveBare',
+        'cost $HOME here',
+        'cost  here',
+      ],
+      [
         'quotes the text after the heading marker',
         'heading',
         '# Heading One',

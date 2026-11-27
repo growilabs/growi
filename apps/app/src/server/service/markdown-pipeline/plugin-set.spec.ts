@@ -128,6 +128,16 @@ describe('plugin-set declaration module', () => {
       );
     });
 
+    it('orders pukiwiki-like-linker and growi-directive after emoji and before remark-directive (mirrors the web order)', () => {
+      const names = ADOPTED_PLUGINS.map((p) => p.name);
+      const emojiIndex = names.indexOf('emoji');
+      const directiveIndex = names.indexOf('remark-directive');
+      for (const plugin of ['pukiwiki-like-linker', 'growi-directive']) {
+        expect(names.indexOf(plugin)).toBeGreaterThan(emojiIndex);
+        expect(names.indexOf(plugin)).toBeLessThan(directiveIndex);
+      }
+    });
+
     it('orders remark-directive before echo-directive (parser must run before the echo transform)', () => {
       const names = ADOPTED_PLUGINS.map((p) => p.name);
       expect(names.indexOf('remark-directive')).toBeLessThan(
@@ -181,8 +191,6 @@ describe('plugin-set declaration module', () => {
 
     it('contains all listed intentionally-excluded plugins', () => {
       const expectedExcluded = [
-        'pukiwiki-like-linker',
-        'growi-directive',
         'codeblock',
         'github-admonitions',
         'callout',
@@ -198,13 +206,15 @@ describe('plugin-set declaration module', () => {
       }
     });
 
-    // 改訂 5: these were excluded before but are now adopted (React/DOM-free reuse).
-    it('no longer excludes emoji / xsv-to-table / remark-directive / echo-directive', () => {
+    // These were excluded before but are now adopted (React/DOM-free reuse).
+    it('no longer excludes emoji / xsv-to-table / remark-directive / echo-directive / pukiwiki-like-linker / growi-directive', () => {
       for (const plugin of [
         'emoji',
         'xsv-to-table',
         'remark-directive',
         'echo-directive',
+        'pukiwiki-like-linker',
+        'growi-directive',
       ]) {
         expect(
           EXCLUDED_PLUGIN_NAMES.has(plugin),

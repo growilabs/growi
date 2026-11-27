@@ -110,5 +110,25 @@
   "mixed": {
     "md": "# Title\n\nPara one.\n\n## Sub\n\nPara two.",
     "text": "#Title\nPara one.\n#Sub\nPara two."
+  },
+  "pukiwikiLink": {
+    "md": "see [[Foo]] for details",
+    "text": "see Foo for details"
+  },
+  "pukiwikiLinkWithLabel": {
+    "md": "[[label>/path]]",
+    "text": "label"
+  },
+  "growiDirectiveBare": {
+    "md": "cost $HOME here",
+    "text": "cost  here"
+  },
+  "growiDirectiveWithArgs": {
+    "md": "a $foo(x) b",
+    "text": "a  b"
+  },
+  "titledCodeBlock": {
+    "md": "```js:app.js\nconst a = 1;\n```",
+    "text": "app.jsconst a = 1;"
   }
 }

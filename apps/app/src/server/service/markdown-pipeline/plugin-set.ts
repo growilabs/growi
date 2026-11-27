@@ -10,7 +10,8 @@
  *
  * Ordering follows the unified pipeline (mirrors the web renderer's selection order):
  *   remark-parse (implicit base)
- *   → remark plugins (gfm, emoji, remark-directive, echo-directive, frontmatter,
+ *   → remark plugins (gfm, emoji, pukiwiki-like-linker, growi-directive,
+ *                      remark-directive, echo-directive, frontmatter,
  *                      math, xsv-to-table)
  *   → remark-rehype (bridge, allowDangerousHtml)
  *   → rehype plugins (raw, slug, sanitize, katex, add-class, stringify)
@@ -70,6 +71,29 @@ export const ADOPTED_PLUGINS: ReadonlyArray<PluginDeclaration> = [
     name: 'emoji',
     load: () => import('~/services/renderer/remark-plugins/emoji'),
     exportName: 'remarkPlugin',
+    options: undefined,
+  },
+  // Reused GROWI web plugin: pukiwiki-like-linker turns `[[page]]` /
+  // `[[label>page]]` into a link showing the page or the label, as the web
+  // renderer does (generateCommonOptions). DOM-free micromark/mdast extension;
+  // placed after emoji, mirroring the web order. The web renderer's
+  // relative-links rehype plugins, which resolve the href against the page
+  // path, are not adopted, so the href stays as written.
+  {
+    name: 'pukiwiki-like-linker',
+    load: () =>
+      import('~/services/renderer/remark-plugins/pukiwiki-like-linker'),
+    exportName: 'pukiwikiLikeLinker',
+    options: undefined,
+  },
+  // growi-directive parses `$name` / `$name(args)` directives (DOM-free
+  // micromark/mdast extension), as the web renderer does. With no React
+  // consumer here, a directive renders as an empty element — the same text the
+  // web renderer shows for any directive other than its lsx/ref widgets. The
+  // `load` thunk is needed because the canonical name is not the package name.
+  {
+    name: 'growi-directive',
+    load: () => import('@growi/remark-growi-directive'),
     options: undefined,
   },
   // remark-directive parses `:foo[..]{..}` / `::bar` / `:::baz` directive syntax
@@ -142,17 +166,16 @@ export const ADOPTED_PLUGINS: ReadonlyArray<PluginDeclaration> = [
  *      callout (colored callouts via CalloutViewer), and the diagram/highlight features
  *      (drawio, lsx, mermaid, plantuml, attachment-refs, syntax-highlight colors).
  *  - Not needed by this spec / deferred for a different reason:
- *      pukiwiki-like-linker, growi-directive (parser alone is not useful without its
- *      React consumers), codeblock / add-inline-code (negligible visual effect),
+ *      codeblock / add-inline-code (negligible visual effect),
  *      relative-links (needs a per-page pagePath injected at runtime),
  *      remark-breaks (gated on the per-instance `isEnabledLinebreaks` config).
  *
  * (emoji, xsv-to-table, remark-directive and echo-directive were excluded here before
- * 改訂 5; they are now ADOPTED — see ADOPTED_PLUGINS above.)
+ * 改訂 5, and pukiwiki-like-linker / growi-directive until inline comments
+ * needed the server text to match the browser's; they are now ADOPTED — see
+ * ADOPTED_PLUGINS above.)
  */
 export const INTENTIONALLY_EXCLUDED_PLUGINS: ReadonlyArray<string> = [
-  'pukiwiki-like-linker',
-  'growi-directive',
   'codeblock',
   'github-admonitions',
   'callout',
