@@ -1,0 +1,22 @@
+{
+  "feature_name": "remote-mcp-server-route",
+  "created_at": "2026-11-24T10:42:24Z",
+  "updated_at": "2026-11-25T00:00:00Z",
+  "language": "ja",
+  "phase": "design-generated",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": false
+    },
+    "tasks": {
+      "generated": false,
+      "approved": false
+    }
+  },
+  "ready_for_implementation": false
+}
