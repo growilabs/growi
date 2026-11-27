@@ -13,8 +13,6 @@
  * They do NOT assert on:
  *  - "any markdown file exists" (fixture-dependent generic check)
  *  - Filenames the implementation never produces (e.g. 'root.md')
- *  - git's auth-fallback behaviour (this is a git client property,
- *    not a vault gateway contract — verified at the HTTP layer below)
  */
 
 import { execFile } from 'node:child_process';
@@ -40,36 +38,15 @@ const execFileAsync = promisify(execFile);
 
 const vaultRepoUrl = (): string => `${VAULT_E2E_CONFIG.baseUrl}/vault.git`;
 
-/**
- * Clone the vault repo with an explicit Authorization header.
- *
- * git's default behaviour is to issue the first `/info/refs` request WITHOUT
- * credentials and only retry with credentials if the server returns 401.
- * Because our gateway intentionally allows anonymous access to the public
- * namespace, an unauthenticated probe succeeds — and git never sends the
- * credentials embedded in the URL.
- *
- * For the integration test we need every request to carry the PAT so the
- * gateway resolves the user, ACL filters the view, and the clone includes
- * the user's GRANT_OWNER pages. We inject the header via `http.extraheader`
- * which applies to every HTTP request issued by `git clone`.
- */
+/** Clone with the PAT as URL credentials; git sends them after the gateway's 401 challenge. */
 async function cloneAuthenticated(pat: string): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), 'growi-vault-clone-'));
-  const auth = Buffer.from(`x:${pat}`).toString('base64');
-  await execFileAsync('git', [
-    '-c',
-    `http.extraheader=Authorization: Basic ${auth}`,
-    'clone',
-    vaultRepoUrl(),
-    dir,
-  ]);
-  return dir;
-}
-
-async function cloneAnonymous(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), 'growi-vault-clone-'));
-  await execFileAsync('git', ['clone', vaultRepoUrl(), dir]);
+  const url = new URL(vaultRepoUrl());
+  url.username = 'x';
+  url.password = pat;
+  await execFileAsync('git', ['clone', url.toString(), dir], {
+    env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+  });
   return dir;
 }
 
@@ -171,20 +148,6 @@ describe('GROWI Vault — clone E2E contract', () => {
   });
 
   // ----------------------------------------------------------------------
-  // Contract: an anonymous clone returns the public namespace only —
-  // never any page that requires authentication.
-  // ----------------------------------------------------------------------
-  it('anonymous clone includes public pages and excludes admin-only page', async () => {
-    const dir = await cloneAnonymous();
-    tmpDirs.push(dir);
-
-    const files = new Set(await listFiles(dir));
-    expect(files.has(VAULT_E2E_PAGES.publicRoot.mappedFile)).toBe(true);
-    expect(files.has(VAULT_E2E_PAGES.publicDeep.mappedFile)).toBe(true);
-    expect(files.has(VAULT_E2E_PAGES.adminOnly.mappedFile)).toBe(false);
-  });
-
-  // ----------------------------------------------------------------------
   // Contract: a single-page rename relocates the page's blob — the OLD
   // mapped file disappears and the NEW mapped file appears in the clone.
   //
@@ -235,7 +198,7 @@ describe('GROWI Vault — clone E2E contract', () => {
     // The old file must exist before the rename (guards against a false
     // positive where the assertion below passes only because nothing was
     // ever materialised).
-    const beforeDir = await cloneAnonymous();
+    const beforeDir = await cloneAuthenticated(VAULT_E2E_CONFIG.admin.pat);
     tmpDirs.push(beforeDir);
     const beforeFiles = new Set(await listFiles(beforeDir));
     expect(beforeFiles.has(oldFile)).toBe(true);
@@ -263,7 +226,7 @@ describe('GROWI Vault — clone E2E contract', () => {
     await new Promise((r) => setTimeout(r, 500));
 
     // Step 3: clone again and assert the relocation took effect.
-    const afterDir = await cloneAnonymous();
+    const afterDir = await cloneAuthenticated(VAULT_E2E_CONFIG.admin.pat);
     tmpDirs.push(afterDir);
     const afterFiles = new Set(await listFiles(afterDir));
 
@@ -329,16 +292,15 @@ describe('GROWI Vault — clone E2E contract', () => {
         grantedGroups: [],
         ...grantState,
       });
-    const cloneHasFile = async (pat: string | null): Promise<boolean> => {
-      const dir =
-        pat == null ? await cloneAnonymous() : await cloneAuthenticated(pat);
+    const cloneHasFile = async (pat: string): Promise<boolean> => {
+      const dir = await cloneAuthenticated(pat);
       tmpDirs.push(dir);
       return (await listFiles(dir)).includes(file);
     };
     // vault-manager applies instructions asynchronously (and plain upserts
     // first sit in the coalesce buffer), so clone until the state is reached.
     const expectCloneEventually = async (
-      pat: string | null,
+      pat: string,
       expected: 'has the file' | 'lacks the file',
     ): Promise<void> => {
       await expect
@@ -350,7 +312,6 @@ describe('GROWI Vault — clone E2E contract', () => {
       pageWith({ grant: PageGrant.GRANT_PUBLIC, grantedUsers: [] }),
     );
 
-    await expectCloneEventually(null, 'has the file');
     await expectCloneEventually(VAULT_E2E_CONFIG.admin.pat, 'has the file');
 
     await handlePageUpdate(pageWith(onlyMeGrantState), {
@@ -359,7 +320,6 @@ describe('GROWI Vault — clone E2E contract', () => {
       previousGrantedUsers: [],
     });
 
-    await expectCloneEventually(null, 'lacks the file');
     await expectCloneEventually(VAULT_E2E_CONFIG.admin.pat, 'lacks the file');
     await expectCloneEventually(VAULT_E2E_CONFIG.member.pat, 'has the file');
   });
@@ -368,10 +328,9 @@ describe('GROWI Vault — clone E2E contract', () => {
   // Contract: the gateway authenticates against the PAT supplied in HTTP
   // Basic Auth. An invalid PAT must yield 401.
   //
-  // We probe the HTTP layer directly because `git clone` will silently
-  // retry without credentials after a 401 — that's a git client property,
-  // not a vault contract. The vault contract is "Authorization: Basic
-  // <bad-pat> → 401".
+  // We probe the HTTP layer directly: the vault contract is
+  // "Authorization: Basic <bad-pat> → 401", while a failing `git clone`
+  // would only show how the git client reports it.
   // ----------------------------------------------------------------------
   it('HTTP request with invalid PAT returns 401', async () => {
     const url = `${VAULT_E2E_CONFIG.baseUrl}/vault.git/info/refs?service=git-upload-pack`;

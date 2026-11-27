@@ -80,7 +80,7 @@ GROWI Vault は、GROWI 上のページを git プロトコル経由で read-onl
 1. When ユーザが GROWI Vault を clone した場合, the GROWI Vault shall 当該ユーザが GROWI 既存の ACL 上で閲覧権限を持つページ (public、該当する場合 anyone-with-link、所属グループのページ、本人が owner の only-me ページ) のみを応答リポジトリに含める
 2. If ページが only-me ACL を持ちリクエスト元ユーザが owner でない場合, then the GROWI Vault shall 当該ページをファイル名・中間ディレクトリの痕跡を含めてユーザの clone から完全に除外する
 3. If ページが group ACL を持ちリクエスト元ユーザが認可されたいずれのグループにも所属しない場合, then the GROWI Vault shall 当該ページをユーザの clone から完全に除外する
-4. When ユーザが有効な認証情報を伴わずに匿名でアクセスした場合, the GROWI Vault shall public ACL を持つページのみを応答に含める
+4. When 認証情報を伴わずに clone または fetch が実行された場合, the GROWI Vault shall GROWI のゲスト閲覧の設定によらず、ページを一切応答に含めず、標準的な git 認証要求応答を返して認証情報 (personal access token) を求める
 5. The GROWI Vault shall ユーザが閲覧権限を持たないページの存在が応答のいかなる観測経路 (ref 一覧、tree 内容、エラーメッセージ、object 転送等) からも推測不可能であることを保証する
 
 ### Requirement 4: 認証と認可

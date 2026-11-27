@@ -1,7 +1,7 @@
 /**
  * VaultViewComposer
  *
- * Merges multiple namespace trees into a single per-user (or anonymous) view
+ * Merges multiple namespace trees into a single per-user view
  * ref that is served to git clients via git upload-pack.
  *
  * Three strategies are applied in order of preference:
@@ -433,13 +433,13 @@ function sourceVersionsEqual(
  * Composes (or retrieves from cache) a per-user view ref that merges the
  * provided namespaces into a single git tree.
  *
- * @param userId     - GROWI user ObjectId string, or null for anonymous view.
+ * @param userId     - GROWI user ObjectId string.
  * @param namespaces - Ordered list of namespaces the user has access to.
  * @returns viewRef and the commitOid at its tip.
  * @throws while packed-refs exists.
  */
 export async function compose(
-  userId: string | null,
+  userId: string,
   namespaces: ReadonlyArray<Namespace>,
 ): Promise<ComposeViewResponse> {
   // A cache hit reads no ref, so it would otherwise keep serving a view
@@ -447,7 +447,7 @@ export async function compose(
   await VaultRepoStorage.assertRefsReadable();
 
   // Step 1: Determine viewRef name.
-  const viewRef = userId != null ? `user-${userId}-view` : 'anonymous-view';
+  const viewRef = `user-${userId}-view`;
 
   // Step 2: Build currentVersions map (namespace → commitOid).
   const commitOidMap =

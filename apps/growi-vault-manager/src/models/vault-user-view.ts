@@ -16,18 +16,17 @@ import mongoose, {
 export type SourceVersionMap = Record<Namespace, string>;
 
 /**
- * Represents a per-user (or anonymous) composed view cache document.
+ * Represents a per-user composed view cache document.
  * vault-manager owns this collection entirely.
  */
 export interface IVaultUserView {
   /**
-   * The GROWI user ObjectId as a string, or null for the anonymous singleton view.
-   * The sparse unique index on userId allows at most one document per user,
-   * with the null entry being the single anonymous row.
+   * The GROWI user ObjectId as a string.
+   * The unique index on userId allows at most one document per user.
    */
-  readonly userId: string | null;
+  readonly userId: string;
   /**
-   * Git ref name for the composed view (e.g. 'user-<uid>-view' or 'anonymous-view').
+   * Git ref name for the composed view (e.g. 'user-<uid>-view').
    * Passed to git upload-pack as GIT_NAMESPACE.
    */
   readonly viewRef: string;
@@ -59,17 +58,17 @@ export interface IVaultUserViewDocument extends IVaultUserView, Document {
 
 export interface IVaultUserViewModel extends Model<IVaultUserViewDocument> {
   /**
-   * Retrieves the cached view for the given userId (null = anonymous).
+   * Retrieves the cached view for the given userId.
    * Returns null when no view has been composed yet.
    */
-  findByUserId(userId: string | null): Promise<IVaultUserView | null>;
+  findByUserId(userId: string): Promise<IVaultUserView | null>;
 
   /**
    * Upserts the view cache for a user.
    * Overwrites all fields on conflict (same userId).
    */
   upsertView(
-    userId: string | null,
+    userId: string,
     data: {
       viewRef: string;
       viewCommitOid: string;
@@ -92,8 +91,7 @@ const vaultUserViewSchema = new Schema<
   IVaultUserViewModel
 >(
   {
-    // null represents the anonymous singleton view
-    userId: { type: String, default: null },
+    userId: { type: String, required: true },
     viewRef: { type: String, required: true },
     viewCommitOid: { type: String, required: true },
     mergedTreeOid: { type: String, required: true },
@@ -111,11 +109,7 @@ const vaultUserViewSchema = new Schema<
 // ---- Indexes ----
 
 /**
- * Sparse unique index on userId:
- * - Unique: at most one view document per user.
- * - Sparse: null values are excluded from the uniqueness constraint,
- *   which allows the single anonymous row (userId: null) to coexist with
- *   user-specific rows without violating uniqueness.
+ * Sparse unique index on userId: at most one view document per user.
  */
 vaultUserViewSchema.index({ userId: 1 }, { unique: true, sparse: true });
 
@@ -123,16 +117,14 @@ vaultUserViewSchema.index({ userId: 1 }, { unique: true, sparse: true });
 
 vaultUserViewSchema.statics.findByUserId = function (
   this: IVaultUserViewModel,
-  userId: string | null,
+  userId: string,
 ): Promise<IVaultUserView | null> {
-  // Explicit null match: sparse index excludes null from the B-tree, but
-  // Mongoose falls back to a collection scan and still finds the document.
   return this.findOne({ userId }).lean<IVaultUserView>().exec();
 };
 
 vaultUserViewSchema.statics.upsertView = function (
   this: IVaultUserViewModel,
-  userId: string | null,
+  userId: string,
   data: {
     viewRef: string;
     viewCommitOid: string;
@@ -162,7 +154,7 @@ vaultUserViewSchema.statics.upsertView = function (
     .then((doc) => {
       if (doc == null) {
         throw new Error(
-          `VaultUserView upsert returned null for userId: ${userId ?? 'anonymous'}`,
+          `VaultUserView upsert returned null for userId: ${userId}`,
         );
       }
       return doc;
