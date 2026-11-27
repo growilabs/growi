@@ -6,7 +6,7 @@
 
 **Users**: 管理者は、AI 連携の管理ページで MCP 連携を切り替える。開発者・検証者は、アクセストークンを MCP クライアントに設定して接続する。この spec は単独ではリリースしない。リリース時の認証は `remote-mcp-server-oauth` が差し替える。
 
-**Impact**: `features/mastra` に、MCP のルート・MCP 用のツール定義・管理 API・管理画面の節を足す。既存の全文検索ツールとページ本文取得ツールから処理の中身を関数として取り出し、エージェント用のツールと MCP 用のツールが同じ関数を呼ぶ形にする。全リクエストが通る場所への変更は 2 つである: `express-init.js` で、`bodyParser.json` の直後（セッションより前）に MCP のルートをマウントする 1 行と、回数制限の既定の設定への `/_api/v3/mcp` の追加。既存の共通処理（セッション、`CertifyOrigin`、`mongoSanitize` など）の動きは変えない。
+**Impact**: 新しい feature `features/mcp-server` に、MCP のルート・MCP 用のツール定義・管理 API・管理画面の節を置く。`features/mastra` の全文検索ツールとページ本文取得ツールから処理の中身を関数として取り出し、エージェント用のツールと MCP 用のツールが同じ関数を呼ぶ形にする。全リクエストが通る場所への変更は 2 つである: `express-init.js` で、`bodyParser.json` の直後（セッションより前）に MCP のルートをマウントする 1 行と、回数制限の既定の設定への `/_api/v3/mcp` の追加。既存の共通処理（セッション、`CertifyOrigin`、`mongoSanitize` など）の動きは変えない。
 
 ### Goals
 
@@ -50,7 +50,8 @@
 - `AccessToken` モデルと `extractBearerToken`（暫定の認証の中身だけが使う）。
 - `features/rate-limiter` の公開の口（この spec が `consumeUserPoints` を足す）。
 - `crowi.searchService`、`crowi.activityService.createActivity`、`configManager`、`Page` モデル。
-- 依存の向き: `interfaces` → `server/services/mastra-modules/tools`（共有関数）→ `server/services/mcp` → `server/routes/mcp`。逆向きの import はしない。`server/services/mcp` は Express に依存しない。
+- 依存の向き（`features/mcp-server` の中）: `interfaces` → `server/services` → `server/routes/mcp`・`server/routes/admin-mcp-settings` → `client/admin`（`interfaces` だけを読む）。逆向きの import はしない。`server/services` は Express に依存しない。
+- feature をまたぐ依存: `features/mcp-server` は、`features/mastra` の共有関数（`searchPages`、`readPageContent`）を、同 feature が公開する barrel（`features/mastra/server/services/mastra-modules/tools/shared/index.ts`）からだけ読み込む。`features/mastra` は `features/mcp-server` を読み込まない。
 
 ### Revalidation Triggers
 
@@ -71,7 +72,7 @@
 ### Existing Architecture Analysis
 
 - **`features/mastra` のルーター**（`/_api/v3/mastra`）は、全体に `aiReadyGuard` をかけ、最初のリクエストでハンドラ群を動的に読み込む。MCP は LLM の設定を必要としないので（1.8）、このルーターの下には置かない。遅延ロードの形（Promise を保持し、失敗したら捨てる）は同じものを使う。
-- **`features/mastra` の中のコードを別の URL にマウントする前例**は `routes/admin-ai-settings`（`/_api/v3/ai-settings`）にある。管理 API はこれに倣う。
+- **feature の中のコードを `/_api/v3` の下の別の URL にマウントする前例**は、`features/mastra` の `routes/admin-ai-settings`（`/_api/v3/ai-settings`）にある。管理 API はこれに倣う。
 - **共通処理の順序**: リクエストは、次の処理をこの順に通ってから、各ルートに届く。1〜6 は `server/crowi/express-init.js`、7 は `server/routes/index.js` にある。
   1. `bodyParser.json`: 本文を読み終える（上限 50 MB）。
   2. セッション: Cookie の無いリクエストには、新しいセッションの記録を作り、`Set-Cookie` を返す。
@@ -161,7 +162,7 @@ graph TB
 ### Directory Structure
 
 ```
-features/mastra/
+features/mcp-server/                     # 新設。Mastra（@mastra/*）を読み込まない
 ├── interfaces/
 │   └── mcp-settings.ts                  # MCP_ENDPOINT_PATH、管理 API の入出力の型（サーバーとクライアントで共有）
 ├── server/
@@ -173,7 +174,7 @@ features/mastra/
 │   │   │   │   ├── types.ts             # McpAuth、McpAuthResult、McpAuthFailureReason
 │   │   │   │   ├── access-token-authenticator.ts   # 暫定: Bearer のアクセストークンから利用者を得る
 │   │   │   │   └── auth-failure-response.ts        # 暫定: 理由によらず、チャレンジなしの 401
-│   │   │   ├── json-rpc-error-response.ts          # 401 / 429 / 400 / 500 の固定の応答を書く
+│   │   │   ├── json-rpc-error-response.ts          # 401 / 403 / 429 / 400 / 500 の固定の応答を書く
 │   │   │   ├── is-batch-request.ts                 # 本文が配列かどうかの判定（純粋な関数）
 │   │   │   ├── is-allowed-origin.ts                # 送信元（Origin）の検査（純粋な関数）
 │   │   │   ├── lazy-mcp-request-handler.ts         # 重い層の遅延ロードと、保持している参照の解放
@@ -183,35 +184,39 @@ features/mastra/
 │   │       ├── index.ts                 # /_api/v3/mcp-settings のルーター
 │   │       ├── get-mcp-settings.ts
 │   │       └── put-mcp-settings.ts
-│   └── services/
-│       ├── mcp/                         # Express に依存しない
-│       │   ├── is-mcp-available.ts      # isMcpAvailable（有効で、かつサイト URL が設定済み）
-│       │   ├── required-scopes.ts       # MCP_REQUIRED_SCOPES（1 か所の宣言）
-│       │   ├── caller-context.ts        # McpCallerContext と、AuthInfo との相互変換
-│       │   ├── mcp-tools/
-│       │   │   ├── index.ts             # MCP_TOOL_DECLARATIONS（公開するツールの一覧）
-│       │   │   ├── types.ts             # McpToolDeclaration、McpToolDeps
-│       │   │   ├── search-pages-tool.ts
-│       │   │   └── get-page-content-tool.ts
-│       │   ├── register-mcp-tools.ts    # 宣言の一覧を McpServer に登録する（Activity、例外の封じ込め）
-│       │   └── mcp-server-factory.ts    # createGrowiMcpServerFactory（リクエストごとに McpServer を作る）
-│       └── mastra-modules/tools/
-│           ├── search-pages.ts          # 新規: 全文検索の中身（入力スキーマを含む）
-│           └── read-page-content.ts     # 新規: ページ本文取得の中身（入力スキーマを含む）
+│   └── services/                        # Express に依存しない
+│       ├── is-mcp-available.ts          # isMcpAvailable（有効で、かつサイト URL が設定済み）
+│       ├── required-scopes.ts           # MCP_REQUIRED_SCOPES（1 か所の宣言）
+│       ├── caller-context.ts            # McpCallerContext と、AuthInfo との相互変換
+│       ├── mcp-tools/
+│       │   ├── index.ts                 # MCP_TOOL_DECLARATIONS（公開するツールの一覧）
+│       │   ├── types.ts                 # McpToolDeclaration、McpToolDeps
+│       │   ├── search-pages-tool.ts
+│       │   └── get-page-content-tool.ts
+│       ├── register-mcp-tools.ts        # 宣言の一覧を McpServer に登録する（Activity、例外の封じ込め）
+│       └── mcp-server-factory.ts        # createGrowiMcpServerFactory（リクエストごとに McpServer を作る）
 └── client/admin/
+    ├── index.ts                         # McpSettings だけを公開する barrel
     ├── McpSettings.tsx                  # MCP の節（スイッチ、URL の表示）
     └── use-mcp-settings.ts              # SWR のフック
+
+features/mastra/server/services/mastra-modules/tools/
+└── shared/                              # 新設。@mastra/* を読み込まない共有関数
+    ├── index.ts                         # searchPages、readPageContent と入力スキーマだけを公開する barrel
+    ├── search-pages.ts                  # 全文検索の中身（入力スキーマを含む）
+    └── read-page-content.ts             # ページ本文取得の中身（入力スキーマを含む）
 ```
+
+- **共有関数の置き場所**: 2 つの関数は、既存のエージェント用のツールから取り出したもので、`ai-agentic-search` の spec が持つツールの中身である。`features/mastra` に残し、`@mastra/*` を読み込まない `shared/` に分ける。`features/mcp-server` は、この barrel だけを読み込む。`features/mastra` の他の部分（`createTool` で作ったツール、エージェント）は読み込まない。この約束は drift spec で守る（`mcp-request-handler.ts` から `@mastra/` に届かないこと）。
+- 将来 `features/mastra` を入れ替える・外す場合は、`shared/` を中立の場所へ移す。今は利用者が 2 つの feature だけなので、移さない。
 
 テストは各ファイルの隣に置く（`*.spec.ts` / `*.integ.ts` / `*.spec.tsx`）。
 
 ### Modified Files
 
-- `features/mastra/server/services/mastra-modules/tools/full-text-search-tool.ts` — 中身を `searchPages` の呼び出しに置き換える。出力は変えない。
-- `features/mastra/server/services/mastra-modules/tools/get-page-content-tool.ts` — 中身を `readPageContent` の呼び出しに置き換える。出力は変えない。
-- `features/mastra/server/no-eager-ai-imports.spec.ts` — MCP のルートの入口と管理 API の入口を起点とする検査を足す。
-- `features/mastra/client/admin/index.ts` — `McpSettings` を公開する。
-- `pages/admin/ai.page.tsx` — `AiSettings` の下に `McpSettings` を並べる。
+- `features/mastra/server/services/mastra-modules/tools/full-text-search-tool.ts` — 中身を `shared/` の `searchPages` の呼び出しに置き換える。出力は変えない。
+- `features/mastra/server/services/mastra-modules/tools/get-page-content-tool.ts` — 中身を `shared/` の `readPageContent` の呼び出しに置き換える。出力は変えない。
+- `pages/admin/ai.page.tsx` — `AiSettings` の下に、`features/mcp-server/client/admin` の `McpSettings` を並べる。`AiSettings` と同じく `dynamic` で読み込む（pages から feature の client を読み込む既存の書き方に合わせる）。
 - `server/crowi/express-init.js` — `bodyParser.json` の直後、セッションより前に、MCP のルートをマウントする 1 行を足す。既存の行は変えない。
 - `server/routes/apiv3/index.js` — `routerForAdmin` に `/mcp-settings` をマウントする。
 - `server/service/config-manager/config-definition.ts` — `app:mcpEnabled` を足す。
@@ -837,7 +842,7 @@ export const isAllowedOrigin: (
 | PUT | `/_api/v3/mcp-settings` | `McpSettingsUpdateRequest` | `McpSettingsResponse` | 400、401、403、500 |
 
 ```typescript
-// features/mastra/interfaces/mcp-settings.ts
+// features/mcp-server/interfaces/mcp-settings.ts
 export const MCP_ENDPOINT_PATH = '/_api/v3/mcp';
 
 export type McpSettingsResponse = { readonly mcpEnabled: boolean };
@@ -872,7 +877,7 @@ export type McpSettingsUpdateRequest = { readonly mcpEnabled: boolean };
 #### isMcpAvailable
 
 ```typescript
-// features/mastra/server/services/mcp/is-mcp-available.ts
+// features/mcp-server/server/services/is-mcp-available.ts
 export const isMcpAvailable: () => boolean;
 ```
 
@@ -951,9 +956,9 @@ HTTP の層のエラーと、ツールの結果としてのエラーを分ける
 
 ### Guard / Drift Specs
 
-- `routes/mcp/no-eager-mcp-imports.spec.ts`（新設。`server-boot-imports` のルールの 2 つの起点で歩く）（8.3）:
-  - `BOOT_ENTRYPOINTS` と、`routes/mcp/index.ts`・`routes/admin-mcp-settings/index.ts` を起点にして、`@modelcontextprotocol/` への静的な import の連鎖が無いこと。`express-init.js` が MCP のルーターを静的に読み込むので、起動の入口からの連鎖も検査の対象になる。
-  - `routes/mcp/mcp-request-handler.ts` を起点にして、`@mastra/` への静的な import の連鎖が無いこと。MCP エンドポイントが Mastra を読み込まないことを守る。
+- `features/mcp-server/server/routes/mcp/no-eager-mcp-imports.spec.ts`（新設。`server-boot-imports` のルールの 2 つの起点で歩く）（8.3）:
+  - `BOOT_ENTRYPOINTS` と、`features/mcp-server/server/routes/mcp/index.ts`・`.../routes/admin-mcp-settings/index.ts` を起点にして、`@modelcontextprotocol/` への静的な import の連鎖が無いこと。`express-init.js` が MCP のルーターを静的に読み込むので、起動の入口からの連鎖も検査の対象になる。
+  - `features/mcp-server/server/routes/mcp/mcp-request-handler.ts` を起点にして、`@mastra/` への静的な import の連鎖が無いこと。MCP エンドポイントが Mastra を読み込まないこと（`features/mastra` からは `shared/` だけを読むこと）を守る。
   - 起点のファイルが存在することの検査も足す。コミットの前に、禁止の import をわざと足して、失敗することを確かめる。
 - 既存の `no-eager-ai-imports.spec.ts` は変えない。
 

@@ -212,7 +212,7 @@ umbrella 全体の調査（claude.ai の挙動、MCP の仕様、先行事例）
 
 #### 推奨する方針
 
-- **置き場所は `features/mastra`（2026-11-25、ユーザー確認済み）**。MCP サーバーは Mastra を使う前提なので、ルート、認証の差し込み口、`MCPServer` の組み立て、管理 API、管理画面を `features/mastra` の下に置く。新しい feature は作らない。
+- ~~**置き場所は `features/mastra`（2026-11-25、ユーザー確認済み）**。~~ 2026-11-27 に、新しい feature `features/mcp-server` に改めた（Decision「コードは新しい feature `features/mcp-server` に置く」）。以下はもとの記述。MCP サーバーは Mastra を使う前提なので、ルート、認証の差し込み口、`MCPServer` の組み立て、管理 API、管理画面を `features/mastra` の下に置く。新しい feature は作らない。
 - **管理画面は、既存の「AI 連携」の管理ページ（`pages/admin/ai.page.tsx`、`features/mastra/client/admin/`）に MCP の節を足す（2026-11-25、ユーザー確認済み）**。新しい管理ページとナビゲーションの項目は作らない。MCP の節は、GROWI AI の有効・無効や LLM の設定の状態にかかわらず操作できるようにする（要件 1.8・1.9）。既存の AI 設定の画面が、未設定のときに他の項目を隠す・無効にする作りになっていないかを、設計で確かめる。
 - **ツールの構成は Option C のまま**。既存の 2 ツールから処理の中身を関数として取り出し、MCP 用のツール定義を `features/mastra` の中に、エージェント用の定義とは別に置く。閲覧権限の判定を 1 か所に保ったまま、MCP 向けの定義を分けられる。Option A の欠点（`mapAuthInfoToUser` の副作用、定義の混在）は、これで避けられる。
 - **URL は `/_api/v3/mcp` のまま**。`features/mastra` のルーター（`/_api/v3/mastra`）は、全体に `aiReadyGuard` をかけている（`features/mastra/server/routes/index.ts`）。その下に置くと要件 1.8（AI の設定に左右されない）に反するので、MCP のルートは別にマウントする。`features/mastra` の中のコードを別の URL にマウントする前例は、`routes/admin-ai-settings` にある。
@@ -367,8 +367,19 @@ umbrella 全体の調査（claude.ai の挙動、MCP の仕様、先行事例）
   - 自分で書く量はほぼ変わらない。SDK の `createMcpHandler` はリクエストごとにサーバーを作るので、リクエストごとに呼び出し元が決まる設計に素直に合う。
 - **Trade-offs**:
   - 既存の Mastra のツール（`createTool`）をそのまま公開するには、変換を自分で書くことになる。今の設計は、MCP 用のツールを宣言の一覧として別に持つので、影響しない。Mastra のツールを大量にそのまま公開する方針になれば、見直す。
-  - コードの置き場所の理由（「Mastra を使うので `features/mastra` に置く」）が成り立たなくなった。置き場所は別に決める。
+  - コードの置き場所の理由（「Mastra を使うので `features/mastra` に置く」）が成り立たなくなった。置き場所は、次の Decision で決めた。
 - **Follow-up**: 本番ビルドの GROWI でのメモリと、`.next/node_modules/` に現れるパッケージを、実装で確かめる（design.md の Verification Checkpoints 6・7）。
+
+#### Decision: コードは新しい feature `features/mcp-server` に置く
+
+- **Context**: `features/mastra` に置く理由は「MCP サーバーに Mastra を使う」ことだった。SDK を直接使うと決めたので、この理由が無くなった。
+- **Alternatives Considered**:
+  1. `features/mastra` のまま。共有関数と管理画面（AI 連携ページ）が近くにまとまる。
+  2. 新しい feature `features/mcp-server` に分ける。
+- **Selected Approach**: 2（2026-11-27、ユーザー確認済み）。
+- **Rationale**: 名前と中身が一致する。Mastra（AI のエージェント）と MCP サーバーの境界がはっきりし、Mastra を入れ替える・外す場合にも、MCP 側の変更が共有関数の移動だけで済む。
+- **共有関数の置き場所**: `searchPages` と `readPageContent` は、`ai-agentic-search` の spec が持つツールの中身なので、`features/mastra` に残す。`@mastra/*` を読み込まない `shared/` に分け、barrel から公開する。`features/mcp-server` は、この barrel だけを読み込む。drift spec で、MCP のハンドラから `@mastra/` に届かないことを守る。
+- **管理画面**: 節は AI 連携ページに置く決定のまま。`pages/admin/ai.page.tsx` が、`features/mcp-server/client/admin` の部品を `dynamic` で読み込む。
 
 #### Decision: 動かない状態のメモリの扱い
 
@@ -496,4 +507,4 @@ PR のレビューで、`@modelcontextprotocol/server` を直接使う案との�
 - 既存ツールからの取り出しで、AI チャットの結果が変わる — 既存の spec を変えずに通すことを、取り出しのタスクの完了条件にする。
 
 ---
-_Updated: 2026-11-27. `@mastra/mcp` と SDK の比較の検証と、SDK を直接使う Decision を足した。Prior: 2026-11-27. マウントする位置の Decision（セッションより前）と検証の結果を足し、それで覆った記述（3.1、3.2、3.8、3.9）に結論を書いた。Prior: 2026-11-27. PR のレビューを受けて、動かない状態のメモリの扱いの Decision と、共有された計測値を足した。Prior: 2026-11-25. PR のレビューを受けて、後の決定で覆った記述（ギャップ分析の 2 と 3）を直し、Decision を 3 つ足した。Prior: 2026-11-25. 設計の調査と判断（Design Discovery）を足した。Prior: 2026-11-25. 置き場所を `features/mastra` にする決定を、設計への申し送りに足した。Prior: 2026-11-25. パスを `/_api/v3/mcp` にする決定を反映した（1.1 を解決済みにし、`CertifyOrigin` の制約を 3.9 に足した）。Prior: 2026-11-24. ギャップ分析を記録。_
+_Updated: 2026-11-27. 置き場所を `features/mcp-server` に改める Decision を足した。Prior: 2026-11-27. `@mastra/mcp` と SDK の比較の検証と、SDK を直接使う Decision を足した。Prior: 2026-11-27. マウントする位置の Decision（セッションより前）と検証の結果を足し、それで覆った記述（3.1、3.2、3.8、3.9）に結論を書いた。Prior: 2026-11-27. PR のレビューを受けて、動かない状態のメモリの扱いの Decision と、共有された計測値を足した。Prior: 2026-11-25. PR のレビューを受けて、後の決定で覆った記述（ギャップ分析の 2 と 3）を直し、Decision を 3 つ足した。Prior: 2026-11-25. 設計の調査と判断（Design Discovery）を足した。Prior: 2026-11-25. 置き場所を `features/mastra` にする決定を、設計への申し送りに足した。Prior: 2026-11-25. パスを `/_api/v3/mcp` にする決定を反映した（1.1 を解決済みにし、`CertifyOrigin` の制約を 3.9 に足した）。Prior: 2026-11-24. ギャップ分析を記録。_
