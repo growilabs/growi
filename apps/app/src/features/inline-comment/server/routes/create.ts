@@ -114,6 +114,13 @@ const validator = [
     .optional()
     .isMongoId()
     .withMessage('revisionId must be a valid MongoId'),
+  body(['markdownOffset', 'revisionId'])
+    .if(isAnchorMode())
+    .not()
+    .exists()
+    .withMessage(
+      'markdownOffset and revisionId can be sent only with markdownQuote',
+    ),
   body(['anchor', 'anchorOriginRevisionId'])
     .if(isMarkdownQuoteMode())
     .not()
@@ -510,8 +517,9 @@ const targetFromMarkdownQuote = async (
  *                      $ref: '#/components/schemas/InlineComment'
  *          400:
  *            description: >
- *              Invalid input, both `anchor` and `markdownQuote` sent, or the caller is
- *              a read-only user (code `validation_failed`); an empty `anchor.quote`, or
+ *              Invalid input, both `anchor` and `markdownQuote` sent, `markdownOffset`
+ *              or `revisionId` sent without `markdownQuote`, or the caller is a
+ *              read-only user (code `validation_failed`); an empty `anchor.quote`, or
  *              an `anchorOriginRevisionId` of a revision of another page (code
  *              `inline-comment-create-failed`). With `markdownQuote`: it does not occur in
  *              the latest revision (code `inline-comment-quote-not-found`); it occurs

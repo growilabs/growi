@@ -594,6 +594,18 @@ describe('POST /_api/v3/inline-comments', () => {
       });
     });
 
+    it.each([
+      ['markdownOffset', { markdownOffset: 0 }],
+      ['revisionId', { revisionId: String(new Types.ObjectId()) }],
+    ])('returns 400 when an anchor is sent with %s', async (_field, extra) => {
+      const res = await request(app)
+        .post('/_api/v3/inline-comments')
+        .send({ ...validBody(), pageId: String(markdownPage._id), ...extra });
+
+      expect(res.status).toBe(400);
+      expect(errorOf(res)).toMatchObject({ code: 'validation_failed' });
+    });
+
     it('returns 400 and stores nothing when both an anchor and a markdown quote are sent', async () => {
       const before = await prisma.comments.count({
         where: { pageId: String(markdownPage._id) },
