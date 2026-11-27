@@ -27,6 +27,7 @@
 
 ### This Spec Owns
 
+- 管理画面（`client/admin/`）と、管理画面の API（`server/admin/admin-router.ts` のルート）。`chat-integration-app` から受け持ちを移す（下の「chat-integration-app から移す受け持ち」）。
 - 管理画面の構成: 接続の追加、接続の一覧（並び順、2 列、折りたたみ、空の表示）、切断の確認と再接続の案内、状態と「できること」の表の言葉づかい。
 - チャンネル権限の編集の仕組み: 4 つの選択肢、「既定値」の表示、チャンネルを選ぶ汎用の部品、一覧が取れないとき・一覧にないときの扱い、変更の検出、保存結果の言葉づかい。
 - 通知先の削除と、配信イベントが 0 件の検査（管理画面の側）。
@@ -40,6 +41,7 @@
 - 通知の送出の経路。通知先を消しても、すでに outbox に書き留められた通知（書き留めた時点の宛先の写しを持つ）は、そのまま送られる。
 - 管理画面の通知先を追加する側のチャンネルの選び方（`<select>`）。文言の i18n 化と、配信イベントの検査の表示だけを足す。
 - `chat-integration-agent` が足した `agent` の行と DM の欄の振る舞い。この spec は、その上に載る。
+- 権限（`RelationSettings` の保存の形）と通知先（`ChatNotificationDestination`）の model。`chat-integration-app` が持つ。
 
 ### Allowed Dependencies
 
@@ -54,22 +56,22 @@
 - `COMMAND_NAMES` に、行の特性が `separate-flag` の読み取り系コマンドが足されたとき（下の「DM だけを許す行」）。
 - `CapabilityReport` の機能の名前、`CapabilityLevel`、`ConnectionHealth` の値が増えたとき。知らない値は生のまま出るので壊れないが、言葉が未登録になる。
 - 管理画面の API（`GET …/channels`、`DELETE …/notification-destinations`）を、管理画面の外から呼ぶ者が現れたとき。
-- 書き戻しの順番: `chat-integration-agent` のタスク 7.1 が `chat-integration-app` の design.md の管理画面の項を書き換える。この spec の書き戻しは、その後に行う（下の「Amend target」）。
+- `chat-integration-app` の権限や通知先の model、または設定の保存・ペアリング・切断の処理の契約が変わったとき。
+- 受け持ちを移す順番: `chat-integration-agent` のタスク 7.1 が `chat-integration-app` の design.md の管理画面の項を書き換える。この spec のタスク 7.3（app の design.md から管理画面の節を除く）は、その後に行う（下の「chat-integration-app から移す受け持ち」）。
 
-## Amend target
+## chat-integration-app から移す受け持ち
 
-この spec は、完成済みの spec の契約を変える amend spec であり、一時的な入れ物である（[spec-lifecycle.md](../../../.claude/rules/spec-lifecycle.md)）。最後のタスクで書き戻して、この spec を削除する。
+この spec は、umbrella `chat-integration` の下に、`chat-integration-protocol`・`-proxy`・`-app` と並ぶ 4 つ目の sub-spec として常に置く。書き戻して消す amend spec にはしない（理由は brief.md の「なぜ amend spec ではなく sub-spec にするか」）。管理画面の受け持ちを `chat-integration-app` から移し、要件は umbrella が持つ。
 
-| 対象の spec | 書き戻す場所 | 変わる内容 |
+| 対象 | 場所 | 変わる内容 |
 |---|---|---|
-| `chat-integration`（umbrella） | `requirements.md` | 要件 1・2・9・11 の末尾に、requirements.md の番号のまま受け入れ条件を足す。要件 16 を足す。既存の番号は振り直さない |
-| `chat-integration-app` | `design.md` の「管理画面と個人設定」の要約、「管理画面の関係の状態」、「触れない部品」（節ごと削除）、ファイル構成の `client/admin/`、管理画面の API の表、管理画面の文言の方針（英語の直書き → `admin` namespace） | 管理画面の部品の構成、API の追加 2 つ、i18n の方針 |
-| `chat-integration-app` | `research.md` | 本 spec の research.md の決定のうち、管理画面の作りに関わるもの |
-| roadmap.md | 順 8 の行 | 対象を本 spec の範囲に広げ、完了時にこの行を消す |
+| `chat-integration`（umbrella） | `requirements.md`、`spec.json` | 要件 1・2・9・11 の末尾に、requirements.md の番号のまま受け入れ条件を足す。要件 16 を足す。既存の番号は振り直さない。この spec は番号を参照するだけにし、spec.json に `owned_by_umbrella: true` を付ける。umbrella の `sub_specs` にこの spec を足す |
+| `chat-integration-app` | `design.md` の「管理画面と個人設定」の要約、「管理画面の関係の状態」、「触れない部品」、ファイル構成と API の表のうち管理画面の部分 | 管理画面の節を取り除き、この spec への参照に置き換える。Boundary Commitments の Out of Boundary に「`client/admin/` と管理画面の API」を足し、Revalidation Triggers に「権限や通知先の model を変えたら、`chat-integration-admin-ui` も確かめ直す」を足す |
+| roadmap.md | Sub-specs の表、順 8 の行 | Sub-specs の表にこの spec を足す。順 8 の対象を本 spec の範囲に広げ、完了したときにこの行を消す |
 
-- **Revalidation Triggers への影響**: `@growi/chat` と proxy の契約は変えないので、他の spec の再検証は要らない。
-- **書き戻しの衝突**: `chat-integration-agent` のタスク 7.1 は、`chat-integration-app` の design.md の管理画面の項に「権限の行の 2 つの性質（コマンドの注意書きと DM の欄）と、DM だけを許す行は `allowedChannels: 'none'` で保存されること」を書く。本 spec の書き戻しは、その記述を、この design の「権限の行」の節に合わせて書き直す形で行う。そのため、agent の 7.1 が済んでから行う。
-- 書き戻しの手順は tasks.md の最終タスクに置く。
+- **Revalidation Triggers への影響**: `@growi/chat` と proxy の契約は変えないので、protocol と proxy の再検証は要らない。app には、上の表の Revalidation Triggers を足す。
+- **app の design.md を書き換える順番**: `chat-integration-agent` のタスク 7.1 は、`chat-integration-app` の design.md の管理画面の項に「権限の行の 2 つの性質（コマンドの注意書きと DM の欄）と、DM だけを許す行は `allowedChannels: 'none'` で保存されること」を書く。本 spec のタスク 7.3 は、その項ごと app の design.md から除き、この design の「権限の行」の節（DM だけを許す行は、既定の挙動に等しい `allowedChannels` で書く）への参照に置き換える。そのため、agent の 7.1 が済んでから行う。
+- 手順は tasks.md のタスク 7 に置く。設計の理由（research.md）は、この spec に残す。
 
 ## Architecture
 

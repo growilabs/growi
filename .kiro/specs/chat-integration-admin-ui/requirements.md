@@ -18,7 +18,7 @@
 
 ## Introduction
 
-umbrella spec `chat-integration` の管理画面（`/admin/chat-integration`）を作り直す amend spec。
+umbrella spec `chat-integration` の管理画面（`/admin/chat-integration`）を作り直す。この spec は、umbrella の下に `chat-integration-protocol`・`-proxy`・`-app` と並ぶ 4 つ目の sub-spec として常に置き、管理画面を受け持つ。
 
 管理者が、チャットサービスとの接続の追加、チャンネル単位の権限と通知先の設定、接続の切断と再接続までを、画面の案内だけで進められるようにする。変えるのは管理画面と、その画面が呼ぶ GROWI application の API だけで、chat-integration proxy と `@growi/chat` の契約は変えない。
 
@@ -26,13 +26,13 @@ umbrella spec `chat-integration` の管理画面（`/admin/chat-integration`）�
 
 以下、中継サーバを **chat-integration proxy**、GROWI 本体を **GROWI application** と呼ぶ（umbrella と同じ）。
 
-### Amend target
+### chat-integration-app から移す受け持ち
 
-| 対象の spec | 変わる契約 |
+| 対象 | 変わること |
 |---|---|
-| `chat-integration`（umbrella） | 要件 1・2・9・11 に受け入れ条件を足す。要件 16（管理画面の使いやすさ）を新しく足す。既存の受け入れ条件は変えない |
-| `chat-integration-app` | design.md の「触れない部品」（`CapabilityReportTable`・`ChannelPermissionsSection`・`NotificationDestinationsSection`・`UnpairButton`）の取り決めを解く。管理画面の文言を英語の直書きとする取り決めを、表示言語ごとの文言に改める。管理画面の節と、管理画面の API（チャンネルの一覧、通知先の削除）を書き換える |
-| roadmap.md | 順 8「管理画面の作り直し」の対象を、この spec の範囲に広げる。完了時に、この行を消す |
+| `chat-integration`（umbrella） | 要件 1・2・9・11 に受け入れ条件を足す。要件 16（管理画面の使いやすさ）を新しく足す。既存の受け入れ条件は変えない。要件は umbrella が持つので、実装の後、この文書の受け入れ条件を umbrella の requirements.md へ移す（tasks.md のタスク 7.2） |
+| `chat-integration-app` | 管理画面（`client/admin/`）と、管理画面の API の受け持ちを、この spec へ移す。app の design.md の「触れない部品」（`CapabilityReportTable`・`ChannelPermissionsSection`・`NotificationDestinationsSection`・`UnpairButton`）と、管理画面の文言を英語の直書きとする取り決めは無くなる（表示言語ごとの文言にする） |
+| roadmap.md | Sub-specs の表にこの spec を足す。順 8「管理画面の作り直し」の対象を、この spec の範囲に広げる。完了したときに、順 8 の行を消す |
 
 再検証が必要になる条件への影響: なし。`@growi/chat` と chat-integration proxy の契約は変えない。
 
@@ -86,7 +86,7 @@ umbrella spec `chat-integration` の管理画面（`/admin/chat-integration`）�
 
 - **chat-integration proxy** — GROWI の URL の持ち主を確認できなかった理由を返さない（要件 9.3 の確認は、原因を断定できない）。この spec は、その前提で失敗の知らせを書く
 - **チャットサービス側の登録の解除** — chat-integration proxy の管理コマンド（`unregister`）が受け持つ。GROWI の切断は、これを呼ばない
-- **`chat-integration-agent`** — 管理画面の `agent` の行と DM の欄を、先に足し終えていることを前提にする（roadmap 順 7 → 8）。書き戻し先の `chat-integration-app` の design.md を同じ節で書き直すので、書き戻しの順番を守る
+- **`chat-integration-agent`** — 管理画面の `agent` の行と DM の欄を、先に足し終えていることを前提にする（roadmap 順 7 → 8）。agent の書き戻しが書き換える `chat-integration-app` の design.md の管理画面の節を、この spec が取り除いて参照に置き換えるので、順番を守る
 - **表示言語** — GROWI が持つ表示言語（英語・日本語・中国語・フランス語・韓国語）すべてに、文言が揃っていることを、GROWI のビルドの検査が求める
 
 ### まだ確かめていないこと

@@ -9,7 +9,7 @@
   - 方向性は brief.md の決定と一致し、`@growi/chat` と proxy の契約を変えずに収まる。
   - brief.md の記述と現行コードの食い違いが 2 つある（通知先の配信イベント 0 件、`keep`）。どちらも、要件・design は現行コードに合わせてある。
   - 要件 2.16 の「以降」には、outbox に書き留め済みの通知が絡む。解釈を design に明記した。
-  - `chat-integration-agent` の残りのタスク（6.3 と 7）のうち、7.1 が `chat-integration-app` の design.md の管理画面の項を書き換える。書き戻しの順番に制約がある。
+  - `chat-integration-agent` の残りのタスク（6.3 と 7）のうち、7.1 が `chat-integration-app` の design.md の管理画面の項を書き換える。この spec のタスク 7.3（app の design.md から管理画面の節を除く）の順番に制約がある。
 
 ## Research Log
 
@@ -68,7 +68,7 @@
 ### `chat-integration-agent` の残りのタスクとの干渉
 
 - **Findings**: 残りは 6.3（実機の確認と能力表・導入ドキュメントの合わせ）と 7（書き戻し）。7.1 は、`chat-integration-app` の design.md の管理画面の項に、権限の行の 2 つの性質（コマンドの注意書きと DM の欄）と、DM だけを許す行が `allowedChannels: 'none'` で保存されることを書く。6.3 は、実機の確認の結果、能力表の値を合わせる可能性がある。
-- **Implications**: 本 spec の書き戻しは、agent の 7 が済んでから行う。能力表の値が変わっても、本 spec の画面は、知らない値を生のまま出し、既知の値を言葉に置き換えるだけなので壊れない（言葉が未登録になるだけ）。
+- **Implications**: 本 spec のタスク 7 は、agent の 7 が済んでから行う。能力表の値が変わっても、本 spec の画面は、知らない値を生のまま出し、既知の値を言葉に置き換えるだけなので壊れない（言葉が未登録になるだけ）。
 
 ## Architecture Pattern Evaluation
 
@@ -138,7 +138,7 @@
 - **要件との関係**: design レビューで、この例外が承認済みの 11.13 に書かれていないことが分かった。代わりに「『既定値』のあいだは DM の欄を無効にする」（例外そのものを無くす）も検討したが、DM の欄は `chat-integration-agent` の範囲で、この spec が振る舞いを変えるべきでないため採らず、11.13 にただし書きを足した。
 - **Selected Approach**: `default` のコマンドで DM を許したときだけ、行を書く。`allowedChannels` は、そのコマンドの既定の挙動（`deny` → `'none'`、`allow` → `'all'`）。
 - **Rationale**: 今の実装は `'none'` を固定で書く。`agent`（書き込み系）では同じ結果。読み取り系に `separate-flag` が足されても、チャンネルでの挙動が変わらない。
-- **Follow-up**: 書き戻しで、agent の 7.1 が書く「DM だけを許す行は `'none'`」の記述に、この一般化を合わせる。
+- **Follow-up**: タスク 7.3 で app の design.md から管理画面の節を除くとき、agent の 7.1 が書く「DM だけを許す行は `'none'`」の記述も取り除き、この spec の design.md の説明（既定の挙動に等しい `allowedChannels`）への参照にする。
 
 ### Decision: 変更の検出は、保存の形に正規化した結果どうしで比べる
 
@@ -197,7 +197,7 @@
 
 ## Risks & Mitigations
 
-- **書き戻しの衝突**（agent の 7.1 と同じ節を書き換える）— 書き戻しの順番を守る。tasks.md の最終タスクに、先に agent の 7 が済んでいることの確認を置く。
+- **app の design.md の同じ節に触れる**（agent の 7.1 が書き換え、本 spec の 7.3 が取り除く）— 順番を守る。tasks.md のタスク 7.1 に、先に agent の 7 が済んでいることの確認を置く。
 - **i18n の基準値**（未使用・未訳の数が増える）— キーは 5 言語に同時に足し、文字列リテラルの `t()` で書く。実装の途中と最後に `lint:i18n` を回す。
 - **zh_CN・fr_FR・ko_KR の訳の質** — en・ja を正とし、ほかの 3 言語は初稿として足す。母語の確認が望ましい。
 - **2 列のカードで権限の行が崩れる** — 権限の行は、半分の幅でも読める縦積みにする。実装の最後に画面で確かめる。
@@ -210,4 +210,4 @@
 - [chat-integration-app の design.md](../chat-integration-app/design.md) — 「管理画面の関係の状態」「触れない部品」
 - [chat-integration の requirements.md](../chat-integration/requirements.md) — 要件 1・2・9・11
 - [chat-integration-agent の tasks.md](../chat-integration-agent/tasks.md) — タスク 6.3・7
-- [spec-lifecycle.md](../../../.claude/rules/spec-lifecycle.md) — amend spec の扱い
+- [spec-lifecycle.md](../../../.claude/rules/spec-lifecycle.md) — amend spec の扱い。この spec は amend spec ではなく sub-spec として置くので、書き戻して自分を消す手順は当てはめない（brief.md）

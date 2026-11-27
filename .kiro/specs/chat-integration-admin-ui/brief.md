@@ -1,19 +1,25 @@
 # Brief: chat-integration-admin-ui
 
-管理画面（`/admin/chat-integration`）を作り直す amend spec（[roadmap.md](../chat-integration/roadmap.md) の順 8）。
+管理画面（`/admin/chat-integration`）を受け持つ sub-spec。umbrella `chat-integration` の下に、`chat-integration-protocol`・`-proxy`・`-app` と並ぶ 4 つ目の sub-spec として常に置く（[roadmap.md](../chat-integration/roadmap.md) の順 8 で作り直す）。
 接続の追加から、権限と通知先の設定、切断と再接続までを、管理者が画面の案内だけで進められるようにする。
 protocol と proxy の契約は変えない。app の管理画面と、その API だけを変える。
 
-## Amend target
+## chat-integration-app から移す受け持ち
 
-| 対象の spec | 変わる契約 |
+| 対象 | 移すもの・変わること |
 |---|---|
-| `chat-integration-app` | design.md の「触れない部品」（`CapabilityReportTable`・`ChannelPermissionsSection`・`NotificationDestinationsSection`・`UnpairButton`）の取り決めを解く。管理画面の文言を英語の直書きとする取り決めを、i18n 対応に改める。管理画面の節（要件 1.3・11・12.4・12.5・9.10〜9.13 を受け持つ `client/admin/`）と、管理画面の API（チャンネル一覧、通知先の削除）を書き換える |
-| `chat-integration`（umbrella） | 次の要件が、振る舞いとして変わるか、足りない。**要件フェーズで確定する**: 要件 9（ペアリングの入力、失敗の知らせ、切断 9.7、切断後の案内）、要件 11（チャンネル単位の権限。既定値の見せ方、チャンネルの選び方）、要件 2.2（通知先。削除、配信イベントの検査）、要件 1.3・1.4（機能表と接続状態の表示）。新しい要件は**末尾に足し、既存の番号は振り直さない** |
-| roadmap.md | 順 8 の対象は今「チャンネルの権限と『できること』の表」だけ。この spec の範囲（上の表と Scope）に広げる。完了時にこの行を消す |
+| `chat-integration-app` | 管理画面（`client/admin/`。要件 1.3・11・12.4・12.5・9.10〜9.13 の管理画面の側）と、管理画面の API（`server/admin/admin-router.ts` のルート）の受け持ちを、この spec へ移す。app の design.md からは管理画面の節（「管理画面の関係の状態」「触れない部品」、ファイル構成と API の表のうち管理画面の部分）を除き、この spec への参照に置き換える。あわせて、「触れない部品」（`CapabilityReportTable`・`ChannelPermissionsSection`・`NotificationDestinationsSection`・`UnpairButton`）の取り決めと、管理画面の文言を英語の直書きとする取り決めは無くなる（i18n 対応にする）。設定の保存・ペアリング・切断の処理と、権限や通知先の model は app に残る |
+| `chat-integration`（umbrella） | 要件は umbrella が持つ。この spec で決めた受け入れ条件（要件 1・2・9・11 への追記と、新しい要件 16）を umbrella の requirements.md へ移し、この spec は番号を参照するだけにする。新しい受け入れ条件は**末尾に足し、既存の番号は振り直さない**。spec.json の `sub_specs` にこの spec を足す |
+| roadmap.md | Sub-specs の表にこの spec を足す。順 8 の対象は今「チャンネルの権限と『できること』の表」だけなので、この spec の範囲（上の表と Scope）に広げる。順 8 の行は、完了したときに消す |
 
-- Revalidation Triggers への影響: なし。protocol と proxy の契約は変えない（管理画面の API は app の中で完結する）。
+- Revalidation Triggers への影響: protocol と proxy の契約は変えない（管理画面の API は app の中で完結する）。app の Revalidation Triggers に「権限や通知先の model を変えたら、`chat-integration-admin-ui` も確かめ直す」を足す。
 - 前提: roadmap は「`agent`（順 7）が権限と能力表に行を足した後に作り直す」としている。`chat-integration-agent` の task 5.8（`agent` の行、DM の欄）と 6.1（`keep` の除去）は完了済みで、この前提は満たされている。agent の残りのタスクが管理画面に触れるかは、未確認。
+
+## なぜ amend spec ではなく sub-spec にするか
+
+- **書き戻すと、app の design.md が分割前の大きさに戻る。** roadmap.md の「分割の経緯」のとおり、1 つの spec の design.md が 1882 行になり、「ある節を直すと別の節と食い違う」欠陥が出続けたので 3 つに分けた。app の design.md はすでに 1202 行で、テンプレートが警告を出す 1000 行を超えている。この spec の design.md（約 650 行）を書き戻すと、分割前の 1882 行に近づく。
+- **分量が多く、今後も変わり続ける。** 足す受け入れ条件は 43 件ある。範囲外として先送りしたもの（「既定値」と「すべてのチャンネルで使う」の違いの見せ方、Slack への bot の導入の画面化など）もある。手を付けるたびに amend spec を作って書き戻すより、置き場所を決めておくほうが楽である。
+- **範囲の線引きがはっきりしている。** 対象は `client/admin/` と管理画面の API だけで、protocol と proxy の契約には触れない。roadmap の Approach Decision が「機能で割る案」を退けた理由は「どの機能も 3 つの成果物すべてにまたがるので線が引けない」ことだったが、管理画面は app の中で閉じているので、この理由に当たらない。
 
 ## Problem
 
@@ -71,4 +77,5 @@ protocol と proxy の契約は変えない。app の管理画面と、その AP
 
 ## 出典と後始末
 
-- この spec は amend spec であり、一時的な入れ物である。実装の後、最終タスクで、変更を `chat-integration-app` の design.md と umbrella の requirements に書き戻し、この spec を削除する（[spec-lifecycle.md](../../../.claude/rules/spec-lifecycle.md)）。
+- この spec は、umbrella `chat-integration` の下に常に置く sub-spec である。実装の後、最終タスク（tasks.md のタスク 7）で、要件を umbrella の requirements.md へ移し、`chat-integration-app` の design.md から管理画面の節を除いてこの spec への参照に置き換え、umbrella の spec.json と roadmap.md にこの spec を載せる。そのあと `/kiro-spec-cleanup` で、この spec の HOW を削り、WHY を残す。
+- [spec-lifecycle.md](../../../.claude/rules/spec-lifecycle.md) の amend spec（書き戻して自分を消す）の扱いは、この spec には当てはめない（上の「なぜ amend spec ではなく sub-spec にするか」。2026-11 のレビューで決定）。

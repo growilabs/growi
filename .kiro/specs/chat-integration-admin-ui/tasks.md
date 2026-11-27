@@ -232,47 +232,47 @@
   - _Requirements: 11.14, 11.16, 16.1, 16.2, 16.9_
   - _Depends: 5.3_
 
-- [ ] 7. 変更を対象の spec へ書き戻し、この spec を消す
+- [ ] 7. 要件を umbrella へ移し、管理画面の受け持ちを `chat-integration-app` からこの spec へ移す
+  - この spec は、umbrella の下に常に置く 4 つ目の sub-spec である（brief.md の「なぜ amend spec ではなく sub-spec にするか」）。書き戻して消すことはしない
 
-- [ ] 7.1 書き戻しの前提を確かめる
+- [ ] 7.1 受け持ちを移す前提を確かめる
   - `chat-integration-agent` のタスク 7（書き戻し）が済み、`.kiro/specs/chat-integration-agent/` が消えていることを確かめる。済んでいなければ、ここで止め、agent の書き戻しを先に行うよう、ユーザーに知らせる
   - 完了の条件: agent の書き戻しが済んでいることを確かめた
   - _Requirements: 16.9_
 
-- [ ] 7.2 umbrella の requirements.md を書き直す
+- [ ] 7.2 要件を umbrella の requirements.md へ移す
   - 要件 1・2・9・11 の末尾に、この spec の requirements.md の受け入れ条件を、同じ番号のまま足す。要件 16 を足す。既存の番号は振り直さない
   - 「以前は〜だった」という経緯を書かず、今の事実だけを書く
-  - 完了の条件: umbrella の requirements.md に、1.23〜1.24、2.15〜2.17、9.14〜9.29、11.9〜11.20、要件 16（16.1〜16.10）が、既存の番号を変えずに入っている
+  - この umbrella では、要件は umbrella が持ち、sub-spec は番号を参照するだけである。この spec の requirements.md を消し、Boundary Context のうち design.md に無いものは design.md の Boundary Commitments へ移す。brief.md・design.md・tasks.md の requirements.md への参照を、umbrella の requirements.md へ直す
+  - この spec の spec.json の `approvals.requirements` に、`chat-integration-app` と同じく `owned_by_umbrella: true` を付ける
+  - 完了の条件: umbrella の requirements.md に、1.23〜1.24、2.15〜2.17、9.14〜9.29、11.9〜11.20、要件 16（16.1〜16.10）が、既存の番号を変えずに入っている。この spec に requirements.md が無く、spec.json に `owned_by_umbrella: true` がある
   - _Requirements: 1.23, 1.24, 2.15, 2.16, 2.17, 9.14, 9.15, 9.16, 9.17, 9.18, 9.19, 9.20, 9.21, 9.22, 9.23, 9.24, 9.25, 9.26, 9.27, 9.28, 9.29, 11.9, 11.10, 11.11, 11.12, 11.13, 11.14, 11.15, 11.16, 11.17, 11.18, 11.19, 11.20, 16.1, 16.2, 16.3, 16.4, 16.5, 16.6, 16.7, 16.8, 16.9, 16.10_
   - _Depends: 7.1_
 
-- [ ] 7.3 `chat-integration-app` の design.md を書き直す
-  - 「管理画面と個人設定」の要約、「管理画面の関係の状態」、ファイル構成の管理画面の部分、管理画面の API の表、管理画面の文言の方針（英語の直書きから、`admin` の文言へ）を、この spec の design.md に合わせて書き直す。「触れない部品」の節は、節ごと削除する
-  - `chat-integration-agent` が書いた、権限の行の 2 つの性質と、DM だけを許す行の説明を、この spec の「DM だけを許す行」の説明（既定の挙動に等しいチャンネル設定で書く）に合わせて書き直す
+- [ ] 7.3 `chat-integration-app` の design.md から管理画面の節を除く
+  - 管理画面の節（「管理画面の関係の状態」「触れない部品」、ファイル構成と API の表のうち管理画面の部分）を取り除き、この spec への参照に置き換える。「管理画面と個人設定」の要約（This Spec Owns）からも管理画面を外し、この spec への参照にする
+  - `chat-integration-agent` が書いた、権限の行の 2 つの性質と、DM だけを許す行の説明も、管理画面の節として取り除き、この spec の design.md の「権限の行」の節への参照にする
+  - Boundary Commitments の Out of Boundary に「`client/admin/` と管理画面の API（`chat-integration-admin-ui` が持つ）」を足す
+  - Revalidation Triggers に「権限や通知先の model を変えたら、`chat-integration-admin-ui` も確かめ直す」を足す
   - 「以前は〜だった」という経緯を書かず、今の事実だけを書く
-  - 完了の条件: design.md に「触れない部品」の節がなく、管理画面の部品・API・文言の方針が、この spec の design.md と一致している
+  - 完了の条件: app の design.md に管理画面の節がなく、その場所からこの spec の design.md を参照している。Out of Boundary と Revalidation Triggers に上の 2 項目がある
   - _Requirements: 9.24, 11.13, 16.9_
   - _Depends: 7.1_
 
-- [ ] 7.4 設計の理由を対象の spec の research.md へ移す
-  - この spec の research.md のうち、管理画面の作りに関わる決定と調査（折りたたみ、チャンネル一覧の口、削除の識別、0 件の検査の置き場所、DM だけを許す行、文言の hook、`already-paired` の手順を常に出す理由、接続が切れているカードの説明の直し）を、`chat-integration-app` の research.md へ移す
-  - 完了の条件: `chat-integration-app` の research.md に、移した決定と調査があり、この spec の research.md にしか無い理由が残っていない
-  - _Requirements: 9.21, 11.13, 16.2_
-  - _Depends: 7.3_
+- [ ] 7.4 umbrella の spec.json と roadmap.md に、この spec を載せる
+  - umbrella の spec.json の `sub_specs` にこの spec を足し、`updated_at` を更新する
+  - roadmap.md の Sub-specs の表に、この spec の行（成果物: `apps/app/src/features/chat-integration/client/admin/` と管理画面の API、責務: 管理画面）を足す
+  - roadmap.md から、順 8 の行と、順 8 の節を消す。ほかの順の番号は変えない
+  - 書き換えた `chat-integration-app` の spec.json の `updated_at` を更新する（`phase` と `approvals` は変えない）
+  - 完了の条件: umbrella の `sub_specs` と roadmap.md の Sub-specs の表にこの spec があり、roadmap.md に順 8 の行が無い。app の spec.json の `updated_at` が更新されている
+  - _Requirements: 16.9_
+  - _Depends: 7.2, 7.3_
 
-- [ ] 7.5 対象の spec.json と roadmap.md を直す
-  - 書き換えた対象の spec の spec.json の `updated_at` を更新する（`phase` と `approvals` は変えない）
-  - roadmap.md から、順 8 の行を消す。ほかの順の番号は変えない
-  - 完了の条件: 対象の spec.json の `updated_at` が更新され、roadmap.md に順 8 の行が無い
+- [ ] 7.5 `/kiro-spec-cleanup` で、この spec を整理する
+  - 実装の後、`/kiro-spec-cleanup chat-integration-admin-ui` を回し、HOW の細部を削って WHY を残す。research.md の設計の理由は、この spec に残す
+  - 完了の条件: `/kiro-spec-cleanup` が済んでいる
   - _Requirements: 16.9_
   - _Depends: 7.4_
-
-- [ ] 7.6 この spec を消す
-  - steering と roadmap.md に、この spec のディレクトリの中のファイルを名前で指している箇所が無いことを確かめる。あれば、書き戻した先の文書へ直す
-  - `.kiro/specs/chat-integration-admin-ui/` を消す
-  - 完了の条件: この spec のディレクトリが無く、リポジトリの文書に、このディレクトリへの参照が残っていない
-  - _Requirements: 16.9_
-  - _Depends: 7.5_
 
 ## Implementation Notes
 
@@ -280,4 +280,4 @@
 - **文言のキーの持ち主**: 文言のキーは、使う部品の作業と同じ作業で、5 言語に同時に足す。同じ 5 つの `admin.json` を触るので、文言を足す作業は、順に行う（`(P)` を付けない）。
 - **既存の試験**: 既存の部品を直接書き換える作業（4.4、4.5）は、その部品の既存の試験の、英語の文言への依存を、同じ作業で直す。新しい部品に置き換える作業は、古い実装が残るあいだ古い試験を通し続け、5.1 で古い試験の項目を移して取り除く。
 - **文言の hook の試験**: 文言の hook の試験は、キーをそのまま返す `t` の差し替えを使う（既存の試験と同じ）。部品を、実際の言葉で試験しない。
-- **書き戻しの順番**: 7 は、`chat-integration-agent` のタスク 7 が済んでから行う（7.1）。
+- **タスク 7 の順番**: 7 は、`chat-integration-agent` のタスク 7（書き戻し）が済んでから行う（7.1）。agent の書き戻しが、7.3 で除く app の design.md の管理画面の項を書き換えるため。
