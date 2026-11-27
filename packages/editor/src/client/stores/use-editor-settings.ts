@@ -46,7 +46,11 @@ const useEnterKeyHandler = (
 ): void => {
   const onPressEnter: Command = useCallback(
     (editor) => {
-      if (isInTable(editor) && autoFormatMarkdownTable) {
+      if (
+        autoFormatMarkdownTable &&
+        editor.state.selection.main.empty &&
+        isInTable(editor)
+      ) {
         insertNewRowToMarkdownTable(editor);
         return true;
       }
