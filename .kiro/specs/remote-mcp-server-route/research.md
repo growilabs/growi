@@ -83,7 +83,7 @@ umbrella 全体の調査（claude.ai の挙動、MCP の仕様、先行事例）
   - **(a)** `/_api/v3/mcp` をセッションの対象から外す（3.8 と同じ対処）。`req.user` はトークンからしか入らなくなる。
   - **(b)** parser の前に `req.user` を消す。
   - **(c)** parser を使わず、`extractBearerToken` と `AccessToken.findUserIdByToken` を直接呼ぶ。growi-vault の `resolvePatUser` が同じ形をとっている。parser が行う「閲覧専用の利用者を拒否する」判定を、自分で書き直すことになる。
-- **結論（Design Discovery で確定）**: (c) を採る。(a) は使えない。セッションの対象から外すと、csurf と passport がエラーになる。(b) は、parser がヘッダー以外のトークンも読むので、要件 2.2〜2.4 を満たすために別の打ち消しが要る。
+- **結論**: (c) を採る。その後、MCP のルートをセッションより前にマウントすると決めたので（Decision「MCP のルートは、セッションより前にマウントする」）、セッションの利用者が `req.user` に入ること自体が起きなくなった。
 
 #### 3.2 `mongoSanitize` が、2026-07-28 版のリクエストを壊す
 
@@ -95,7 +95,8 @@ umbrella 全体の調査（claude.ai の挙動、MCP の仕様、先行事例）
   - **(b)** `mongoSanitize` に、`/_api/v3/mcp` を除外する条件を足す。
   - **(c)** `bodyParser.json` の `verify` で生の本文を残し、`/_api/v3/mcp` で解析し直す。
 - どれも `express-init.js` の変更を伴う。`/_api/v3/mcp` の本文は MongoDB のクエリに渡らない（ツールの引数は zod で検証される）ので、除外しても `mongoSanitize` の目的は損なわない。
-- **Research Needed**: 実際に削除されることを、動かして確かめる。
+- **確認済み（2026-11-27）**: 開発サーバーで、`mongoSanitize` の後ろに置いたルートでは `_meta` の中のキーが削除されることを確かめた。
+- **結論**: 除外はしない。MCP のルートを `mongoSanitize` より前にマウントするので、対処そのものが要らなくなった。
 
 #### 3.3 ツールは、モジュールの読み込み時に作られる定数である
 
@@ -150,11 +151,12 @@ umbrella 全体の調査（claude.ai の挙動、MCP の仕様、先行事例）
 - 既存の回避策が 2 つある。
   - `routes/avoid-session-routes.js`: セッションのミドルウェア自体を通さない（`/api-docs` が使っている）。
   - `server/crowi/session-id.ts` の `FIXED_SESSION_ID_PATHS`: 固定のセッション ID を共有する（healthcheck と ai-usage が使っている）。
-- **結論（Design Discovery で確定）**: 後者（固定のセッション ID）を使う。前者は、セッションを通さないリクエストが csurf と passport でエラーになるので使えない。後者では `req.user` が入った状態で届くことがあるので、3.1 の問題は認証の側（`req.user` を見ない）で解消する。
+- **結論**: どちらも使わない。MCP のルートをセッションより前にマウントするので、セッションが作られない。Design Discovery の時点では固定のセッション ID を選んでいたが、PR のレビューを受けて見直した。
 
 #### 3.9 その他
 
 - **`Origin` の検査**: `CertifyOrigin` は `/_api` 全体にかかる。`Origin` ヘッダーが GROWI のオリジンと違い、クエリにも本文にも `access_token` が無い JSON の POST を、ルートに届く前に拒否する（`server/middlewares/certify-origin.ts`）。`Origin` を送らないリクエストは通す。ブラウザの中から直接つなぐ MCP クライアントは拒否される（GROWI は CORS の応答ヘッダーを返さないので、どのみち接続できない）。MCP の仕様が求める `Origin` の検証とは、向きが合う。拒否の応答は apiv3 のエラー形式で、JSON-RPC の形式ではない。
+  - **結論**: MCP のルートは `CertifyOrigin` より前にマウントするので、この検査を通らない。同じ判断を、ルートの中の `isAllowedOrigin` で行う。
 - **メンテナンスモード**: `/_api/v3` の本体のルーターには `unavailableWhenMaintenanceModeForApi` がかかっている（`server/routes/index.js:215`）。その下か、同じミドルウェアを付けてマウントすれば、要件 3.10 のメンテナンス中の応答は既存の仕組みで満たせる。
 - **本文サイズ**: グローバルの `bodyParser.json` の上限（50 MB）は、ルートに届く前に適用される。SDK 側の 4 MiB の上限は、本文が解析済みのときは効かない。`/_api/v3/mcp` だけ上限を下げるには、`Content-Length` を自分で見るか、`express-init.js` に手を入れる。
 - **応答の形式**: 2025 年系のリクエストへの応答は、常に SSE（`text/event-stream`）である。JSON に固定するオプションは 2.8.0 に無い。GROWI は全応答に `compression()` をかけており、SSE も圧縮の対象になる。イベントを 1 つ送って接続を閉じるので、応答が失われることはないはずだが、遅れないかは未確認。
@@ -216,7 +218,7 @@ umbrella 全体の調査（claude.ai の挙動、MCP の仕様、先行事例）
 - **URL は `/_api/v3/mcp` のまま**。`features/mastra` のルーター（`/_api/v3/mastra`）は、全体に `aiReadyGuard` をかけている（`features/mastra/server/routes/index.ts`）。その下に置くと要件 1.8（AI の設定に左右されない）に反するので、MCP のルートは別にマウントする。`features/mastra` の中のコードを別の URL にマウントする前例は、`routes/admin-ai-settings` にある。
 - ~~認証は、`/_api/v3/mcp` をセッションの対象から外したうえで（3.8）、「Bearer が無ければ 401」の判定と `accessTokenParser` を、差し込み口の暫定の中身にする（3.1 の (a)）。~~ 設計で取り下げた。セッションの対象から外すと csurf と passport がエラーになる。下の「Design Discovery」の Decision を参照。
 - Activity は、MCP 用のツールの `execute` の中で `createActivity` を直接呼ぶ（3.6 の (a)）。
-- `mongoSanitize` は、`/_api/v3/mcp` を除外する（3.2）。
+- ~~`mongoSanitize` は、`/_api/v3/mcp` を除外する（3.2）。~~ 取り下げた。セッションより前にマウントするので、除外が要らない。
 
 #### 設計の前に、要件で決めること
 
@@ -257,7 +259,7 @@ umbrella 全体の調査（claude.ai の挙動、MCP の仕様、先行事例）
   - csurf は、メソッドの判定より前に `req.session` から secret を読む。`req.session` が無いと `misconfigured csrf` を投げる。
   - passport 0.6 の `SessionStrategy` は、`req.session` が無いと `Login sessions require session support` のエラーにする。
   - `FIXED_SESSION_ID_PATHS`（`server/crowi/session-id.ts`）は、Cookie の無いリクエストに固定のセッション ID を割り当てる。healthcheck と ai-usage が使っている。
-- **Implications**: 固定のセッション ID を使う。この場合、ブラウザのセッションを持つリクエストでは `req.user` が入った状態でルートに届く。認証は `req.user` を見ない作りにする。
+- **Implications**: `avoid-session-routes` は使えない。この時点では固定のセッション ID を選んだ。その後、セッションより前にマウントする案に改めた（Decision「MCP のルートは、セッションより前にマウントする」）。
 
 #### 既存の回数制限の構造
 
@@ -285,7 +287,10 @@ umbrella 全体の調査（claude.ai の挙動、MCP の仕様、先行事例）
 
 #### Decision: 認証は `accessTokenParser` を使わず、独立した関数にする
 
-- **Context**: 要件 2.2〜2.4（Bearer だけ）と 2.7（セッションだけでは 401）。固定のセッション ID を使うので、`req.user` が入った状態で届くことがある。
+- **Context**: 要件 2.2〜2.4（Bearer だけ）と 2.7（セッションだけでは 401）。この Decision を書いた時点では、固定のセッション ID を使う設計で、`req.user` が入った状態で届くことがあった。セッションより前にマウントすると決めた後は、この前提は無くなり、parser を借りる形（Bearer があることを確かめてから parser を呼び、利用者がいなければ失敗にする）も成り立つようになった。見直したうえで、3 のままとした（2026-11-27）。
+  - parser を借りると、「閲覧専用の利用者を拒否する」判定の重複は無くなる。ただし、「有効でない利用者を拒否する」判定は parser の外（`loginRequired`）にあるので、どちらの形でも自分で書く。
+  - 3 は、リリース時の認証（トークンを直接調べて利用者を返す）と同じ形で、境界のテストを `remote-mcp-server-oauth` の下敷きにできる。
+  - この認証は `remote-mcp-server-oauth` が置き換える暫定のもので、判定の重複が問題になる期間が短い。重複は境界のテストで固定する。
 - **Alternatives Considered**:
   1. `accessTokenParser` の前に `req.user` を消し、Bearer の有無を先に見る。
   2. parser の中身を関数として取り出し、parser と MCP の両方から使う。
@@ -361,11 +366,41 @@ umbrella 全体の調査（claude.ai の挙動、MCP の仕様、先行事例）
 - **Trade-offs**: `release()` で回収されるのは、ハンドラと `MCPServer` の実体だけで、メモリの大半（モジュールのコード）は戻らない。完全に戻すには再起動が要る。
 - **Follow-up**: 本番ビルドの GROWI で、読み込みの前後・リクエストの処理の後・`release()` の後のメモリを測る（design.md の Verification Checkpoints 6）。
 
+#### Decision: MCP のルートは、セッションより前にマウントする
+
+- **Context**: PR のレビュー（2026-11-27）で、セッションより前にマウントする案との比較を求められた。それまでの設計は、他の API と同じ位置（共通処理の後）にマウントし、MCP に合わない共通処理を個別に打ち消していた。
+- **Alternatives Considered**:
+  1. 共通処理の後（`routes/index.js`）にマウントする。`mongoSanitize` に除外パスを足し、固定のセッション ID を使い、認証は `req.user` を信用しない。
+  2. `express-init.js` の `bodyParser.json` の直後、セッションより前にマウントする。メンテナンスモードの判定、IP 単位の回数制限、送信元の検査は、ルートが自分で行う。
+- **Selected Approach**: 2。
+- **検証**: 開発サーバーに、同じ内容の仮のルートを 2 つの位置に置いて比べた（検証後に削除）。
+
+  | 確かめたこと | セッションより前 | 共通処理の後 |
+  |---|---|---|
+  | 本文の `.` を含むキーと `$` で始まるキー | そのまま届く | 削除される |
+  | Cookie の無いリクエスト | セッションが作られない。`Set-Cookie` も返らない | リクエストごとに新しいセッションが作られ、`Set-Cookie` が返る |
+  | `Origin: https://claude.ai` を付けた JSON の POST | 通る | `CertifyOrigin` が 400 で拒否する |
+  | ルートの中から呼ぶ IP 単位の回数制限 | 動く（上限 3 回で、4 回目から 429） | — |
+  | 設定の読み取り（`app:siteUrl`）、送信元 IP の取得 | できる | できる |
+  | 素通ししたリクエスト | 存在しないパスと同じ応答（POST は本文まで一致、GET も同じ） | 同じ |
+
+- **Rationale**:
+  - 全リクエストが通る既存の処理への変更が、3 つから 1 つ（回数制限の既定の設定）に減る。`mongoSanitize` とセッションの処理には手を入れない。足すのは、マウントする 1 行だけである。
+  - MCP のリクエストが、セッションストアを読み書きしなくなる。
+  - 「`req.user` を信用しない」という規約に頼らなくなる。`req.user` は、そもそも入らない。
+  - 送信元の検査を自分で持つので、応答を JSON-RPC の形式にでき、許可するオリジンを MCP の都合で決められる。共通処理の後に置いた場合、claude.ai が `Origin` を送っていれば拒否されることを、上の検証で確かめた。
+  - 静的なファイルの配信が、同じ理由でセッションより前に置かれている。
+- **Trade-offs**:
+  - ルートが自分で行う処理が 3 つ増える。メンテナンスモードの判定は既存のミドルウェアを置くだけで、IP 単位の回数制限は `features/rate-limiter` に公開の関数を足す。送信元の検査は、小さな関数を 1 つ書く。
+  - ルートを登録する場所が、他のルート（`routes/index.js`）と違う。`express-init.js` は起動時に読み込まれるので、ルーターのファイルが `@mastra/*` を静的に読み込まないことを、drift spec で守る。
+  - csurf を通らない。MCP エンドポイントは Cookie で認証しないので、問題にならない。
+- **Follow-up**: メンテナンスモードの 503 は、ミドルウェアを置いて動くことだけを確かめた。メンテナンスモードに切り替えての確認は、実装のテストで行う。
+
 ### Synthesis
 
-- **Generalization**: 「利用者単位の回数制限を、認証の後に呼ぶ」は MCP に固有ではないので、`features/rate-limiter` の公開の関数にした。`mongoSanitize` の除外も、パスの一覧を受け取る包みにした。どちらも、今の利用者は MCP の 1 つだけである。
+- **Generalization**: 「回数制限を、ルートの中から呼ぶ」は MCP に固有ではないので、`features/rate-limiter` の公開の関数（利用者単位と IP 単位）にした。今の利用者は MCP の 1 つだけである。
 - **Build vs. Adopt**: MCP のプロトコルは `@mastra/mcp` に任せる。回数の計数、Activity、設定、閲覧権限の判定は、既存のものを使う。新しく作るのは、認証の差し込み口と、ツールの宣言と実行役だけである。
-- **Simplification**: `mapAuthInfoToUser` と requestContext、MCP 専用の管理ページ、MCP 専用の管理用スコープ、本文サイズの検査を外した。
+- **Simplification**: `mapAuthInfoToUser` と requestContext、MCP 専用の管理ページ、MCP 専用の管理用スコープ、本文サイズの検査を外した。PR のレビューの後、`mongoSanitize` の除外の包みと、固定のセッション ID も外した。
 
 ### PR のレビューで共有された計測（2026-11-27、yuki-takei）
 
@@ -390,4 +425,4 @@ umbrella 全体の調査（claude.ai の挙動、MCP の仕様、先行事例）
 - 既存ツールからの取り出しで、AI チャットの結果が変わる — 既存の spec を変えずに通すことを、取り出しのタスクの完了条件にする。
 
 ---
-_Updated: 2026-11-27. PR のレビューを受けて、動かない状態のメモリの扱いの Decision と、共有された計測値を足した。Prior: 2026-11-25. PR のレビューを受けて、後の決定で覆った記述（ギャップ分析の 2 と 3）を直し、Decision を 3 つ足した。Prior: 2026-11-25. 設計の調査と判断（Design Discovery）を足した。Prior: 2026-11-25. 置き場所を `features/mastra` にする決定を、設計への申し送りに足した。Prior: 2026-11-25. パスを `/_api/v3/mcp` にする決定を反映した（1.1 を解決済みにし、`CertifyOrigin` の制約を 3.9 に足した）。Prior: 2026-11-24. ギャップ分析を記録。_
+_Updated: 2026-11-27. マウントする位置の Decision（セッションより前）と検証の結果を足し、それで覆った記述（3.1、3.2、3.8、3.9）に結論を書いた。Prior: 2026-11-27. PR のレビューを受けて、動かない状態のメモリの扱いの Decision と、共有された計測値を足した。Prior: 2026-11-25. PR のレビューを受けて、後の決定で覆った記述（ギャップ分析の 2 と 3）を直し、Decision を 3 つ足した。Prior: 2026-11-25. 設計の調査と判断（Design Discovery）を足した。Prior: 2026-11-25. 置き場所を `features/mastra` にする決定を、設計への申し送りに足した。Prior: 2026-11-25. パスを `/_api/v3/mcp` にする決定を反映した（1.1 を解決済みにし、`CertifyOrigin` の制約を 3.9 に足した）。Prior: 2026-11-24. ギャップ分析を記録。_

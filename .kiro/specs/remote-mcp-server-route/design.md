@@ -6,7 +6,7 @@
 
 **Users**: 管理者は、AI 連携の管理ページで MCP 連携を切り替える。開発者・検証者は、アクセストークンを MCP クライアントに設定して接続する。この spec は単独ではリリースしない。リリース時の認証は `remote-mcp-server-oauth` が差し替える。
 
-**Impact**: `features/mastra` に、MCP のルート・MCP 用のツール定義・管理 API・管理画面の節を足す。既存の全文検索ツールとページ本文取得ツールから処理の中身を関数として取り出し、エージェント用のツールと MCP 用のツールが同じ関数を呼ぶ形にする。全リクエストに関わる変更は 3 つある: `mongoSanitize` の除外パス、固定のセッション ID のパス、回数制限の既定の設定。どれも対象を `/_api/v3/mcp` の 1 パスに限る。
+**Impact**: `features/mastra` に、MCP のルート・MCP 用のツール定義・管理 API・管理画面の節を足す。既存の全文検索ツールとページ本文取得ツールから処理の中身を関数として取り出し、エージェント用のツールと MCP 用のツールが同じ関数を呼ぶ形にする。全リクエストが通る場所への変更は 2 つである: `express-init.js` で、`bodyParser.json` の直後（セッションより前）に MCP のルートをマウントする 1 行と、回数制限の既定の設定への `/_api/v3/mcp` の追加。既存の共通処理（セッション、`CertifyOrigin`、`mongoSanitize` など）の動きは変えない。
 
 ### Goals
 
@@ -27,6 +27,7 @@
 ### This Spec Owns
 
 - `/_api/v3/mcp` のリクエストの処理の流れ: MCP 連携が動く状態かどうかの判定（`isMcpAvailable`）、認証の呼び出し、利用者単位の回数制限、バッチの拒否、`MCPServer` への受け渡し。
+- `/_api/v3/mcp` をマウントする位置（セッションより前）と、その結果ルートが自分で行うことになる処理: メンテナンスモードの判定、IP 単位の回数の計数、送信元（`Origin`）の検査。
 - **認証の差し込み口の型**（`McpAuth`）と、その暫定の中身（アクセストークンでの認証、チャレンジなしの 401）。
 - MCP 用のツール定義（名前・説明・annotation・出力の形）と、ツール呼び出しの Activity の記録。
 - 既存の 2 ツールから取り出した共有関数 `searchPages` と `readPageContent`。
@@ -70,16 +71,20 @@
 
 - **`features/mastra` のルーター**（`/_api/v3/mastra`）は、全体に `aiReadyGuard` をかけ、最初のリクエストでハンドラ群を動的に読み込む。MCP は LLM の設定を必要としないので（1.8）、このルーターの下には置かない。遅延ロードの形（Promise を保持し、失敗したら捨てる）は同じものを使う。
 - **`features/mastra` の中のコードを別の URL にマウントする前例**は `routes/admin-ai-settings`（`/_api/v3/ai-settings`）にある。管理 API はこれに倣う。
-- **`/_api` 配下の共通処理**: `/_api/v3/mcp` は、ルートに届く前に次を、この順に通る。1〜5 は `server/crowi/express-init.js`、6 は `server/routes/index.js` にある。
+- **共通処理の順序**: リクエストは、次の処理をこの順に通ってから、各ルートに届く。1〜6 は `server/crowi/express-init.js`、7 は `server/routes/index.js` にある。
   1. `bodyParser.json`: 本文を読み終える（上限 50 MB）。
-  2. セッション: Cookie の無いリクエストには、パスごとの固定のセッション ID を割り当てる。セッションストアを読む。
-  3. csurf と passport（4 を挟む）: どちらもセッションがあることを前提にしており、セッションを通さないとエラーになる。そのため `avoid-session-routes` は使えない。
-  4. `CertifyOrigin`（csurf の後、passport の前）: `Origin` ヘッダーが GROWI のオリジンと違う JSON の POST を拒否する。`Origin` を送らないリクエストは通す。
-  5. `mongoSanitize`: 本文から、`.` を含むキーと `$` で始まるキーを削除する。2026-07-28 版のリクエストは `params._meta` に `.` を含むキーを必ず持つので、そのままでは全件が拒否される。
-  6. グローバルの回数制限（IP 単位。認証前なので利用者は分からない）。
-- この順序から、次のことが言える。
-  - 本文の読み込み、セッションストアの読み取り、`CertifyOrigin` の判定は、回数制限より前に起きる。IP 単位の上限を超えたリクエストでも、ここまでの処理は行われる。これは `/_api` 配下のどのパスでも同じである。
-  - `CertifyOrigin` が拒否したリクエストは、回数制限に数えられない。
+  2. セッション: Cookie の無いリクエストには、新しいセッションの記録を作り、`Set-Cookie` を返す。
+  3. csurf。
+  4. `CertifyOrigin`（`/_api` 配下）: `Origin` ヘッダーが GROWI のオリジンと違い、クエリにも本文にも `access_token` が無い JSON の POST を拒否する。
+  5. passport: セッションから、ログイン中の利用者を `req.user` に入れる。
+  6. `mongoSanitize`: 本文から、`.` を含むキーと `$` で始まるキーを削除する。
+  7. グローバルの回数制限（利用者単位と IP 単位）。
+- **MCP のルートは、1 の直後、2 より前にマウントする。** MCP エンドポイントは、セッションを使わず、Bearer トークンだけで認証する。2〜6 は MCP に不要で、そのうち 3 つは害になる。
+  - 2: MCP クライアントは Cookie を保持しないので、リクエストごとにセッションの記録が増える。
+  - 4: 別のオリジンの `Origin` を送るクライアントは、Bearer トークンを持っていても拒否される。応答は apiv3 のエラー形式で、JSON-RPC の形式ではない。
+  - 6: 2026-07-28 版のリクエストは、`params._meta` に `.` を含むキーを必ず持つ。削除されると、SDK が全件を拒否する。
+- 1 の直後にマウントすれば、MCP のリクエストは 2〜7 を通らない。既存の共通処理を、MCP のために変更する必要が無い。代わりに、MCP に必要なもの（メンテナンスモードの判定、IP 単位の回数の計数、送信元の検査）を、ルートが自分で行う。静的なファイルの配信が、同じ理由でセッションより前に置かれている。
+- この位置で成り立つことは、開発サーバーに仮のルートを置いて確かめた（research.md の Decision「MCP のルートは、セッションより前にマウントする」）。素通ししたリクエストは 2 以降の通常の経路に入り、存在しないパスと同じ応答になる。
 - **既存の 2 ツール**は、モジュールの読み込み時に作られる定数で、`searchService` を requestContext から読む。`MCPServer` 経由の requestContext には `searchService` が入らない。また 2 ツールとも、例外の文面（`err.message`）をそのまま結果に入れる。
 
 ### Architecture Pattern & Boundary Map
@@ -87,15 +92,14 @@
 ```mermaid
 graph TB
     Client[MCP client]
-    subgraph Global[Express global middleware in actual order]
+    subgraph Global[Express global middleware]
         Body[Body parser]
-        Session[Session with fixed id]
-        Origin[CertifyOrigin]
-        Sanitize[Mongo sanitize with exemption]
-        RateIp[Rate limiter per IP]
+        Rest[Session csurf CertifyOrigin passport mongoSanitize rate limiter]
     end
-    subgraph Route[routes mcp light]
+    subgraph Route[routes mcp light mounted before session]
         Router[McpRouter]
+        IpLimit[consumeIpPoints]
+        OriginCheck[isAllowedOrigin]
         Auth[McpAuth seam]
         UserLimit[consumeUserPoints]
     end
@@ -113,7 +117,10 @@ graph TB
     SearchService[SearchService]
     PageModel[Page model]
 
-    Client --> Body --> Session --> Origin --> Sanitize --> RateIp --> Router
+    Client --> Body --> Router
+    Router -->|not the endpoint or unavailable| Rest
+    Router --> IpLimit
+    Router --> OriginCheck
     Router --> Auth
     Router --> UserLimit
     Router --> Handler
@@ -142,7 +149,7 @@ graph TB
 |-------|------------------|-----------------|-------|
 | Backend | `@mastra/mcp` `~2.8.0` | `MCPServer`（Streamable HTTP、`legacy: 'stateless'`） | 新規の依存。2.9 以降は `@mastra/core` 1.83 以上を要求するので 2.8 系に固定する |
 | Backend | `@mastra/core` 1.80.x（既存） | `createTool` | 変更なし |
-| Backend | Express（既存） | ルーター、ミドルウェア | `express-init.js` に 1 か所の変更 |
+| Backend | Express（既存） | ルーター、ミドルウェア | `express-init.js` に、MCP のルートをマウントする 1 行を足す |
 | Data | MongoDB（既存） | 設定値、回数制限の計数（`RateLimiterMongo`）、Activity | 新しいコレクションは無い |
 | Frontend | React、SWR、reactstrap（既存） | 管理画面の MCP の節 | 既存の AI 連携ページに足す |
 
@@ -167,6 +174,7 @@ features/mastra/
 │   │   │   │   └── auth-failure-response.ts        # 暫定: 理由によらず、チャレンジなしの 401
 │   │   │   ├── json-rpc-error-response.ts          # 401 / 429 / 400 / 500 の固定の応答を書く
 │   │   │   ├── is-batch-request.ts                 # 本文が配列かどうかの判定（純粋な関数）
+│   │   │   ├── is-allowed-origin.ts                # 送信元（Origin）の検査（純粋な関数）
 │   │   │   ├── lazy-mcp-request-handler.ts         # 重い層の遅延ロードと、保持している参照の解放
 │   │   │   └── mcp-request-handler.ts              # 重い層の入口。@mastra/mcp を読み込み、startHTTP を呼ぶ
 │   │   └── admin-mcp-settings/
@@ -191,9 +199,6 @@ features/mastra/
 └── client/admin/
     ├── McpSettings.tsx                  # MCP の節（スイッチ、URL の表示）
     └── use-mcp-settings.ts              # SWR のフック
-
-server/middlewares/
-└── mongo-sanitize-with-exemptions.ts    # 除外パスの一覧を受け取る mongoSanitize の包み
 ```
 
 テストは各ファイルの隣に置く（`*.spec.ts` / `*.integ.ts` / `*.spec.tsx`）。
@@ -205,13 +210,11 @@ server/middlewares/
 - `features/mastra/server/no-eager-ai-imports.spec.ts` — MCP のルートの入口と管理 API の入口を起点とする検査を足す。
 - `features/mastra/client/admin/index.ts` — `McpSettings` を公開する。
 - `pages/admin/ai.page.tsx` — `AiSettings` の下に `McpSettings` を並べる。
-- `server/routes/index.js` — `/_api/v3/mcp` を、`/_api/v3` の本体のルーターの直前にマウントする。
+- `server/crowi/express-init.js` — `bodyParser.json` の直後、セッションより前に、MCP のルートをマウントする 1 行を足す。既存の行は変えない。
 - `server/routes/apiv3/index.js` — `routerForAdmin` に `/mcp-settings` をマウントする。
-- `server/crowi/express-init.js` — `mongoSanitize()` を、除外パスつきの包みに置き換える。
-- `server/crowi/session-id.ts` — `FIXED_SESSION_ID_PATHS` に `MCP_ENDPOINT_PATH` を足す。
 - `server/service/config-manager/config-definition.ts` — `app:mcpEnabled` を足す。
 - `features/rate-limiter/config/index.ts` — `defaultConfig` に `/_api/v3/mcp` を足す。
-- `features/rate-limiter/middleware/` と `features/rate-limiter/index.ts` — 設定の解決を関数に取り出し、`consumeUserPoints` を公開する。
+- `features/rate-limiter/middleware/` と `features/rate-limiter/index.ts` — 設定の解決を関数に取り出し、`consumeUserPoints` と `consumeIpPoints` を公開する。
 - `interfaces/activity.ts` — アクション 3 つ、カテゴリ `Mcp`、`McpActions` を足す。
 - `client/components/Admin/AuditLog/SelectActionDropdown.tsx` — カテゴリ `Mcp` を足す。
 - `public/static/locales/{en_US,ja_JP,zh_CN,ko_KR,fr_FR}/admin.json` — MCP の節の文言、アクションとカテゴリの表示名。
@@ -230,7 +233,11 @@ flowchart TD
     Exact -->|no| Fall
     Exact -->|yes| Enabled{isMcpAvailable}
     Enabled -->|no| Fall[Fall through as unknown path]
-    Enabled -->|yes| AuthQ{authenticate}
+    Enabled -->|yes| IpLimit{consumeIpPoints}
+    IpLimit -->|exceeded| R429
+    IpLimit -->|ok| OriginQ{isAllowedOrigin}
+    OriginQ -->|no| R403[403]
+    OriginQ -->|yes| AuthQ{authenticate}
     AuthQ -->|not authenticated| R401[respondAuthFailure]
     AuthQ -->|authenticated| Limit{consumeUserPoints}
     Limit -->|exceeded| R429[429]
@@ -241,7 +248,8 @@ flowchart TD
     Load -->|ok| Dispatch[startHTTP with caller context]
 ```
 
-- 認証は、利用者単位の回数制限より前に置く。未認証のリクエストは、グローバルの IP 単位の制限だけが数える（6.4）。
+- IP 単位の計数は、動く状態かどうかの判定の直後に置く。送信元の検査や認証で拒否されるリクエストも、IP 単位の枠で数える（6.4）。動かない状態やパスが違うリクエストは素通しするので、通常の経路のグローバルの制限が数える。
+- 認証は、利用者単位の回数制限より前に置く。未認証のリクエストは、IP 単位の制限だけが数える。
 - バッチの拒否は、回数制限の後に置く。拒否されるリクエストも 1 回として数える。
 - GET と DELETE は、認証済みなら `startHTTP` が 405 を返す（3.6）。未認証なら 401 になる。
 - `startHTTP` は応答を自分で書いて終える。呼んだ後は、応答を書かず、`next()` も呼ばない。例外が出て、ヘッダーをまだ送っていないときだけ 500 を返す。
@@ -293,12 +301,12 @@ sequenceDiagram
 | 2.9, 2.10 | リダイレクトしない、理由を区別しない | AuthFailureResponse | 理由によらず固定の 401 | — |
 | 2.11 | 認証を差し替えても同じ利用者を基準にする | McpAuth、McpCallerContext | `McpAuth` の型 | 両方の流れ |
 | 3.1, 3.2 | 接続確認、ツールの一覧 | GrowiMcpServer、McpToolDeclarations | `MCPServer` | — |
-| 3.3 | 2026-07-28 版と 2025 年の各版 | GrowiMcpServer、MongoSanitizeWithExemptions | `legacy: 'stateless'`、除外パス | — |
+| 3.3 | 2026-07-28 版と 2025 年の各版 | GrowiMcpServer、McpRouter のマウント位置 | `legacy: 'stateless'`、`mongoSanitize` より前にマウントするので本文が削られない | — |
 | 3.4, 3.5 | 状態に頼らない、複数インスタンス | GrowiMcpServer、McpRouter | プロセス内に利用者ごとの状態を持たない | — |
 | 3.6 | GET / DELETE は非対応 | McpRequestHandler | `startHTTP` の 405 | 処理の流れ |
 | 3.7, 3.8 | 読み取り専用の表示、説明 | McpToolDeclarations | annotation、description | — |
 | 3.9 | 一覧は設定によらず同じ | McpToolDeclarations | 一覧は静的な宣言 | — |
-| 3.10 | メンテナンス中は 503 | McpRouter のマウント | `unavailableWhenMaintenanceModeForApi` | 処理の流れ |
+| 3.10 | メンテナンス中は 503 | McpRouter | ルーターの先頭に `unavailableWhenMaintenanceModeForApi` を置く | 処理の流れ |
 | 3.11 | バッチは実行せずに拒否 | McpRouter、isBatchRequest | 400 の JSON-RPC エラー | 処理の流れ |
 | 4.1, 4.9 | 閲覧できるページだけ、画面と同じ範囲 | searchPages | `SearchService.searchKeyword` と `formatSearchResult` | ツール呼び出し |
 | 4.2, 4.3 | ID・パス・抜粋、総件数 | SearchPagesMcpTool | 出力スキーマ | — |
@@ -311,10 +319,10 @@ sequenceDiagram
 | 5.6, 5.9 | 存在しない・権限なしを同じ結果に | readPageContent、GetPageContentMcpTool | `not_found_or_forbidden` の固定の出力 | — |
 | 5.7 | 入力が足りない | readPageContent、GetPageContentMcpTool | `missing_input` | — |
 | 5.8 | エラーの詳細を含めない | GetPageContentMcpTool、buildMcpTools | 失敗も `not_found_or_forbidden` の固定の出力 | — |
-| 6.1, 6.2, 6.3 | 利用者ごとに数える、429 | McpRouter、RateLimiterUserPoints | `consumeUserPoints` | 処理の流れ |
-| 6.4 | 未認証は送信元単位 | RateLimiterConfig | 既存のグローバルの制限 | — |
+| 6.1, 6.2, 6.3 | 利用者ごとに数える、429 | McpRouter、RateLimiterPoints | `consumeUserPoints` | 処理の流れ |
+| 6.4 | 未認証は送信元単位 | McpRouter、RateLimiterPoints、RateLimiterConfig | `consumeIpPoints` | 処理の流れ |
 | 6.5 | 上限の変更 | RateLimiterConfig | `API_RATE_LIMIT_*` の env | — |
-| 6.6 | 全インスタンスの合計 | RateLimiterUserPoints | `RateLimiterMongo` | — |
+| 6.6 | 全インスタンスの合計 | RateLimiterPoints | `RateLimiterMongo` | — |
 | 6.7 | 1 リクエストで多くとも 1 回 | McpRouter、isBatchRequest | バッチの拒否 | 処理の流れ |
 | 7.1, 7.2 | ツール呼び出しの記録、区別できる形 | buildMcpTools、ActivityActions | ツールごとのアクション | ツール呼び出し |
 | 7.3 | 接続確認・一覧は記録しない | buildMcpTools | 記録はツールの `execute` の中だけ | — |
@@ -340,8 +348,7 @@ sequenceDiagram
 | GrowiMcpServer | Service | `MCPServer` の組み立て | 3.1, 3.2, 3.3, 3.4, 3.5 | `@mastra/mcp` (P0)、buildMcpTools (P0) | Service |
 | McpToolDeclarations / buildMcpTools | Service | 公開するツールの宣言と、実行役 | 3.7, 3.8, 3.9, 4.2, 4.3, 4.6, 4.7, 4.8, 5.6, 5.7, 5.8, 5.9, 7.1, 7.2, 7.3 | searchPages (P0)、readPageContent (P0)、ActivityService (P1) | Service |
 | searchPages / readPageContent | Shared core | ツールの中身 | 4.1, 4.4, 4.5, 4.6, 4.7, 4.9, 5.1〜5.7, 8.1, 8.2 | SearchService (P0)、Page モデル (P0) | Service |
-| RateLimiterUserPoints / RateLimiterConfig | Infra | 利用者単位の計数、既定の設定 | 6.1〜6.6 | `rate-limiter-flexible` (P0) | Service |
-| MongoSanitizeWithExemptions | Infra | 除外パスつきの sanitize | 3.3 | `express-mongo-sanitize` (P0) | Service |
+| RateLimiterPoints / RateLimiterConfig | Infra | 利用者単位と IP 単位の計数、既定の設定 | 6.1〜6.6 | `rate-limiter-flexible` (P0) | Service |
 | ActivityActions | Infra | アクションとカテゴリの定義 | 7.2, 7.7, 7.8 | — | State |
 | AdminMcpSettingsApi | Route | 設定の読み書き | 1.2, 1.3, 1.7, 1.8, 1.12, 7.5, 8.7 | configManager (P0) | API |
 | McpSettingsSection | UI | 管理画面の MCP の節 | 1.5, 1.6, 1.9, 1.12, 8.8 | AdminMcpSettingsApi (P0) | State |
@@ -359,7 +366,11 @@ sequenceDiagram
 **Responsibilities & Constraints**
 
 - 処理の順序（System Flows の図）を持つ。個々の判定は、他の部品に任せる。
-- `req.user` を読まない。利用者は、`McpAuth.authenticate` の戻り値だけから得る。固定のセッション ID を使うので、ブラウザのセッションを持つリクエストでは `req.user` が入った状態で届く。それを信用すると 2.7 に反する。
+- `req.user` を読まない。利用者は、`McpAuth.authenticate` の戻り値だけから得る。セッションと passport より前にマウントするので、`req.user` はそもそも入らない。ログインセッションの Cookie を送っても、認証には影響しない（2.7）。
+- セッションより前にマウントするので、共通処理が行っていた次の 3 つを、自分で行う。
+  - メンテナンスモードの判定: 既存の `unavailableWhenMaintenanceModeForApi` を、ルーターの先頭に置く（3.10）。
+  - IP 単位の回数の計数: `consumeIpPoints` を呼ぶ（6.4）。
+  - 送信元の検査: `isAllowedOrigin` で確かめ、許可しない `Origin` には 403 を返す。
 - `@mastra/*` を静的に読み込まない。重い層（`mcp-request-handler.ts`）の読み込みと保持は、`lazy-mcp-request-handler.ts` に任せる。
 - プロセス内に、利用者や接続ごとの状態を持たない。保持するのは、`lazy-mcp-request-handler.ts` が持つ、読み込んだハンドラの Promise だけである。
 - `isMcpAvailable()` が偽のリクエストを受けたら、素通しする前に `release()` を呼ぶ（8.7）。
@@ -386,8 +397,8 @@ export const release: () => void;
 
 **Dependencies**
 
-- Inbound: `server/routes/index.js` — マウント (P0)
-- Outbound: `mcpAuth` — 認証 (P0)、`consumeUserPoints` — 利用者単位の計数 (P0)、`mcp-request-handler` — 受け渡し (P0)、`isMcpAvailable` — 動く状態かどうかの判定 (P0)
+- Inbound: `server/crowi/express-init.js` — マウント (P0)
+- Outbound: `mcpAuth` — 認証 (P0)、`consumeIpPoints` と `consumeUserPoints` — 回数の計数 (P0)、`isAllowedOrigin` — 送信元の検査 (P0)、`mcp-request-handler` — 受け渡し (P0)、`isMcpAvailable` — 動く状態かどうかの判定 (P0)
 
 **Contracts**: API [x]
 
@@ -399,21 +410,20 @@ export const factory: (crowi: Crowi) => express.Router;
 
 | Method | Endpoint | Request | Response | Errors |
 |--------|----------|---------|----------|--------|
-| POST | `/_api/v3/mcp` | JSON-RPC 2.0 のメッセージ 1 件。`Authorization: Bearer <token>` | MCP の応答（2025 年の各版は SSE、2026-07-28 版は JSON） | 400（バッチ）、401、429、500、503 |
+| POST | `/_api/v3/mcp` | JSON-RPC 2.0 のメッセージ 1 件。`Authorization: Bearer <token>` | MCP の応答（2025 年の各版は SSE、2026-07-28 版は JSON） | 400（バッチ）、401、403（送信元）、429、500、503 |
 | GET / DELETE | `/_api/v3/mcp` | — | — | 401（未認証）、405（認証済み） |
 
-- マウント: `app.use(MCP_ENDPOINT_PATH, unavailableWhenMaintenanceModeForApi, mcpRouteFactory(crowi))` を、`/_api/v3` の本体のルーターの直前に置く。`app.use` は前方一致で、大文字と小文字や末尾のスラッシュも区別しないので、`/_api/v3/mcp/`、`/_api/v3/MCP`、`/_api/v3/mcp/xxx` もルーターに届く。
+- マウント: `express-init.js` の `bodyParser.json` の直後、セッションの前に、`app.use(MCP_ENDPOINT_PATH, mcpRouteFactory(crowi))` を置く。`express-init.js` は起動時に読み込まれるので、ルーターのファイル（軽い層）は `@mastra/*` を静的に読み込んではならない。drift spec が、起動の入口からの連鎖として検査する。`app.use` は前方一致で、大文字と小文字や末尾のスラッシュも区別しないので、`/_api/v3/mcp/`、`/_api/v3/MCP`、`/_api/v3/mcp/xxx` もルーターに届く。
 - **パスの一致の規則**: MCP エンドポイントは、パスが `MCP_ENDPOINT_PATH` と 1 文字も違わずに一致するリクエストだけである。ルーターは、最初に `req.originalUrl` のパスの部分（クエリを除く）を `MCP_ENDPOINT_PATH` と比べ、一致しなければ `next()` を呼ぶ。末尾のスラッシュつきや大文字の違いは、存在しないパスと同じ応答になる。認証・利用者単位の計数・ハンドラの読み込みには進まない。
-  - `mongoSanitize` の除外と固定のセッション ID も、同じ定数との完全一致で決まる。そのため「MCP エンドポイントとして扱われるリクエスト」と「除外と固定のセッション ID が効くリクエスト」は、常に同じ集合になる。`startHTTP` の比較（`httpPath` との完全一致）とも一致する。
-  - グローバルの回数制限だけは、パスを小文字にし、末尾のスラッシュを取ってから設定を探す。表記の違うパスへのリクエストも、`/_api/v3/mcp` の IP 単位の枠で数えられる。存在しないパスへのリクエストを同じ枠で数えるだけなので、害は無い。
+  - 一致しないリクエストは、素通しして通常の経路（セッション以降）に入る。他の存在しないパスと、まったく同じ扱いになる。`startHTTP` の比較（`httpPath` との完全一致）とも一致する。
 - `isMcpAvailable()` が偽のときは `next()` を呼ぶ。後続のルーターに一致する経路が無いので、存在しない `/_api/v3/*` のパスと同じ応答になる（1.4、1.10）。判定はリクエストごとに行うので、設定の変更は再起動なしで効く（1.2、1.3、1.11）。
-- 401・429・400・500 の本文は、`json-rpc-error-response.ts` が書く固定の JSON-RPC エラーである（`id` は `null`）。内部の情報を含めない。
+- 401・403・429・400・500 の本文は、`json-rpc-error-response.ts` が書く固定の JSON-RPC エラーである（`id` は `null`）。内部の情報を含めない。
 
 **Implementation Notes**
 
 - Integration: 429 の判定は、既存のグローバルの制限と同じく、`consumeUserPoints` が拒否したら 429 とする。
 - Validation: 処理の順序を、ルーターの結合テストで固定する（Testing Strategy）。
-- Risks: `CertifyOrigin` が、`Origin` を送る MCP クライアントを拒否する。claude.ai が `Origin` を送るかは未確認（Verification Checkpoints）。
+- Risks: claude.ai が `Origin` ヘッダーを送るかは未確認である（Verification Checkpoints）。送る場合は、`isAllowedOrigin` が許可するオリジンに足す。検査を自分で持つので、対処はこの 1 関数で済む。
 
 #### McpAuth（認証の差し込み口）
 
@@ -433,7 +443,8 @@ export const factory: (crowi: Crowi) => express.Router;
 - 暫定の `respondAuthFailure`（`auth-failure-response.ts`）: 理由によらず、固定の本文の 401 を返す。`WWW-Authenticate` を付けない。リダイレクトしない（2.5、2.9、2.10）。
 - **失敗の理由を型で運ぶ理由**: MCP の認可の仕様は、無効なトークンに 401（`error="invalid_token"`）、スコープ不足に 403（`error="insufficient_scope"`）、トークンなしに案内だけの 401 を求める。`remote-mcp-server-oauth` がこれらを出し分けるとき、理由が型に無いと `McpAuth` の型を変えることになり、ルーターにも変更が及ぶ。理由を先に型に入れておけば、差し替えは 2 つの関数の中身だけで済む。
 - 理由は、応答を選ぶためにだけ使う。Activity には記録しない。応答の本文に、トークンが拒否された理由（存在しない・期限切れ）を区別して書かないことは、差し替えた後も保つ（2.10）。
-- `accessTokenParser` を使わない理由: parser は、トークンが無い・不正なときにセッションの `req.user` を残す。また `X-GROWI-ACCESS-TOKEN`・クエリ・本文も読む。parser を変えずに 2.2〜2.4 と 2.7 を満たすには、parser の前後に打ち消しの処理を重ねることになる。暫定の認証は `remote-mcp-server-oauth` が置き換えるので、消しやすい独立したファイルにする。引き換えに、「閲覧専用の利用者を拒否する」判定が parser と 2 か所になる。この判定は、境界のテストで固定する。
+- `accessTokenParser` を使わない理由: parser は、Bearer の他に `X-GROWI-ACCESS-TOKEN`・クエリ・本文からもトークンを読む。また、トークンが無い・無効なときは、何もせずに次へ進む。parser を変えずに 2.2〜2.5 を満たすには、parser の前後に確認の処理を重ねることになる。暫定の認証は `remote-mcp-server-oauth` が置き換えるので、消しやすい独立したファイルにする。引き換えに、「閲覧専用の利用者を拒否する」判定が parser と 2 か所になる。この判定は、境界のテストで固定する。
+  - 補足: セッションより前にマウントしたので、「parser がセッション由来の `req.user` を残す」という問題は起きなくなった。parser を借りて前後に確認を足す形も成り立つが、採らない。理由は research.md の Decision「認証は `accessTokenParser` を使わず、独立した関数にする」にある。
 
 **Dependencies**
 
@@ -716,17 +727,17 @@ export const readPageContent: (
 
 ### Infrastructure changes
 
-#### RateLimiterUserPoints / RateLimiterConfig
+#### RateLimiterPoints / RateLimiterConfig
 
 | Field | Detail |
 |-------|--------|
-| Intent | 認証の後に、利用者単位の回数を数える手段を公開する |
+| Intent | ルートの中から、IP 単位と利用者単位の回数を数える手段を公開する |
 | Requirements | 6.1, 6.2, 6.3, 6.4, 6.5, 6.6 |
 
 **Responsibilities & Constraints**
 
-- 既存のグローバルの制限は、「利用者 1 人あたり `maxRequests`」「IP 1 つあたり `maxRequests × usersPerIpProspection`」の 2 つを数える。前者は、`req.user` が分かっているときだけ動く。MCP では認証がルートの中なので、前者をルートから呼べるようにする。
-- エンドポイントの設定の解決（`defaultConfig` と env の合成、完全一致での検索）を、`middleware/factory.ts` から関数として取り出す。グローバルの制限と `consumeUserPoints` が、同じ関数で設定を得る。
+- 既存のグローバルの制限は、「利用者 1 人あたり `maxRequests`」「IP 1 つあたり `maxRequests × usersPerIpProspection`」の 2 つを数える。MCP のルートは、セッションより前にマウントするので、グローバルの制限を通らない。2 つとも、ルートから呼べるようにする。IP 単位は認証の前に、利用者単位は認証の後に呼ぶ。
+- エンドポイントの設定の解決（`defaultConfig` と env の合成、完全一致での検索）を、`middleware/factory.ts` から関数として取り出す。グローバルの制限と、`consumeIpPoints`・`consumeUserPoints` が、同じ関数で設定を得る。上限の値と、env での変更の方法は、他のエンドポイントと同じになる。
 - 既定の設定に `/_api/v3/mcp` を足す。
 
   | 項目 | 値 | 意味 |
@@ -752,28 +763,31 @@ export const consumeUserPoints: (
   userId: string,
   target: RateLimitTarget,
 ) => Promise<void>;
+
+// IP 1 つあたりの上限（maxRequests × usersPerIpProspection）で数える
+export const consumeIpPoints: (
+  ip: string,
+  target: RateLimitTarget,
+) => Promise<void>;
 ```
 
-- 計数のキーは、グローバルの制限が使う利用者単位のキー（`userId`・エンドポイント・メソッドの md5）とは別の形式にする（接頭辞を付けて名前空間を分ける）。上限の値は、同じエンドポイントの設定（`maxRequests`）を使う。
-  - 同じ形式にすると、同じ枠を 2 回消費する場合がある。グローバルの制限は、`req.user` が入っていれば、ルートに届く前に利用者単位の枠を消費する。ブラウザのログインセッションの Cookie と Bearer トークンの両方を送るリクエストでは、セッションの利用者とトークンの持ち主が同じなら 1 リクエストで 2 回減り、実効の上限が半分になる。
-  - 別の形式にすれば、`consumeUserPoints` が数えるのは「認証の差し込み口が特定した利用者の、このエンドポイントへのリクエスト」だけになる。Cookie の有無で上限が変わらない。
+- MCP のリクエストは、グローバルの制限を通らない。そのため、同じリクエストを 2 つの場所で数えて、同じ枠を 2 回消費することは無い。計数のキーは、グローバルの制限と同じ形式（利用者または IP・エンドポイント・メソッド）でよい。
 
-#### MongoSanitizeWithExemptions
+#### 送信元の検査（isAllowedOrigin）
 
 ```typescript
-export const createMongoSanitizeMiddleware: (
-  exemptPaths: readonly string[],
-) => RequestHandler;
+// routes/mcp/is-allowed-origin.ts
+export const isAllowedOrigin: (
+  originHeader: string | undefined,
+  siteUrl: string,
+) => boolean;
 ```
 
-- `req.path` が `exemptPaths` のどれかと完全に一致するとき、何もせずに `next()` を呼ぶ。それ以外は、既存の `mongoSanitize()` と同じ動作をする。
-- `express-init.js` は、`createMongoSanitizeMiddleware([MCP_ENDPOINT_PATH])` を使う。
-- 除外してよい理由: `/_api/v3/mcp` の本文は、MongoDB のクエリに直接渡らない。ツールの入力は zod のスキーマで検証され、文字列と数値だけが共有関数に渡る。
-
-#### 固定のセッション ID
-
-- `FIXED_SESSION_ID_PATHS` に `MCP_ENDPOINT_PATH` を足す。Cookie を持たないリクエストが、リクエストごとに新しいセッションの記録を作るのを防ぐ。
-- セッションを通さない方法（`avoid-session-routes`）は使わない。csurf と passport が、セッションの無いリクエストでエラーになる。
+- `Origin` ヘッダーが無いときは、真を返す。サーバーどうしの通信や、ブラウザ以外のクライアントは `Origin` を送らない。
+- `Origin` ヘッダーがあるときは、GROWI のサイト URL のオリジンと一致する場合だけ、真を返す。
+- 偽のとき、ルーターは 403 を固定の JSON-RPC エラーで返す。認証には進まない。
+- 既存の `CertifyOrigin` と同じ判断（別のオリジンのブラウザからのリクエストを通さない）を、MCP のルートの中で行うものである。MCP の仕様は、サーバーが `Origin` を検証することを求めている。`CertifyOrigin` そのものは使わない。クエリや本文の `access_token` があれば通す、という MCP に合わない分岐を持ち、応答が apiv3 のエラー形式のためである。
+- 許可するオリジンを増やす必要が出た場合（claude.ai が `Origin` を送る場合など）は、この関数に足す。
 
 #### ActivityActions
 
@@ -859,10 +873,10 @@ HTTP の層のエラーと、ツールの結果としてのエラーを分ける
 |---|---|---|
 | メンテナンスモード | 503 `{ error: 'GROWI is under maintenance.' }` | 既存のミドルウェア |
 | MCP 連携が無効 | 存在しないパスと同じ | McpRouter（素通し） |
-| `Origin` の検査に失敗 | apiv3 のエラー形式 | 既存の `CertifyOrigin` |
+| 送信元の検査に失敗 | 403、固定の JSON-RPC エラー | McpRouter（`isAllowedOrigin`） |
 | 認証に失敗（理由によらず） | 401、固定の JSON-RPC エラー、`WWW-Authenticate` なし | `mcpAuth.respondAuthFailure` |
 | 利用者単位の上限を超過 | 429、固定の JSON-RPC エラー | McpRouter |
-| IP 単位の上限を超過 | 429（本文なし） | 既存のグローバルの制限 |
+| IP 単位の上限を超過 | 429、固定の JSON-RPC エラー | McpRouter（`consumeIpPoints`） |
 | バッチのリクエスト | 400、JSON-RPC の Invalid Request（-32600） | McpRouter |
 | ハンドラの読み込みに失敗、`startHTTP` の例外 | 500、固定の JSON-RPC エラー | McpRouter |
 | GET / DELETE（認証済み） | 405 | `MCPServer` |
@@ -886,7 +900,7 @@ HTTP の層のエラーと、ツールの結果としてのエラーを分ける
 - `buildMcpTools`: 呼び出し元が取り出せないとき、`run` が例外を投げたときに、`fallbackOutput` を返し、例外の文面を含めないこと（4.8、5.8）。`recordActivity` が失敗しても `run` を呼ぶこと。`run` より前に `recordActivity` を呼ぶこと。
 - MCP 用のツール: `failed` と `not_found_or_forbidden` が、同じ出力になること（5.6、5.9）。
 - `MCP_TOOL_DECLARATIONS`: 名前が重複しないこと。すべてに `readOnlyHint: true` が付くこと（3.7）。
-- `createMongoSanitizeMiddleware`: 除外パスでは本文を変えないこと。それ以外では、`.` を含むキーを削除すること。
+- `isAllowedOrigin`: `Origin` なし、サイト URL と同じオリジン、別のオリジン。
 - `McpSettings`: 有効で URL が表示される、無効で URL が出ない、サイト URL が未設定のときは有効・無効のどちらでも警告が出てスイッチは操作できる（1.5、1.6、1.12）。
 - `isMcpAvailable`: 有効とサイト URL の 4 通りの組み合わせ（1.10）。
 
@@ -896,10 +910,14 @@ HTTP の層のエラーと、ツールの結果としてのエラーを分ける
 - **ルーターの処理の順序**（`routes/mcp/index.integ.ts`、`McpRequestHandler` は差し替える）:
   - `/_api/v3/mcp/`、`/_api/v3/MCP`、`/_api/v3/mcp/xxx` は、有効で正しいトークンがあっても、存在しないパスと同じ応答になり、認証もハンドラも呼ばれない。
   - 無効のとき、存在しないパスと同じ応答になる（1.4）。有効でもサイト URL が未設定なら、同じ応答になる（1.10）。
-  - `req.user` が入っていても、Bearer が無ければ 401 になる（2.7）。401 に `WWW-Authenticate` と `Location` が無い（2.9）。
+  - ログインセッションの Cookie を送っても、Bearer が無ければ 401 になる（2.7）。401 に `WWW-Authenticate` と `Location` が無い（2.9）。
   - 401 の応答が、失敗の理由（`missing_token`、`invalid_token`）によらず同じである（2.10）。
   - 利用者単位の上限を超えると 429 になり、別の利用者は通る（6.2、6.3）。
-  - ログインセッションの Cookie と Bearer トークンを両方送るリクエストでも、利用者単位の枠は 1 リクエストにつき 1 回だけ減る（6.1）。
+  - IP 単位の上限を超えると 429 になり、認証に進まない（6.4）。
+  - 別のオリジンの `Origin` を付けたリクエストは、正しいトークンがあっても 403 になる。
+  - 応答に `Set-Cookie` が無く、セッションの記録が増えない。
+  - 本文の `.` を含むキー（`params._meta` の中）が、削られずにハンドラへ届く（3.3）。
+  - メンテナンスモードのあいだは 503 になる（3.10）。
   - 配列の本文は 400 になり、ハンドラが呼ばれない（3.11、6.7）。
   - ハンドラの読み込みに失敗すると 500 になり、次のリクエストで読み込みをやり直す（8.5）。
   - 動く状態から動かない状態に変えたあとのリクエストで、保持していたハンドラが手放される。再び動く状態にすると、ハンドラが作り直される（8.7）。
@@ -927,22 +945,23 @@ HTTP の層のエラーと、ツールの結果としてのエラーを分ける
 
 | # | 確かめること | 前提が崩れたとき |
 |---|---|---|
-| 1 | `mongoSanitize` が `_meta` の `.` を含むキーを削除し、除外すると 2026-07-28 版のリクエストが通る | 除外の方法を見直す |
+| 1 | **確認済み（2026-11-27）**。`mongoSanitize` は `_meta` の `.` を含むキーを削除する。セッションより前にマウントすれば、キーはそのまま届く（開発サーバーで確認）。`_meta` の 2 つのキーが無いリクエストを SDK が 400 で拒否することは、PR のレビューで確認された | — |
 | 2 | `legacy: 'stateless'` で、`initialize` を経ていない `tools/call` に応答する | 設計の前提（3.4）を見直す |
 | 3 | `req.auth.extra` に入れた値が、ツールの実行コンテキストの `authInfo.extra` に、そのまま届く | `mapAuthInfoToUser` と requestContext で運ぶ |
 | 4 | `AuthInfo.token` に固定の文字列を入れても、`MCPServer` が受け付ける | トークンの値を入れ、ログに出ないことをテストで固定する |
 | 5 | `compression()` の下で、2025 年の版の SSE の応答が遅れずに届く | `/_api/v3/mcp` を圧縮の対象から外す |
 | 6 | 本番ビルドの GROWI で、MCP の部品を読み込む前後と、リクエストを処理した後のメモリ（RSS とヒープ）。無効に戻して `release()` したあとに、どれだけ戻るか | 数値を research.md に記録する（8.3・8.7・8.8 の根拠）。単独のプロセスでの参考値は research.md にある |
 | 7 | ビルド後に、`@mastra/mcp` と `@modelcontextprotocol/*` が `.next/node_modules/` に現れるか | `dependencies` に置く |
-| 8 | claude.ai が送るプロトコルの版、`Origin` ヘッダーの有無、バッチの有無 | `Origin` を送るなら `CertifyOrigin` の扱いを、バッチを送るなら 3.11 を、利用者と相談する |
+| 8 | claude.ai が送るプロトコルの版、`Origin` ヘッダーの有無、バッチの有無 | `Origin` を送るなら、`isAllowedOrigin` が許可するオリジンに足すかを、バッチを送るなら 3.11 を、利用者と相談する |
 
 ## Security Considerations
 
-- **利用者の特定**: 利用者は Bearer トークンからだけ決まる。固定のセッション ID を共有するので、セッション由来の `req.user` は信用しない。この前提を、ルーターの結合テストで固定する。
+- **利用者の特定**: 利用者は Bearer トークンからだけ決まる。セッションと passport より前にマウントするので、ログインセッションは認証に関わらない。この前提を、ルーターの結合テストで固定する。
 - **情報の漏れ**: 401 は拒否の理由を区別しない。ツールは、例外の文面を結果に入れない。ページが存在しないことと、権限が無いことを、同じ出力にする。
-- **`mongoSanitize` の除外**: 除外は 1 パスに限る。ツールの入力は zod で検証し、MongoDB には文字列の ID とパスだけが渡る。
+- **`mongoSanitize` を通らないこと**: MCP のリクエストは `mongoSanitize` を通らない。ツールの入力は zod で検証し、スキーマに無いキーは捨てる。MongoDB に渡るのは、文字列の ID とパスだけである。既存のルートは、今までどおり `mongoSanitize` を通る。
 - **トークンの値**: 呼び出し元の情報（`McpCallerContext`）に、トークンを含めない。Activity とログに出る経路が無い。
-- **`Origin`**: 既存の `CertifyOrigin` が、別のオリジンからのブラウザのリクエストを拒否する。MCP の仕様が求める `Origin` の検証と、向きが合う。
+- **`Origin`**: `isAllowedOrigin` が、別のオリジンからのブラウザのリクエストを拒否する。MCP エンドポイントは Cookie で認証しないので、ブラウザが利用者の権限を勝手に使う攻撃は成り立たないが、MCP の仕様が求める検証として行う。
+- **csurf を通らないこと**: 同じ理由（Cookie で認証しない）で、問題にならない。
 - **無効のときの露出**: 無効な GROWI と、サイト URL が未設定の GROWI は、MCP の入口があることを応答で示さない。
 
 ## Performance & Scalability
@@ -950,4 +969,5 @@ HTTP の層のエラーと、ツールの結果としてのエラーを分ける
 - **動かない状態のメモリ**: `@mastra/mcp` は、動く状態で認証済みのリクエストが最初に届くまで読み込まない。動かない状態で起動した GROWI と、未認証のリクエストしか届かない GROWI では、読み込まれない。
 - **読み込んだあとのメモリ**: 単独のプロセスでの計測では、`@mastra/mcp` の読み込みで RSS が 68〜71 MB 増える（`@mastra/core` を読み込み済みなら 7〜12 MB）。リクエストを処理すると、V8 が確保した領域のぶん、RSS がさらに増える。使用中のヒープは増えず、漏れは無い（research.md の計測）。無効に戻しても、この大半は再起動まで戻らない。GROWI の中での値は、Verification Checkpoints 6 で測る。
 - **複数インスタンス**: プロセス内に利用者ごとの状態を持たない。回数は MongoDB で数える。設定の反映は `configManager` に従う。
-- **認証のコスト**: リクエストごとに、トークンのハッシュでの検索が 1 回と、利用者の取得が 1 回かかる。未認証のリクエストは、上限を超えると IP 単位の制限が止めるので、トークンの検索までは進まない。ただし、本文の読み込みとセッションストアの読み取りは、回数制限より前に行われる（Existing Architecture Analysis の順序）。固定のセッション ID を使うので、Cookie の無いリクエストがセッションの記録を増やすことは無い。
+- **認証のコスト**: リクエストごとに、トークンのハッシュでの検索が 1 回と、利用者の取得が 1 回かかる。未認証のリクエストは、上限を超えると IP 単位の制限が止めるので、トークンの検索までは進まない。
+- **セッション**: MCP のリクエストは、セッションストアを読み書きしない。
