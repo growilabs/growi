@@ -46,6 +46,11 @@ Write the port-back-and-delete step as **the amend spec's own final task in its
 
 Implementation landing is not the completion point — **this final task is**.
 
+The one alternative to deleting itself is to **take over ownership** of the changed part
+and stay as a standing spec — see
+[Alternative: take over ownership](#alternative-take-over-ownership-instead-of-folding-back)
+below. Either way, the spec's final task is what closes it out.
+
 ## Procedure
 
 ### 1. When opening the amend spec — declare the target up front
@@ -96,6 +101,59 @@ current facts belong there. History lives in git (same principle as this repo's
   sub-spec or similar)
 - Delete `.kiro/specs/<amend spec>/`
 
+## Alternative: take over ownership (instead of folding back)
+
+Folding back is the default. But when the amend spec's content is a large, cohesive part
+of the target, folding it back can make the target spec too big to review as one
+document. That is the failure that made `chat-integration` (developed on
+`feat/slackbot-proxy-gen2`) split into sub-specs: a single design.md of 1882 lines kept
+breaking one section while another was being fixed. In that
+case, the amend spec may instead **take over ownership** of that part and stay as a
+standing spec (e.g. a new sub-spec under the same umbrella).
+
+The rule's goal — one source of truth — still holds, because the target spec gives that
+part up: its sections on it are removed, not kept alongside.
+
+### When it qualifies
+
+All of these must hold:
+
+- **Folding back would make the target too big.** The guide is the design template's
+  1000-line warning: if the target's design.md is already near or past it, or would pass
+  it after the fold-back, consider the transfer.
+- **The part has a clear boundary.** It can be named as a directory and/or an API
+  surface (e.g. `client/admin/` and the admin API), and moving it does not change the
+  target's contracts with other specs.
+- **Decided before tasks are approved.** The final task differs (below), so record the
+  choice and its reason in `brief.md` at the brief or requirements phase. Don't switch
+  after implementation starts.
+
+Wanting to skip the port-back work is not a reason. If the boundary is unclear, fold back.
+
+### What changes from the amend-spec procedure
+
+- In `brief.md` / `design.md`, the "Amend target" section lists **what moves out of the
+  target spec** (the sections and files this spec now owns), not only what changes.
+- Requirements still go where requirements are owned. If an umbrella owns them, port the
+  new acceptance criteria to the umbrella's requirements.md (append, never renumber) and
+  mark this spec's `spec.json` with `owned_by_umbrella`, like the other sub-specs.
+- Design rationale stays in **this** spec's research.md. Move only the rationale that is
+  about what the target spec keeps.
+- The final task removes the transferred sections from the target and registers this
+  spec. It does not delete this spec:
+
+```markdown
+- [ ] N. Take over ownership from the target spec
+  - [ ] N.1 Port new acceptance criteria to whoever owns requirements (append, never renumber)
+  - [ ] N.2 Remove the transferred sections from <target-spec>'s design.md and leave a one-line pointer to this spec
+  - [ ] N.3 Update <target-spec>'s Boundary Commitments: the transferred part goes to Out of Boundary, naming this spec
+  - [ ] N.4 Add Revalidation Triggers on both sides for what the two specs still share (e.g. models this spec reads)
+  - [ ] N.5 Update <target-spec>'s spec.json (`updated_at`; leave `phase`/`approvals` alone)
+  - [ ] N.6 Register this spec: add it to the umbrella's `sub_specs` and roadmap.md's spec list; remove its in-progress row
+```
+
+After implementation, run `/kiro-spec-cleanup` on it like any other spec.
+
 ## What this does NOT apply to
 
 - **A spec for new functionality** — if it doesn't change an already-shipped spec's
@@ -128,3 +186,14 @@ Confirm before treating an amend spec as complete:
 - [ ] The target spec's `spec.json` `updated_at` was updated
 - [ ] The amend spec's row was removed from `roadmap.md`
 - [ ] `.kiro/specs/<amend spec>/` was deleted
+
+If the spec took over ownership instead, the items from "Design rationale was moved"
+onward do not apply, except the target's `spec.json` `updated_at`. Check these instead:
+
+- [ ] `brief.md` records the choice to take over ownership and why, made before tasks
+      were approved
+- [ ] The transferred sections are gone from the target's design.md; only a one-line
+      pointer to this spec remains
+- [ ] The target's Boundary Commitments list the transferred part as Out of Boundary,
+      naming this spec, and both specs' Revalidation Triggers name each other
+- [ ] This spec is listed in the umbrella's `sub_specs` and in roadmap.md's spec list
