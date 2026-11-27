@@ -1,4 +1,4 @@
-# Design Document: legacy-password-hash-cleanup
+# Design Document: password-hash-migration-status
 
 ## Overview
 

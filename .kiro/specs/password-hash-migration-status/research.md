@@ -4,7 +4,7 @@
 
 ## Summary
 
-- **Feature**: `legacy-password-hash-cleanup`
+- **Feature**: `password-hash-migration-status`
 - **Discovery Scope**: Extension（既存の管理画面セクションの追加。新規依存なし）
 - **Key Findings**:
   - password-hash-upgrade が「新形式を書くとき旧形式を同じ保存で除去する」方針になったため、ユーザーは常に 3 区分のいずれか 1 つに属し、「両形式を持つ」状態は到達不能になった。この機能が当初持っていた削除操作は、対象になるデータが構造的に存在しなくなる
