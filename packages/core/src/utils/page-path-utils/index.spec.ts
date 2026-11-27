@@ -65,6 +65,16 @@ describe.concurrent('convertToNewAffiliationPath test', () => {
     );
     expect(result === 'child/parent4').toBe(false);
   });
+
+  test.concurrent.each([
+    '/n$&y',
+    '/n$$y',
+    '/n$`y',
+    "/n$'y",
+  ])('keeps the new path %s as written, $ sequences included', (newPath) => {
+    const result = convertToNewAffiliationPath('/a', newPath, '/a/x');
+    expect(result).toBe(`${newPath}/x`);
+  });
 });
 
 describe.concurrent('isCreatablePage test', () => {

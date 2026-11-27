@@ -142,10 +142,7 @@ describe('copyDescendantBatch', () => {
       Partial<DescendantBatchInput>,
     caseName: string,
   ): DescendantBatchInput => ({
-    oldPathPrefix: new RegExp(
-      `^${RegExp.escape(`${PATH_ROOT}/${caseName}`)}`,
-      'i',
-    ),
+    oldPathPrefix: `${PATH_ROOT}/${caseName}`,
     newPathPrefix: `${PATH_ROOT}/${caseName}-copy`,
     onlyDuplicateUserRelatedResources: false,
     recordProgress: async () => {},
@@ -306,6 +303,23 @@ describe('copyDescendantBatch', () => {
     expect(copy.path).toBe(`${PATH_ROOT}/prefix-copy/child/prefix`);
     expect(copy.creator?.toString()).toBe(user._id.toString());
     expect(copy.lastUpdateUser?.toString()).toBe(user._id.toString());
+  });
+
+  it('keeps $ sequences in the new path as written', async () => {
+    const user = await createUser();
+    const pages = await seedSourcePages([
+      { path: `${PATH_ROOT}/dollar/child`, bodies: ['body'] },
+    ]);
+
+    await run(
+      batchInput(
+        { pages, user, newPathPrefix: `${PATH_ROOT}/n$&y$$z` },
+        'dollar',
+      ),
+    );
+
+    const [copy] = await findCopiedPages(user);
+    expect(copy.path).toBe(`${PATH_ROOT}/n$&y$$z/child`);
   });
 
   it('does not copy empty pages', async () => {

@@ -152,7 +152,8 @@ export const convertToNewAffiliationPath = (
     throw new Error('Please input the new page path');
   }
   const pathRegExp = new RegExp(`^${RegExp.escape(oldPath)}`, 'i');
-  return childPath.replace(pathRegExp, newPath);
+  // A replacer function keeps `$&`, `$$` etc. in newPath literal
+  return childPath.replace(pathRegExp, () => newPath);
 };
 
 /**
