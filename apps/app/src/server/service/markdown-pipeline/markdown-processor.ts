@@ -56,14 +56,21 @@ async function buildProcessor() {
 
 type MarkdownProcessor = Awaited<ReturnType<typeof buildProcessor>>;
 
-/** Built once on first use and reused; the plugins load via dynamic import(), never at server boot. */
-let cachedProcessor: MarkdownProcessor | undefined;
+/**
+ * Built once on first use and reused; the plugins load via dynamic import(),
+ * never at server boot. The in-flight build is shared so concurrent first
+ * requests do not build twice, and a failed build is retried next time.
+ */
+let processorPromise: Promise<MarkdownProcessor> | undefined;
 
-async function getProcessor(): Promise<MarkdownProcessor> {
-  if (cachedProcessor == null) {
-    cachedProcessor = await buildProcessor();
+function getProcessor(): Promise<MarkdownProcessor> {
+  if (processorPromise == null) {
+    processorPromise = buildProcessor().catch((err: unknown) => {
+      processorPromise = undefined;
+      throw err;
+    });
   }
-  return cachedProcessor;
+  return processorPromise;
 }
 
 /** Convert a markdown body into a sanitized HTML fragment. */
