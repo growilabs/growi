@@ -1,3 +1,4 @@
+import type { Root as HastRoot } from 'hast';
 import type * as HastUtilSanitize from 'hast-util-sanitize';
 
 import { loadPlugins } from './esm-plugin-loader';
@@ -71,4 +72,19 @@ export async function renderMarkdownToHtml(
 ): Promise<string> {
   const processor = await getProcessor();
   return String(await processor.process(markdownBody));
+}
+
+/**
+ * Convert a markdown body into the final hast tree: every transformer runs
+ * (sanitize, katex, add-class, ...), only the HTML serialization is skipped.
+ * Nodes keep their `position` in `markdownBody` where the plugins preserve it.
+ */
+export async function renderMarkdownToHast(
+  markdownBody: string,
+): Promise<HastRoot> {
+  const processor = await getProcessor();
+  const tree = await processor.run(processor.parse(markdownBody));
+  // WHY: the processor is assembled from data, so unified cannot infer that
+  // its last transformer yields a hast root.
+  return tree as HastRoot;
 }
