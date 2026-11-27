@@ -26,10 +26,10 @@
   - _Boundary: ActivityExtension_
 
 - [ ] 2.3 (P) データのインポートで取り込む activity の endpoint を伏せ字にする
-  - インポートの特例の変換表に、activity の endpoint の変換を足す。文字列なら伏せ字の関数に通し、文字列でなければそのまま返す
-  - activity の snapshot の既存の特例と、他の項目の変換は変えない
-  - 統合テストで、変換表に endpoint の変換が載っていること、トークンを含む値が伏せ字の関数の戻り値と一致し、トークンの文字列が残らず `[REDACTED]` が入っていること、文字列でない値が変わらないことを確かめる（Mongoose の Activity モデルが外れたときに落ちるドリフト検知を兼ねる）
-  - 完了時: インポートの変換表の統合テストが通り、取り込む endpoint が伏せ字になる
+  - インポートのコレクションごとの上書き（`overwrite-params/`）に activity 用のモジュールを足し、コレクション名で上書きを選ぶ分岐に activity を加える。上書きするのは endpoint だけで、文字列なら伏せ字の関数に通し、文字列でなければそのまま返す
+  - 変換表の activity の snapshot の特例と、他の項目の変換は変えない
+  - 単体テストで、activity の上書きが endpoint だけを持つこと、トークンを含む値が伏せ字の関数の戻り値と一致し、トークンの文字列が残らず `[REDACTED]` が入っていること、文字列でない値が変わらないことを確かめる
+  - 完了時: activity の上書きの単体テストが通り、取り込む endpoint が伏せ字になる
   - _Requirements: 7.1, 7.2, 8.1_
   - _Boundary: ImportEndpointConverter_
 

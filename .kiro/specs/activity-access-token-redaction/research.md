@@ -21,12 +21,13 @@
 - **Implications**: 記録時の伏せ字は `createByParameters` の 1 か所で全経路を押さえられる。`updateByParameters` は型から endpoint を外し、実行時にも取り除く（型の除外はオブジェクトリテラルにしか効かないため）。インポートは別の口として扱う。
 
 ### インポートでの変換の仕組み
-- **Sources Consulted**: `service/import/construct-convert-map.ts`、`service/import/import.ts`（`convertDocuments`）、`service/import/overwrite-function.ts`
+- **Sources Consulted**: `service/import/construct-convert-map.ts`、`service/import/import.ts`（`convertDocuments`）、`service/import/overwrite-function.ts`、`service/import/overwrite-params/`、`routes/apiv3/import-settings-builder.ts`、`models/activity.ts`
 - **Findings**:
-  - `constructConvertMap` は `mongoose.modelNames()` と各モデルの `schema.paths` から、コレクション×項目ごとの変換関数の表を作る。`SPECIAL_CONVERT_FUNCTIONS` に `activities.snapshot` の特例がすでにある。
-  - `convertDocuments` は、取り込む文書の各項目に表の変換関数を適用してから bulk 書き込みする。
-  - この表は Mongoose モデルの登録に依存する。`Activity` の Mongoose モデルは、TTL インデックスの作成と統合テストの seed のために今も登録されている。
-- **Implications**: `SPECIAL_CONVERT_FUNCTIONS.activities.endpoint` に伏せ字の関数を置けば、インポートでも伏せ字になる。Mongoose の `Activity` モデルがなくなると、この項目は表から黙って消える。そのため Revalidation Trigger にし、統合テストで表に項目があることを確かめる。
+  - `convertDocuments` は、取り込む文書の各項目に変換表の関数を当て、そのあとコレクションごとの上書き（`overwriteParams`）を当ててから bulk 書き込みする。上書きは、値が `undefined` の項目には当たらない。
+  - 変換表（`constructConvertMap`）は `mongoose.modelNames()` と各モデルの `schema.paths` から作られる。`SPECIAL_CONVERT_FUNCTIONS` に `activities.snapshot` の特例がある。モデルがないコレクションは表に載らず、全項目が元の値のまま通る。書き込みは `mongoose.connection.collection(collectionName)` なので、モデルがなくてもインポートは成功する。
+  - 上書きは `overwrite-params/index.ts` の `generateOverwriteParams` がコレクション名の `switch` で選ぶ。インポートではコレクションごとに必ず呼ばれる（`import-settings-builder.ts`）。モデルを持たない `attachmentFiles.chunks` がすでにこれを使っている。
+  - `Activity` の Mongoose モデルは、すべてのモデルを Prisma に移したあとに外す予定（`models/activity.ts` の TODO）。
+- **Implications**: 伏せ字を変換表に置くと、Mongoose モデルを外したときにエラーなしで伏せ字が止まる。上書きに置けば、モデルの登録に関係なく伏せ字になる。
 
 ### migration の実行方式
 - **Sources Consulted**: `apps/app/package.json`（`preserver`、`migrate`）、`prisma/migrate.ts`、`src/migrations/20261111120000-add-endpoint-index-to-activities.js`、`src/migrations/20260901160138-backfill-comments-isinline.js`、`.claude/rules/model.md`
@@ -111,6 +112,15 @@
 - **Selected Approach**: `down` は何もせず、ログに戻せない旨を出す。
 - **Rationale**: 戻す手段がなく、戻すべきでもない（平文のトークンを DB に戻すことになる）。
 
+### Decision: インポートの伏せ字は `overwrite-params/` に置く
+- **Context**: 要件 7.1 は、インポートで取り込む activity の endpoint を伏せ字にすることを求める。インポートはモデルを通らずに書くので、保存口の伏せ字は効かない。
+- **Alternatives Considered**:
+  1. 変換表の `SPECIAL_CONVERT_FUNCTIONS.activities.endpoint` に置く
+  2. `overwrite-params/activities.ts` を足し、`generateOverwriteParams` の `switch` に `case 'activities'` を足す
+- **Selected Approach**: 2。
+- **Rationale**: 変換表は Mongoose に登録されたモデルから作られるので、1 は `Activity` の Mongoose モデルを外すと、エラーなしで伏せ字が止まる。モデルを外すことは予定されている。2 はコレクション名だけで動くので、モデルの登録に依存しない。止まる原因がないので、見張りのための Revalidation Trigger やテストも要らない。
+- **Trade-offs**: なし。上書きは変換表のあとに当たるので、`activities.snapshot` の特例とは干渉しない。
+
 ### Decision: 伏せ字の関数を `server/util/` に移す
 - **Context**: 伏せ字の関数は今 `middlewares/` にある。保存口（モデル）、migration、インポートの 3 か所から使う。
 - **Selected Approach**: `server/middlewares/redact-access-token-from-endpoint.ts` とその spec を `server/util/` に移す。
@@ -123,7 +133,6 @@
 - **Simplification**: 伏せ字のための新しいモデル層の仕組み（Prisma の query 拡張など）は作らない。migration のための汎用バッチ基盤も作らない。
 
 ## Risks & Mitigations
-- Mongoose の `Activity` モデルが廃止されると、インポートの変換表から `activities.endpoint` が黙って消える → `construct-convert-map.integ.ts` で表に変換関数があることを確かめ、activity-log の Revalidation Trigger に書く。
 - activity が多い環境（保持期間を延ばした環境）では、全件の走査で起動が延びる → 書くのは値が変わる文書だけ、アプリに返すのは `endpoint` だけ、`_id` の範囲で区切る。終わったら書き換えた件数をログに出す。
 - change stream を読むインスタンスが 1 つもない間に書き換えが oplog の保持範囲を超えると、索引の再構築が必要になる → design.md の Migration Strategy に条件と対処を書く。
 - 将来、文脈（`PendingActivityContext`）をログに出すと平文が漏れる → activity-log の Revalidation Trigger に書く。

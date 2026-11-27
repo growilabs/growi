@@ -71,7 +71,7 @@
 ### This Spec Owns
 - **endpoint の伏せ字の規則**: どのクエリパラメータを、どの値に置き換えるか。純粋関数 `redactAccessTokenFromEndpoint` が唯一の定義。
 - **保存口での伏せ字の適用**: `createByParameters` に渡された endpoint を、保存前に必ず伏せ字にすること。`updateByParameters` で endpoint を書けないようにすること（型と実行時の両方）。
-- **インポートでの伏せ字の適用**: `activities.endpoint` の変換関数。
+- **インポートでの伏せ字の適用**: `activities` コレクションの `endpoint` を上書きする `overwrite-params`。
 - **既存の activity の伏せ字**: 伏せ字の migration と、その冪等性・再実行性。
 
 ### Out of Boundary
@@ -82,13 +82,12 @@
 - 残骸行の掃除、TTL の値。
 
 ### Allowed Dependencies
-- 保存口（`models/activity.ts`）、migration、インポートの変換（`service/import/construct-convert-map.ts`）は、`server/util/redact-access-token-from-endpoint.ts` に依存してよい。
+- 保存口（`models/activity.ts`）、migration、インポートの上書き（`service/import/overwrite-params/activities.ts`）は、`server/util/redact-access-token-from-endpoint.ts` に依存してよい。
 - 伏せ字の関数は何にも依存しない（標準の文字列処理と `decodeURIComponent` だけ）。
 - migration は migrate-mongo が渡す `db`（MongoDB driver）だけで書く。Prisma と Mongoose のモデルは使わない。
 - 依存してはならない: 保存口から middleware（`server/middlewares/`）への依存。伏せ字の関数から model・service への依存。
 
 ### Revalidation Triggers
-- **Mongoose の `Activity` モデルの廃止**: インポートの変換表は Mongoose に登録されたモデルの `schema.paths` から作られる。`Activity` の Mongoose モデルがなくなると、`activities.endpoint` の変換関数が黙って外れ、インポートで平文が入るようになる。モデルを廃止するときは、変換表の作り方を見直す。
 - **文脈（`PendingActivityContext`）をログに出す変更**: 文脈の `endpoint` は生の URL を持つ。ログに出すなら、出す前に伏せ字にする。
 - **activity の endpoint を書く新しい口の追加**: `createByParameters` 以外から endpoint を書く口を足すときは、伏せ字の関数を通す。
 - **伏せ字の対象パラメータの追加**: `SENSITIVE_QUERY_PARAMS` に足しても、すでに保存済みの activity には効かない。既存の行を直すなら、新しい migration を足す。
@@ -98,7 +97,7 @@
 ### Existing Architecture Analysis
 - activity の行はすべて `prisma.activities.createByParameters` で作られる。呼ぶのは記録の 3 経路（settle、fail-safe、`ActivityService.createActivity`）と、それ以外に直接呼ぶ箇所（inline-comment のサービスなど。リクエストの文脈がないので endpoint は渡さない）。
 - `IActivityUpdateParameters` は endpoint を受け付ける。この型を使うのは `updateByParameters`（本番コードから呼ばれていない）と、settleActivityRecord の入力 `activityParameters`（`emit('update')` の payload）。settle は文脈の `endpoint` のあとに `activityParameters` を展開して `createByParameters` に渡すので、型の上では payload が文脈の endpoint を上書きできる。
-- データのインポートは `import.ts` で変換表を通したあと、モデルを通らずに bulk 書き込みする。
+- データのインポートは `import.ts` の `convertDocuments` で、変換表（Mongoose に登録されたモデルの `schema.paths` から作る）を通し、そのあとコレクションごとの上書き（`overwrite-params/` の `generateOverwriteParams`）を当ててから、モデルを通らずに bulk 書き込みする。上書きはコレクション名だけで決まり、Mongoose モデルの登録に依存しない。
 - migration は migrate-mongo で、`server` スクリプトの前（`preserver`）に流れる。
 
 ### Architecture Pattern & Boundary Map
@@ -114,8 +113,8 @@ graph TB
     CreateActivity --> SavePort
     SavePort --> Redact[redactAccessTokenFromEndpoint]
     SavePort --> Activities[(activities)]
-    Import[import convertDocuments] --> ConvertMap[constructConvertMap]
-    ConvertMap --> Redact
+    Import[import convertDocuments] --> Overwrite[overwrite-params activities]
+    Overwrite --> Redact
     Import --> Activities
     Migration[redaction migration] --> Redact
     Migration --> Activities
@@ -123,11 +122,11 @@ graph TB
 
 **Architecture Integration**:
 - Selected pattern: 保存口で伏せ字にする。DB に endpoint が入る口は、保存口・インポート・migration の 3 つ。どれも同じ純粋関数を呼ぶ。
-- Existing patterns preserved: 保存口の正規化（`normalizeToId` など）と同じく、呼び出し元を変えずに保存口の中で値を整える。インポートは既存の `SPECIAL_CONVERT_FUNCTIONS` に項目を足す。
-- New components rationale: migration だけが新しいファイル。伏せ字の関数は場所を移すだけ。
+- Existing patterns preserved: 保存口の正規化（`normalizeToId` など）と同じく、呼び出し元を変えずに保存口の中で値を整える。インポートは、モデルを持たない `attachmentFiles.chunks` と同じく `overwrite-params/` にコレクション用のモジュールを足す。
+- New components rationale: 新しいファイルは migration と、インポートの上書き（`overwrite-params/activities.ts`）。伏せ字の関数は場所を移すだけ。
 - Steering compliance: 純粋関数を切り出してラッパーは薄くする。規則は 1 か所で定義する（coding-style）。
 
-**Dependency direction**: `server/util/redact-access-token-from-endpoint` ← `models/activity` / `service/import/construct-convert-map` / `migrations/*`。逆向きの import は禁止。
+**Dependency direction**: `server/util/redact-access-token-from-endpoint` ← `models/activity` / `service/import/overwrite-params/activities` / `migrations/*`。逆向きの import は禁止。
 
 ### Technology Stack
 
@@ -142,6 +141,8 @@ graph TB
 ### New Files
 - `apps/app/src/migrations/20261120120000-redact-access-token-in-activity-endpoint.js` — 既存の activity の endpoint を伏せ字にする migration。`up` は `_id` の範囲で区切って処理し、`down` は何もしない。1 バッチ分の読み出しのカーソルを作る `findRedactionBatch` も export し、`up` と統合テストの両方がこれを使う。
 - `apps/app/src/migrations/20261120120000-redact-access-token-in-activity-endpoint.integ.ts` — migration の統合テスト。
+- `apps/app/src/server/service/import/overwrite-params/activities.ts` — インポートで `activities` の `endpoint` を伏せ字にする上書き。
+- `apps/app/src/server/service/import/overwrite-params/activities.spec.ts` — `activities` の上書きの単体テスト。
 
 ### Moved Files
 - `apps/app/src/server/middlewares/redact-access-token-from-endpoint.ts` → `apps/app/src/server/util/redact-access-token-from-endpoint.ts` — 伏せ字の規則の唯一の定義。中身は変えない（冪等性はテストで固定する）。
@@ -151,9 +152,8 @@ graph TB
 - `apps/app/src/server/models/activity.ts` — `createByParameters` で、`create` に渡す前に `endpoint` を伏せ字にする。`IActivityUpdateParameters` から `endpoint` を外し、`updateByParameters` は実行時にも `endpoint` を取り除いてから `update` に渡す。
 - `apps/app/src/server/models/activity-update-by-parameters.integ.ts` — `endpoint` を含む変数を渡しても、保存済みの endpoint が変わらないことのテストを足す。
 - `apps/app/src/server/middlewares/add-activity.ts` — 伏せ字の呼び出しを外し、文脈の `endpoint` に `req.originalUrl` をそのまま入れる。
-- `apps/app/src/server/service/import/construct-convert-map.ts` — `SPECIAL_CONVERT_FUNCTIONS.activities` に `endpoint` の変換関数を足す。
+- `apps/app/src/server/service/import/overwrite-params/index.ts` — `generateOverwriteParams` の `switch` に `case 'activities'` を足す。
 - `apps/app/src/server/models/activity-create-by-parameters.integ.ts` — 保存口での伏せ字のテストを足す。
-- `apps/app/src/server/service/import/construct-convert-map.integ.ts` — `activities.endpoint` の変換関数が表にあり、伏せ字にすることのテストを足す。
 - `apps/app/src/server/service/activity/record-gate.integ.ts` — 生の URL を持つ文脈から settle した行が伏せ字で保存されることのテストを足す。
 - `apps/app/src/server/service/activity/record-failsafe-attempt.integ.ts` — 生の URL を持つ文脈から作った試行記録が伏せ字で保存されることのテストを足す。
 - `apps/app/src/server/service/activity.integ.ts` — `createActivity` の直接呼び出しで伏せ字になることのテストを足す。
@@ -194,8 +194,8 @@ flowchart TB
 | 6.3 | endpoint 以外を変えない | RedactionMigration | `up(db)`（`$set: { endpoint }` のみ） | migration の処理 |
 | 6.4 | 伏せ字済みは変えない | RedactionMigration, redactAccessTokenFromEndpoint | `up(db)` | migration の処理 |
 | 6.5 | 中断後の再実行 | RedactionMigration | `up(db)` | migration の処理 |
-| 7.1 | インポートで伏せ字 | ImportEndpointConverter | `SPECIAL_CONVERT_FUNCTIONS.activities.endpoint` | — |
-| 7.2 | 他の項目は変えない | ImportEndpointConverter | `SPECIAL_CONVERT_FUNCTIONS.activities` | — |
+| 7.1 | インポートで伏せ字 | ImportEndpointConverter | `generateOverwriteParams('activities', …).endpoint` | — |
+| 7.2 | 他の項目は変えない | ImportEndpointConverter | `generateOverwriteParams('activities', …)`（`endpoint` だけを持つ） | — |
 | 8.1 | 3 経路で同じ結果 | redactAccessTokenFromEndpoint（3 か所から呼ぶ） | `redactAccessTokenFromEndpoint` | — |
 | 8.2 | 対象追加が以後の記録・インポートに効く | redactAccessTokenFromEndpoint | `SENSITIVE_QUERY_PARAMS` | — |
 | 9.1 | 一覧・エクスポートは保存値のまま | （変更なし） | — | — |
@@ -209,7 +209,7 @@ flowchart TB
 | redactAccessTokenFromEndpoint | server/util | 伏せ字の規則の唯一の定義 | 5.3–5.6, 8.1, 8.2 | なし | Service |
 | ActivityExtension（保存口） | Data | 保存前に endpoint を伏せ字にする | 5.1, 5.2 | redactAccessTokenFromEndpoint (P0) | Service |
 | add-activity middleware | Middleware | 文脈に生の URL を入れる（伏せ字は保存口） | 5.2, 9.3 | なし | — |
-| ImportEndpointConverter | Service / import | インポートで endpoint を伏せ字にする | 7.1, 7.2 | redactAccessTokenFromEndpoint (P0), Mongoose `Activity` モデルの登録 (P1) | Service |
+| ImportEndpointConverter | Service / import | インポートで endpoint を伏せ字にする | 7.1, 7.2 | redactAccessTokenFromEndpoint (P0) | Service |
 | RedactionMigration | Migration | 既存の activity を伏せ字にする | 6.1–6.5 | redactAccessTokenFromEndpoint (P0), migrate-mongo `db` (P0) | Batch |
 
 ### server/util
@@ -282,7 +282,7 @@ export type IActivityUpdateParameters = Omit<
 
 ### Service / import
 
-#### ImportEndpointConverter（`SPECIAL_CONVERT_FUNCTIONS.activities.endpoint`）
+#### ImportEndpointConverter（`overwrite-params/activities.ts`）
 
 | Field | Detail |
 |-------|--------|
@@ -291,16 +291,18 @@ export type IActivityUpdateParameters = Omit<
 
 **Responsibilities & Constraints**
 - 値が文字列なら `redactAccessTokenFromEndpoint` を通す。文字列でなければ、そのまま返す。
-- `activities.snapshot` の既存の特例と、他の項目の変換は変えない（7.2）。
-- 変換表は Mongoose に登録された `Activity` モデルの `schema.paths` から作られる。`endpoint` は schema にあるので表に載る。
+- 上書きするのは `endpoint` だけ。変換表の `activities.snapshot` の既存の特例と、他の項目の変換は変えない（7.2）。
+- `generateOverwriteParams` はコレクション名だけで上書きを選ぶので、Mongoose の `Activity` モデルの登録に依存しない。`convertDocuments` は変換表のあとに上書きを当て、値が `undefined` の項目には当てない。
 
 **Contracts**: Service [x]
 
 ##### Service Interface
 ```typescript
-// Entry added to the existing table.
-const SPECIAL_CONVERT_FUNCTIONS: Record<string, Record<string, OverwriteFunction>>;
-// activities.endpoint: (value: unknown) => unknown
+// overwrite-params/activities.ts
+export const overwriteParams: OverwriteParams; // { endpoint: (value: unknown) => unknown }
+
+// overwrite-params/index.ts: case added to the existing switch.
+// generateOverwriteParams('activities', …) returns the overwriteParams above.
 ```
 
 ### Migration
@@ -340,12 +342,13 @@ const SPECIAL_CONVERT_FUNCTIONS: Record<string, Record<string, OverwriteFunction
 
 - **保存口**: 伏せ字の関数は例外を投げない（キーのデコード失敗は「対象外」として扱う）。保存の失敗は今までどおり呼び出し元が扱う。
 - **migration**: `bulkWrite` の失敗はそのまま投げ、migrate-mongo に未適用として残させる。次の起動で再実行する（冪等なので安全）。
-- **インポート**: 文字列でない値は変えずに通す。変換で例外は投げない。
+- **インポート**: 文字列でない値は変えずに通す。上書きで例外は投げない。
 
 ## Testing Strategy
 
 ### Unit Tests
 - `redact-access-token-from-endpoint.spec.ts`（移動）: 既存のケース（単一、他パラメータの保持、エンコードの保持、エンコードされたキー、複数、クエリなし、対象なし）に、冪等性（伏せ字済みの値をもう一度通しても同じ）を足す（5.3–5.6, 6.4）。
+- `overwrite-params/activities.spec.ts`: `generateOverwriteParams('activities', …)` の上書きが `endpoint` だけを持ち、トークンを含む endpoint を伏せ字にし、文字列でない値を変えない（7.1, 7.2）。
 
 ### Integration Tests
 - `activity-create-by-parameters.integ.ts`: `createByParameters` に `access_token` を含む endpoint を渡すと、保存された行は伏せ字になっている。endpoint を渡さないと `''` のまま（5.1）。
@@ -359,8 +362,7 @@ const SPECIAL_CONVERT_FUNCTIONS: Record<string, Record<string, OverwriteFunction
   - 2 回目の `up` のあとも、全行の endpoint・`__v`・他の項目が 1 回目のあとと同じ
   - 1,000 件を超える行（バッチの境目）でも全件直る
   - `findRedactionBatch` が返すカーソルの実行計画が、`_id_` の IXSCAN で SORT ステージを含まない
-- `construct-convert-map.integ.ts`: `activities.endpoint` の変換関数が表にあり、トークンを含む値を伏せ字にし、文字列でない値は変えない（7.1, 7.2）。Mongoose の `Activity` モデルが外れたときに落ちるドリフト検知を兼ねる。
-- 同じ endpoint の文字列を、保存口・migration・インポートの変換に通した結果が一致する（8.1）。上の各テストの期待値を `redactAccessTokenFromEndpoint` の戻り値で書く。あわせて各テストで、保存・変換された値にトークンの文字列そのものが残らず、`[REDACTED]` が入っていることも直接確かめる（伏せ字の関数が壊れたときに、期待値も一緒に変わって見逃さないため）。
+- 同じ endpoint の文字列を、保存口・migration・インポートの上書きに通した結果が一致する（8.1）。上の各テストの期待値を `redactAccessTokenFromEndpoint` の戻り値で書く。あわせて各テストで、保存・上書きされた値にトークンの文字列そのものが残らず、`[REDACTED]` が入っていることも直接確かめる（伏せ字の関数が壊れたときに、期待値も一緒に変わって見逃さないため）。
 
 - `activity-update-by-parameters.integ.ts`: `endpoint` を含む変数（オブジェクトリテラルでない値）を `updateByParameters` に渡しても、保存済みの endpoint が変わらない（5.2）。
 
