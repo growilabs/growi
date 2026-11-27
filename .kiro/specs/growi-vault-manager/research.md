@@ -198,6 +198,18 @@
 - **Selected Approach**: `git update-ref -d refs/namespaces/<namespace>/refs/heads/main` で ref を消し、その後で namespace のディレクトリ（HEAD を含む）を削除する。
 - **現在の gc との関係**: vault-manager の gc は `gc.packRefs=false` で動くので、vault-manager が `packed-refs` を作ることはない（過去の版の gc や手作業の gc が残したものはありうる）。`packed-refs` が残っている repo は、再構築が必要な状態として扱われる（`init()` が error ログを出し、`readRef` が例外を投げる）。`git update-ref -d` は `packed-refs` から対象の行だけを消し、ほかの行は変えない（`vault-repo-storage.spec.ts` の `keeps other namespaces and sparse-filter refs (packed)` で固定）。ほかに packed の ref がある限りファイルも残るので、再構築が必要な状態は片付けの後も残る。対象が唯一の packed の ref だった場合にファイルが残るかどうかは git の版による（git 2.55.0 ではヘッダーだけのファイルが残った。テストでは固定していない）。その場合はほかに packed の ref がないので、隠れる状態もない。
 
+### Decision I: `rename-prefix` は移動先のディレクトリと合成し、同名の項目は移動先の側を残す
+
+- **Context**: `rename-prefix` は `oldFilePrefix` のディレクトリを `newFilePrefix` へ移す。移動先のディレクトリが、その namespace にすでにあることがある。GROWI は、改名先のパスにページがなく（empty page）、その配下にだけページがある場合の改名を許すためである。
+- **Alternatives Considered**:
+  1. 移動先のディレクトリを、移動してきたディレクトリで置き換える
+  2. 再帰的に合成し、同名の項目は移動してきた側を残す
+  3. 再帰的に合成し、同名の項目は移動先にすでにある側を残す
+- **Selected Approach**: 3。片側にしかない項目はどちらも残す。ディレクトリ同士は中へ再帰する。それ以外で名前がぶつかったら、移動先にすでにある項目を残す。
+- **Rationale**: 1 は、移動先にもとからあったページのファイルを Vault から消す。同名の項目がぶつかるのは、2 つのページが同じファイルの位置に対応する場合で、どちらか一方しか残せない。3 は、すでにそこにある内容を消さない。移動してきた側は改名の前に書かれた内容であり、移動先の側は別のページか、改名の後に新しいパスへ書かれた内容である。
+- **自分の配下への改名（`/a` → `/a/b`）**: 改名したページ自身のファイル（`a/b.md`）は、移動元のディレクトリ `a/` の中に書かれる。ディレクトリごと移すと `a/b/b.md` へ運ばれてしまうので、このファイルは移動の対象から外し、元の位置に残す。ページ自身のファイルを書く指示と `rename-prefix` のどちらが先に適用されるかは決まっていないため、適用の順番に頼らず、vault-manager の側で外す。
+- **Trade-offs**: 移動先が移動元の配下にある `rename-prefix` は、2 回適用すると結果が変わる（1 回目で作られた `a/` がもう一度動き、`a/b/b/` になる）。gateway は 1 回の改名につき namespace ごとに 1 件だけ発行するので、通常はこれが起きない（growi-vault-gateway の research.md、Decision 9）。ただし、中断した改名の再開（新しい `operation` になる）と、適用後に処理済みの記録だけが失敗した指示の再実行では起きうる（要件 2.7 の注記）。
+
 ---
 
 ## 実装知見（Post-Implementation Discoveries）

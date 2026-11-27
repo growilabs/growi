@@ -406,13 +406,13 @@ interface VaultDispatcher {
 
 **prefix primitive（親ページのバルク操作）**
 
-- 親ページ rename: 2 経路に分離する。(1) rename されたページ**自身**の blob は `'rename'` イベント購読 → `onPageRenamed`（remove + upsert、上記「単一ページ操作」参照）で再配置する。(2) **descendants** の subtree は `pageEvent.emit('updateMany', pages, user, { oldPagePathPrefix, newPagePathPrefix })` 購読 → 影響を受ける各 namespace に `rename-prefix` 1 件（descendants 数 N によらず namespace 数 M 件）で移動する。`rename-prefix` は subtree（`type === 'tree'`）専用であり、ページ自身の blob には作用しないため、両経路の併用で旧パスの blob・subtree がともに残らないことを保証する
+- 親ページ rename: 2 経路に分離する。(1) rename されたページ**自身**の blob は `'rename'` イベント購読 → `onPageRenamed`（remove + upsert、上記「単一ページ操作」参照）で再配置する。(2) **descendants** は `pageEvent.emit('updateMany', pages, user, extras)`（`extras` は `PageUpdateManyEventExtras`）を購読して移動する。`scope: 'subtree'`（v5）では、namespace が初めて現れたバッチで、その namespace に `rename-prefix` を 1 件出す（同じ rename の後続バッチでは出さない。rename の区別は `operation` の同一性で行う）。`scope: 'listed-pages'`（v4）では、event のページごとに `onPageRenamed` で remove + upsert する。`rename-prefix` は旧パスのディレクトリ（subtree）を移すだけで、ページ自身の blob（`<name>.md`）はディレクトリの外にあるので動かさない。自分の配下への rename（`/a` → `/a/b`）では、(1) で書かれたページ自身の新しい blob（`a/b.md`）が旧ディレクトリの中に入るが、vault-manager はそれを移動せずその位置に残す。そのため両経路を併用しても、旧パスの blob・subtree は残らず、ページ自身の blob が descendants 側へ運ばれることもない
 - 親ページ grant 一括変更: 影響を受けた各 page に対して per-page `acl-change` instruction を発行（remove from previous namespaces + upsert to current namespaces）。`pageEvent.emit('descendantsGrantChanged', { affectedPages, user })` を購読する
 - 当初設計で想定した `grant-change-prefix` op は subtree 単位の prefix scope を持たないため、現状は使用していない（将来の vault-manager 設計改修で再評価）
 
 **実装ノート**
 - 既存 GROWI `PageEvent`（`apps/app/src/server/events/page.ts`）に subscribe
-- `syncDescendants` 完了 event 等の境界 event を購読し、descendants 処理途中での per-page event を受信しないようにする
+- descendants の移動は最初のバッチで発行する。そのため rename 処理中に、まだ rename されていない descendant を編集すると、旧パスのファイルが残り、新パスは編集前の内容になる。ページツリーに載っていない（未変換の）ページが同じ namespace の旧 prefix の下にあると、DB では rename されないまま、ファイルだけが移動する。新パスの古い内容や欠けたファイルは targeted reconcile で直せる（reconcile は `bulk-upsert` しか発行しない）。旧パスに残ったファイルは再構築で消す
 - 書き込み失敗時は WARN ログ + リトライ（ページ編集 response とは切り離す）
 
 ---

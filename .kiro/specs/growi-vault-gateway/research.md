@@ -94,6 +94,23 @@
 - **Rationale**: 1 は GROWI 本体の判定と食い違う。実際に、adapter が「Authorization ヘッダーが無ければ public だけを返す」と自分で決めていた実装では、`security:restrictGuestMode='Deny'` のサイトでも、認証情報のない clone が public のページを受け取れた。判定を標準の middleware に任せれば、GROWI 本体の判定の変更が、gateway のコードを変えずに clone にも及ぶ。
 - **Trade-offs**: 標準の middleware の振る舞い（`/login` へのリダイレクトなど）が git に合わない所は、`fallback` と credential adapter で個別に置き換える（要件 11.2）。
 
+### Decision 9: descendants の改名は、namespace が初めて現れたバッチで `rename-prefix` を 1 件だけ出す（要件 4.4）
+
+- **Context**: 親ページを改名すると、GROWI は descendants を 100 件ずつのバッチで改名し、バッチごとに `updateMany` を発行する。Vault は、descendants のファイルを新しいパスへ移す必要がある。
+- **Findings**:
+  - v5 のページツリーでは、改名は操作ユーザーの権限に関係なく、ツリー上の descendants をすべて動かす。Vault から見ると、これは namespace ごとのディレクトリの改名と同じである。
+  - v4 互換の処理は、操作ユーザーが編集できる descendants だけを改名する。ディレクトリごと動かすと、改名されなかったページまで動く。
+  - 移動先が移動元の配下にある `rename-prefix`（`/a` → `/a/b`）は、2 回適用するとディレクトリがもう一段入れ子になる。
+  - ある namespace に属する descendants が、最初のバッチに含まれるとは限らない。
+- **Alternatives Considered**:
+  1. バッチごとに、そのバッチの namespace へ `rename-prefix` を出す
+  2. 最後のバッチの後で、まとめて出す
+  3. namespace が初めて現れたバッチで 1 件だけ出し、同じ改名の後続のバッチでは出さない
+  4. descendants を 1 ページずつ、旧パスの `remove` と新パスの `upsert` で移す
+- **Selected Approach**: v5 は 3、v4 は 4。同じ改名に属するバッチかどうかは、page service が改名 1 回ごとに作って全バッチの event に付けるオブジェクト（`operation`）が同じかどうかで見分ける。v5 と v4 のどちらの形で移すかは、event の `scope` が決める。
+- **Rationale**: 1 は、自分の配下への改名でディレクトリを二重に入れ子にする。2 は、改名の途中で旧パスの下に作られたページまで動かし、改名済みのページの削除とも食い違う。4 は正しいが、descendants の数だけ指示と commit が要り、途中の状態が clone に見える。3 は、指示の数が namespace の数で済み、ディレクトリの移動が 1 つの commit で終わる。
+- **Trade-offs**: 改名の処理中に、まだ改名されていない descendant を旧パスで編集すると、旧パスにファイルが残り、新パスは編集前の内容になる。ページツリーに載っていない未変換のページが、改名されたページと同じ namespace の旧パスの下にあると、ファイルだけが移動する。v4 は指示の数が descendants の数に比例する。
+
 ---
 
 ## Risks & Mitigations
