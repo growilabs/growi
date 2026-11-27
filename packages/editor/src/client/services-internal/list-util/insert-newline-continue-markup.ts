@@ -1,4 +1,4 @@
-import type { ChangeSpec } from '@codemirror/state';
+import { EditorSelection, type EditorState } from '@codemirror/state';
 import type { EditorView } from '@codemirror/view';
 
 // https://regex101.com/r/r9plEA/1
@@ -8,70 +8,39 @@ const indentAndMarkRE =
 const indentAndMarkOnlyRE =
   /^(\s*)(>[> ]*|[*+-] \[[x ]\]|[*+-]|(\d+)[.)])(\s*)$/;
 
-export const insertNewlineContinueMarkup = (editor: EditorView): void => {
-  const changes: ChangeSpec[] = [];
+type NewlineReplacement = { readonly from: number; readonly insert: string };
 
-  let selection:
-    | typeof editor.state.selection
-    | {
-        anchor: number;
-        head?: number;
-      }
-    | undefined;
+const buildReplacement = (
+  state: EditorState,
+  from: number,
+): NewlineReplacement => {
+  const bolPos = state.doc.lineAt(from).from;
+  const strFromBol = state.sliceDoc(bolPos, from);
 
-  const curPos = editor.state.selection.main.head;
-
-  const aboveLine = editor.state.doc.lineAt(curPos).number;
-  const bolPos = editor.state.doc.line(aboveLine).from;
-
-  const strFromBol = editor.state.sliceDoc(bolPos, curPos);
-
-  // If the text before the cursor is only markdown symbols
+  // The text before the cursor is only markdown symbols: clear them
   if (indentAndMarkOnlyRE.test(strFromBol)) {
-    const insert = editor.state.lineBreak;
-
-    changes.push({
-      from: bolPos,
-      to: curPos,
-      insert,
-    });
+    return { from: bolPos, insert: state.lineBreak };
   }
 
-  // If the text before the cursor is markdown text
-  else if (indentAndMarkRE.test(strFromBol)) {
-    const indentAndMark = strFromBol.match(indentAndMarkRE)?.[0];
-
-    if (indentAndMark == null) {
-      return;
-    }
-
-    const insert = editor.state.lineBreak + indentAndMark;
-    const nextCurPos = curPos + insert.length;
-
-    selection = { anchor: nextCurPos };
-
-    changes.push({
-      from: curPos,
-      insert,
-    });
+  // The text before the cursor is markdown text: continue the markup
+  const indentAndMark = strFromBol.match(indentAndMarkRE)?.[0];
+  if (indentAndMark != null) {
+    return { from, insert: state.lineBreak + indentAndMark };
   }
 
-  // If the text before the cursor is regular text
-  else {
-    const insert = editor.state.lineBreak;
-    const nextCurPos = curPos + insert.length;
+  return { from, insert: state.lineBreak };
+};
 
-    selection = { anchor: nextCurPos };
+export const insertNewlineContinueMarkup = (editor: EditorView): void => {
+  const { state } = editor;
 
-    changes.push({
-      from: curPos,
-      insert,
-    });
-  }
-
-  editor.dispatch({
-    changes,
-    selection,
-    userEvent: 'input',
+  const transaction = state.changeByRange((range) => {
+    const { from, insert } = buildReplacement(state, range.from);
+    return {
+      changes: { from, to: range.to, insert },
+      range: EditorSelection.cursor(from + insert.length),
+    };
   });
+
+  editor.dispatch(transaction, { userEvent: 'input' });
 };
