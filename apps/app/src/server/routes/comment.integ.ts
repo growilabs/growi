@@ -845,6 +845,45 @@ describe('/comments.get share-link authorization (integration)', () => {
     });
   });
 
+  describe('POST /comments.add — slackNotificationForm is optional', () => {
+    const posterId = new ObjectId();
+
+    beforeAll(() => {
+      crowi.setupCommentService();
+    });
+
+    beforeEach(() => {
+      currentUser = { _id: posterId };
+      accessSpy.mockResolvedValue(true);
+    });
+
+    afterEach(async () => {
+      await prisma.comments.deleteMany({
+        where: { creatorId: posterId.toString() },
+      });
+    });
+
+    it('stores the comment when slackNotificationForm is omitted', async () => {
+      const res = await request(app)
+        .post('/comments.add')
+        .send({
+          commentForm: {
+            page_id: pageAId.toString(),
+            revision_id: revAId.toString(),
+            comment: 'posted without a slack form',
+          },
+        });
+
+      expect(res.body.ok).toBe(true);
+      const stored = await prisma.comments.findMany({
+        where: { creatorId: posterId.toString() },
+      });
+      expect(stored.map((c) => c.comment)).toEqual([
+        'posted without a slack form',
+      ]);
+    });
+  });
+
   describe('GET /comments.get — creator output is the full sanitized user row (5.1, 5.4)', () => {
     const workerId = process.env.VITEST_WORKER_ID ?? '1';
     const pageCId = new ObjectId();
