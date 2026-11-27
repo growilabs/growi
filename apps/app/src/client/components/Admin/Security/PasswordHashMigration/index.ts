@@ -1,0 +1,1 @@
+export { PasswordHashMigration } from './PasswordHashMigration';
