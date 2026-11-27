@@ -170,3 +170,79 @@ Verified the gaps between the requirements ↔ the existing codebase by cross-ch
 
 ### Implications
 - Most of the premises actually exist, and there is no integration blocker that would prevent the scrypt migration.
+
+---
+
+## Gap Analysis: the codebase against the rewritten requirements (2026-11-27)
+
+Run after `origin/master` was merged into `feat/170496-password-hash-algorithm-v8`
+(939 commits), against that merged tree. Scope: what the shipped code still has to
+change for the requirements as rewritten for the no-downgrade-support policy.
+
+### Requirement-to-Asset Map
+
+| Req | Existing asset | Status |
+|---|---|---|
+| 1.1–1.4 | `server/service/password-hash.ts` (scrypt, envelope, per-user salt) | Satisfied |
+| 1.5 | `models/user/index.js` `setPassword` | **Constraint** — the default already retires the legacy hash, but the `keepLegacyHash` opt-out still exists (`index.js:240`) and is declared on the Passport-side type (`service/passport.ts:67`). The option has to go, not just its callers |
+| 2.1 | `verifyLegacy` in `password-hash.ts` | Satisfied |
+| 2.2 | `service/passport.ts:130` | **Missing** — the lazy migration still passes `{ keepLegacyHash: true }`, so the login path is the one place that leaves a user holding both formats |
+| 2.3–2.5 | `verify()` branch table | Satisfied |
+| 3.1 | `migrations/20260724000001-password-hash-status.js` | **Constraint** — reports four categories including `both` (lines 2, 52, 62). Dropping it also touches `bothFilter`, whose other consumers are the two scripts below |
+| 3.2 | same migration | Satisfied |
+| 4.1 | — | **Missing, out of boundary** — the upgrade guide is documentation delivered outside this change; no task here produces it |
+
+### Code with no requirement behind it any more
+
+| Asset | Note |
+|---|---|
+| `server/scripts/password-hash-cleanup.ts` + `.integ.ts` | Req 3.3/3.4 no longer exist |
+| `server/scripts/password-hash-downgrade-prep.ts` + `.integ.ts` | Req 4.1–4.3 no longer exist |
+| `server/scripts/password-hash-reupgrade-prep.ts` + `.integ.ts` | Req 4.4 no longer exists |
+| `server/scripts/script-runner.ts` + `.spec.ts` | Its only consumers are the three scripts above |
+| `package.json` scripts (lines 72–77) | Six entries: `password-hash:{cleanup,downgrade-prep,reupgrade-prep}` and their `:dev` counterparts |
+| `bothFilter` in `models/user/password-hash-format-filters.ts` | Unreachable state once 1.5 and 2.2 land |
+| `service/password-reset/send-password-reset-email.ts` | Its last consumer is downgrade-prep. Master's own `processPasswordResetRequest` now owns the reset flow (arrived with the merge) |
+
+### Latent breakage that 1.5 / 2.2 will expose
+
+These read `password` alone as a proxy for "has a password". They are already wrong for
+any user created, reset or activated on the new build; once the login path stops keeping
+the legacy hash, they become wrong for everyone who has logged in.
+
+| Site | Effect |
+|---|---|
+| `routes/apiv3/security-settings/checkSetupStrategiesHasAdmin.ts:18` (`password: { $exists: true }`) | A migrated administrator is not counted, so disabling SAML/LDAP answers 405 |
+| `client/components/Admin/Users/ExternalAccountTable.tsx:110` (`ea.user.password`) | Shows "unset" for migrated users. Note the response has been serialized since #11607, so the field is already always absent |
+| `service/import/rescue-admins.ts:83` (`hasValue(user.password)`) | A scrypt-only administrator is not rescued. A fix exists on the #12145 branch |
+
+### Implementation approach options
+
+- **Option A — one change on the integration branch.** Remove the option, the scripts and
+  the `both` category together, with the dependent-site fixes. Fewest moving parts, but it
+  mixes an auth-path behaviour change with a large deletion and with fixes to code that is
+  already broken today, so a reviewer cannot judge them separately.
+- **Option B — split by requirement.** One change per requirement (1.5, 2.2, 3.1). The
+  scripts cannot be deleted until both 1.5 and 2.2 land, so B leaves the tree carrying
+  scripts that operate on an unreachable state in between.
+- **Option C — split by "already broken" vs "newly decided" (recommended).** First land the
+  dependent-site fixes on their own, since they are a live regression independent of the
+  policy change and need no spec approval (they sit inside the approved Req 2.2/2.3). Then
+  remove `keepLegacyHash`, the three scripts and the `both` category as one coherent change,
+  because they are all consequences of the same invariant.
+
+### Effort and risk
+
+| Work | Effort | Risk | Why |
+|---|---|---|---|
+| Dependent-site fixes | S | Low | Three call sites, one shared predicate, existing test patterns |
+| Remove the option + scripts + `both` | M | Medium | Touches the authentication path; the risk is a missed consumer (`send-password-reset-email`, `script-runner`, the `package.json` entries) rather than the deletion itself |
+| Status migration to three categories | S | Low | One migration file plus the shared filter module |
+
+### Research Needed
+
+- Whether `sendPasswordResetTemplateEmail` (the "reset succeeded" mail) is covered by
+  master's `processPasswordResetRequest`, or whether deleting
+  `send-password-reset-email.ts` would drop that mail.
+- Whether any operator runbook or deployment document references the `password-hash:*`
+  npm scripts, which would need a note when they are removed.
