@@ -13,7 +13,7 @@
 - MCP 連携が有効なとき、`/_api/v3/mcp` が MCP の Streamable HTTP として、2026-07-28 版と 2025 年の各版のクライアントに応答する。
 - 利用者の特定（認証）を 1 つの差し込み口に閉じ込め、`remote-mcp-server-oauth` が、ツール・回数制限・Activity を変えずに中身を差し替えられるようにする。
 - ページの閲覧権限の判定を、エージェント用のツールと MCP 用のツールで 1 か所に保つ。
-- MCP 連携を一度も有効にしていない GROWI では、`@mastra/mcp` を読み込まない。
+- MCP 連携が動かない状態のときは、MCP サーバーのためのメモリを消費しない。動かない状態で起動したプロセスは、`@mastra/mcp` を読み込まない。動かない状態に戻したときは、保持している部品への参照を手放す。
 
 ### Non-Goals
 
@@ -167,6 +167,7 @@ features/mastra/
 │   │   │   │   └── auth-failure-response.ts        # 暫定: 理由によらず、チャレンジなしの 401
 │   │   │   ├── json-rpc-error-response.ts          # 401 / 429 / 400 / 500 の固定の応答を書く
 │   │   │   ├── is-batch-request.ts                 # 本文が配列かどうかの判定（純粋な関数）
+│   │   │   ├── lazy-mcp-request-handler.ts         # 重い層の遅延ロードと、保持している参照の解放
 │   │   │   └── mcp-request-handler.ts              # 重い層の入口。@mastra/mcp を読み込み、startHTTP を呼ぶ
 │   │   └── admin-mcp-settings/
 │   │       ├── index.ts                 # /_api/v3/mcp-settings のルーター
@@ -323,15 +324,17 @@ sequenceDiagram
 | 7.7 | 種類を指定して絞り込める | ActivityActions、SelectActionDropdown | カテゴリ `Mcp` と `Admin` | — |
 | 7.8 | 既定の設定では記録しない | ActivityActions | どのグループにも入れない | — |
 | 8.1, 8.2 | AI チャットと suggest-path の結果を保つ | 既存の 2 ツール、searchPages、readPageContent | 既存の出力への写し | — |
-| 8.3 | 起動時に読み込まない | McpRouter、drift spec | 動的な `import()` | 処理の流れ |
+| 8.3 | 動かない状態で起動したプロセスは読み込まない | McpRouter、LazyMcpRequestHandler、drift spec | 動的な `import()` は、動く状態で認証済みのリクエストが届いたときだけ | 処理の流れ |
 | 8.4 | 既存 API のトークンの受け付け方を保つ | AccessTokenAuthenticator | `accessTokenParser` を変更しない | — |
-| 8.5, 8.6 | 読み込みの失敗 | McpRouter | 失敗した Promise を捨てる、500 | 処理の流れ |
+| 8.5, 8.6 | 読み込みの失敗 | McpRouter、LazyMcpRequestHandler | 失敗した Promise を捨てる、500 | 処理の流れ |
+| 8.7 | 動かない状態に変わったら参照を手放す | LazyMcpRequestHandler、McpRouter、AdminMcpSettingsApi | `release()` | — |
+| 8.8 | 再起動まで解放されないことの表示 | McpSettingsSection | スイッチの下の説明文 | — |
 
 ## Components and Interfaces
 
 | Component | Layer | Intent | Req Coverage | Key Dependencies | Contracts |
 |-----------|-------|--------|--------------|------------------|-----------|
-| McpRouter | Route（軽い層） | 処理の流れを組み立てる | 1.2, 1.3, 1.4, 1.8, 1.10, 1.11, 2.7, 2.8, 3.4, 3.5, 3.10, 3.11, 6.1, 6.2, 6.3, 6.7, 7.4, 8.3, 8.5, 8.6 | McpAuth (P0)、consumeUserPoints (P0)、McpRequestHandler (P0) | API |
+| McpRouter | Route（軽い層） | 処理の流れを組み立てる | 1.2, 1.3, 1.4, 1.8, 1.10, 1.11, 2.7, 2.8, 3.4, 3.5, 3.10, 3.11, 6.1, 6.2, 6.3, 6.7, 7.4, 8.3, 8.5, 8.6, 8.7 | McpAuth (P0)、consumeUserPoints (P0)、McpRequestHandler (P0) | API |
 | McpAuth | Route（軽い層） | 認証の差し込み口 | 2.1〜2.11, 8.4 | AccessToken モデル (P0) | Service |
 | McpRequestHandler | Route（重い層） | `MCPServer` への受け渡し | 3.6 | GrowiMcpServer (P0) | Service |
 | GrowiMcpServer | Service | `MCPServer` の組み立て | 3.1, 3.2, 3.3, 3.4, 3.5 | `@mastra/mcp` (P0)、buildMcpTools (P0) | Service |
@@ -340,8 +343,8 @@ sequenceDiagram
 | RateLimiterUserPoints / RateLimiterConfig | Infra | 利用者単位の計数、既定の設定 | 6.1〜6.6 | `rate-limiter-flexible` (P0) | Service |
 | MongoSanitizeWithExemptions | Infra | 除外パスつきの sanitize | 3.3 | `express-mongo-sanitize` (P0) | Service |
 | ActivityActions | Infra | アクションとカテゴリの定義 | 7.2, 7.7, 7.8 | — | State |
-| AdminMcpSettingsApi | Route | 設定の読み書き | 1.2, 1.3, 1.7, 1.8, 7.5 | configManager (P0) | API |
-| McpSettingsSection | UI | 管理画面の MCP の節 | 1.5, 1.6, 1.9, 1.12 | AdminMcpSettingsApi (P0) | State |
+| AdminMcpSettingsApi | Route | 設定の読み書き | 1.2, 1.3, 1.7, 1.8, 1.12, 7.5, 8.7 | configManager (P0) | API |
+| McpSettingsSection | UI | 管理画面の MCP の節 | 1.5, 1.6, 1.9, 1.12, 8.8 | AdminMcpSettingsApi (P0) | State |
 | McpConfig | Config | 設定キー | 1.1 | — | State |
 
 ### Route layer
@@ -351,14 +354,35 @@ sequenceDiagram
 | Field | Detail |
 |-------|--------|
 | Intent | `/_api/v3/mcp` のリクエストを、決まった順序で処理する |
-| Requirements | 1.2, 1.3, 1.4, 1.8, 1.10, 1.11, 2.7, 2.8, 3.4, 3.5, 3.10, 3.11, 6.1, 6.2, 6.3, 6.7, 7.4, 8.3, 8.5, 8.6 |
+| Requirements | 1.2, 1.3, 1.4, 1.8, 1.10, 1.11, 2.7, 2.8, 3.4, 3.5, 3.10, 3.11, 6.1, 6.2, 6.3, 6.7, 7.4, 8.3, 8.5, 8.6, 8.7 |
 
 **Responsibilities & Constraints**
 
 - 処理の順序（System Flows の図）を持つ。個々の判定は、他の部品に任せる。
 - `req.user` を読まない。利用者は、`McpAuth.authenticate` の戻り値だけから得る。固定のセッション ID を使うので、ブラウザのセッションを持つリクエストでは `req.user` が入った状態で届く。それを信用すると 2.7 に反する。
-- `@mastra/*` を静的に読み込まない。`mcp-request-handler.ts` は、有効で認証済みのリクエストが最初に届いたときに、動的な `import()` で読み込む。読み込みに失敗したら、保持していた Promise を捨てて 500 を返す。次のリクエストでやり直す。
-- プロセス内に、利用者や接続ごとの状態を持たない。保持するのは、読み込んだハンドラの Promise だけである。
+- `@mastra/*` を静的に読み込まない。重い層（`mcp-request-handler.ts`）の読み込みと保持は、`lazy-mcp-request-handler.ts` に任せる。
+- プロセス内に、利用者や接続ごとの状態を持たない。保持するのは、`lazy-mcp-request-handler.ts` が持つ、読み込んだハンドラの Promise だけである。
+- `isMcpAvailable()` が偽のリクエストを受けたら、素通しする前に `release()` を呼ぶ（8.7）。
+
+**LazyMcpRequestHandler（`lazy-mcp-request-handler.ts`）**
+
+```typescript
+// 動く状態で認証済みのリクエストが届いたときに、ルーターが呼ぶ。
+// 初回は mcp-request-handler を動的に読み込み、以後は保持したものを返す。
+export const getMcpRequestHandler: (crowi: Crowi) => Promise<McpRequestHandler>;
+
+// 保持しているハンドラ（と、その先の MCPServer）への参照を手放す。保持していなければ何もしない。
+export const release: () => void;
+```
+
+- `getMcpRequestHandler` は、動的な `import()` をこの関数の中でだけ行う。動かない状態で起動したプロセスは、動く状態になって認証済みのリクエストが届くまで、重い層を読み込まない（8.3）。
+- 読み込みに失敗したら、保持していた Promise を捨てる。ルーターは 500 を返し、次のリクエストでやり直す（8.5）。
+- `release()` を呼ぶのは 2 か所である。どちらも、動かない状態になったことを知った時点で呼ぶ（8.7）。
+  - 管理 API の PUT のハンドラ: 無効として保存した直後。設定を保存したインスタンスは、ここで手放す。
+  - McpRouter: `isMcpAvailable()` が偽のリクエストを受けたとき。他のインスタンスと、サイト URL が消された場合は、ここで手放す。
+- **手放せるものと、手放せないもの**: `release()` で回収の対象になるのは、ハンドラと `MCPServer` の実体、ツールの定義である。動的に読み込んだモジュールのコード（`@mastra/mcp` と、その先の依存）は、Node.js が解放できないので、プロセスを再起動するまで残る。メモリの大半は後者である。そのため、無効にしてもメモリが戻らないことを、管理画面に表示する（8.8）。
+- 再び動く状態になったら、次の認証済みのリクエストで `getMcpRequestHandler` がハンドラを作り直す。モジュールは読み込み済みなので、追加の読み込みは起きない。
+- このファイルは `@mastra/*` を静的に読み込まない。管理 API からも読み込まれるためである。
 
 **Dependencies**
 
@@ -792,6 +816,7 @@ export type McpSettingsUpdateRequest = { readonly mcpEnabled: boolean };
   - PUT: `accessTokenParser([SCOPE.WRITE.ADMIN.AI], { acceptLegacy: true })` → `loginRequiredStrictly` → `adminRequired` → `addActivity` → 入力の検証 → ハンドラ
 - 管理用スコープは、AI 連携の設定と同じものを使う。同じ管理ページの設定で、新しいスコープは作らない。
 - PUT のハンドラは、`configManager.updateConfigs({ 'app:mcpEnabled': ... })` で保存し、`res.apiv3()` の前に `activityEvent.emit('update', ..., { action: ACTION_ADMIN_MCP_SETTING_UPDATE })` を呼ぶ。
+- PUT のハンドラは、無効として保存したとき、`release()`（`lazy-mcp-request-handler.ts`）を呼んで、このインスタンスが保持している部品への参照を手放す（8.7）。
 - `aiReadyGuard` を付けない（1.8）。`@mastra/*` を静的に読み込まない。
 - 他のインスタンスへの反映は、`configManager` の既存の仕組みに従う。
 
@@ -803,6 +828,7 @@ export type McpSettingsUpdateRequest = { readonly mcpEnabled: boolean };
   - 保存済みの値が有効のとき: MCP エンドポイントの URL（`useSiteUrl()` の値と `MCP_ENDPOINT_PATH` をつなぐ）と、コピーのボタン（1.5）。
   - サイト URL が未設定のとき: URL の代わりに、サイト URL を設定するまで MCP 連携が動かないことの警告と、アプリ設定ページへのリンク（1.6）。スイッチの有効・無効にかかわらず出す。外部認証の設定画面（OIDC など）が、サイト URL が未設定のときに出す警告と同じ形にする。
   - スイッチと更新のボタンは、サイト URL が未設定でも操作できる（1.12）。
+  - スイッチの下に、「MCP 連携を一度でも使うと、そのための部品がメモリに読み込まれる。無効にしても、GROWI を再起動するまで、そのメモリは解放されない」という説明を常に出す（8.8）。「このプロセスが読み込み済みかどうか」で出し分けることはしない。複数のインスタンスで動いている場合、管理画面に応答した 1 つのインスタンスの状態しか分からず、表示が実態と食い違うためである。
 - 保存に成功したらトーストを出して再取得する。失敗したら、入力を保ったままトーストを出す。
 
 #### McpConfig
@@ -876,6 +902,8 @@ HTTP の層のエラーと、ツールの結果としてのエラーを分ける
   - ログインセッションの Cookie と Bearer トークンを両方送るリクエストでも、利用者単位の枠は 1 リクエストにつき 1 回だけ減る（6.1）。
   - 配列の本文は 400 になり、ハンドラが呼ばれない（3.11、6.7）。
   - ハンドラの読み込みに失敗すると 500 になり、次のリクエストで読み込みをやり直す（8.5）。
+  - 動く状態から動かない状態に変えたあとのリクエストで、保持していたハンドラが手放される。再び動く状態にすると、ハンドラが作り直される（8.7）。
+  - 動かない状態のあいだは、認証済みのリクエストが届いても、ハンドラの読み込みが起きない（8.3）。
 - **`MCPServer` を通した結合**（`mcp-request-handler.integ.ts`、実物の `@mastra/mcp` を使う）:
   - `initialize`（2025 年の版）と `server/discover`（2026-07-28 版）に応答する（3.1、3.3）。
   - `tools/list` が 2 つのツールを、annotation つきで返す（3.2、3.7）。
@@ -904,7 +932,7 @@ HTTP の層のエラーと、ツールの結果としてのエラーを分ける
 | 3 | `req.auth.extra` に入れた値が、ツールの実行コンテキストの `authInfo.extra` に、そのまま届く | `mapAuthInfoToUser` と requestContext で運ぶ |
 | 4 | `AuthInfo.token` に固定の文字列を入れても、`MCPServer` が受け付ける | トークンの値を入れ、ログに出ないことをテストで固定する |
 | 5 | `compression()` の下で、2025 年の版の SSE の応答が遅れずに届く | `/_api/v3/mcp` を圧縮の対象から外す |
-| 6 | `@mastra/mcp` を読み込んだときのメモリの増加量 | 数値を research.md に記録する（8.3 の根拠） |
+| 6 | 本番ビルドの GROWI で、MCP の部品を読み込む前後と、リクエストを処理した後のメモリ（RSS とヒープ）。無効に戻して `release()` したあとに、どれだけ戻るか | 数値を research.md に記録する（8.3・8.7・8.8 の根拠）。単独のプロセスでの参考値は research.md にある |
 | 7 | ビルド後に、`@mastra/mcp` と `@modelcontextprotocol/*` が `.next/node_modules/` に現れるか | `dependencies` に置く |
 | 8 | claude.ai が送るプロトコルの版、`Origin` ヘッダーの有無、バッチの有無 | `Origin` を送るなら `CertifyOrigin` の扱いを、バッチを送るなら 3.11 を、利用者と相談する |
 
@@ -919,6 +947,7 @@ HTTP の層のエラーと、ツールの結果としてのエラーを分ける
 
 ## Performance & Scalability
 
-- **起動時のメモリ**: `@mastra/mcp` は、有効で認証済みのリクエストが最初に届くまで読み込まない。無効な GROWI と、未認証のリクエストしか届かない GROWI では、読み込まれない。
+- **動かない状態のメモリ**: `@mastra/mcp` は、動く状態で認証済みのリクエストが最初に届くまで読み込まない。動かない状態で起動した GROWI と、未認証のリクエストしか届かない GROWI では、読み込まれない。
+- **読み込んだあとのメモリ**: 単独のプロセスでの計測では、`@mastra/mcp` の読み込みで RSS が 68〜71 MB 増える（`@mastra/core` を読み込み済みなら 7〜12 MB）。リクエストを処理すると、V8 が確保した領域のぶん、RSS がさらに増える。使用中のヒープは増えず、漏れは無い（research.md の計測）。無効に戻しても、この大半は再起動まで戻らない。GROWI の中での値は、Verification Checkpoints 6 で測る。
 - **複数インスタンス**: プロセス内に利用者ごとの状態を持たない。回数は MongoDB で数える。設定の反映は `configManager` に従う。
 - **認証のコスト**: リクエストごとに、トークンのハッシュでの検索が 1 回と、利用者の取得が 1 回かかる。未認証のリクエストは、上限を超えると IP 単位の制限が止めるので、トークンの検索までは進まない。ただし、本文の読み込みとセッションストアの読み取りは、回数制限より前に行われる（Existing Architecture Analysis の順序）。固定のセッション ID を使うので、Cookie の無いリクエストがセッションの記録を増やすことは無い。
