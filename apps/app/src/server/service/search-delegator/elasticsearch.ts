@@ -1461,20 +1461,52 @@ class ElasticsearchDelegator
     const sort = option?.sort ?? null;
     const order = option?.order ?? null;
 
-    const query = this.createSearchQuery();
-
-    this.appendCriteriaForQueryString(query, terms);
-    this.appendCriteriaForGroupFilter(query, terms, data.resolvedFilterData);
-    this.filterPagesByViewer(query, user, userGroups);
+    const query = this.createPageSearchQuery(data, user, userGroups);
     await this.appendFunctionScore(query, queryString);
 
     this.appendResultSize(query, from, size);
 
     this.appendSortOrder(query, sort, order);
 
-    this.appendHighlight(query);
+    return await this.searchKeyword(query);
+  }
+
+  /**
+   * Page search restricted to `pageIds`: only those page search would return
+   * for the viewer come back, each with its highlight.
+   */
+  async searchWithinPages(
+    data: Omit<SearchableData<ESQueryTerms>, 'queryString'>,
+    user,
+    userGroups,
+    pageIds: readonly string[],
+  ): Promise<ISearchResult<ISearchResultData>> {
+    const query = this.createPageSearchQuery(data, user, userGroups);
+    const filter = query.body?.query?.bool?.filter;
+    if (!Array.isArray(filter)) {
+      throw new Error('query.body.query.bool is not initialized');
+    }
+    filter.push({ ids: { values: [...pageIds] } });
+    this.appendResultSize(query, 0, pageIds.length);
 
     return await this.searchKeyword(query);
+  }
+
+  /** Page search's keyword, operators, viewer filter and highlight. */
+  private createPageSearchQuery(
+    {
+      terms,
+      resolvedFilterData,
+    }: Omit<SearchableData<ESQueryTerms>, 'queryString'>,
+    user,
+    userGroups,
+  ): SearchQuery {
+    const query = this.createSearchQuery();
+    this.appendCriteriaForQueryString(query, terms);
+    this.appendCriteriaForGroupFilter(query, terms, resolvedFilterData);
+    this.filterPagesByViewer(query, user, userGroups);
+    this.appendHighlight(query);
+    return query;
   }
 
   isTermsNormalized(terms: Partial<QueryTerms>): terms is ESQueryTerms {

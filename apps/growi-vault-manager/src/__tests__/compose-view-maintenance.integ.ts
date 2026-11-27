@@ -27,7 +27,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 const execFileAsync = promisify(execFile);
 
@@ -75,7 +75,7 @@ async function disconnectMongo(): Promise<void> {
 // ---------------------------------------------------------------------------
 
 async function callComposeView(
-  userId: string | null,
+  userId: string,
   namespaces: string[],
 ): Promise<{ viewRef: string; commitOid: string }> {
   const res = await fetch(`${BASE_URL}/internal/compose-view`, {
@@ -162,6 +162,174 @@ async function upsertPageAndWait(opts: {
   }
 
   throw new Error(`Instruction ${instrId} was not processed within 15 s`);
+}
+
+// ---------------------------------------------------------------------------
+// Helper: list the files in a namespace's HEAD tree
+// ---------------------------------------------------------------------------
+
+function requireRepoPath(): string {
+  const repoPath = process.env.VAULT_REPO_PATH;
+  if (repoPath == null) {
+    throw new Error('VAULT_REPO_PATH is not set by the integ setup');
+  }
+  return repoPath;
+}
+
+async function listNamespaceFiles(namespace: string): Promise<string[]> {
+  const { stdout } = await execFileAsync(
+    'git',
+    [
+      '-C',
+      requireRepoPath(),
+      'ls-tree',
+      '-r',
+      '--name-only',
+      `refs/namespaces/${namespace}/refs/heads/main`,
+    ],
+    { maxBuffer: 10 * 1024 * 1024 },
+  );
+  return stdout.trim().split('\n').filter(Boolean);
+}
+
+/** Upserts `count` new pages into the namespace, one instruction at a time. */
+async function upsertNewPages(namespace: string, count: number): Promise<void> {
+  if (mongoose == null) {
+    throw new Error('Mongoose not connected');
+  }
+  const { ObjectId } = mongoose.mongo;
+  for (let i = 0; i < count; i++) {
+    const pageId = new ObjectId().toHexString();
+    // biome-ignore lint/performance/noAwaitInLoops: instructions are applied one at a time
+    await upsertPageAndWait({
+      namespace,
+      pageId,
+      pagePath: `/${namespace}/page-${pageId}`,
+      revisionId: new ObjectId().toHexString(),
+      bodyText: `# ${pageId}`,
+    });
+  }
+}
+
+/** Inserts a revision document and returns ids for an upsert payload. */
+async function newRevision(
+  body: string,
+): Promise<{ pageId: string; revisionId: string }> {
+  if (mongoose?.connection.db == null) {
+    throw new Error('Mongoose not connected');
+  }
+  const { ObjectId } = mongoose.mongo;
+  const pageId = new ObjectId();
+  const revisionId = new ObjectId();
+  await mongoose.connection.db
+    .collection('revisions')
+    .insertOne({ _id: revisionId, body, pageId });
+  return {
+    pageId: pageId.toHexString(),
+    revisionId: revisionId.toHexString(),
+  };
+}
+
+/**
+ * Inserts an instruction and waits until it is processed or has failed once.
+ */
+async function insertInstructionAndSettle(
+  op: string,
+  payload: Record<string, unknown>,
+  issuedAt: Date = new Date(),
+): Promise<{ id: unknown; processed: boolean; lastError: string | null }> {
+  if (mongoose?.connection.db == null) {
+    throw new Error('Mongoose not connected');
+  }
+  const instructions = mongoose.connection.db.collection('vault_instructions');
+  const { insertedId } = await instructions.insertOne({
+    op,
+    payload,
+    issuedAt,
+    processedAt: null,
+    attempts: 0,
+    lastError: null,
+  });
+
+  const deadline = Date.now() + 15_000;
+  while (Date.now() < deadline) {
+    // biome-ignore lint/performance/noAwaitInLoops: polling loop — must check state sequentially with delay between attempts
+    const doc = await instructions.findOne({ _id: insertedId });
+    if (doc?.processedAt != null || doc?.lastError != null) {
+      return {
+        id: insertedId,
+        processed: doc.processedAt != null,
+        lastError: (doc.lastError as string | null) ?? null,
+      };
+    }
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+  throw new Error(
+    `Instruction ${String(insertedId)} did not settle within 15 s`,
+  );
+}
+
+/** Inserts an upsert of one new page and waits until it settles. */
+async function upsertNewPageAndSettle(
+  namespace: string,
+): Promise<{ id: unknown; processed: boolean; lastError: string | null }> {
+  const ids = await newRevision(`# ${namespace}`);
+  return insertInstructionAndSettle('upsert', {
+    namespace,
+    ...ids,
+    pagePath: `/${namespace}/page-${ids.pageId}`,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Helpers: refs in the bare repository
+// ---------------------------------------------------------------------------
+
+const SPARSE_FILTER_REF = 'refs/vault/sparse-filters/exclude-user-pages';
+
+function namespaceRef(namespace: string): string {
+  return `refs/namespaces/${namespace}/refs/heads/main`;
+}
+
+function packedRefsExist(): boolean {
+  return fs.existsSync(path.join(requireRepoPath(), 'packed-refs'));
+}
+
+/** Packs every ref the way a gc without gc.packRefs=false does. */
+async function packAllRefs(): Promise<void> {
+  await execFileAsync('git', [
+    '-C',
+    requireRepoPath(),
+    'pack-refs',
+    '--all',
+    '--prune',
+  ]);
+}
+
+/** Resolves a ref the way git does (loose file first, then packed-refs). */
+async function resolveRef(ref: string): Promise<string | null> {
+  try {
+    const { stdout } = await execFileAsync('git', [
+      '-C',
+      requireRepoPath(),
+      'rev-parse',
+      '--verify',
+      '--quiet',
+      ref,
+    ]);
+    return stdout.trim();
+  } catch {
+    return null;
+  }
+}
+
+function findInstruction(id: unknown): Promise<Record<string, unknown> | null> {
+  if (mongoose?.connection.db == null) {
+    throw new Error('Mongoose not connected');
+  }
+  return mongoose.connection.db
+    .collection('vault_instructions')
+    .findOne({ _id: id });
 }
 
 // ---------------------------------------------------------------------------
@@ -311,6 +479,45 @@ async function triggerGcAndWait(): Promise<{
       expect(second.commitOid).toMatch(/^[0-9a-f]{40}$/);
     });
 
+    it('compose-view rejects a request without a user and creates neither a view ref nor a view record', async () => {
+      const repoPath = process.env.VAULT_REPO_PATH;
+      if (repoPath == null || !fs.existsSync(repoPath)) {
+        throw new Error('VAULT_REPO_PATH is not a local directory');
+      }
+      const db = mongoose?.connection.db;
+      if (db == null) {
+        throw new Error('Mongoose connection db is not available');
+      }
+      const listNamespaceRefs = async (): Promise<string> => {
+        const { stdout } = await execFileAsync('git', [
+          '-C',
+          repoPath,
+          'for-each-ref',
+          '--format=%(refname)',
+          'refs/namespaces/',
+        ]);
+        return stdout;
+      };
+      const countViews = (): Promise<number> =>
+        db.collection('vault_user_views').countDocuments({});
+
+      const refsBefore = await listNamespaceRefs();
+      const viewsBefore = await countViews();
+
+      const res = await fetch(`${BASE_URL}/internal/compose-view`, {
+        method: 'POST',
+        headers: {
+          Authorization: AUTH_HEADER,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId: null, namespaces: ['public'] }),
+      });
+
+      expect(res.status).toBe(400);
+      expect(await listNamespaceRefs()).toBe(refsBefore);
+      expect(await countViews()).toBe(viewsBefore);
+    });
+
     // -------------------------------------------------------------------------
     // Test 2: squash auto-trigger after 1000+ commits
     // -------------------------------------------------------------------------
@@ -424,12 +631,6 @@ async function triggerGcAndWait(): Promise<{
         });
       expect(failedCount).toBe(0);
 
-      // At this point the version counter must be >= COMMIT_COUNT.
-      const stateBeforeSquash = await db
-        .collection('vault_namespace_state')
-        .findOne({ namespace: squashNs });
-      expect(stateBeforeSquash?.version).toBeGreaterThanOrEqual(COMMIT_COUNT);
-
       // Wait for the next scheduler tick to perform the squash within the
       // computed squash budget.
       const squashDeadline = Date.now() + squashWaitMs;
@@ -462,13 +663,16 @@ async function triggerGcAndWait(): Promise<{
       expect(stateAfterSquash?.version).toBe(1);
       expect(stateAfterSquash?.commitOid).toMatch(/^[0-9a-f]{40}$/);
 
-      // Verify the squash commit is a root commit (no parents) by calling the
-      // storage-stats or health endpoint — a direct git log check would require
-      // shell access to the repo, which we proxy via the manager's HTTP API.
-      // Here we simply assert that the namespace state is coherent after squash.
-      expect(stateAfterSquash?.commitOid).not.toBe(
-        stateBeforeSquash?.commitOid,
-      );
+      // The namespace HEAD is a single root commit that still holds every page.
+      const { stdout: depth } = await execFileAsync('git', [
+        '-C',
+        requireRepoPath(),
+        'rev-list',
+        '--count',
+        `refs/namespaces/${squashNs}/refs/heads/main`,
+      ]);
+      expect(Number(depth.trim())).toBe(1);
+      expect(await listNamespaceFiles(squashNs)).toHaveLength(COMMIT_COUNT);
     });
 
     // -------------------------------------------------------------------------
@@ -573,6 +777,201 @@ async function triggerGcAndWait(): Promise<{
       expect(gcResult.looseObjectCountAfter).toBeLessThanOrEqual(
         gcResult.looseObjectCountBefore,
       );
+    });
+
+    // -------------------------------------------------------------------------
+    // Test 4: namespace pages survive gc
+    // -------------------------------------------------------------------------
+
+    it('keeps every page of a namespace when a page is written after gc', {
+      timeout: 120_000,
+    }, async () => {
+      const ns = 'integ-pages-after-gc-ns';
+      await upsertNewPages(ns, 3);
+
+      await triggerGcAndWait();
+      expect(packedRefsExist()).toBe(false);
+      await upsertNewPages(ns, 1);
+
+      expect(await listNamespaceFiles(ns)).toHaveLength(4);
+    });
+
+    // The tests below run last: every reset-all they issue wipes every namespace.
+    async function rebuildVault(issuedAt?: Date): Promise<void> {
+      const rebuild = await insertInstructionAndSettle(
+        'reset-all',
+        {},
+        issuedAt,
+      );
+      expect(rebuild.lastError).toBeNull();
+    }
+
+    it('a rebuild (reset-all) wipes every namespace ref, its state and the composed views', {
+      timeout: 120_000,
+    }, async () => {
+      const ns = 'integ-rebuild-ns';
+      await upsertNewPages(ns, 2);
+      await callComposeView('cafebabedeadbeef00000006', [ns]);
+
+      await rebuildVault();
+
+      const db = mongoose?.connection.db;
+      expect(await resolveRef(namespaceRef(ns))).toBeNull();
+      expect(
+        await db?.collection('vault_namespace_state').countDocuments(),
+      ).toBe(0);
+      expect(await db?.collection('vault_user_views').countDocuments()).toBe(0);
+
+      await upsertNewPages(ns, 1);
+      expect(await listNamespaceFiles(ns)).toHaveLength(1);
+    });
+
+    it('a rebuild also wipes a namespace ref the state has no record of, and the view refs', {
+      timeout: 120_000,
+    }, async () => {
+      const ns = 'integ-rebuild-orphan-ns';
+      await upsertNewPages(ns, 2);
+      const view = await callComposeView('cafebabedeadbeef00000007', [ns]);
+      // The state of a namespace whose instruction failed between the ref
+      // update and the state write.
+      const db = mongoose?.connection.db;
+      await db
+        ?.collection('vault_namespace_state')
+        .deleteOne({ namespace: ns });
+      expect(await resolveRef(namespaceRef(view.viewRef))).not.toBeNull();
+
+      await rebuildVault();
+
+      expect(await resolveRef(namespaceRef(ns))).toBeNull();
+      expect(await resolveRef(namespaceRef(view.viewRef))).toBeNull();
+      expect(await resolveRef(SPARSE_FILTER_REF)).not.toBeNull();
+
+      await upsertNewPages(ns, 1);
+      expect(await listNamespaceFiles(ns)).toHaveLength(1);
+    });
+
+    describe('while refs are packed', () => {
+      afterEach(async () => {
+        if (packedRefsExist()) {
+          await rebuildVault();
+        }
+      });
+
+      it('refuses writes until a rebuild (reset-all) clears the packed refs', {
+        timeout: 120_000,
+      }, async () => {
+        const ns = 'integ-refuse-packed-ref-ns';
+        await upsertNewPages(ns, 3);
+        await packAllRefs();
+
+        const refused = await upsertNewPageAndSettle(ns);
+        expect(refused.lastError).toMatch(/Rebuild Vault/);
+        expect(await listNamespaceFiles(ns)).toHaveLength(3);
+
+        await rebuildVault();
+        expect(packedRefsExist()).toBe(false);
+
+        // The refused write is superseded by the rebuild, so no later drain
+        // replays it on top of the rebuilt namespace.
+        expect((await findInstruction(refused.id))?.processedAt).not.toBeNull();
+
+        await upsertNewPages(ns, 1);
+        expect(await listNamespaceFiles(ns)).toHaveLength(1);
+      });
+
+      it('refuses a write to a namespace whose ref is also loose, or that has no ref yet', {
+        timeout: 120_000,
+      }, async () => {
+        const looseNs = 'integ-packed-and-loose-ns';
+        const newNs = 'integ-packed-new-ns';
+        await upsertNewPages(looseNs, 3);
+        const head = await resolveRef(namespaceRef(looseNs));
+        const filterOid = await resolveRef(SPARSE_FILTER_REF);
+        await packAllRefs();
+        const looseRefFile = path.join(
+          requireRepoPath(),
+          namespaceRef(looseNs),
+        );
+        await fs.promises.mkdir(path.dirname(looseRefFile), {
+          recursive: true,
+        });
+        await fs.promises.writeFile(looseRefFile, `${head}\n`);
+
+        const refusedLoose = await upsertNewPageAndSettle(looseNs);
+        expect(refusedLoose.lastError).toMatch(/Rebuild Vault/);
+        expect(await listNamespaceFiles(looseNs)).toHaveLength(3);
+
+        const refusedNew = await upsertNewPageAndSettle(newNs);
+        expect(refusedNew.lastError).toMatch(/Rebuild Vault/);
+        expect(await resolveRef(namespaceRef(newNs))).toBeNull();
+
+        await rebuildVault();
+        expect(packedRefsExist()).toBe(false);
+        expect(await resolveRef(namespaceRef(looseNs))).toBeNull();
+        expect(await resolveRef(SPARSE_FILTER_REF)).toBe(filterOid);
+
+        await upsertNewPages(looseNs, 1);
+        expect(await listNamespaceFiles(looseNs)).toHaveLength(1);
+      });
+
+      it('refuses compose-view until a rebuild, even for a view composed before', {
+        timeout: 120_000,
+      }, async () => {
+        const ns = 'integ-packed-compose-ns';
+        const cachedUserId = 'cafebabedeadbeef00000004';
+        const newUserId = 'cafebabedeadbeef00000005';
+        await upsertNewPages(ns, 1);
+        await callComposeView(cachedUserId, [ns]);
+        await packAllRefs();
+
+        await expect(callComposeView(cachedUserId, [ns])).rejects.toThrow(
+          /compose-view returned 500/,
+        );
+        await expect(callComposeView(newUserId, [ns])).rejects.toThrow(
+          /compose-view returned 500/,
+        );
+
+        await rebuildVault();
+        const { commitOid } = await callComposeView(cachedUserId, [ns]);
+        expect(commitOid).toMatch(/^[0-9a-f]{40}$/);
+      });
+
+      it('a rebuild supersedes an instruction that was given up on, but not one issued after the rebuild', {
+        timeout: 120_000,
+      }, async () => {
+        const ns = 'integ-packed-supersede-ns';
+        await upsertNewPages(ns, 1);
+        await packAllRefs();
+
+        const givenUp = await upsertNewPageAndSettle(ns);
+        await mongoose?.connection.db
+          ?.collection('vault_instructions')
+          .updateOne({ _id: givenUp.id }, { $set: { attempts: 7 } });
+        const rebuildIssuedAt = new Date();
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        const issuedLater = await upsertNewPageAndSettle(ns);
+        expect(issuedLater.lastError).toMatch(/Rebuild Vault/);
+
+        await rebuildVault(rebuildIssuedAt);
+
+        expect((await findInstruction(givenUp.id))?.processedAt).not.toBeNull();
+        expect((await findInstruction(issuedLater.id))?.processedAt).toBeNull();
+      });
+
+      it('gc leaves packed-refs and the refs in it as they are', {
+        timeout: 120_000,
+      }, async () => {
+        const ns = 'integ-packed-gc-ns';
+        await upsertNewPages(ns, 2);
+        const head = await resolveRef(namespaceRef(ns));
+        await packAllRefs();
+
+        await triggerGcAndWait();
+
+        expect(packedRefsExist()).toBe(true);
+        expect(await resolveRef(namespaceRef(ns))).toBe(head);
+        expect(await listNamespaceFiles(ns)).toHaveLength(2);
+      });
     });
   },
 );

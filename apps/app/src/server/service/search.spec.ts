@@ -1,4 +1,4 @@
-import type { IUser } from '@growi/core';
+import { type IUser, PageGrant } from '@growi/core';
 import type { Model } from 'mongoose';
 import mongoose from 'mongoose';
 import { type MockProxy, mock, mockDeep } from 'vitest-mock-extended';
@@ -6,7 +6,6 @@ import { type MockProxy, mock, mockDeep } from 'vitest-mock-extended';
 import type {
   AttachmentSearchInput,
   AttachmentSearchResultAggregator,
-  IPrimarySearchResult,
 } from '~/features/search-attachments/server/services/attachment-search-result-aggregator';
 import { SearchDelegatorName } from '~/interfaces/named-query';
 import type { IPageWithSearchMeta } from '~/interfaces/search';
@@ -14,9 +13,11 @@ import type Crowi from '~/server/crowi';
 import { UserStatus } from '~/server/models/user/conts';
 import { configManager } from '~/server/service/config-manager/config-manager';
 
+import type { ObjectIdLike } from '../interfaces/mongoose-utils';
 import type { QueryTerms, SearchDelegator } from '../interfaces/search';
 import SearchService from './search';
-import type ElasticsearchDelegator from './search-delegator/elasticsearch';
+import ElasticsearchDelegator from './search-delegator/elasticsearch';
+import type { SocketIoService } from './socket-io';
 
 const { mockFindSnapshotUsernamesByUsernameRegex } = vi.hoisted(() => ({
   mockFindSnapshotUsernamesByUsernameRegex: vi.fn(),
@@ -344,46 +345,11 @@ describe('SearchService.canShowSnippet()', () => {
 
 describe('SearchService.searchByFacet()', () => {
   const viewer = { user: null, userGroups: null };
-  const input: AttachmentSearchInput = {
-    queryString: 'word',
-    terms: mock<QueryTerms>(),
-    resolvedFilterData: { groupIds: [], notGroupIds: [] },
-    viewer,
-  };
-  const primary: IPrimarySearchResult = {
-    items: [{ data: mock<IPageWithSearchMeta['data']>({ _id: 'p1' }) }],
-    meta: { primaryResultIncomplete: false },
-  };
-
-  let service: TestSearchService;
-  let aggregator: MockProxy<AttachmentSearchResultAggregator>;
-
-  beforeEach(() => {
-    service = new TestSearchService();
-    vi.spyOn(service, 'createAttachmentSearchInput').mockResolvedValue(input);
-    aggregator = mock<AttachmentSearchResultAggregator>();
-    aggregator.searchPrimary.mockResolvedValue(primary);
-  });
-
-  it('answers the attachment search for the parsed query and the requested page', async () => {
-    service.setAttachmentSearchResultAggregator(aggregator);
-
-    const result = await service.searchByFacet('word', viewer, {
-      from: 20,
-      size: 10,
-    });
-
-    expect(result).toBe(primary);
-    expect(aggregator.searchPrimary).toHaveBeenCalledWith(input, {
-      from: 20,
-      size: 10,
-    });
-  });
 
   it('fails when the attachment search is not initialized', async () => {
-    await expect(service.searchByFacet('word', viewer, {})).rejects.toThrow(
-      'Attachment search is not initialized',
-    );
+    await expect(
+      new TestSearchService().searchByFacet('word', viewer, {}),
+    ).rejects.toThrow('Attachment search is not initialized');
   });
 });
 
@@ -436,5 +402,394 @@ describe('SearchService.resolveAttachmentSecondary()', () => {
         primaryIds: ['p1'],
       }),
     ).rejects.toThrow('Attachment search is not initialized');
+  });
+});
+
+describe('page documents and snippets', () => {
+  const TestUser =
+    mongoose.models.User ??
+    mongoose.model(
+      'User',
+      new mongoose.Schema({
+        username: String,
+        password: String,
+        email: String,
+        isEmailPublished: Boolean,
+      }),
+    );
+  const TestPage =
+    mongoose.models.SearchSpecPage ??
+    mongoose.model(
+      'SearchSpecPage',
+      new mongoose.Schema({
+        path: String,
+        revision: String,
+        grant: Number,
+        seenUsers: [String],
+        lastUpdateUser: mongoose.Schema.Types.Mixed,
+        creator: mongoose.Schema.Types.Mixed,
+      }),
+    );
+
+  const createUser = () =>
+    new TestUser({
+      username: 'editor',
+      password: 'secret-hash',
+      email: 'editor@example.com',
+      isEmailPublished: false,
+    });
+  const createPage = (path: string, grant: number) =>
+    new TestPage({
+      path,
+      revision: `revision-of-${path}`,
+      grant,
+      seenUsers: ['u1', 'u2'],
+      lastUpdateUser: createUser(),
+      creator: createUser(),
+    });
+
+  const toJson = (value: unknown) => JSON.parse(JSON.stringify(value));
+
+  class PageReadingSearchService extends TestSearchService {
+    pagesInMongo: InstanceType<typeof TestPage>[] = [];
+
+    protected override findPageListByIds(pageIds: ObjectIdLike[]) {
+      const ids = pageIds.map(String);
+      const pages = this.pagesInMongo.filter((page) =>
+        ids.includes(String(page._id)),
+      );
+      return Promise.resolve({ pages });
+    }
+  }
+
+  let service: PageReadingSearchService;
+
+  beforeEach(() => {
+    vi.mocked(configManager.getConfig).mockImplementation((key) =>
+      key === 'app:elasticsearchVersion' ? 8 : undefined,
+    );
+    service = new PageReadingSearchService();
+    service.crowi = mock<Crowi>();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  describe('SearchService.formatSearchResult()', () => {
+    it('answers the page document with the tags, the bookmark count and the filtered snippet', async () => {
+      const page = createPage('/matched', PageGrant.GRANT_PUBLIC);
+      service.pagesInMongo = [page];
+
+      const result = await service.formatSearchResult(
+        {
+          data: [
+            {
+              _id: String(page._id),
+              _score: 1,
+              _source: { tag_names: ['tag-a'], bookmark_count: 3 },
+              _highlight: {
+                'body.en': [
+                  'a <em class="highlighted-keyword">word</em><script>x</script>',
+                ],
+                'path.en': ['/<em class="highlighted-keyword">matched</em>'],
+              },
+            },
+            {
+              _id: new mongoose.Types.ObjectId().toString(),
+              _score: 1,
+              _source: {},
+              _highlight: {},
+            },
+          ],
+          meta: { total: 2, hitsCount: 2, took: 1 },
+        },
+        SearchDelegatorName.DEFAULT,
+        null,
+        null,
+      );
+
+      const json = toJson(result);
+      expect(json.meta).toEqual({ total: 2, hitsCount: 2, took: 1 });
+      expect(json.data).toHaveLength(1);
+      expect(json.data[0].data).toMatchObject({
+        path: '/matched',
+        revision: 'revision-of-/matched',
+        tags: ['tag-a'],
+        seenUserCount: 2,
+        lastUpdateUser: { username: 'editor' },
+        creator: { username: 'editor' },
+      });
+      expect(json.data[0].data.lastUpdateUser).not.toHaveProperty('password');
+      expect(json.data[0].data.lastUpdateUser).not.toHaveProperty('email');
+      expect(json.data[0].meta).toEqual({
+        bookmarkCount: 3,
+        elasticSearchResult: {
+          snippet:
+            'a <em class="highlighted-keyword">word</em>&lt;script&gt;x&lt;/script&gt;',
+          highlightedPath: '/<em class="highlighted-keyword">matched</em>',
+        },
+      });
+    });
+  });
+
+  describe('SearchService.searchByFacet() items', () => {
+    const viewer = { user: null, userGroups: null };
+    const VIEWER_FILTER = { term: { 'viewer-filter': 'guest' } };
+
+    const itemOf = (page: { _id: unknown }): IPageWithSearchMeta => ({
+      data: mock<IPageWithSearchMeta['data']>({ _id: String(page._id) }),
+      meta: { attachmentHits: [] },
+    });
+    const pageHit = (
+      page: { _id: unknown },
+      highlight: object,
+      source: { bookmark_count?: number } = {},
+    ) => ({
+      _id: String(page._id),
+      _score: 1,
+      _source: source,
+      _highlight: highlight,
+    });
+
+    let delegator: ElasticsearchDelegator;
+
+    beforeEach(() => {
+      delegator = new ElasticsearchDelegator(mock<SocketIoService>());
+      // Stands in for page search's viewer filter, which reads the Page model.
+      vi.spyOn(delegator, 'filterPagesByViewer').mockImplementation((query) => {
+        const filter = query.body?.query?.bool?.filter;
+        if (Array.isArray(filter)) filter.push(VIEWER_FILTER);
+      });
+      service.fullTextSearchDelegator = delegator;
+      service.nqDelegators = {
+        [SearchDelegatorName.DEFAULT]: delegator,
+        [SearchDelegatorName.PRIVATE_LEGACY_PAGES]: mock<SearchDelegator>(),
+      };
+      aggregator = mock<AttachmentSearchResultAggregator>();
+      service.setAttachmentSearchResultAggregator(aggregator);
+    });
+
+    let aggregator: MockProxy<AttachmentSearchResultAggregator>;
+
+    const searchItems = async (
+      primaryItems: IPageWithSearchMeta[],
+    ): Promise<IPageWithSearchMeta[]> => {
+      aggregator.searchPrimary.mockResolvedValue({
+        items: primaryItems,
+        meta: { primaryResultIncomplete: false },
+      });
+      return (await service.searchByFacet('word', viewer, {})).items;
+    };
+
+    it('answers the attachment search for the parsed query and the requested page', async () => {
+      const page = createPage('/page', PageGrant.GRANT_PUBLIC);
+      service.pagesInMongo = [page];
+      vi.spyOn(delegator, 'searchKeyword').mockResolvedValue({
+        data: [],
+        meta: { total: 0, hitsCount: 0 },
+      });
+      const primary = {
+        items: [itemOf(page)],
+        meta: { primaryResultIncomplete: true },
+      };
+      aggregator.searchPrimary.mockResolvedValue(primary);
+
+      const result = await service.searchByFacet('word', viewer, {
+        from: 20,
+        size: 10,
+      });
+
+      expect(result.primary).toBe(primary);
+      expect(toJson(result.items).map((item) => item.data.path)).toEqual([
+        '/page',
+      ]);
+      expect(aggregator.searchPrimary).toHaveBeenCalledWith(
+        expect.objectContaining({
+          queryString: 'word',
+          terms: expect.objectContaining({ match: ['word'] }),
+          viewer,
+        }),
+        { from: 20, size: 10 },
+      );
+    });
+
+    it('answers the page documents in the given order and drops the items whose page is gone', async () => {
+      const first = createPage('/first', PageGrant.GRANT_PUBLIC);
+      const second = createPage('/second', PageGrant.GRANT_PUBLIC);
+      const gone = createPage('/gone', PageGrant.GRANT_PUBLIC);
+      service.pagesInMongo = [first, second];
+      vi.spyOn(delegator, 'searchKeyword').mockResolvedValue({
+        data: [],
+        meta: { total: 0, hitsCount: 0 },
+      });
+
+      const result = await searchItems([
+        itemOf(second),
+        itemOf(gone),
+        itemOf(first),
+      ]);
+
+      const json = toJson(result);
+      expect(json.map((item) => item.data.path)).toEqual(['/second', '/first']);
+      expect(json[0].data).toMatchObject({
+        revision: 'revision-of-/second',
+        seenUserCount: 2,
+        lastUpdateUser: { username: 'editor' },
+      });
+      expect(json[0].data.lastUpdateUser).not.toHaveProperty('password');
+      expect(json[0].data.lastUpdateUser).not.toHaveProperty('email');
+      expect(json[0].data.creator).not.toHaveProperty('password');
+      expect(json[0].meta).toEqual({ attachmentHits: [] });
+    });
+
+    it('adds the snippet only to the pages that also match the query, from one search restricted to their ids', async () => {
+      const matched = createPage('/matched', PageGrant.GRANT_PUBLIC);
+      const unmatched = createPage('/unmatched', PageGrant.GRANT_PUBLIC);
+      service.pagesInMongo = [matched, unmatched];
+      const searchKeyword = vi
+        .spyOn(delegator, 'searchKeyword')
+        .mockResolvedValue({
+          data: [
+            pageHit(
+              matched,
+              {
+                body: [
+                  'the <em class="highlighted-keyword">word</em><img src=x onerror=alert(1)>',
+                ],
+              },
+              { bookmark_count: 4 },
+            ),
+          ],
+          meta: { total: 1, hitsCount: 1 },
+        });
+
+      const result = await searchItems([itemOf(matched), itemOf(unmatched)]);
+
+      expect(toJson(result).map((item) => item.meta)).toEqual([
+        {
+          attachmentHits: [],
+          bookmarkCount: 4,
+          elasticSearchResult: {
+            snippet:
+              'the <em class="highlighted-keyword">word</em>&lt;img src=x onerror=alert(1)&gt;',
+            highlightedPath: null,
+          },
+        },
+        { attachmentHits: [] },
+      ]);
+      expect(searchKeyword).toHaveBeenCalledTimes(1);
+      const query = searchKeyword.mock.calls[0][0];
+      expect(query.body?.query?.bool?.filter).toContainEqual({
+        ids: {
+          values: sameStringSet([String(matched._id), String(unmatched._id)]),
+        },
+      });
+      expect(query.body?.query?.bool?.filter).toContainEqual(VIEWER_FILTER);
+      expect(query.body?.highlight).toBeDefined();
+    });
+
+    it('withholds the snippet of a page whose content the viewer may not see, as page search does', async () => {
+      const ownerOnly = createPage('/owner-only', PageGrant.GRANT_OWNER);
+      service.pagesInMongo = [ownerOnly];
+      vi.spyOn(delegator, 'searchKeyword').mockResolvedValue({
+        data: [
+          pageHit(ownerOnly, {
+            body: ['<em class="highlighted-keyword">word</em>'],
+            'path.en': ['/<em class="highlighted-keyword">owner-only</em>'],
+          }),
+        ],
+        meta: { total: 1, hitsCount: 1 },
+      });
+
+      const [item] = await searchItems([itemOf(ownerOnly)]);
+
+      expect(item.meta?.elasticSearchResult).toEqual({
+        snippet: null,
+        highlightedPath: '/<em class="highlighted-keyword">owner-only</em>',
+      });
+    });
+
+    it('answers a bookmark count of 0 for a snippet item whose hit carries none, as page search does', async () => {
+      const page = createPage('/page', PageGrant.GRANT_PUBLIC);
+      service.pagesInMongo = [page];
+      vi.spyOn(delegator, 'searchKeyword').mockResolvedValue({
+        data: [
+          pageHit(page, {
+            body: ['<em class="highlighted-keyword">word</em>'],
+          }),
+        ],
+        meta: { total: 1, hitsCount: 1 },
+      });
+
+      const [item] = await searchItems([itemOf(page)]);
+
+      expect(item.meta?.bookmarkCount).toBe(0);
+    });
+
+    it('answers an item without a snippet or a bookmark count when its hit carries no highlight', async () => {
+      const page = createPage('/page', PageGrant.GRANT_PUBLIC);
+      service.pagesInMongo = [page];
+      vi.spyOn(delegator, 'searchKeyword').mockResolvedValue({
+        data: [
+          {
+            ...pageHit(page, {}, { bookmark_count: 4 }),
+            _highlight: undefined,
+          },
+        ],
+        meta: { total: 1, hitsCount: 1 },
+      });
+
+      const [item] = await searchItems([itemOf(page)]);
+
+      expect(item.meta).toEqual({ attachmentHits: [] });
+    });
+
+    it('answers the items without snippets when the snippet search fails', async () => {
+      const page = createPage('/page', PageGrant.GRANT_PUBLIC);
+      service.pagesInMongo = [page];
+      vi.spyOn(delegator, 'searchKeyword').mockRejectedValue(
+        new Error('es down'),
+      );
+
+      const result = await searchItems([itemOf(page)]);
+
+      expect(toJson(result)).toEqual([
+        expect.objectContaining({
+          data: expect.objectContaining({ path: '/page' }),
+          meta: { attachmentHits: [] },
+        }),
+      ]);
+    });
+
+    it('answers the items without snippets once the snippet search takes 500ms', async () => {
+      vi.useFakeTimers();
+      const page = createPage('/page', PageGrant.GRANT_PUBLIC);
+      service.pagesInMongo = [page];
+      vi.spyOn(delegator, 'searchKeyword').mockReturnValue(
+        new Promise(() => {}),
+      );
+
+      let result: IPageWithSearchMeta[] | undefined;
+      searchItems([itemOf(page)]).then((items) => {
+        result = items;
+      });
+
+      await vi.advanceTimersByTimeAsync(499);
+      expect(result).toBeUndefined();
+
+      await vi.advanceTimersByTimeAsync(1);
+      expect(toJson(result)).toEqual([
+        expect.objectContaining({ meta: { attachmentHits: [] } }),
+      ]);
+    });
+
+    it('answers no items without searching when there are none', async () => {
+      const searchKeyword = vi.spyOn(delegator, 'searchKeyword');
+
+      expect(await searchItems([])).toEqual([]);
+      expect(searchKeyword).not.toHaveBeenCalled();
+    });
   });
 });

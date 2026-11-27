@@ -733,6 +733,42 @@ describe('VaultDispatcher', () => {
       expect(createSpy).toHaveBeenCalledOnce();
       expect(createSpy.mock.calls[0][0].op).toBe('rename-prefix');
     });
+
+    it('writes an upsert still waiting in the coalesce window to the new path', async () => {
+      const { createVaultDispatcher, COALESCE_WINDOW_MS } = await import(
+        './vault-dispatcher'
+      );
+      const dispatcher = createVaultDispatcher(
+        buildMapper({ current: ['public'] }),
+      );
+
+      await dispatcher.onPageChanged({
+        type: 'update',
+        page: buildPage({ path: '/old/parent/child' }),
+        revisionId: 'rev-1',
+      });
+      await dispatcher.onPageChanged({
+        type: 'update',
+        page: buildPage({
+          _id: { toString: () => 'page-id-002' },
+          path: '/old/parentheses',
+        }),
+        revisionId: 'rev-2',
+      });
+      await dispatcher.onBulkOperation({
+        type: 'rename-prefix',
+        namespaces: ['public'],
+        oldPrefix: '/old/parent',
+        newPrefix: '/new/parent',
+      });
+      await vi.advanceTimersByTimeAsync(COALESCE_WINDOW_MS + 1);
+
+      const upsertPaths = createSpy.mock.calls
+        .filter((c) => c[0].op === 'upsert')
+        .map((c) => c[0].payload.pagePath)
+        .sort();
+      expect(upsertPaths).toEqual(['/new/parent/child', '/old/parentheses']);
+    });
   });
 
   // -------------------------------------------------------------------------

@@ -32,7 +32,7 @@
 
 - `GET/POST /vault.git/...` を唯一の対外エンドポイントとして提供する
 - 認証・認可は apps/app 標準 middleware 構成を共有する（要件 11）。git 固有の差異のみを 2 つの seam に局所化する: (a) `Authorization: Basic base64(x:PAT)` から PAT を抽出し標準トークン解決へ橋渡しする credential adapter、(b) 認証失敗時に `/login` リダイレクトではなく git 互換の `401 + WWW-Authenticate: Basic` を返す `loginRequired` の `fallback`
-- ゲスト/匿名アクセスの可否は `aclService.isGuestAllowedToRead()`（= `loginRequiredFactory(crowi, true)` の判定）に委譲する。許可されない場合（デフォルト `restrictGuestMode='Deny'` / `wikiMode='private'`）は匿名 clone を 401 で拒否する（要件 2.4a）
+- ユーザー必須化は `loginRequiredFactory(crowi, false)` に委譲する。利用者を特定できない clone / fetch は、ゲスト閲覧の設定（`restrictGuestMode` / `wikiMode`）によらず 401 で拒否する（要件 2.4）
 - ユーザーがアクセス可能な namespace 集合の決定（GROWI ACL 評価）
 - ページの所属 namespace の決定（grant / grantedGroups / grantedUsers から）
 - ページ変更イベントの購読 → vault_instructions コレクション書き込み
@@ -47,8 +47,7 @@
 - 既存 `Page` / `Revision` Mongoose モデル（read-only）
 - `access-token-parser` ミドルウェア（標準トークン解決）
 - `extractAccessToken` / `X_GROWI_ACCESS_TOKEN_HEADER_NAME`（PR #11244。token-source 単一情報源、`X-GROWI-ACCESS-TOKEN` 対応。master → dev/8.0.x → feat/growi-vault 経由で到達）
-- `loginRequiredFactory(crowi, isGuestAllowed, fallback)` ミドルウェア（ゲスト判定 + ユーザー必須化、第3引数で git 用 fallback を差し替え）
-- `aclService.isGuestAllowedToRead()`（ゲスト読み取り可否の単一情報源）
+- `loginRequiredFactory(crowi, isGuestAllowed=false, fallback)` ミドルウェア（ユーザー必須化、第3引数で git 用 fallback を差し替え）
 - `page-grant.ts` の `isUserGrantedPageAccess`、`generateGrantCondition`
 - `UserGroupRelation` / `ExternalUserGroupRelation` の group resolution
 - 既存 audit log インフラ
@@ -57,8 +56,8 @@
 ### 再検証トリガー
 
 - GROWI Page モデルの grant / grantedGroups スキーマ変更
-- access-token-parser / `loginRequiredFactory` / `aclService` のインターフェース変更
-- `security:restrictGuestMode` / `security:wikiMode` の仕様変更（ゲスト判定への影響）
+- access-token-parser / `loginRequiredFactory` のインターフェース変更
+- 利用者を特定できない clone / fetch を許可する変更（vault のビューは 1 人の利用者に 1 本だけ対応する前提に立っており、複数の相手が共有するビューの履歴の持ち方を先に決める必要がある。research.md の「漏れの経路」参照）
 - `@growi/core` の Vault DTO 型の breaking change
 - ページパスエンコーディング規則の変更
 
@@ -141,7 +140,10 @@ apps/app/src/features/growi-vault/
 │   │   ├── vault-manager-client.ts    # vault-manager との HTTP RPC + body proxy
 │   │   └── vault-settings-service.ts  # vaultEnabled, endpoint, secret の取得（全て ConfigSource.env で env のみから読む）
 │   ├── middlewares/
-│   │   └── vault-pat-auth.ts          # access-token-parser を vault scope で composition
+│   │   ├── vault-pat-auth.ts          # access-token-parser を vault scope で composition
+│   │   └── vault-auth-challenge.ts    # 利用者を特定できない要求への 401 応答 + VAULT_AUTH_FAILURE 記録
+│   ├── interfaces/
+│   │   └── vault-activity-recorder.ts # audit log 記録コールバックの型（VaultActivityRecorder）
 │   ├── models/
 │   │   ├── vault-instruction.ts       # 書き込み用 Mongoose model（owned: apps/app）
 │   │   └── vault-sync-state.ts        # bootstrap 進捗 owned by apps/app（bootstrap* fields）
@@ -189,10 +191,10 @@ packages/core/src/interfaces/vault/
 
 **責務と制約**
 - `VAULT_ENABLED` 環境変数が false の場合、`info/refs` および `git-upload-pack` に対して 404 を返す（環境変数による永続的な設定状態であり「一時的に処理できない」を意味する 503 ではない。Retry-After も付与しない）
-- `bootstrapState !== 'done'` の場合、全 clone / fetch に `503 + Retry-After`（bootstrap は一時的な状態であり 503 が適切）
+- `bootstrapState !== 'done'` の場合、利用者を特定できた clone / fetch に `503 + Retry-After`（bootstrap は一時的な状態であり 503 が適切）
 - `git-receive-pack` への全リクエストに 403 `read-only repository`
 - 成功・失敗とも既存 audit log にイベントを記録する
-- 認証・認可は標準 middleware チェーンに委譲する（下記「認証・認可ミドルウェア構成」参照）。匿名は `aclService.isGuestAllowedToRead()` が許可する場合のみ通す（要件 2.4a）
+- 認証・認可は標準 middleware チェーンに委譲する（下記「認証・認可ミドルウェア構成」参照）。利用者を特定できない要求は、ゲスト閲覧の設定によらず 401 で拒否する（要件 2.4）
 - apps/app は git wire format を解釈せず、HTTP body を vault-manager にパイプし stdout をクライアントにパイプするだけ
 
 ---
@@ -202,7 +204,7 @@ packages/core/src/interfaces/vault/
 | フィールド | 詳細 |
 |-----------|------|
 | Intent | `/vault.git/*` を apps/app 標準の middleware チェーンに乗せ、認可ロジックの並行実装を排除する |
-| 要件カバレッジ | 11, 2.4a, 10.3 |
+| 要件カバレッジ | 11, 2.4, 10.3, 10.4 |
 
 **標準チェーンとの対応**
 
@@ -212,15 +214,19 @@ canonical な apiv3 ルート（例: `apiv3/pages`）は次の合成を使う:
 rateLimiter → [maintenanceMode] → accessTokenParser([SCOPE...]) → loginRequired(crowi, true) → [excludeReadOnlyUser] → handler
 ```
 
-`/vault.git/*` も同じ並びを共有し、git 固有の差異だけを 2 つの seam に局所化する:
+`/vault.git/*` も同じ並びを共有し（`loginRequired` の第 2 引数は `false`）、git 固有の差異だけを 2 つの seam に局所化する:
+
+```
+[maintenanceMode] → credentialAdapter (seam #1) → loginRequiredFactory(crowi, false, rejectWithChallenge) → handler
+```
 
 | チェーン要素 | vault gateway での扱い |
 |---|---|
 | rateLimiter | 既存をそのまま適用（mount は rate limiter の後段。要件 10.3） |
 | maintenanceMode | 標準 middleware を適用（停止時は gateway も一貫して unavailable を返す） |
 | トークン解決 | `extractAccessToken`（PR #11244）と同一 precedence を共有（`Bearer` > `X-GROWI-ACCESS-TOKEN` > query > body）。git 用に Basic password の fallback を 1 段足すだけ（seam #1 = VaultPatAuth）。下記「reverse proxy の Basic 認証共存」参照 |
-| ゲスト / ユーザー必須化 | `loginRequiredFactory(crowi, isGuestAllowed=true, gitFallback)` を再利用。`isGuestAllowedToRead()` がゲスト可否の単一情報源 |
-| 認証失敗時の応答 | seam #2: `gitFallback` が `/login` リダイレクトの代わりに `401 + WWW-Authenticate: Basic`（git 互換）を返す |
+| ユーザー必須化 | `loginRequiredFactory(crowi, isGuestAllowed=false, rejectWithChallenge)` を再利用。ゲストは通さず、ゲスト閲覧の設定（`isGuestAllowedToRead()`）は参照しない（意図的逸脱・下記） |
+| 認証失敗時の応答 | seam #2: `createVaultAuthChallenge(createActivity)` が作る応答（`rejectWithChallenge`）を `loginRequired` の `fallback` に渡し、`/login` リダイレクトの代わりに `401 + WWW-Authenticate: Basic`（git 互換）を返す（下記「VaultAuthChallenge」参照） |
 | readOnly ユーザー | clone は read 操作のため `excludeReadOnlyUser` は適用しない（意図的逸脱・下記） |
 | CSRF / `certifyOrigin` | git クライアントは origin/CSRF を持たないため適用しない（意図的逸脱・下記） |
 
@@ -228,6 +234,8 @@ rateLimiter → [maintenanceMode] → accessTokenParser([SCOPE...]) → loginReq
 
 - **CSRF / `certifyOrigin` 非適用**: git smart HTTP はブラウザ same-origin の枠外。`info/refs`(GET) と `git-upload-pack`(POST) はいずれも GROWI のデータを変更しない read 系であり、認可は PAT で担保される。
 - **`excludeReadOnlyUser` 非適用**: vault clone は読み取り専用のため read-only ユーザーにも許可する。標準 `accessTokenParser` は readOnly ユーザーを一律弾く（`access-token.ts`）が、それは write 系 API 向けの制約であり read-only clone には過剰。この判断は design 上の明示決定として記録する。
+- **ゲスト非許可（`isGuestAllowed=false`）**: 読み取り系の apiv3 ルートはゲスト閲覧の設定に従ってゲストを通すが、vault gateway はゲスト閲覧の設定によらず利用者の特定を必須にする。vault のビューは 1 人の利用者に 1 本だけ対応させ、利用者を特定しないビューを作らないためである（理由は research.md の「漏れの経路」と Decision 1 参照）。
+- **ハンドラ内の利用者確認**: 本番のチェーンでは `loginRequired` が先に拒否するので到達しない。`crowi` なしで組み立てる経路と型を狭めるためだけにあり、独自の認可判定は持たない。
 
 > これにより `vault-admin` / `vault-page` ルータ（既に `loginRequiredFactory(crowi)` を使用）と gateway の middleware 方針が feature 内で一貫する。
 
@@ -237,30 +245,61 @@ rateLimiter → [maintenanceMode] → accessTokenParser([SCOPE...]) → loginReq
 
 | フィールド | 詳細 |
 |-----------|------|
-| Intent | git 固有の認証トランスポートを標準 middleware 構成へ橋渡しする credential adapter（seam #1）。Basic password を PAT として解釈し、標準トークン解決でユーザーを解決する。認可判定（ゲスト可否・ユーザー必須化）は `loginRequired` / `aclService` に委譲し、自前で再実装しない（要件 11） |
+| Intent | git 固有の認証トランスポートを標準 middleware 構成へ橋渡しする credential adapter（seam #1）。Basic password を PAT として解釈し、標準トークン解決でユーザーを解決する。認可判定（ユーザー必須化）は `loginRequired` に委譲し、自前で再実装しない（要件 11） |
 | 要件カバレッジ | 2, 11 |
 
 ```typescript
-type VaultAuthResult = {
-  readonly userId: string;
-  readonly scopes: ReadonlyArray<string>;
-} | null; // null = 匿名（public のみアクセス可）
+// middlewares/vault-pat-auth.ts
+type VaultAuthenticatedReq = Request & {
+  user?: IUserSerializedSecurely<IUserHasId>; // adapter が設定するのは有効な PAT のときだけ（passport がセッションから設定していることもある）
+  vaultScopes?: ReadonlyArray<string>;         // PAT の scopes（要件 2.5）
+};
 
-interface VaultPatAuth {
-  authenticate(req: Request): Promise<VaultAuthResult>;
-}
+// Express middleware を返す。audit は 401 時の VAULT_AUTH_FAILURE 記録に使う
+function createVaultCredentialAdapter(
+  audit?: VaultActivityRecorder,
+): (req: VaultAuthenticatedReq, res: Response, next: NextFunction) => Promise<void>;
 ```
 
 **実装ノート**
 - git クライアントは `Authorization: Basic base64(anyuser:TOKEN)` を送る。adapter は password 部のみを PAT として取り出す（username は無視）
 - トークンソース解決は PR #11244 の `extractAccessToken(req)`（`Bearer` > `X-GROWI-ACCESS-TOKEN` > query > body）を再利用し、それが null のとき `Authorization: Basic` の password 部を git ネイティブ fallback として使う。検証は `AccessToken.findUserIdByToken(rawToken, [SCOPE.READ.FEATURES.PAGE])` を共有する
-- `Authorization` ヘッダーが存在しない場合は `null`（匿名候補）を返す。匿名の最終可否は後段の guest gate（`aclService.isGuestAllowedToRead()`）が決める — adapter は可否を判断しない
-- 401 には 2 つの拒否点がある。いずれも `WWW-Authenticate: Basic realm="GROWI Vault"` を含む 401 を返す（`/login` リダイレクトを git 用に置換）:
-  - **資格情報が提示されたが無効/期限切れ/revoke の場合**: credential adapter が即座に fail-closed で 401 を返し `next()` を呼ばない（要件 2.2）。これは adapter 側で行う必要がある — `loginRequired` の `fallback` に委ねると、guest 許可設定下では「無効な資格情報」が `req.user` 未設定の匿名候補と区別できず public へ降格してしまうため
-  - **資格情報が無く（匿名候補）かつ guest 拒否設定の場合**: `loginRequiredFactory(crowi, true, gitFallback)` の `gitFallback` が 401 を返す（要件 2.4a）
+- 有効な PAT の場合は `req.user = serializeUserSecurely(user)` と `req.vaultScopes` を設定して `next()` を呼ぶ
+- どの経路からも PAT が得られない場合は、`req.user` を設定せずに `next()` を呼ぶ。拒否は後段が行う — adapter は可否を判断しない（passport がセッションから `req.user` を設定していれば、その利用者として後段へ進む）
+- 401 には 3 つの拒否点があり、どれも `createVaultAuthChallenge` が作る同じ応答を返す（下記「VaultAuthChallenge」）:
+  - **資格情報が提示されたが無効/期限切れ/revoke の場合**: credential adapter が即座に fail-closed で 401 を返し `next()` を呼ばない（要件 2.2）。これは adapter 側で行う必要がある — このルートでも express-session / passport がセッション cookie から `req.user` を設定しうるため、無効な PAT を後段へ流すと cookie のユーザーとして認証されてしまう
+  - **PAT が無く、ログイン中のセッションも無い場合**: `loginRequiredFactory(crowi, false, rejectWithChallenge)` の `fallback` が 401 を返す（要件 2.4）
+  - **ハンドラに入った時点で利用者がいない場合**: ハンドラの `readIdentity(req)` が `null` を返し、ハンドラが 401 を返して終わる。`crowi` を渡さずにルータを組み立てる経路（`loginRequiredFactory` が入らない）でも、利用者を特定できない要求を namespace 計算へ進めないための確認である（要件 2.4 / 3.2）
 - エラーメッセージにページ情報を含めない（要件 2.3）
 
-> 設計移行ノート: 旧実装は adapter 内で「ヘッダ無し → 即 `['public']` 許可」を独自に決めていたため、`restrictGuestMode='Deny'` でも匿名 clone が通る ACL すり抜けがあった（要件 2.4a で是正）。可否判定を `aclService` に一本化し、adapter は transport 変換のみを担う。
+---
+
+### VaultAuthChallenge
+
+| フィールド | 詳細 |
+|-----------|------|
+| Intent | 利用者を特定できなかった `/vault.git` 要求への応答と、その audit log 記録を 1 か所で作る |
+| 要件カバレッジ | 2.2, 2.3, 2.4, 10.1, 10.4 |
+
+```typescript
+// middlewares/vault-auth-challenge.ts
+function createVaultAuthChallenge(
+  recordActivity: VaultActivityRecorder | undefined,
+): (req: Request, res: Response) => void;
+
+// interfaces/vault-activity-recorder.ts（activityService.createActivity の部分集合）
+type VaultActivityRecorder = (params: {
+  ip: string | undefined;
+  endpoint: string;
+  action: string;
+  user: string | undefined;
+  snapshot: { username?: string };
+}) => Promise<void>;
+```
+
+- 応答は `401` + `WWW-Authenticate: Basic realm="GROWI Vault"`、本文なし（要件 2.3）
+- `VAULT_AUTH_FAILURE` を audit log に記録する（要件 10.4）。記録の失敗は warn ログに残し、応答には影響させない
+- 利用箇所は 3 つ: credential adapter（無効な資格情報）、`loginRequired` の `fallback`（PAT もログイン中のセッションも無い）、ハンドラの `readIdentity` が `null` のとき
 
 ---
 
@@ -276,7 +315,11 @@ type Namespace = string; // 'public' | `group-${string}` | `user-${string}-only-
 
 interface VaultNamespaceMapper {
   // clone/pull 時: ユーザーがアクセスできる namespace 全集合
-  computeAccessibleNamespaces(userId: string | null): Promise<ReadonlyArray<Namespace>>;
+  // scopes は PAT の scopes（要件 2.5）
+  computeAccessibleNamespaces(
+    userId: string,
+    scopes?: ReadonlyArray<string>,
+  ): Promise<ReadonlyArray<Namespace>>;
 
   // page edit 時: ページが属する namespace（ACL 変更時は前後 namespace を返す）
   // 1 ページが複数の grantedGroups を持つ場合、current に複数の namespace が返る
@@ -297,7 +340,7 @@ interface VaultNamespaceMapper {
 
 **accessible namespaces 計算**
 - 認証済みユーザー: `['public', 'restricted-link', 'group-<g1>', ..., 'user-<uid>-only-me']`
-- 匿名: `['public']`（要件 3.2）。ただしこの匿名分岐は guest gate を通過した場合のみ到達する（`isGuestAllowedToRead()=false` の匿名は gateway 層で 401 済み・要件 2.4a）
+- 計算は特定された利用者に対してだけ行う（要件 3.2）。利用者を特定できない要求は、gateway が計算の前に 401 で拒否する（要件 2.4）
 
 **実装ノート**
 - 既存 `generateGrantCondition` / `isUserGrantedPageAccess` を再利用
@@ -353,6 +396,7 @@ interface VaultDispatcher {
   - 単一ページ更新での ACL 変更の検出: `PageService.updatePage` / `updatePageV4`（権限だけを変える `updateGrant` もここを通る）は `pageEvent.emit('update', page, user, { previousGrant, previousGrantedGroups, previousGrantedUsers })` の第 3 引数で、更新前の権限状態を渡す。購読側（`vault-page-update-handler.ts`）は更新前の namespace を計算し、`previous` として dispatcher に渡す
   - dispatcher は `previous` のうち `current` に含まれない namespace（ページが抜けた namespace）にだけ `remove` を発行する。ページが引き続き属する namespace には `remove` を発行しない（同じ namespace への `remove` と `upsert` は書き込み順が保証されないため）。抜けた namespace が無ければ通常の `update`（coalesce 対象の `upsert`）として扱う。この規則は親ページ grant 一括変更の経路にも同じく適用される
   - `remove` を伴う操作（`delete` / ACL 変更 / 単一ページ rename）は、発行の前に、同じページの coalesce 待ちの `upsert` を対象 namespace のバッファから取り除く（待機中の `upsert` が後から書き込まれて `remove` を打ち消すのを防ぐ）
+  - `rename-prefix` を発行する前に、対象 namespace のバッファで coalesce 待ちになっている `upsert` のうち、パスが `<旧 prefix>/` で始まるものを新 prefix のパスに書き換える（待機中の `upsert` が、ディレクトリの移動後に旧パスへファイルを作り直すのを防ぐ）
 - 単一ページ rename（`onPageRenamed`）: `current` 配列の各 namespace に `remove`（oldPath）+ `upsert`（newPath）を 1 件ずつ。ページ自身は namespace tree 上で blob（`<name>.md`）として保持されるため、ディレクトリ subtree 移動である `rename-prefix` では再配置できない（`rename-prefix` は `type === 'tree'` のエントリのみ移動する）。remove + upsert で blob を確実に旧パスから削除し新パスに再作成する。grant は rename で不変なので old/new は同一 namespace 集合に属する
 
 **coalesce 挙動**
@@ -363,13 +407,13 @@ interface VaultDispatcher {
 
 **prefix primitive（親ページのバルク操作）**
 
-- 親ページ rename: 2 経路に分離する。(1) rename されたページ**自身**の blob は `'rename'` イベント購読 → `onPageRenamed`（remove + upsert、上記「単一ページ操作」参照）で再配置する。(2) **descendants** の subtree は `pageEvent.emit('updateMany', pages, user, { oldPagePathPrefix, newPagePathPrefix })` 購読 → 影響を受ける各 namespace に `rename-prefix` 1 件（descendants 数 N によらず namespace 数 M 件）で移動する。`rename-prefix` は subtree（`type === 'tree'`）専用であり、ページ自身の blob には作用しないため、両経路の併用で旧パスの blob・subtree がともに残らないことを保証する
+- 親ページ rename: 2 経路に分離する。(1) rename されたページ**自身**の blob は `'rename'` イベント購読 → `onPageRenamed`（remove + upsert、上記「単一ページ操作」参照）で再配置する。(2) **descendants** は `pageEvent.emit('updateMany', pages, user, extras)`（`extras` は `PageUpdateManyEventExtras`）を購読して移動する。`scope: 'subtree'`（v5）では、namespace が初めて現れたバッチで、その namespace に `rename-prefix` を 1 件出す（同じ rename の後続バッチでは出さない。rename の区別は `operation` の同一性で行う）。`scope: 'listed-pages'`（v4）では、event のページごとに `onPageRenamed` で remove + upsert する。`rename-prefix` は旧パスのディレクトリ（subtree）を移すだけで、ページ自身の blob（`<name>.md`）はディレクトリの外にあるので動かさない。自分の配下への rename（`/a` → `/a/b`）では、(1) で書かれたページ自身の新しい blob（`a/b.md`）が旧ディレクトリの中に入るが、vault-manager はそれを移動せずその位置に残す。そのため両経路を併用しても、旧パスの blob・subtree は残らず、ページ自身の blob が descendants 側へ運ばれることもない
 - 親ページ grant 一括変更: 影響を受けた各 page に対して per-page `acl-change` instruction を発行（remove from previous namespaces + upsert to current namespaces）。`pageEvent.emit('descendantsGrantChanged', { affectedPages, user })` を購読する
 - 当初設計で想定した `grant-change-prefix` op は subtree 単位の prefix scope を持たないため、現状は使用していない（将来の vault-manager 設計改修で再評価）
 
 **実装ノート**
 - 既存 GROWI `PageEvent`（`apps/app/src/server/events/page.ts`）に subscribe
-- `syncDescendants` 完了 event 等の境界 event を購読し、descendants 処理途中での per-page event を受信しないようにする
+- descendants の移動は最初のバッチで発行する。そのため rename 処理中に、まだ rename されていない descendant を編集すると、旧パスのファイルが残り、新パスは編集前の内容になる。ページツリーに載っていない（未変換の）ページが同じ namespace の旧 prefix の下にあると、DB では rename されないまま、ファイルだけが移動する。新パスの古い内容や欠けたファイルは targeted reconcile で直せる（reconcile は `bulk-upsert` しか発行しない）。旧パスに残ったファイルは再構築で消す
 - 書き込み失敗時は WARN ログ + リトライ（ページ編集 response とは切り離す）
 
 ---
@@ -412,7 +456,7 @@ interface VaultBootstrapper {
 
 既存の `forceWipe` 経路（`VAULT_BOOTSTRAP_ON_START=force` で発火するのと同じパス）を共有する。
 
-> kill switch 中はもちろん `bootstrapState !== 'done'` のため、すべての clone / fetch リクエストは 503 + Retry-After で応答される。これにより repository が空 / 不完全な状態でユーザに不整合なデータが見えることはない。
+> kill switch 中はもちろん `bootstrapState !== 'done'` のため、利用者を特定できた clone / fetch リクエストはすべて 503 + Retry-After で応答される。これにより repository が空 / 不完全な状態でユーザに不整合なデータが見えることはない。
 
 **Bootstrap SLA**
 
@@ -432,12 +476,12 @@ interface VaultBootstrapper {
 
 ```typescript
 interface ComposeViewRequest {
-  readonly userId: string | null;
+  readonly userId: string;
   readonly namespaces: ReadonlyArray<Namespace>;
 }
 
 interface ComposeViewResponse {
-  readonly viewRef: string;  // 'user-<uid>-view' または 'anonymous-view'
+  readonly viewRef: string;  // 'user-<uid>-view'
   readonly commitOid: string;
 }
 
@@ -587,7 +631,7 @@ interface VaultSettingsService {
 | エラー種別 | HTTP 応答 | 挙動 |
 |-----------|---------|------|
 | 認証失敗 | 401 + `WWW-Authenticate` | ページ情報を含まないメッセージ |
-| 匿名アクセス（ゲスト拒否設定） | 401 + `WWW-Authenticate` | `aclService.isGuestAllowedToRead()=false` のとき匿名 clone を拒否し PAT を要求（要件 2.4a）。public すら応答しない |
+| 利用者を特定できない要求（PAT もログイン中のセッションも無い） | 401 + `WWW-Authenticate`、本文なし | ゲスト閲覧の設定によらず拒否し PAT を要求（要件 2.4）。namespace の計算も compose-view RPC も行わない。audit log に `VAULT_AUTH_FAILURE` を記録 |
 | 機能無効（`VAULT_ENABLED=false`） | 404 + git エラー文字列 | `info/refs` / `git-upload-pack` に適用。環境変数による永続的な設定状態のため 503 ではなく 404。Retry-After なし |
 | bootstrap 未完了 | 503 + `Retry-After` | bootstrapState が done 以外（一時的な状態） |
 | push 試行 | 403 `read-only repository` | git クライアントに表示 |
@@ -596,6 +640,8 @@ interface VaultSettingsService {
 | upload-pack proxy 失敗 | 502 | 同上 |
 | vault-manager 全体不到達 | 503 | apps/app は warning ログ |
 | vault_instructions 書き込み失敗 | — | WARN ログ + リトライ（ページ編集 response とは切り離す） |
+
+本番のチェーン（`crowi` を渡して組み立てた場合）では、利用者を特定できない要求には、機能無効の 404・bootstrap 未完了の 503 より先に 401 を返す（`loginRequired` がハンドラより前に動くため）。
 
 ---
 
@@ -607,7 +653,7 @@ interface VaultSettingsService {
 - **認証失敗レスポンス**: エラーメッセージにページリスト・存在情報を含めない（要件 2.3）
 - **既存 audit log への統合**: 認証失敗（auth-failure）も記録しブルートフォース検出を可能にする
 - **レート制限**: 既存 GROWI の rate limiting を `/vault.git/*` にも適用する
-- **ゲストモード準拠**: 匿名アクセスは `aclService.isGuestAllowedToRead()` が true の場合のみ許可。デフォルト（`restrictGuestMode='Deny'`）や private wiki では匿名 clone を 401 で拒否し、GROWI 本体の閲覧ポリシーと一致させる（要件 2.4a / 11）
+- **利用者を特定できない clone の拒否**: ゲスト閲覧の設定によらず、利用者を特定できない clone / fetch は 401 で拒否する。拒否は `loginRequired` の `fallback` とハンドラの `readIdentity` の確認の 2 か所で行い、型の上でも namespace 計算と compose-view RPC は `userId: string` しか受け取らない（要件 2.4 / 3.2 / 11）
 
 ### reverse proxy の Basic 認証共存（確定 — 要件 2.6）
 
@@ -634,13 +680,13 @@ PAT = extractAccessToken(req)                       // Bearer > X-GROWI-ACCESS-T
 | 要件 | コンポーネント |
 |------|--------------|
 | 1（git HTTP エンドポイント） | VaultGatewayRouter |
-| 2（PAT 認証 / ゲスト gate / reverse proxy 共存） | VaultPatAuth（credential adapter）、認証・認可ミドルウェア構成、VaultGatewayRouter |
-| 3（namespace 計算） | VaultNamespaceMapper（匿名分岐はゲスト許可時のみ到達） |
+| 2（PAT 認証 / 利用者を特定できない要求の拒否 / reverse proxy 共存） | VaultPatAuth（credential adapter）、VaultAuthChallenge、認証・認可ミドルウェア構成、VaultGatewayRouter |
+| 3（namespace 計算） | VaultNamespaceMapper |
 | 4（vault_instructions 書き込み） | VaultDispatcher、VaultInstructionModel |
 | 5（bootstrap） | VaultBootstrapper、VaultSyncStateModel |
 | 6（vault-manager 通信） | VaultManagerClient |
 | 7（設定管理） | VaultSettingsService |
 | 8（admin UI） | VaultAdminSettings、vault-admin.ts |
 | 9（共通 DTO） | @growi/core interfaces/vault/ |
-| 10（エラーハンドリング / セキュリティ） | VaultGatewayRouter、VaultPatAuth |
+| 10（エラーハンドリング / セキュリティ） | VaultGatewayRouter、VaultPatAuth、VaultAuthChallenge |
 | 11（標準 middleware 構成との整合） | 認証・認可ミドルウェア構成、VaultPatAuth、VaultNamespaceMapper |

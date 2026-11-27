@@ -1,4 +1,6 @@
 import type { NextFunction, Response } from 'express';
+import express from 'express';
+import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AccessToken } from '~/server/models/access-token';
@@ -150,11 +152,11 @@ describe('vault credential adapter (seam #1)', () => {
   });
 
   // -------------------------------------------------------------------------
-  // No Authorization header → anonymous candidate (req.user stays null)
+  // No Authorization header → req.user stays unset
   // -------------------------------------------------------------------------
 
   describe('when the Authorization header is absent', () => {
-    it('leaves req.user unset and calls next() (guest decision deferred to loginRequired)', async () => {
+    it('leaves req.user unset and calls next() (the 401 is left to loginRequired)', async () => {
       const adapter = createVaultCredentialAdapter();
       const req = buildRequest(); // no Authorization header
       const res = buildResponse();
@@ -346,8 +348,7 @@ describe('vault credential adapter (seam #1)', () => {
 
   // -------------------------------------------------------------------------
   // Present-but-invalid / revoked / expired PAT → 401 + WWW-Authenticate + END
-  // (req 2.2 — loginRequiredFactory alone cannot do this: it would treat a
-  // missing user as anonymous and allow it when guests are permitted.)
+  // (req 2.2)
   // -------------------------------------------------------------------------
 
   describe('when a present credential is invalid / revoked / expired', () => {
@@ -364,25 +365,8 @@ describe('vault credential adapter (seam #1)', () => {
       expect(res.statusCode).toBe(401);
       expect(res.headers['WWW-Authenticate']).toBe('Basic realm="GROWI Vault"');
       expect(res.ended).toBe(true);
-      // MUST NOT fall through to anonymous handling.
       expect(next).not.toHaveBeenCalled();
       expect(req.user).toBeUndefined();
-    });
-
-    it('records a VAULT_AUTH_FAILURE audit event when a present credential is invalid (req 10.4)', async () => {
-      vi.mocked(AccessToken.findUserIdByToken).mockResolvedValue(null);
-      const createActivity = vi.fn().mockResolvedValue(undefined);
-
-      const adapter = createVaultCredentialAdapter(createActivity);
-      const req = buildRequest(encodeBasic('anyuser', INVALID_PAT));
-      const res = buildResponse();
-      const next = vi.fn() as unknown as NextFunction;
-
-      await adapter(req, res, next);
-
-      expect(createActivity).toHaveBeenCalledWith(
-        expect.objectContaining({ action: 'VAULT_AUTH_FAILURE' }),
-      );
     });
 
     it('rejects a non-Basic Authorization scheme with 401 (fail-closed)', async () => {
@@ -398,19 +382,30 @@ describe('vault credential adapter (seam #1)', () => {
       expect(next).not.toHaveBeenCalled();
     });
 
-    it('does not include page/path/existence information in the rejection (req 2.3)', async () => {
+    it('answers over HTTP with the 401 challenge and records the auth-failure audit record', async () => {
       vi.mocked(AccessToken.findUserIdByToken).mockResolvedValue(null);
+      const createActivity = vi.fn().mockResolvedValue(undefined);
+      const app = express();
+      app.get(
+        '/vault.git/info/refs',
+        createVaultCredentialAdapter(createActivity),
+        (_req, res) => {
+          res.status(200).send('handler reached');
+        },
+      );
 
-      const adapter = createVaultCredentialAdapter();
-      const req = buildRequest(encodeBasic('anyuser', INVALID_PAT));
-      const res = buildResponse();
-      const next = vi.fn() as unknown as NextFunction;
+      const res = await request(app)
+        .get('/vault.git/info/refs?service=git-upload-pack')
+        .set('Authorization', encodeBasic('anyuser', INVALID_PAT));
 
-      await adapter(req, res, next);
-
-      // The challenge body is empty (.end() with no payload); only the
-      // WWW-Authenticate header is emitted.
-      expect(res.headers['WWW-Authenticate']).toBe('Basic realm="GROWI Vault"');
+      expect(res.status).toBe(401);
+      expect(res.headers['www-authenticate']).toBe('Basic realm="GROWI Vault"');
+      expect(createActivity).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({
+          action: 'VAULT_AUTH_FAILURE',
+          endpoint: '/vault.git/info/refs?service=git-upload-pack',
+        }),
+      );
     });
   });
 
@@ -511,8 +506,7 @@ describe('vault credential adapter (seam #1)', () => {
 
     it('fails closed (401) when only a reverse-proxy Basic credential is present and its password is NOT a valid PAT', async () => {
       // Behind a Basic-auth proxy WITHOUT the X-GROWI-ACCESS-TOKEN extraHeader:
-      // the Basic fallback extracts the proxy password, validation fails, and
-      // the adapter MUST reject rather than silently degrade to anonymous.
+      // the Basic fallback extracts the proxy password and validation fails.
       recogniseOnlyValidPat();
 
       const adapter = createVaultCredentialAdapter();
@@ -577,11 +571,11 @@ describe('vault credential adapter (seam #1)', () => {
   // Runtime guard: /vault.git/* requests have no body parser, so req.body is
   // undefined. extractAccessToken dereferences req.body.access_token last in
   // its ?? chain, so the adapter must guard against the undefined body for the
-  // common anonymous / Basic-only paths (it must not throw).
+  // common no-credential / Basic-only paths (it must not throw).
   // -------------------------------------------------------------------------
 
   describe('when the request has no body parser (req.body undefined)', () => {
-    it('treats an anonymous request as anonymous without throwing', async () => {
+    it('passes a request without a credential through without throwing', async () => {
       const adapter = createVaultCredentialAdapter();
       const req = buildRequest(); // no Authorization, no X-GROWI header, undefined body
       const res = buildResponse();

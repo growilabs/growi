@@ -62,7 +62,7 @@
 
 - **上流**: `attachment-search-text-extractor` spec が提供する OpenAPI spec (`POST /extract`、`ExtractResponse` / `ErrorResponse`)、Docker image、運用者向け手順書 `docker/README.md`
 - 既存 `AttachmentService.addAttachHandler` / `addDetachHandler` (ハンドラ登録のみ)
-- 既存 `ElasticsearchDelegator` (composition で添付向けメソッド合成、既存 Page 系メソッドは不変)。`searchAccessiblePages` からは既存の `createSearchQuery()` / `appendCriteriaForQueryString()` / `appendCriteriaForGroupFilter()` / `filterPagesByViewer()` を呼び出しのみで使う
+- 既存 `ElasticsearchDelegator` (composition で添付向けメソッド合成。既存 Page 系メソッドの振る舞いは変えない。ページ検索のクエリ (検索語・演算子・viewer filter・強調表示) は 1 か所で組み立て、`search()` と id に絞ったページ検索 `searchWithinPages()` が共有する)。`searchAccessiblePages` からは既存の `createSearchQuery()` / `appendCriteriaForQueryString()` / `appendCriteriaForGroupFilter()` / `filterPagesByViewer()` を呼び出しのみで使う
 - 既存 `SearchService` の `parseSearchQuery()` / `resolve()` / `resolveFilterData()` (呼び出しのみ。演算子の解析ロジックは複製しない)
 - 既存 `prisma.attachments` (読み取りのみ。Attachment の作成・削除は `AttachmentService` が行う)
 - 既存 `GET /_api/search` ハンドラ (`routes/search.ts`、optional なクエリの追加のみ。`facet` 省略時の処理は変えない)
@@ -240,7 +240,11 @@ apps/app/src/features/search-attachments/
     └── attachment-search.ts                       # IAttachmentHit, IAttachmentEsDoc, ExtractionOutcome DTOs
 
 apps/app/src/server/service/search/
-└── can-show-snippet.ts                            # 本文の抜粋の表示規則 (ページ検索と添付検索が共有)
+├── can-show-snippet.ts                            # 本文の抜粋の表示規則 (ページ検索と添付検索が共有)
+└── page-search-item.ts                            # ページ検索の項目の組み立て (ページ文書・抜粋。ページ検索と facet=attachments が共有)
+
+apps/app/src/server/util/
+└── with-timeout.ts                                # 時間の上限 (添付検索と facet=attachments の抜粋の検索が共有)
 
 packages/attachment-text-extractor-client/
 ├── orval.config.js
@@ -264,10 +268,13 @@ packages/attachment-text-extractor-client/
 - [apps/app/src/server/crowi/index.ts](apps/app/src/server/crowi/index.ts) — `initAttachmentFullTextSearch(this)` を searchService / attachmentService 初期化後に追加
 - [apps/app/src/server/routes/search.ts](apps/app/src/server/routes/search.ts) — 既存のキーワード検索 API (`GET /_api/search`、apiv1) に optional な `facet` クエリを追加。`facet` 省略時と `facet=pages` は従来の `searchKeyword()` → `formatSearchResult()` をそのまま通す。`facet=attachments` で機能有効時は `searchService.searchByFacet()` を呼び、結果を既存の `IFormattedSearchResult` の形 (各 item の `meta` に optional の `attachmentHits`、応答の meta に `facet` / `primaryResultIncomplete`) に詰めて返す (`IFacetedSearchResult`)
 - [apps/app/src/server/service/search.ts](apps/app/src/server/service/search.ts) — `facet=attachments` の検索と、検索結果のページへの添付ヒットの取得を `AttachmentSearchResultAggregator` として追加し、入口として `searchByFacet()` と `resolveAttachmentSecondary()` を置く (クエリ解析・delegator 解決・`resolveFilterData()` を 1 回だけ行って `AttachmentSearchInput` を組み立てる)。`canShowSnippet()` は `can-show-snippet.ts` の規則を呼ぶだけにする (ページ検索の抜粋と添付ヒットで同じ規則)。`registerUpdateEvent()` への権限変更リスナ追加は **不要** (Option D は query-time 方式のため)
-- `apps/app/src/server/service/search-delegator/elasticsearch-client-delegator/es8-client-delegator.ts` / `es9-client-delegator.ts` — 添付 index の操作に要る ES client の呼び出しを追加。`elasticsearch.ts` 本体 (Page 系のメソッド) は変えず、添付の拡張は同じ ES client を受け取って使う
+- `apps/app/src/server/service/search-delegator/elasticsearch-client-delegator/es8-client-delegator.ts` / `es9-client-delegator.ts` — 添付 index の操作に要る ES client の呼び出しを追加。添付の拡張は同じ ES client を受け取って使う
+- `apps/app/src/server/service/search-delegator/elasticsearch.ts` — ページ検索のクエリを 1 か所で組み立て、`search()` と、ページ id に絞った `searchWithinPages()` (facet=attachments の抜粋) が共有する
 - [apps/app/src/server/service/config-manager/config-definition.ts](apps/app/src/server/service/config-manager/config-definition.ts) — `app:attachmentFullTextSearch:*` 4 キー追加 (`extractorUri` / **`extractorToken` (`isSecret: true`。API からは write-only)** / `timeoutMs` / `maxFileSizeBytes`)。各キーの env var 名: `GROWI_ATTACHMENT_EXTRACTOR_URI` / `GROWI_ATTACHMENT_EXTRACTOR_SERVICE_TOKEN` / `GROWI_ATTACHMENT_EXTRACTOR_TIMEOUT_MS` / `GROWI_ATTACHMENT_EXTRACTOR_MAX_FILE_SIZE_BYTES`。`enabled` / `maxConcurrency` の Config キーは無い (前者は算出値、後者は抽出サービス側の env var 専用)。加えて `ENV_ONLY_GROUPS` に `env:useOnlyEnvVars:app:attachmentFullTextSearch` エントリを追加し、control env var `ATTACHMENT_EXTRACTOR_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS=true` で 4 キー全てを env-only 強制できるようにする (マルチテナント向け詳細は下記「ENV_ONLY_GROUPS エントリ」参照)
 - [apps/app/src/interfaces/search.ts](apps/app/src/interfaces/search.ts) — `IPageSearchMeta.attachmentHits?: IAttachmentHit[]` (optional) と、facet 付き検索の応答型 `IFacetedSearchResult` / `SearchFacet` を追加
 - `apps/app/src/server/service/search/can-show-snippet.ts` (新規) — 本文の抜粋の表示規則 (`canShowSnippetForGrant` / `canShowSnippetOfPage`)
+- `apps/app/src/server/service/search/page-search-item.ts` (新規) — ページ検索の項目のページ文書と抜粋の組み立て (`toSearchedPageDocument` / `toElasticSearchResult`)。`formatSearchResult` と facet=attachments が共有する
+- `apps/app/src/server/util/with-timeout.ts` (新規) — 時間の上限 (`withTimeout`)
 - [apps/app/src/interfaces/activity.ts](apps/app/src/interfaces/activity.ts) — `ACTION_ADMIN_ATTACHMENT_SEARCH_SETTINGS_UPDATE` (Large のグループ) と `ACTION_ATTACHMENT_REEXTRACT` (Medium のグループ) を追加
 - `apps/app/src/features/rate-limiter/config/index.ts` — 再抽出の回数制限 (添付ごとに 1 分あたり 5 回) を追加
 - [apps/app/src/server/routes/apiv3/search.js](apps/app/src/server/routes/apiv3/search.js) — `PUT /search/indices` に `includeAttachments` フラグを受理。true のときは `AttachmentReindexBatch.startRebuild()` を呼んで即応答し、実行中なら 409 `rebuild_in_progress`
@@ -393,8 +400,9 @@ sequenceDiagram
     Svc->>Svc: 見えるページの添付ヒットだけを点数順に並べ、pageId ごとにまとめて from〜from+size 番目のページを返す
     Note over Svc: 検索か権限確認が失敗・800ms 超過なら空 items + primaryResultIncomplete: true
     Svc-->>Api: IPrimarySearchResult
+    Note over Api: 以下は SearchService.searchByFacet の中 (route は searchByFacet を 1 回呼ぶ)
     Api->>Api: findPageListByIds でページ文書を読み、data に入れる (MongoDB に無いページの項目は落とす)
-    Api->>Del: 返すページの id に絞ったページ検索 (検索語 + 演算子 + viewer filter + ids + 強調表示)
+    Api->>Del: searchWithinPages (ページ検索と同じクエリ + ids)
     Del->>ES: page_index search
     ES-->>Del: 一致したページの highlight
     Api->>Api: ページ検索と同じ規則で meta.elasticSearchResult を作る (失敗・時間切れなら抜粋なし)
@@ -406,8 +414,9 @@ sequenceDiagram
 - 権限判定は、1 回の往復で窓の中の unique pageId (最大 200 件) を `searchAccessiblePages` に渡す。結果は「見えるヒットだけを並べた列」の上で決めるので、窓が 200 件に達するまでは、見えないヒットがあっても無くても同じ結果になる。200 件より下位にある見えるヒットには届かない
 - `meta.total` は常に null、`primaryResultIncomplete` は検索か権限確認が失敗 (800ms 超過を含む) したときだけ true。権限で落ちた件数に応じて変わる値は返さない
 - 「続きを読み込む」の終わりは、`meta.hitsCount` が `limit` に満たないことで判定できる。窓はどの `offset` でも上位 200 件で頭打ちになり、各要求が同じ範囲を見るので、短い応答の後に続きは出ない (research.md 14.1)
-- 各項目の `data` は、ページ検索と同じ形のページ文書である。route が `findPageListByIds` で読み、`lastUpdateUser` を `serializeUserSecurely` で直し、`seenUserCount` を入れる (ページ検索の `formatSearchResult` と同じ処理)。MongoDB に無いページの項目は落とす。`meta.hitsCount` は落とす前の項目数にする (ページ検索の `hitsCount` と同じ数え方。落としたことで続きの読み込みが止まらないように)。下流の画面は、ページ検索と同じ一覧とプレビューの部品でこの結果を描く (Req 9.7、research.md 14.1)
-- ページのパス・本文・コメントも検索語に一致する項目には、ページ検索と同じ抜粋 (`meta.elasticSearchResult` の `snippet` / `highlightedPath`) を入れる。返すページの id (最大 `limit` 件) に絞って、ページ検索と同じ組み立て (`appendCriteriaForQueryString`・`appendCriteriaForGroupFilter`・`filterPagesByViewer`・`appendHighlight`) で page_index を 1 回検索する。抜粋の作り方 (`canShowSnippet`、`filterXss`) は `formatSearchResult` と共有する。権限確認の `searchAccessiblePages` には相乗りさせない (役割を混ぜない)。検索語に一致しないページは返ってこないので、抜粋は付かない。この検索が失敗するか時間の上限 (500ms) を超えたときは、抜粋を付けずに項目を返し、ログに残す。抜粋は項目の補足であり、無くても項目は正しいため (research.md 14.3)
+- 各項目の `data` は、ページ検索と同じ形のページ文書である。`SearchService` が `findPageListByIds` で読み、`lastUpdateUser` を `serializeUserSecurely` で直し、`seenUserCount` を入れる (ページ検索の `formatSearchResult` と同じ処理)。MongoDB に無いページの項目は落とす。`meta.hitsCount` は落とす前の項目数にする (ページ検索の `hitsCount` と同じ数え方。落としたことで続きの読み込みが止まらないように)。下流の画面は、ページ検索と同じ一覧とプレビューの部品でこの結果を描く (Req 9.7、research.md 14.1)
+- ページのパス・本文・コメントも検索語に一致する項目には、ページ検索と同じ抜粋 (`meta.elasticSearchResult` の `snippet` / `highlightedPath`) を入れる。返すページの id (最大 `limit` 件) に絞って、`ElasticsearchDelegator.searchWithinPages` で page_index を 1 回検索する。クエリは、ページ検索の `search()` と同じ組み立て (検索語・演算子・viewer filter・強調表示) を delegator の中で共有し、id の絞り込みだけを足したものである。抜粋の作り方 (`canShowSnippet`、`filterXss`) は `formatSearchResult` と共有する。権限確認の `searchAccessiblePages` には相乗りさせない (役割を混ぜない)。検索語に一致しないページは返ってこないので、抜粋は付かない。この検索が失敗するか時間の上限 (500ms) を超えたときは、抜粋を付けずに項目を返し、ログに残す。抜粋は項目の補足であり、無くても項目は正しいため (research.md 14.3)
+- 抜粋を入れる項目には、同じ検索の hit の `_source.bookmark_count` から、ページ検索と同じ `meta.bookmarkCount` も入れる。抜粋の無い項目には入れない (下流の一覧は、抜粋の無い行だけページの付随情報を取り、そこでブックマーク数も埋まる。research.md 14.4)
 - `sort` / `order` / `type` は適用しない (点数順だけ)
 
 #### 2.3 API 呼び出しパターン (アプリ実装)
@@ -557,6 +566,7 @@ Key decisions:
 | 5.5 | URI 未設定時も添付保存継続 | AttachmentService 本体は無変更 | — | — |
 | 5.6 | 設定の更新を監査ログに記録 | apiv3 admin config (`addActivity` + `ADMIN_ATTACHMENT_SEARCH_SETTINGS_UPDATE`) | — | — |
 | 5.7 | 環境変数で固定されているかを返す | apiv3 admin config (GET) | `AttachmentSearchConfig.useOnlyEnvVars` | — |
+| 5.8 | 環境変数で固定されているときは保存を断る | apiv3 admin config (PUT) | 409 `config_locked_by_env_vars` | — |
 | 6.1 | 添付再インデックス実施 | AttachmentReindexBatch | — | Flow 5 |
 | 6.2 | 個別失敗時スキップ + 障害を疑う結果が続くときは中止 | AttachmentReindexBatch + `rebuild-failure-budget.ts` | `AttachmentRebuildingFailed` `{ error }` | Flow 5 |
 | 6.3 | 進捗 Socket.io | Socket.io `AddAttachmentProgress` / `FinishAddAttachment` | — | Flow 5 |
@@ -580,7 +590,8 @@ Key decisions:
 | 9.4 | optional フィールド | `interfaces/search.ts` 差分 (`IPageSearchMeta.attachmentHits`) | — | — |
 | 9.5 | 有効時もページ検索は不変、添付ヒットは別の要求 | `GET /_api/search` は `facet=attachments` のときだけ aggregator を呼ぶ。検索結果のページへの添付ヒットは `GET /_api/v3/search/attachments` | AttachmentSearchResultAggregator.resolveSecondary | Flow 2 |
 | 9.6 | 添付ヒットの取得の失敗はエラーで返す | `resolveSecondary` は失敗と 500ms 超過で例外を投げ、ルートは 500 を返す | AttachmentSearchResultAggregator.resolveSecondary | Flow 2.1 |
-| 9.7 | 添付だけの検索の項目にページ文書と、ページも一致したときの抜粋を入れる | `GET /_api/search` の `facet=attachments` の処理 (`findPageListByIds`、id に絞ったページ検索) | `IFacetedSearchResult` | Flow 2.2 |
+| 9.7 | 添付だけの検索の項目にページ文書と、ページも一致したときの抜粋を入れる | `GET /_api/search` の `facet=attachments` の処理 (`findPageListByIds`、`ElasticsearchDelegator.searchWithinPages`) | `IFacetedSearchResult` | Flow 2.2 |
+| 9.8 | 抜粋を入れる項目にブックマーク数も入れる | `GET /_api/search` の `facet=attachments` の処理 (`searchWithinPages` の hit の `_source.bookmark_count`) | `IFacetedSearchResult` | Flow 2.2 |
 
 ## Components and Interfaces
 
@@ -599,7 +610,7 @@ Key decisions:
 | AttachmentSearchResultAggregator | Server | facet=attachments の検索と、検索結果のページへの添付ヒット。添付ヒットは見てよいページのものだけ、検索演算子の振り分け | 3.3, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 9.1, 9.3, 9.5, 9.6 | searchAccessiblePages (P0), query builder 2 つ (P0), 既存 Page 検索 (P0) | Service |
 | apiv3: attachment-reextract | Server | `POST /attachments/:id/reextract` | 7.1–7.7 | AttachmentSearchIndexer (P0), reextract-gate (P0) | API |
 | apiv3: search-attachments | Server | `GET /search/attachments` (検索結果のページへの添付ヒット) | 4.1, 9.1, 9.3, 9.5, 9.6 | AttachmentSearchResultAggregator (P0) | API |
-| apiv3: attachment-search-admin | Server | failures / config 取得更新 | 5.1, 5.2, 5.3, 5.6, 8.4 | ConfigManager (P0), FailureLogService (P0) | API |
+| apiv3: attachment-search-admin | Server | failures / config 取得更新 | 5.1, 5.2, 5.3, 5.6, 5.7, 5.8, 8.4 | ConfigManager (P0), FailureLogService (P0) | API |
 | apiv3: search indices extended | Server | `includeAttachments` フラグ受理、作り直しを裏で起動して即応答 | 6.1, 6.5, 6.6 | AttachmentReindexBatch (P0) | API |
 | Response type (`IPageSearchMeta` / `IFacetedSearchResult`) | Interface | optional `meta.attachmentHits[]` 追加、facet 付き検索の応答 | 9.3, 9.4 | 既存 interfaces/search.ts (P0) | Contract |
 | SearchConfigurationProps 拡張 | SSR props / Interface | 非 admin 一般ユーザ向けに機能有効フラグを SSR 経路で公開 | 5.1, 5.4 | ConfigManager (P0), 既存 basic-layout-page SSR (P0) | Contract, SSR |
@@ -973,7 +984,7 @@ resolveAttachmentSecondary(
 | POST | /_api/v3/attachments/:id/reextract | — | `{ outcome: { kind } }` (`ReextractResponse`。抽出テキストは返さない) | 400 (id が ObjectId でない), 404 `notfound_or_forbidden` (添付なし・ページに属さない・親ページなし・admin でもページを閲覧できる利用者でもない、を区別しない同一応答), 429 (回数制限: 添付ごとに 1 分あたり 5 回。rate-limiter が `res.sendStatus(429)` で返すので、本文は `Too Many Requests` の文字だけで、エラーコードは無い), 500 `reextract_failed` (最後まで進められなかった) / `internal_server_error`, 503 `feature_disabled` / `reextract_timeout` (`timeoutMs × 2 + 30 秒` を超えた。抽出の順番待ちを含む) |
 | GET | /_api/v3/admin/attachment-search/failures | `?limit=N&since=iso` (`limit` は 1〜200、既定 50) | `{ items: ExtractionFailureEntry[], total: number }` (新しい順。`total` は `since` 以降の全件数) | 400 validation, 403 forbidden |
 | GET | /_api/v3/admin/attachment-search/config | — | `{ config: AttachmentSearchConfig }` | 403 forbidden |
-| PUT | /_api/v3/admin/attachment-search/config | `AttachmentSearchConfigUpdate` | `{}` (更新後の値は GET で読む) | 400 validation / `invalid_extractor_uri`, 403 forbidden |
+| PUT | /_api/v3/admin/attachment-search/config | `AttachmentSearchConfigUpdate` | `{}` (更新後の値は GET で読む) | 400 validation / `invalid_extractor_uri`, 403 forbidden, 409 `config_locked_by_env_vars` (4 つのキーが環境変数で固定されている。入力の検査より先に判定するので、本文の中身に関係なくこの応答になり、何も保存しない) |
 | PUT | /_api/v3/search/indices | `{ operation: 'rebuild', includeAttachments?: boolean }` | 既存 response (作り直しの完了を待たずに 200) | 既存 + 409 `rebuild_in_progress` + 503 `feature_disabled` |
 
 `IFacetedSearchResult` (`apps/app/src/interfaces/search.ts`):
@@ -1112,6 +1123,7 @@ GROWI.cloud のようなマルチテナント環境では、プラットフォ�
 
 **admin UI への影響（下流 `attachment-search-ui` spec に委譲）**:
 - 設定 API の GET 応答は、固定されているかを `useOnlyEnvVars` で返す (Req 5.7)。`true` の場合、admin UI の設定フォームは読み取り専用表示にし、env var で管理されている旨を示すメッセージを表示する（既存の他 ENV_ONLY 設定項目と同等のパターン）
+- 固定されているときの `PUT /config` は、何も保存せずに 409 `config_locked_by_env_vars` を返す (Req 5.8)。画面を通さずに API を呼ばれても、使われない値が DB に残ったり、何も変わらないのに監査ログに更新が記録されたりしない
 
 #### `requiresReindex` の算出ルール (computed、state persist なし)
 
@@ -1540,5 +1552,4 @@ flowchart LR
 2. **`packages/attachment-text-extractor-client` の公開境界**: server 専用依存として apps/app から import し、UI 側に混入させないレイヤリング制約を lint ルール化するか検討
 3. **`requiresReindex` cardinality agg の共有 ES コスト**: 30 秒のキャッシュはインスタンスごとに独立しているので、複数インスタンスでは admin GET のたびに各インスタンスが集計を投げうる。`precision_threshold` の指定、共有のキャッシュ、MongoDB 上の件数の記録への置き換えのどれかを、リリース後に検討する
 4. **複数インスタンスでの作り直し**: 実行中の判定と、作り直し中の削除の記録はインスタンスごとのメモリにある (research.md 8.6 の「残っている制約」)
-5. **残っている作業**: tasks.md の未完了のタスク (3.4 監視メトリクス、13 下流の画面のための追加)
-6. **環境変数の固定と `PUT /config`**: 4 つのキーが環境変数で固定されていても、`PUT /config` は保存を受け付ける (値は使われない)。下流の画面は保存の操作を出さない。API を直接使う場合に断るかどうかは未定
+5. **残っている作業**: tasks.md の未完了のタスク (3.4 監視メトリクス)

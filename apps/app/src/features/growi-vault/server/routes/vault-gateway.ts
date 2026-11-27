@@ -1,11 +1,5 @@
 import { pipeline } from 'node:stream/promises';
-import type {
-  NextFunction,
-  Request,
-  RequestHandler,
-  Response,
-  Router,
-} from 'express';
+import type { Request, RequestHandler, Response, Router } from 'express';
 import express from 'express';
 
 import { SupportedAction } from '~/interfaces/activity';
@@ -13,6 +7,8 @@ import loginRequiredFactory from '~/server/middlewares/login-required';
 import { generateUnavailableWhenMaintenanceModeMiddlewareForApi } from '~/server/middlewares/unavailable-when-maintenance-mode';
 import loggerFactory from '~/utils/logger';
 
+import type { VaultActivityRecorder } from '../interfaces/vault-activity-recorder';
+import { createVaultAuthChallenge } from '../middlewares/vault-auth-challenge';
 import {
   createVaultCredentialAdapter,
   type VaultAuthenticatedReq,
@@ -27,15 +23,6 @@ const logger = loggerFactory('growi:features:growi-vault:routes:vault-gateway');
 // ============================================================================
 // Types
 // ============================================================================
-
-/** Activity-logger callback shape (see VaultGatewayRouterDeps.createActivity). */
-type CreateActivity = (params: {
-  ip: string | undefined;
-  endpoint: string;
-  action: string;
-  user: string | undefined;
-  snapshot: { username?: string };
-}) => Promise<void>;
 
 /**
  * Dependencies injected into the VaultGatewayRouter factory.
@@ -56,14 +43,13 @@ export interface VaultGatewayRouterDeps {
   readonly vaultPatAuth?: RequestHandler;
   /**
    * Optional activity logger callback. Called fire-and-forget after a
-   * successful git operation, and on auth failures (via the credential
-   * adapter / git fallback). Accepts the same shape as
-   * activityService.createActivity().
+   * successful git operation, and on auth failures (via the 401 challenge).
+   * Accepts the same shape as activityService.createActivity().
    *
    * Keeping this as an optional callback (rather than accepting the full Crowi
    * object) limits coupling to the audit log interface alone.
    */
-  readonly createActivity?: CreateActivity;
+  readonly createActivity?: VaultActivityRecorder;
 }
 
 // ============================================================================
@@ -124,58 +110,23 @@ async function assertGatewayReady(
 }
 
 /**
- * git-compatible fallback (seam #2) for `loginRequiredFactory`.
- *
- * The standard loginRequired fallback redirects an unauthenticated browser to
- * `/login`. A git client cannot follow that — so this fallback returns the
- * git-native challenge `401 + WWW-Authenticate: Basic realm="GROWI Vault"` and
- * records a VAULT_AUTH_FAILURE audit event (req 10.4). This is the single point
- * where the "anonymous + guests denied → 401" decision (req 2.4a) surfaces; the
- * guest/user decision itself is made by loginRequiredFactory via
- * `aclService.isGuestAllowedToRead()` (single source of truth — req 11).
- *
- * The response body intentionally carries no page content / list / existence
- * information (req 2.3).
- */
-function createGitFallback(createActivity: CreateActivity | undefined) {
-  return (req: Request, res: Response, _next: NextFunction): void => {
-    if (!res.headersSent) {
-      res.setHeader('WWW-Authenticate', 'Basic realm="GROWI Vault"');
-      res.status(401).end();
-    } else {
-      res.end();
-    }
-
-    createActivity?.({
-      ip: req.ip,
-      endpoint: req.originalUrl,
-      action: SupportedAction.ACTION_VAULT_AUTH_FAILURE,
-      user: undefined,
-      snapshot: {},
-    }).catch((err) =>
-      logger.warn({ err }, 'Failed to record auth-failure activity'),
-    );
-  };
-}
-
-/**
  * Read the authenticated identity off the request.
  *
  * The credential adapter (seam #1) populated `req.user` with a securely
  * serialized user (when a valid PAT was presented) and stashed the PAT scopes
- * on `req.vaultScopes`. An anonymous-but-allowed request (guest read permitted)
- * reaches the handler with `req.user` unset → userId resolves to null and only
- * the 'public' namespace is accessible (req 3.2).
+ * on `req.vaultScopes`. Returns null when no user is present, which happens on
+ * the crowi-less path where `loginRequiredFactory` does not run.
  */
 function readIdentity(req: Request): {
-  userId: string | null;
+  userId: string;
   scopes: ReadonlyArray<string> | undefined;
-} {
+} | null {
   const authedReq = req as VaultAuthenticatedReq;
   const rawUser = authedReq.user as
     | { _id?: { toString(): string } }
     | undefined;
-  const userId = rawUser?._id?.toString() ?? null;
+  const userId = rawUser?._id?.toString();
+  if (userId == null) return null;
   return { userId, scopes: authedReq.vaultScopes };
 }
 
@@ -195,7 +146,7 @@ function readIdentity(req: Request): {
  * of re-implementing authz (req 11):
  *
  *   [maintenanceMode] → credentialAdapter (seam #1)
- *     → loginRequiredFactory(crowi, isGuestAllowed=true, gitFallback) → handler
+ *     → loginRequiredFactory(crowi, isGuestAllowed=false, rejectWithChallenge) → handler
  *
  * The rate limiter is applied at the mount point (server/routes/index.js,
  * req 10.3) so it is intentionally NOT added here.
@@ -214,6 +165,9 @@ export const createVaultGatewayRouter = (
   const credentialAdapter =
     deps.vaultPatAuth ?? createVaultCredentialAdapter(createActivity);
 
+  // Shared by the loginRequired fallback (seam #2: a git client cannot follow
+  // the /login redirect) and the handlers' no-identity check.
+  const rejectWithChallenge = createVaultAuthChallenge(createActivity);
   const router = express.Router();
 
   // --------------------------------------------------------------------------
@@ -228,7 +182,7 @@ export const createVaultGatewayRouter = (
       ? [
           generateUnavailableWhenMaintenanceModeMiddlewareForApi(crowi),
           credentialAdapter,
-          loginRequiredFactory(crowi, true, createGitFallback(createActivity)),
+          loginRequiredFactory(crowi, false, rejectWithChallenge),
         ]
       : [credentialAdapter];
 
@@ -261,7 +215,12 @@ export const createVaultGatewayRouter = (
       }
 
       // Identity resolved by the credential adapter + loginRequired chain.
-      const { userId, scopes } = readIdentity(req);
+      const identity = readIdentity(req);
+      if (identity == null) {
+        rejectWithChallenge(req, res);
+        return;
+      }
+      const { userId, scopes } = identity;
 
       // Compute accessible namespaces (req 3, req 2.5)
       let namespaces: ReadonlyArray<string>;
@@ -301,7 +260,7 @@ export const createVaultGatewayRouter = (
         ip: req.ip,
         endpoint: req.originalUrl,
         action: SupportedAction.ACTION_VAULT_CLONE_PREPARE,
-        user: userId ?? undefined,
+        user: userId,
         snapshot: {},
       }).catch((err) =>
         logger.warn({ err }, 'Failed to record clone-prepare activity'),
@@ -363,7 +322,12 @@ export const createVaultGatewayRouter = (
       if (!ready) return;
 
       // Identity resolved by the credential adapter + loginRequired chain.
-      const { userId, scopes } = readIdentity(req);
+      const identity = readIdentity(req);
+      if (identity == null) {
+        rejectWithChallenge(req, res);
+        return;
+      }
+      const { userId, scopes } = identity;
 
       // Compute accessible namespaces (req 3, req 2.5)
       let namespaces: ReadonlyArray<string>;
@@ -436,7 +400,7 @@ export const createVaultGatewayRouter = (
         ip: req.ip,
         endpoint: req.originalUrl,
         action: SupportedAction.ACTION_VAULT_CLONE_COMPLETE,
-        user: userId ?? undefined,
+        user: userId,
         snapshot: {},
       }).catch((err) =>
         logger.warn({ err }, 'Failed to record clone-complete activity'),

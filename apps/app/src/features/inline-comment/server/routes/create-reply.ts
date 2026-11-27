@@ -54,6 +54,72 @@ const validator = [
   body('comment').isString().withMessage('comment must be a string'),
 ];
 
+/**
+ * @swagger
+ *
+ *    /inline-comments/{id}/replies:
+ *      post:
+ *        tags: [Comments]
+ *        summary: Reply to an inline comment
+ *        description: >
+ *          Adds a reply to an origin inline comment. A reply cannot itself be replied
+ *          to: `id` must be an origin inline comment. Requires login, or an access token
+ *          with the scope `write:features:page`, and permission to view the page. Not
+ *          available through a share link. Read-only users are refused unless read-only
+ *          users are allowed to comment.
+ *        parameters:
+ *          - in: path
+ *            name: id
+ *            required: true
+ *            schema:
+ *              type: string
+ *            description: ID of the origin inline comment to reply to.
+ *        requestBody:
+ *          required: true
+ *          content:
+ *            application/json:
+ *              schema:
+ *                type: object
+ *                required:
+ *                  - comment
+ *                properties:
+ *                  comment:
+ *                    type: string
+ *                    description: Reply body (markdown).
+ *        responses:
+ *          201:
+ *            description: The created reply.
+ *            content:
+ *              application/json:
+ *                schema:
+ *                  type: object
+ *                  required:
+ *                    - inlineCommentReply
+ *                  properties:
+ *                    inlineCommentReply:
+ *                      $ref: '#/components/schemas/InlineCommentReply'
+ *          400:
+ *            description: >
+ *              Invalid input, or the caller is a read-only user (code
+ *              `validation_failed`); `id` is not an origin inline comment (code
+ *              `inline-comment-not-origin`); the reply could not be created (code
+ *              `inline-comment-reply-create-failed`).
+ *            content:
+ *              application/json:
+ *                schema:
+ *                  $ref: '#/components/schemas/ErrorV3'
+ *          403:
+ *            description: Not authenticated, or the access token lacks the required scope.
+ *          404:
+ *            description: >
+ *              The comment does not exist (code `inline-comment-not-found`), or its page
+ *              does not exist or the caller may not view it (code
+ *              `notfound_or_forbidden`; these two page cases are indistinguishable).
+ *            content:
+ *              application/json:
+ *                schema:
+ *                  $ref: '#/components/schemas/ErrorV3'
+ */
 export const createInlineCommentReplyRouteHandlersFactory = (
   crowi: Crowi,
 ): RequestHandler[] => {

@@ -61,6 +61,8 @@ Ts.ED v7.x ベースのマイクロサービスとして、`apps/pdf-converter` 
 - git binary が container image から外れる事態
 - GROWI Revision モデルの `body` フィールド形式変更
 - ページパスエンコーディング規則の変更（既存 clone 履歴との互換破壊）
+- view ref の命名規則（`user-<uid>-view`）を変更する場合（起動時の片付けが消す `anonymous-view` という名前が、利用者の view と衝突しないことを確かめ直す）
+- 利用者に対応しない view（複数の相手が共有する view）を作る場合（view の合成は前回の view の commit を親にするため、共有される view の履歴の扱いを先に決める。`../growi-vault-gateway/research.md` の「漏れの経路」参照）
 - 公開する sparse-checkout パターン集合（`PUBLISHED_SPARSE_FILTERS`）を変更する場合（object の ID が内容から決まるため、README に載せた clone コマンドと既存クライアントに残る `remote.origin.partialclonefilter` が無効になる。README との突き合わせは単体テストで固定済み）
 - `uploadpack.allowReachableSHA1InWant` を有効にする場合（クライアントが object を ID で名指しできるようになるため、要件 5.6 の検査を blob / tree の到達性まで拡張することが前提になる。research.md の Decision D 参照）
 - gateway がクライアントの `Git-Protocol` ヘッダを転送し、upload-pack が protocol v2 を使うようになる場合（同検査が v0 の形式のみ解釈するため）
@@ -184,6 +186,7 @@ apps/growi-vault-manager/
 │   │   ├── vault-pkt-line.ts                # want 区間の pkt-line 解析（純関数）
 │   │   ├── vault-want-guard.ts              # 本文先頭の peek + ビュー ref からの到達性確認
 │   │   ├── vault-sparse-filter.ts           # 公開する sparse filter 集合と絞り込み指定の判定
+│   │   ├── vault-legacy-anonymous-view.ts   # 起動時に anonymous-view の ref・HEAD・記録を消す
 │   │   ├── vault-upload-pack-spawner.ts     # git upload-pack 子プロセス起動
 │   │   └── vault-maintenance-scheduler.ts  # squash + 周期 gc 自走スケジューラ
 │   ├── models/
@@ -228,6 +231,7 @@ vault-manager は `VaultUploadPackSpawner` が `git upload-pack` を spawn す�
 | 9.1–9.5 | bare repo ストレージ抽象化 | VaultRepoStorage |
 | 10.1–10.4 | アプリスケルトン・デプロイ | server.ts, Dockerfile, docker-compose |
 | 11.1–11.5 | storage stats RPC | StorageStatsController, VaultMaintenanceScheduler |
+| 12.1–12.7 | 利用者に対応しない view の起動時の片付け | VaultLegacyAnonymousView, VaultRepoStorage, server-runtime.ts |
 
 ---
 
@@ -237,7 +241,7 @@ vault-manager は `VaultUploadPackSpawner` が `git upload-pack` を spawn す�
 
 | コンポーネント | レイヤー | Intent | 要件カバレッジ |
 |--------------|---------|--------|--------------|
-| ComposeViewController | HTTP Controller | POST /internal/compose-view の RPC handler | 4.1 |
+| ComposeViewController | HTTP Controller | POST /internal/compose-view の RPC handler | 4.1, 4.7 |
 | GitProxyController | HTTP Controller | git smart HTTP lower-half（spawn pipe） | 5.1–5.5 |
 | HealthController | HTTP Controller | GET /health の監視用エンドポイント | 8.1–8.4 |
 | StorageStatsController | HTTP Controller | GET /internal/storage-stats（admin UI 観測用） | 11.1–11.5 |
@@ -245,7 +249,7 @@ vault-manager は `VaultUploadPackSpawner` が `git upload-pack` を spawn す�
 | VaultNamespaceBuilder | Service | instruction → blob/tree/commit + ref 更新 | 2.1–2.8 |
 | VaultViewComposer | Service | namespace merge → user view ref（delta merge + cache） | 4.2–4.8 |
 | VaultTreeNormalizer | Service | merged tree のエントリ名正規化（大小衝突 suffix + 名前の長さの上限） | 4.9–4.12 |
-| VaultRepoStorage | Service | bare repo object I/O 抽象 | 9.1–9.5 |
+| VaultRepoStorage | Service | bare repo object I/O 抽象 | 9.1–9.5, 12.2, 12.6 |
 | VaultPathMapper | Service | pagePath → filePath 純関数 | 3.1–3.7 |
 | VaultBlobHasher | Service | git blob OID 計算（isomorphic-git） | 2.1, 2.2 |
 | VaultUploadPackSpawner | Service | git upload-pack 子プロセス起動（検査済み本文の先頭を書き戻す） | 5.1–5.5 |
@@ -253,6 +257,7 @@ vault-manager は `VaultUploadPackSpawner` が `git upload-pack` を spawn す�
 | VaultWantGuard | Service | 本文先頭の peek + ビュー ref からの到達性確認 | 5.6–5.8 |
 | VaultSparseFilter | Service | 公開する sparse-checkout パターン集合・その object ID の算出・絞り込み指定の判定・repo への設置 | 5.9–5.11 |
 | VaultMaintenanceScheduler | Service | squash + gc 自走スケジューラ | 6.1–6.7 |
+| VaultLegacyAnonymousView | Service | 起動時に `anonymous-view` の ref・HEAD・記録を消す | 12.1–12.7 |
 | SharedSecretAuth | Middleware | Bearer token constant-time 検証 | 7.1–7.5 |
 
 ---
@@ -264,28 +269,30 @@ vault-manager は `VaultUploadPackSpawner` が `git upload-pack` を spawn す�
 | フィールド | 詳細 |
 |-----------|------|
 | Intent | apps/app からの compose-view 指示を受け、namespace 集合を tree merge して user view ref を更新する |
-| 要件 | 4.1 |
+| 要件 | 4.1, 4.7 |
 
 **API Contract**
 
 | Method | Endpoint | Auth | Body | Response | Errors |
 |--------|----------|------|------|----------|--------|
-| POST | `/internal/compose-view` | Bearer | ComposeViewRequest | ComposeViewResponse | 401, 500 |
+| POST | `/internal/compose-view` | Bearer | ComposeViewRequest | ComposeViewResponse | 400, 401, 500 |
 
 ```typescript
 // @growi/core から import
 interface ComposeViewRequest {
-  readonly userId: string | null; // null = 匿名（public namespace のみで合成）
+  readonly userId: string;      // GROWI のユーザー ID
   readonly namespaces: ReadonlyArray<string>;
 }
 
 interface ComposeViewResponse {
-  readonly viewRef: string;     // 例: 'user-<uid>-view' or 'anonymous-view'
+  readonly viewRef: string;     // 'user-<uid>-view'
   readonly commitOid: string;   // 40-char SHA-1
 }
 ```
 
 委譲先: `VaultViewComposer.compose(userId, namespaces)`
+
+`userId` が空でない文字列でなければ（`null` を含む）、合成を呼ばずに 400（`BadRequest`）を返す。view ref も `vault_user_views` の記録も作らない（要件 4.7）。型の上では `string` だが、別プロセスから届く値なので受け口で確かめる。
 
 ---
 
@@ -393,8 +400,9 @@ interface VaultNamespaceBuilder {
 
 - **upsert / remove**: `VaultPathMapper.map` で filePath を求め、blob write（content-addressed・既存 OID は no-op）→ tree を root まで再計算 → commit → `updateRef` → `vault_namespace_state.upsert({ version++ })`
 - **bulk-upsert**: revisions を `$in` 1 クエリで取得し、blob hash/write を並列（concurrency 16）化。全 entry を 1 度の tree rebuild・1 commit・1 ref update に集約する（N entries でも state は 1 step）
-- **rename-prefix / grant-change-prefix**: subtree を抽出し移動先 prefix / namespace に mount する。blob は再書き込み不要（content-addressing で OID 不変）。grant-change-prefix は両 namespace で namespace 単位 atomic に commit + updateRef
-- **reset-all**: `payload.namespace` は **undefined**（特定 namespace を対象としない全体操作）。全 namespace ref と `vault_namespace_state` / `vault_user_views` を wipe するが、**object pool は保持**し後続 upsert で content-addressing により再利用する
+- **rename-prefix**: `oldFilePrefix` の subtree を抽出し、`newFilePrefix` へ移す。移動先ディレクトリが既にあれば再帰的に合成し、同名の項目は移動先の側を残す（research.md Decision I）。自分の配下への rename では、`newPrefix` に対応するページ自身のファイルを移動せずその位置に残す。blob は再書き込み不要（content-addressing で OID 不変）
+- **grant-change-prefix**: subtree を抽出し移動先 namespace に mount する。blob は再書き込み不要。両 namespace で namespace 単位 atomic に commit + updateRef
+- **reset-all**: `payload.namespace` は **undefined**（特定 namespace を対象としない全体操作）。`refs/namespaces/` の下を丸ごと消し、`vault_namespace_state` / `vault_user_views` を wipe するが、**object pool は保持**し後続 upsert で content-addressing により再利用する。消す対象を `vault_namespace_state` の記録から決めないのは、`updateRef` と state の記録の間で失敗した namespace の ref が残り、再構築後の書き込みがその古い tree の上に積まれて、削除済みのページが残るため。view の ref と HEAD も同じく消える（`vault_user_views` も消すので、次の合成で作り直される）。`refs/vault/sparse-filters/` は `refs/namespaces/` の外にあるので残る。ロックは `vault_namespace_state` にある namespace を押さえる（`reset-all` と重なりうる書き込みは squash だけで、squash は state の記録をもとにロックするため）
 
 **Commit message フォーマット**（要件 2.8）
 
@@ -424,13 +432,13 @@ issuedAt: <iso8601>
 
 ```typescript
 interface VaultViewComposer {
-  compose(userId: string | null, namespaces: ReadonlyArray<string>): Promise<{ viewRef: string; commitOid: string }>;
+  compose(userId: string, namespaces: ReadonlyArray<string>): Promise<{ viewRef: string; commitOid: string }>;
 }
 ```
 
 **Behavior（要点）**
 
-`viewRef` は `userId ? 'user-<uid>-view' : 'anonymous-view'`。各 namespace の現 `commitOid` から `currentVersions` を構築し、既存 view の `sourceVersions` と deep-equal ならキャッシュヒットで既存 `viewCommitOid` を返す。初回は full merge（`fullMergeTreesByPath`）、それ以降は変動 namespace のみ再計算する delta merge（`applyNamespaceDeltas`、base から未変動 subtree OID を継承）。結果を commit → `updateRef` し `vault_user_views` を upsert する。
+`viewRef` は常に `user-<uid>-view` で、1 本の view は 1 人の利用者にだけ対応する（要件 4.7）。各 namespace の現 `commitOid` から `currentVersions` を構築し、既存 view の `sourceVersions` と deep-equal ならキャッシュヒットで既存 `viewCommitOid` を返す。初回は full merge（`fullMergeTreesByPath`）、それ以降は変動 namespace のみ再計算する delta merge（`applyNamespaceDeltas`、base から未変動 subtree OID を継承）。結果を commit → `updateRef` し `vault_user_views` を upsert する。
 
 **衝突解消（同一 path に複数 namespace のエントリ）**:
 優先順位: `user-<uid>-only-me` > `group-*` > `restricted-link` > `public`
@@ -459,7 +467,7 @@ view は compose のたびに namespace 群から全エントリを作り直す�
 | フィールド | 詳細 |
 |-----------|------|
 | Intent | bare repo の物理操作を抽象化する。dev local fs / self-host NFS / GROWI Cloud Filestore のいずれでも動作 |
-| 要件 | 9.1–9.5 |
+| 要件 | 9.1–9.5, 12.2, 12.6 |
 
 ```typescript
 interface VaultRepoStorage {
@@ -474,7 +482,12 @@ interface VaultRepoStorage {
   // ref 操作（POSIX atomic rename ベース）
   updateRef(refPath: string, newOid: string): Promise<void>;
   readRef(refPath: string): Promise<string | null>;
-  deleteRef(refPath: string): Promise<void>;
+
+  // namespace 全体の操作（reset-all 専用）
+  deleteAllNamespaceRefs(): Promise<void>;   // refs/namespaces/ の下を丸ごと消す
+
+  // namespace 1 つの ref と HEAD を消す。無ければ何もしない
+  deleteNamespace(namespace: string): Promise<void>;
 
   // upload-pack 用 path
   getRepoPath(): string;
@@ -495,6 +508,8 @@ interface CommitOptions {
   readonly committer: { readonly name: string; readonly email: string; readonly timestamp: number };
 }
 ```
+
+**`deleteNamespace`**: `git --git-dir <repo> update-ref -d refs/namespaces/<ns>/refs/heads/main` で ref を消し、その後で `refs/namespaces/<ns>/` のディレクトリ（HEAD ファイルを含む）を消す。ref が loose ファイルにある場合も `packed-refs` の中にある場合も消え、`packed-refs` の中のほかの ref は変えない。ほかの namespace と `refs/vault/sparse-filters/` には触れない。対象が無ければ何もしない。`readRef` を使わないので、`packed-refs` がある repo でも動く。ref を git で消す理由は research.md の Decision H を参照。
 
 ---
 
@@ -610,8 +625,14 @@ interface MaintenanceStatus {
 
 | ジョブ | トリガ | 動作 |
 |--------|--------|------|
-| **Squash** | commit 数 > N（デフォルト 1000）**または** 経過時間 > T（デフォルト 1h）。5 分間隔チェック | 現 tree OID を取得 → `parents: []` の新 commit → `updateRef` → `vault_namespace_state.version++` |
-| **GC** | 24h ごと **または** loose object 数 > L（デフォルト 50,000） | `git gc --prune=2.weeks.ago` を spawn |
+| **Squash** | commit 数 > N（デフォルト 1000）**または** 経過時間 > T（デフォルト 1h）。5 分間隔チェック。ただし前回の squash（または最初の commit）の後に書き込みがなければ何もしない | 現 tree OID を取得 → `parents: []` の新 commit → `updateRef` → `vault_namespace_state.version` を 1 に戻す |
+| **GC** | 24h ごと **または** loose object 数 > L（デフォルト 50,000） | `git -c gc.packRefs=false gc --prune=2.weeks.ago` を spawn |
+
+**ref は常に loose ファイルで保つ**: `VaultRepoStorage` の `readRef` / `updateRef` は ref ファイルを直接読み書きし、`packed-refs` を見ない。gc が ref を `packed-refs` にまとめると namespace の HEAD が「無い」と読まれ、次の instruction がその 1 ページだけの root commit で namespace を置き換えてしまう。そのため gc は `gc.packRefs=false` で実行する。それでも `packed-refs` がある場合（過去の gc や手作業の gc）は、ref を戻さずに再構築を求める。`init()` は再構築を促す error ログを出し、`readRef` は例外を投げる（instruction・view の合成・squash が失敗する）。`packed-refs` があるかどうかを確かめられないとき（ファイルが無いことを示す ENOENT 以外のエラー。NFS の一時的な I/O エラーなど）も、同じく読ませずにそのエラーを投げる。squash は名前空間ごとに失敗させず、tick の最初に `packed-refs` の有無を確かめて、squash の確認全体を 1 回だけ失敗させる（error ログは tick ごとに 1 件。名前空間の数だけログが出るのを避ける）。gc の確認はそのまま続ける。view の合成は、合成済みの view をそのまま返せる場合（ref を読まない場合）でも同じ例外を投げる。合成済みの view が、すでに 1 ページに置き換わった名前空間から作られている可能性があるため。loose ファイルがある ref も読ませないのは、過去の gc の後の書き込みで、その名前空間がそのページ 1 件に置き換わっている可能性があるため。`packed-refs` の ref を起動時に loose へ戻さないのは、再構築（`reset-all`）で消したはずの namespace ref も `packed-refs` に残ることがあり、ref だけでは生きている ref と区別できないため。再構築の `reset-all` は `packed-refs` の namespace ref を消し（sparse filter の ref などそれ以外は loose ファイルとして残す）、DB から作り直す。`packed-refs` を消すのは `reset-all` の最後にする。loose ファイルの ref・state・view の記録の削除や、未処理 instruction の処理済み化が途中で失敗したときに、`packed-refs` が残って ref が読めないままになるようにするため（先に消すと、1 ページに置き換わった loose ファイルの ref が読める状態で残る）。再構築より前に出されて未処理のまま残った instruction は、`reset-all` が処理済みにする。残すと、再構築の後の起動時に古い instruction が再実行され、ページが古い版に戻ったり、削除・権限変更が取り消されたりする
+
+**書き込みのない namespace は squash し直さない**: squash は、ロックの中で HEAD を読み、`vault_namespace_state` の `version` が 1 で、かつ `commitOid` が HEAD と同じなら何もしない。経過時間の条件は `updatedAt` で判定するので、書き込みのない namespace は毎回この条件に当たる。そのたびに squash すると、tree は同じなのに commit OID だけが変わり、その namespace を含む view がすべて作り直される。`version` が 1 になるのは最初の commit と squash の直後だけで、どちらも親なし commit なので、この 2 つが成り立てば履歴は commit 1 つである。HEAD の commit を git から読んで親の有無を確かめる方法は採らない。何もしないと判定した namespace は `updatedAt` が変わらず 5 分ごとに判定し直すことになり、commit が pack に入っていると、isomorphic-git はそのたびに pack ファイル全体を読むため。`commitOid` も比べるのは、state の記録が ref とずれている場合（`updateRef` の後で state の更新に失敗した場合）に squash して、ずれを直すため
+
+**再利用する object は更新時刻を新しくする**: `writeBlob` / `writeTree` / `writeCommit` は、書き込みの後でその loose object の更新時刻を現在時刻にする。isomorphic-git は同じ object の loose ファイルがすでにあると書き込みを省き、更新時刻も変えない。そのままだと、2 週間より古く、どの ref からもたどれない object を書き込みが再利用した後、ref がそれを指す前に `gc --prune=2.weeks.ago` が走ると、その object が消される（bulk-upsert は blob をすべて書き終えてから tree と commit を作るので、この間隔は長くなりうる）。git 自身も既存の object を再利用するときに更新時刻を新しくしている。更新時刻を変えようとした時点で loose ファイルが無ければ（prune が直前に消した場合）、もう一度書き込む。pack の中にしかない object は、isomorphic-git が loose ファイルを新しく書くので、追加の処理は要らない（実測は research.md の「gc と object の再利用」）
 
 **env var override**: `VAULT_SQUASH_COMMIT_THRESHOLD` / `VAULT_SQUASH_AGE_HOURS` / `VAULT_GC_INTERVAL_HOURS` / `VAULT_GC_LOOSE_OBJECT_THRESHOLD`
 
@@ -702,8 +723,8 @@ interface MaintenanceStatus {
 ```
 {
   _id: ObjectId,
-  userId: ObjectId | null,    // null = anonymous (singleton row)
-  viewRef: string,            // 'user-<uid>-view' or 'anonymous-view'
+  userId: string,             // 必須。GROWI のユーザー ID（ObjectId の文字列）
+  viewRef: string,            // 'user-<uid>-view'
   viewCommitOid: string,      // 40-char SHA-1
   mergedTreeOid: string,      // delta merge の base として利用される merged tree OID
   sourceVersions: { [namespace: string]: string },  // namespace → commitOid スナップショット
@@ -740,7 +761,6 @@ refs/namespaces/public/refs/heads/main                   # 公開ページ tree
 refs/namespaces/group-<gid>/refs/heads/main             # グループ ACL ページ tree
 refs/namespaces/user-<uid>-only-me/refs/heads/main      # only-me ページ tree
 refs/namespaces/user-<uid>-view/refs/heads/main         # per-user 合成 view ref
-refs/namespaces/anonymous-view/refs/heads/main          # 匿名 view ref
 ```
 
 ---
@@ -752,11 +772,13 @@ refs/namespaces/anonymous-view/refs/heads/main          # 匿名 view ref
 | エラー種別 | HTTP 応答 | 挙動 |
 |-----------|---------|------|
 | shared secret 不一致 | 401 Unauthorized | SharedSecretAuth が全 endpoint に適用 |
+| compose-view の `userId` が空でない文字列でない | 400 Bad Request | ComposeViewController が合成の前に拒否する。view も記録も作らない（要件 4.7） |
 | compose-view 処理失敗 | 500 Internal Server Error | VaultViewComposer の例外をキャッチしてログ記録 |
 | upload-pack spawn 失敗 | 502 Bad Gateway | GitProxyController がプロセスエラーをキャッチ |
 | instruction 処理失敗 | — | `attempts++` / `lastError` 記録、次回 drain で retry |
 | MongoDB 接続失失 | 503（health endpoint） | watcher は接続回復まで待機、health は 503 |
 | bare repo 到達不能 | 503（health endpoint） | health check で fs アクセスを確認 |
+| 起動時の片付けの失敗 | — | error ログに残して起動を続け、次の起動で再試行（要件 12.4、本書「起動時の片付け」） |
 
 ### Monitoring
 
@@ -784,6 +806,7 @@ refs/namespaces/anonymous-view/refs/heads/main          # 匿名 view ref
 - **ビュー外 object の取得禁止**: `uploadpack.allowAnySHA1InWant=false`（git デフォルト）だけでは commit の直接取得しか防げない（ファイルの中身とディレクトリ一覧はビューを越えて取得できた。git 2.49.0 で実測）。そのため GitProxyController が upload-pack 起動前にクライアントの要求を検査し、ビュー ref からたどれない object の要求を拒否する（要件 5.6・5.7、本書「ビュー外 object の要求の拒否」）
 - **pages コレクション非アクセス**: vault-manager は `revisions` のみ ID 指定 body lookup（namespace 判定は apps/app に集約済み）
 - **情報漏洩防止**: namespace 集合は apps/app が ACL 評価済みで渡す。vault-manager は受け取った namespace をそのまま処理するのみ
+- **view は利用者ごと**: compose-view は `userId` が空でない文字列の依頼だけを受け付け、view ref は常に `user-<uid>-view` とする（要件 4.7）。view を複数の相手で共有しないので、view の履歴を通じて、ある相手に返した内容が別の相手に渡ることはない（`../growi-vault-gateway/research.md` の「漏れの経路」参照）
 
 ---
 
@@ -862,11 +885,48 @@ git の絞り込み指定のうち、**除外をサーバ側で適用して 1 �
 - 公開した集合以外の `sparse:oid` は拒否する（要件 5.9）。任意の object を指定できると、返ってくるパスの集合からその object の内容を推し量る余地が生じる（実測で応答サイズに差が出た）
 - クライアントは同じパターンをローカルの sparse-checkout にも設定する必要がある。設定しないと checkout がサーバの除外したファイルを要求し、要件 5.6 の検査に拒否される
 
-削減幅の実測（20,000 ページ・うち 5,000 が `user/` 配下）: 6,269,214 → 4,815,099 バイト（23.2%）。詳細と他案との比較は [`research.md`](./research.md)。
+削減幅の実測（20,000 ページ・うち 5,000 が `user/` 配下）: 6,269,214 → 4,815,099 バイト（23.2%）。詳細と他案との比較は [`research.md`](./research.md) の「転送量を絞る手段 — git の絞り込み指定の比較」と Decision D。
+
+---
+
+## 起動時の片付け
+
+要件 12 に対応する。以前の版が作った、利用者に対応しない共有の view（`anonymous-view`）を、起動のたびに bare repo と `vault_user_views` から取り除く。共有の view を残さない理由は [`../growi-vault-gateway/research.md`](../growi-vault-gateway/research.md) の「漏れの経路」、起動時に行う理由と失敗しても起動を続ける理由は [`research.md`](./research.md) の Decision F・G を参照。
+
+### 対象
+
+- bare repo の `refs/namespaces/anonymous-view/`（`refs/heads/main` の ref と HEAD ファイル）
+- `vault_user_views` の、`userId` が null の記録。`{ userId: { $type: 'null' } }` で選ぶので、`userId` フィールドを持たない文書は対象にしない
+
+### 実装
+
+`vault-legacy-anonymous-view.ts` の `removeLegacyAnonymousView()` が行う。`anonymous-view` という名前と記録の選び方はこのファイルだけが持ち、`VaultUserViewModel` に片付け専用の static は置かない。
+
+`server-runtime.ts` が、`initRepo()`（要件 9.1）の直後、`installSparseFilters()`（要件 5.10）と instruction watcher の開始（要件 1.1）より前に呼ぶ。
+
+1. `VaultRepoStorage.deleteNamespace('anonymous-view')` で ref と HEAD を消す（本書「VaultRepoStorage」）
+2. 1 が成功したときだけ、`VaultUserViewModel.deleteMany({ userId: { $type: 'null' } })` で記録を消す
+
+- **毎回の起動で実行する**: どちらの手順も、対象が無ければ何もしない（要件 12.3）
+- **失敗しても起動を止めない**: 例外は投げず、error ログを 1 件残して起動を続ける。次の起動でもう一度試みる（要件 12.4）。1 で失敗した場合、記録は消さずに残る
+- **再構築は要らない**: `reset-all` を経ずに、その場で消す（要件 12.5）
+- **ほかには触れない**: 消すのは `refs/namespaces/anonymous-view/` のディレクトリ 1 つと、`userId` が null の記録だけである。利用者の view、コンテンツの namespace、`refs/vault/sparse-filters/` は変えない（要件 12.6）
+
+### `packed-refs` との関係
+
+`deleteNamespace` は `readRef` を使わないので、`packed-refs` がある repo（本書「VaultMaintenanceScheduler」の「ref は常に loose ファイルで保つ」で、再構築を求める状態）でも片付けは動く。`packed-refs` からは対象の ref の行だけを消し、ほかの ref は変えない。そのため、ほかの namespace について再構築が必要な状態は、片付けの後も残る（片付けはその状態を隠さない）。その状態は再構築で解消する。
+
+### 消した後の object
+
+`anonymous-view` の履歴からしかたどれない object は、周期 gc（`--prune=2.weeks.ago`、要件 6.4）が消すまで object pool に残る。その間も、clone / fetch が受け取れるのは自分の view の ref からたどれる object だけなので（本書「ビュー外 object の要求の拒否」）、どの利用者にも返らない（要件 12.7）。
+
+### 削除してよい時期
+
+すべての環境で片付けが済んだ後は、何もしない処理になる。次のメジャー版で、このファイルと呼び出しを削除してよい。
 
 ## 参考情報
 
-- [git namespaces](https://git-scm.com/docs/gitnamespaces) — `GIT_NAMESPACE` 環境変数の仕様。読み取りのアクセス制御には使えないことも明記されている（[research.md](./research.md) 参照）
+- [git namespaces](https://git-scm.com/docs/gitnamespaces) — `GIT_NAMESPACE` 環境変数の仕様。読み取りのアクセス制御には使えないことも明記されている（[research.md](./research.md) の「`GIT_NAMESPACE` は読み取りの隔離にならない」参照）
 - [git smart HTTP protocol](https://git-scm.com/docs/http-protocol) — upload-pack wire format
 - [isomorphic-git GitHub](https://github.com/isomorphic-git/isomorphic-git) — v1.37.x API リファレンス
 - [MongoDB change streams](https://www.mongodb.com/docs/manual/changeStreams/) — resume token の挙動

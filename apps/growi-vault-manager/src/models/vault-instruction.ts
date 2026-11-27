@@ -80,6 +80,12 @@ export interface IVaultInstructionModel
    * Increments attempts and records lastError for the given document _id.
    */
   appendFailure(id: string, errorMessage: string): Promise<void>;
+
+  /**
+   * Marks every still-unprocessed instruction issued before `issuedAt` as
+   * processed, so a startup drain never replays it.
+   */
+  supersedeUnprocessedBefore(issuedAt: Date): Promise<void>;
 }
 
 // ---- Main schema ----
@@ -199,6 +205,16 @@ vaultInstructionSchema.statics.appendFailure = async function (
   await this.updateOne(
     { _id: id },
     { $inc: { attempts: 1 }, $set: { lastError: errorMessage } },
+  );
+};
+
+vaultInstructionSchema.statics.supersedeUnprocessedBefore = async function (
+  this: IVaultInstructionModel,
+  issuedAt: Date,
+): Promise<void> {
+  await this.updateMany(
+    { processedAt: null, issuedAt: { $lt: issuedAt } },
+    { $set: { processedAt: new Date() } },
   );
 };
 

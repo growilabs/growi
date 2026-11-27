@@ -86,6 +86,7 @@
 - `PageView.tsx` の `inlineCommentAnchors`／`bodyInlineComments`／`visibleResolvedRanges` が別の理由で変更された場合、「アンカー解決とスクロールナビゲーションは解決済みコメントも含めた全件に対して行う（`inlineCommentAnchors`は未フィルタのまま）」「本文中のハイライト・当たり判定・ポップオーバーだけを解決済み除外した`visibleResolvedRanges`経由で描画する」という2段構えの分離が保たれているか再確認する必要がある。`inlineCommentAnchors`自体を`.filter((c) => c.resolvedAt == null)`してしまうと、一覧クリックでの解決済みコメントへのスクロールナビゲーション（Requirement 16.1）が壊れる（`scrollToRange` が解決済みコメントを見つけられなくなる）
 - `removeWithReplies` の挙動（例えば `isInline` によるフィルタが追加される等）が変わった場合、起点コメント削除時の返信道連れ削除が引き続き機能するか再確認する必要がある
 - `IInlineComment`／`InlineCommentReply` の形（フィールドの追加・削除）が変わった場合、更新用DTOとサービス側の行形状チェック（起点／返信の判別）を再確認する必要がある
+- 書き込み系7ルートのパス、HTTP メソッド、入力、応答の項目を変える場合、同じ変更で各ルートの `@swagger` を直す。7ルートは公開 API 仕様に載っており（要件25）、パスと HTTP メソッドから SDK の関数名が、入力と応答の項目から SDK の型が生成されるため、変更は growi-sdk-typescript と GROWI MCP サーバーの利用者に影響する
 - `packages/editor` の `useCodeMirrorEditorIsolated`（共有atomのライフサイクル）が変わる場合、`MentionAwareCommentInput` の一度きりの`initialValue`適用（マウント時1回だけ`initDoc`）が引き続き成立するか再確認する必要がある。前提にしている2つの性質（初期化が終わっていないエディタをatomに入れない／エディタを持つ側のアンマウント時にatomを空に戻す）は`packages/editor`側の一般的な振る舞いであり、他の`CodeMirrorEditorComment`利用箇所（通常コメントの返信・編集）も同じ振る舞いの上で動いている
 - `InlineCommentItem` は折りたたみの状態を自分で持たず、`collapsed`／`onExpand`／`onCollapse` を親から受け取る。`InlineCommentItem` を使う呼び出し元（現在は `PageComment` のみ）が増えたときは、その呼び出し元でも `use-resolved-collapse` を通して状態を渡しているか再確認する
 - 「解決済みは既定で折りたたむ」という表示規則があるため、一覧で解決済みコメントの本文・返信が見えている前提の機能（一覧からハイライトへのスクロール、E2E）を足すときは、折りたたみ中でも成り立つか再確認する。折りたたみ中も引用文は押せてスクロールできる
@@ -526,6 +527,8 @@ interface InlineCommentService {
 | PUT | `/_api/v3/inline-comments/replies/:id` | `UpdateInlineCommentReplyRequestBody`（`{ comment: string }`） | `{ inlineCommentReply: InlineCommentReply }` | 400（入力の検証エラー、`:id`が返信でない〔`inline-comment-not-reply`〕、サービスの失敗〔`inline-comment-update-failed`〕、または読み取り専用利用者にコメントが許可されていない）, 403（投稿者でない。`inline-comment-forbidden`）, 404（`:id`が存在しない〔`inline-comment-not-found`〕、または`:id`が属するページが存在しないか閲覧権限がない〔`notfound_or_forbidden`〕。ステータスはどちらも404だが、コードは異なる） |
 | DELETE | `/_api/v3/inline-comments/:id` | — | `{}` | 400（入力の検証エラー、`:id`が起点コメントでない〔`inline-comment-not-origin`〕、サービスの失敗〔`inline-comment-delete-failed`〕、または読み取り専用利用者にコメントが許可されていない）, 403（投稿者でない。`inline-comment-forbidden`）, 404（`:id`が存在しない〔`inline-comment-not-found`〕、または`:id`が属するページが存在しないか閲覧権限がない〔`notfound_or_forbidden`〕。ステータスはどちらも404だが、コードは異なる） |
 | DELETE | `/_api/v3/inline-comments/replies/:id` | — | `{}` | 400（入力の検証エラー、`:id`が返信でない〔`inline-comment-not-reply`〕、サービスの失敗〔`inline-comment-delete-failed`〕、または読み取り専用利用者にコメントが許可されていない）, 403（投稿者でない。`inline-comment-forbidden`）, 404（`:id`が存在しない〔`inline-comment-not-found`〕、または`:id`が属するページが存在しないか閲覧権限がない〔`notfound_or_forbidden`〕。ステータスはどちらも404だが、コードは異なる） |
+
+7ルートの入力、応答、エラーは、各ルートの `@swagger` で公開 API 仕様（apiv3）にも記述する（要件25）。共通の型（`InlineCommentAnchor`／`InlineComment`／`InlineCommentReply`）は `create.ts` の `@swagger` に置く。
 
 サービスが投げた例外は500にならず、上記の `*-failed` コードの400として返る。ただし、`try` の外の処理（対象行の照会、ページの閲覧権限の確認など）で例外が出た場合は500になりうる。
 

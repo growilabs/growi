@@ -13,8 +13,6 @@
  * They do NOT assert on:
  *  - "any markdown file exists" (fixture-dependent generic check)
  *  - Filenames the implementation never produces (e.g. 'root.md')
- *  - git's auth-fallback behaviour (this is a git client property,
- *    not a vault gateway contract — verified at the HTTP layer below)
  */
 
 import { execFile } from 'node:child_process';
@@ -27,7 +25,13 @@ import mongoose from 'mongoose';
 import { afterAll, describe, expect, it } from 'vitest';
 import { mock } from 'vitest-mock-extended';
 
+import type { PageUpdateManyEventExtras } from '~/server/events/page';
+
 import { getVaultE2eHandle } from '../../../../test/setup/vault-e2e';
+import {
+  createVaultDescendantsRenameHandler,
+  type RenamedDescendant,
+} from '../server/services/vault-descendants-rename-handler';
 import { vaultNamespaceMapper } from '../server/services/vault-namespace-mapper';
 import { createVaultPageUpdateHandler } from '../server/services/vault-page-update-handler';
 import { VAULT_E2E_CONFIG, VAULT_E2E_PAGES } from './fixture-contract';
@@ -40,36 +44,15 @@ const execFileAsync = promisify(execFile);
 
 const vaultRepoUrl = (): string => `${VAULT_E2E_CONFIG.baseUrl}/vault.git`;
 
-/**
- * Clone the vault repo with an explicit Authorization header.
- *
- * git's default behaviour is to issue the first `/info/refs` request WITHOUT
- * credentials and only retry with credentials if the server returns 401.
- * Because our gateway intentionally allows anonymous access to the public
- * namespace, an unauthenticated probe succeeds — and git never sends the
- * credentials embedded in the URL.
- *
- * For the integration test we need every request to carry the PAT so the
- * gateway resolves the user, ACL filters the view, and the clone includes
- * the user's GRANT_OWNER pages. We inject the header via `http.extraheader`
- * which applies to every HTTP request issued by `git clone`.
- */
+/** Clone with the PAT as URL credentials; git sends them after the gateway's 401 challenge. */
 async function cloneAuthenticated(pat: string): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), 'growi-vault-clone-'));
-  const auth = Buffer.from(`x:${pat}`).toString('base64');
-  await execFileAsync('git', [
-    '-c',
-    `http.extraheader=Authorization: Basic ${auth}`,
-    'clone',
-    vaultRepoUrl(),
-    dir,
-  ]);
-  return dir;
-}
-
-async function cloneAnonymous(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), 'growi-vault-clone-'));
-  await execFileAsync('git', ['clone', vaultRepoUrl(), dir]);
+  const url = new URL(vaultRepoUrl());
+  url.username = 'x';
+  url.password = pat;
+  await execFileAsync('git', ['clone', url.toString(), dir], {
+    env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+  });
   return dir;
 }
 
@@ -171,20 +154,6 @@ describe('GROWI Vault — clone E2E contract', () => {
   });
 
   // ----------------------------------------------------------------------
-  // Contract: an anonymous clone returns the public namespace only —
-  // never any page that requires authentication.
-  // ----------------------------------------------------------------------
-  it('anonymous clone includes public pages and excludes admin-only page', async () => {
-    const dir = await cloneAnonymous();
-    tmpDirs.push(dir);
-
-    const files = new Set(await listFiles(dir));
-    expect(files.has(VAULT_E2E_PAGES.publicRoot.mappedFile)).toBe(true);
-    expect(files.has(VAULT_E2E_PAGES.publicDeep.mappedFile)).toBe(true);
-    expect(files.has(VAULT_E2E_PAGES.adminOnly.mappedFile)).toBe(false);
-  });
-
-  // ----------------------------------------------------------------------
   // Contract: a single-page rename relocates the page's blob — the OLD
   // mapped file disappears and the NEW mapped file appears in the clone.
   //
@@ -235,7 +204,7 @@ describe('GROWI Vault — clone E2E contract', () => {
     // The old file must exist before the rename (guards against a false
     // positive where the assertion below passes only because nothing was
     // ever materialised).
-    const beforeDir = await cloneAnonymous();
+    const beforeDir = await cloneAuthenticated(VAULT_E2E_CONFIG.admin.pat);
     tmpDirs.push(beforeDir);
     const beforeFiles = new Set(await listFiles(beforeDir));
     expect(beforeFiles.has(oldFile)).toBe(true);
@@ -263,7 +232,7 @@ describe('GROWI Vault — clone E2E contract', () => {
     await new Promise((r) => setTimeout(r, 500));
 
     // Step 3: clone again and assert the relocation took effect.
-    const afterDir = await cloneAnonymous();
+    const afterDir = await cloneAuthenticated(VAULT_E2E_CONFIG.admin.pat);
     tmpDirs.push(afterDir);
     const afterFiles = new Set(await listFiles(afterDir));
 
@@ -329,16 +298,15 @@ describe('GROWI Vault — clone E2E contract', () => {
         grantedGroups: [],
         ...grantState,
       });
-    const cloneHasFile = async (pat: string | null): Promise<boolean> => {
-      const dir =
-        pat == null ? await cloneAnonymous() : await cloneAuthenticated(pat);
+    const cloneHasFile = async (pat: string): Promise<boolean> => {
+      const dir = await cloneAuthenticated(pat);
       tmpDirs.push(dir);
       return (await listFiles(dir)).includes(file);
     };
     // vault-manager applies instructions asynchronously (and plain upserts
     // first sit in the coalesce buffer), so clone until the state is reached.
     const expectCloneEventually = async (
-      pat: string | null,
+      pat: string,
       expected: 'has the file' | 'lacks the file',
     ): Promise<void> => {
       await expect
@@ -350,7 +318,6 @@ describe('GROWI Vault — clone E2E contract', () => {
       pageWith({ grant: PageGrant.GRANT_PUBLIC, grantedUsers: [] }),
     );
 
-    await expectCloneEventually(null, 'has the file');
     await expectCloneEventually(VAULT_E2E_CONFIG.admin.pat, 'has the file');
 
     await handlePageUpdate(pageWith(onlyMeGrantState), {
@@ -359,19 +326,181 @@ describe('GROWI Vault — clone E2E contract', () => {
       previousGrantedUsers: [],
     });
 
-    await expectCloneEventually(null, 'lacks the file');
     await expectCloneEventually(VAULT_E2E_CONFIG.admin.pat, 'lacks the file');
     await expectCloneEventually(VAULT_E2E_CONFIG.member.pat, 'has the file');
+  });
+
+  // ----------------------------------------------------------------------
+  // Contract: renaming a page with descendants relocates the descendant
+  // files in the clone. The handler is fed what PageService emits: one
+  // 'updateMany' per batch of descendants, all carrying the same operation.
+  // ----------------------------------------------------------------------
+  describe('descendant rename', () => {
+    type SeededPage = RenamedDescendant & {
+      readonly body: string;
+      readonly revision: mongoose.Types.ObjectId;
+    };
+
+    /** Publishes public pages and waits until the admin clone has their files. */
+    const seedPublicPages = async (
+      paths: readonly string[],
+    ): Promise<SeededPage[]> => {
+      const pages = paths.map((path) => ({
+        _id: new mongoose.Types.ObjectId(),
+        revision: new mongoose.Types.ObjectId(),
+        path,
+        body: `# ${path}\n`,
+        grant: PageGrant.GRANT_PUBLIC,
+        grantedGroups: [],
+        grantedUsers: [],
+      }));
+      await db()
+        .collection('revisions')
+        .insertMany(
+          pages.map((p) => ({ _id: p.revision, body: p.body, pageId: p._id })),
+        );
+      const { dispatcher } = getVaultE2eHandle();
+      await Promise.all(
+        pages.map((page) =>
+          dispatcher.onPageChanged({
+            type: 'update',
+            page,
+            revisionId: page.revision.toString(),
+          }),
+        ),
+      );
+      await expect
+        .poll(async () => adminCloneFiles(), { timeout: 30_000, interval: 500 })
+        .toEqual(expect.arrayContaining(paths.map(mappedFile)));
+      return pages;
+    };
+
+    const mappedFile = (path: string): string => `${path.slice(1)}.md`;
+
+    const adminCloneFiles = async (): Promise<string[]> => {
+      const dir = await cloneAuthenticated(VAULT_E2E_CONFIG.admin.pat);
+      tmpDirs.push(dir);
+      return listFiles(dir);
+    };
+
+    const adminCloneAfterDrain = async (): Promise<{
+      files: string[];
+      read: (file: string) => Promise<string>;
+    }> => {
+      await waitForInstructionsDrained(30_000);
+      const dir = await cloneAuthenticated(VAULT_E2E_CONFIG.admin.pat);
+      tmpDirs.push(dir);
+      return {
+        files: await listFiles(dir),
+        read: (file) => readFile(join(dir, file), 'utf-8'),
+      };
+    };
+
+    /** Emits the descendants one per batch, as one rename operation. */
+    const renameDescendantsInBatches = async (
+      descendants: readonly SeededPage[],
+      oldPagePathPrefix: string,
+      newPagePathPrefix: string,
+    ): Promise<void> => {
+      const handleDescendantsRenamed = createVaultDescendantsRenameHandler(
+        getVaultE2eHandle().dispatcher,
+        vaultNamespaceMapper,
+      );
+      const rename: PageUpdateManyEventExtras = {
+        scope: 'subtree',
+        oldPagePathPrefix,
+        newPagePathPrefix,
+        operation: {},
+      };
+      for (const page of descendants) {
+        // biome-ignore lint/performance/noAwaitInLoops: batches arrive one after another
+        await handleDescendantsRenamed([page], rename);
+      }
+    };
+
+    it('moves every descendant file to the new directory with its body unchanged', async () => {
+      const descendants = await seedPublicPages([
+        '/vault-e2e-subtree/a/x',
+        '/vault-e2e-subtree/a/deep/y',
+      ]);
+
+      await renameDescendantsInBatches(
+        descendants,
+        '/vault-e2e-subtree/a',
+        '/vault-e2e-subtree/c',
+      );
+
+      const clone = await adminCloneAfterDrain();
+      expect(clone.files).not.toContain('vault-e2e-subtree/a/x.md');
+      expect(clone.files).not.toContain('vault-e2e-subtree/a/deep/y.md');
+      expect(await clone.read('vault-e2e-subtree/c/x.md')).toBe(
+        descendants[0].body,
+      );
+      expect(await clone.read('vault-e2e-subtree/c/deep/y.md')).toBe(
+        descendants[1].body,
+      );
+    });
+
+    it('keeps the files already in the destination directory', async () => {
+      const [existing, ...descendants] = await seedPublicPages([
+        '/vault-e2e-merge/c/existing',
+        '/vault-e2e-merge/a/x',
+      ]);
+
+      await renameDescendantsInBatches(
+        descendants,
+        '/vault-e2e-merge/a',
+        '/vault-e2e-merge/c',
+      );
+
+      const clone = await adminCloneAfterDrain();
+      expect(await clone.read('vault-e2e-merge/c/existing.md')).toBe(
+        existing.body,
+      );
+      expect(await clone.read('vault-e2e-merge/c/x.md')).toBe(
+        descendants[0].body,
+      );
+    });
+
+    it('renames a page under itself without nesting its files any deeper', async () => {
+      const [renamedPage, ...descendants] = await seedPublicPages([
+        '/vault-e2e-nest/a',
+        '/vault-e2e-nest/a/x',
+        '/vault-e2e-nest/a/y',
+      ]);
+
+      // PageService emits 'rename' for the page itself before it renames
+      // the descendants.
+      await getVaultE2eHandle().dispatcher.onPageRenamed({
+        page: renamedPage,
+        oldPath: '/vault-e2e-nest/a',
+        newPath: '/vault-e2e-nest/a/b',
+        revisionId: renamedPage.revision.toString(),
+      });
+      await renameDescendantsInBatches(
+        descendants,
+        '/vault-e2e-nest/a',
+        '/vault-e2e-nest/a/b',
+      );
+
+      const clone = await adminCloneAfterDrain();
+      expect(
+        clone.files.filter((f) => f.startsWith('vault-e2e-nest/')).sort(),
+      ).toEqual([
+        'vault-e2e-nest/a/b.md',
+        'vault-e2e-nest/a/b/x.md',
+        'vault-e2e-nest/a/b/y.md',
+      ]);
+    });
   });
 
   // ----------------------------------------------------------------------
   // Contract: the gateway authenticates against the PAT supplied in HTTP
   // Basic Auth. An invalid PAT must yield 401.
   //
-  // We probe the HTTP layer directly because `git clone` will silently
-  // retry without credentials after a 401 — that's a git client property,
-  // not a vault contract. The vault contract is "Authorization: Basic
-  // <bad-pat> → 401".
+  // We probe the HTTP layer directly: the vault contract is
+  // "Authorization: Basic <bad-pat> → 401", while a failing `git clone`
+  // would only show how the git client reports it.
   // ----------------------------------------------------------------------
   it('HTTP request with invalid PAT returns 401', async () => {
     const url = `${VAULT_E2E_CONFIG.baseUrl}/vault.git/info/refs?service=git-upload-pack`;

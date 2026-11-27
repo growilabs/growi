@@ -38,10 +38,10 @@
 1. `op: 'upsert'` instruction を受信したとき、VaultNamespaceBuilder は revision body を取得し、blob を書き込み、namespace tree の該当エントリを更新し、新しい commit を作成して namespace ref を更新する
 2. `op: 'bulk-upsert'` instruction を受信したとき、VaultNamespaceBuilder は `$in` で全 revisionId の body を 1 クエリで取得し、全 blob を書き込み、namespace tree を 1 度だけ rebuild し、1 件の commit で namespace ref を更新する
 3. `op: 'remove'` instruction を受信したとき、VaultNamespaceBuilder は namespace tree から当該 filePath のエントリを削除し、新しい commit を作成して namespace ref を更新する
-4. `op: 'rename-prefix'` instruction を受信したとき、VaultNamespaceBuilder は `oldFilePrefix` 配下の subtree を抽出して `newFilePrefix` 下に mount し、blob の再書き込みなしで namespace ref を更新する
+4. `op: 'rename-prefix'` instruction を受信したとき、VaultNamespaceBuilder は `oldFilePrefix` 配下の subtree を `newFilePrefix` へ移し、blob の再書き込みなしで namespace ref を更新する。移動先ディレクトリが既にあれば再帰的に合成し、同名の項目は移動先の側を残す。`newFilePrefix` が `oldFilePrefix` の配下にある（自分の配下への rename）とき、`newPrefix` に対応するページ自身のファイルは移動せずその位置に残す
 5. `op: 'grant-change-prefix'` instruction を受信したとき、VaultNamespaceBuilder は `fromNamespace` の subtree を切り離し、`namespace`（移動先）側に mount し、両 namespace の ref を更新する
 6. `op: 'reset-all'` instruction を受信したとき、VaultNamespaceBuilder は全 namespace の ref を削除し、`vault_namespace_state` と `vault_user_views` の全 doc を削除する。object pool は削除しない
-7. 同一 instruction を複数回実行したとき、VaultNamespaceBuilder はいずれの op 種別においても同一の namespace ref 状態に収束する（冪等性）
+7. 同一 instruction を複数回実行したとき、VaultNamespaceBuilder はいずれの op 種別においても同一の namespace ref 状態に収束する（冪等性）。ただし現状、移動先が移動元の配下にある `rename-prefix`（`/a` → `/a/b`）は冪等でない。2 回実行すると、移動したディレクトリがもう一段入れ子になる
 8. VaultNamespaceBuilder が commit を作成したとき、commit message は `vault: <namespace> [op] <pagePath or "N entries">` の形式を持ち、op / pageId / revisionId / entryCount / issuedAt 等のメタデータを含む
 
 ---
@@ -74,7 +74,7 @@
 4. `sourceVersions` が不一致のとき、VaultViewComposer は変動した namespace の subtree のみ再計算する delta merge を実行し、新しい merged tree を作成する
 5. VaultViewComposer が初回 compose（`vault_user_views` に既存なし）を実行したとき、全 namespace を full merge して新しい view ref を作成する
 6. 同一 path に複数 namespace からのエントリが衝突するとき、VaultViewComposer は `user-<uid>-only-me` > `group-*` > `restricted-link` > `public` の優先順位で解決する
-7. `userId: null` を受信したとき、VaultViewComposer は public namespace のみで合成して `anonymous-view` ref を返す
+7. `userId` が空でない文字列でない（`null` を含む）compose-view の依頼を受信したとき、ComposeViewController は 400 を返してその依頼を拒否し、view ref も `vault_user_views` の記録も作らない。VaultViewComposer が作る view ref は常に `user-<uid>-view` であり、1 本の view は 1 人の利用者にだけ対応する
 8. VaultViewComposer が delta merge の base tree が gc により消失していることを検知したとき、full merge にフォールバックする
 9. VaultViewComposer は merged tree を生成したのち、その view の最終ファイル構造を確定する **tree 正規化**（大小衝突解消）を実行する。正規化は merged tree の構造のみから決定論的に導出され、reverse-index コレクションを必要としない
 10. （大小衝突解消）同一ディレクトリ直下で、小文字化して一致する名前が 2 件以上存在するとき（blob・subtree の双方を対象）、VaultViewComposer は各メンバーの名前に `__<hash8>` suffix を付与して衝突を解消する。`hash8` は当該エントリの suffix 付与前 filePath の SHA-1 先頭 8 文字とする
@@ -114,11 +114,11 @@
 #### 受け入れ基準
 
 1. vault-manager が起動したとき、VaultMaintenanceScheduler は 5 分間隔で namespace ref の commit 数と経過時間を確認する
-2. namespace ref の commit 数が閾値（デフォルト 1000）を超えたとき、または最終 squash から経過時間が閾値（デフォルト 1 時間）を超えたとき、VaultMaintenanceScheduler は対象 namespace を squash する
-3. squash を実行したとき、VaultMaintenanceScheduler は現在の tree OID を取得し、`parents: []` で新しい commit を作成し、namespace ref を上書きし、`vault_namespace_state.version` をインクリメントする
-4. loose object 数が閾値（デフォルト 50,000）を超えたとき、または前回 gc から 24 時間が経過したとき、VaultMaintenanceScheduler は `git gc --prune=2.weeks.ago` を spawn する
+2. namespace ref の commit 数が閾値（デフォルト 1000）を超えたとき、または最終 squash から経過時間が閾値（デフォルト 1 時間）を超えたとき、VaultMaintenanceScheduler は対象 namespace を squash する。ただし、前回の squash（まだ squash していなければ最初の commit）の後に書き込みがない namespace は squash しない
+3. squash を実行したとき、VaultMaintenanceScheduler は現在の tree OID を取得し、`parents: []` で新しい commit を作成し、namespace ref を上書きし、`vault_namespace_state.version` を 1 に戻す
+4. loose object 数が閾値（デフォルト 50,000）を超えたとき、または前回 gc から 24 時間が経過したとき、VaultMaintenanceScheduler は `git gc --prune=2.weeks.ago` を spawn する。このとき ref を `packed-refs` にまとめず、loose ファイルのまま保つ
 5. 環境変数 `VAULT_SQUASH_COMMIT_THRESHOLD` / `VAULT_SQUASH_AGE_HOURS` / `VAULT_GC_INTERVAL_HOURS` / `VAULT_GC_LOOSE_OBJECT_THRESHOLD` を設定したとき、VaultMaintenanceScheduler はそれらの値でデフォルト閾値を上書きする
-6. squash または gc の実行中に同一 namespace への upsert instruction が発生したとき、VaultMaintenanceScheduler は該当 namespace の処理を in-flight 状態として管理し、squash と instruction 処理を直列化する（他の namespace は blocking しない）
+6. 同一 namespace に対する squash と instruction 処理が重なるとき、VaultMaintenanceScheduler と VaultNamespaceBuilder はそれらを直列化する（他の namespace は blocking しない）。gc は namespace の ref を書き換えないため、直列化の対象としない
 7. VaultMaintenanceScheduler が起動したとき、外部の cron job、k8s CronJob、または systemd timer なしに動作する
 
 ---
@@ -188,3 +188,19 @@
 3. `looseObjectCount` および `repoSizeBytes` の取得は bare repo ディレクトリの低コストなファイルシステム操作（`fs.stat` / `git count-objects` 相当）で行い、O(repo size) の重い処理を行わない
 4. `lastSquashAt` および `lastGcAt` は `VaultMaintenanceScheduler.getStatus()` の値を返し、未実行時は null を返す
 5. ストレージ統計の集計に失敗したとき、StorageStatsController は 500 を返し、エラー詳細をログに記録する
+
+---
+
+### 要件 12: 利用者に対応しない view の起動時の片付け
+
+**目的**: システム管理者として、以前の版が作った、利用者に対応しない共有の view（`anonymous-view`）とその記録が、vault-manager を更新して起動するだけで取り除かれてほしい。これにより、共有の view の履歴に残った過去の内容を、bare repo から取り出せる状態が残らない。
+
+#### 受け入れ基準
+
+1. vault-manager が起動したとき、vault-manager は bare repo の初期化（要件 9.1）の後、sparse-checkout パターン集合の設置（要件 5.10）と instruction の購読（要件 1.1）より前に、管理者の操作なしに `refs/namespaces/anonymous-view/` の ref と HEAD を取り除き、続けて `vault_user_views` の `userId` が null の記録を取り除く
+2. `anonymous-view` の ref を取り除くとき、vault-manager は ref が loose ファイルにある場合も `packed-refs` の中にある場合も取り除く
+3. `anonymous-view` の ref・HEAD・記録のいずれも存在しないとき、vault-manager は何も変更せず、エラーも出さずに起動を続ける。片付けは毎回の起動で実行する
+4. 片付けに失敗したとき、vault-manager は失敗を error ログに残して例外を投げずに起動を続け、次の起動でもう一度取り除きを試みる
+5. vault-manager は片付けのために Vault の再構築（`reset-all`）を必要としない
+6. 片付けを実行するとき、vault-manager はほかの namespace（`user-<uid>-view`、`public` などのコンテンツの namespace）とその HEAD、`refs/vault/sparse-filters/` の ref、`userId` が文字列の `vault_user_views` の記録を変えない
+7. 片付けの後、vault-manager は、`anonymous-view` の履歴からしかたどれない object を、要件 5.6 の検査によってどの view の clone / fetch にも返さない。これらの object を object pool から消すのは周期 gc（要件 6.4）であり、片付けはその場では消さない
