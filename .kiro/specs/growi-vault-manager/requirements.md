@@ -74,7 +74,7 @@
 4. `sourceVersions` が不一致のとき、VaultViewComposer は変動した namespace の subtree のみ再計算する delta merge を実行し、新しい merged tree を作成する
 5. VaultViewComposer が初回 compose（`vault_user_views` に既存なし）を実行したとき、全 namespace を full merge して新しい view ref を作成する
 6. 同一 path に複数 namespace からのエントリが衝突するとき、VaultViewComposer は `user-<uid>-only-me` > `group-*` > `restricted-link` > `public` の優先順位で解決する
-7. `userId: null` を受信したとき、VaultViewComposer は public namespace のみで合成して `anonymous-view` ref を返す
+7. `userId` が空でない文字列でない（`null` を含む）compose-view の依頼を受信したとき、ComposeViewController は 400 を返してその依頼を拒否し、view ref も `vault_user_views` の記録も作らない。VaultViewComposer が作る view ref は常に `user-<uid>-view` であり、1 本の view は 1 人の利用者にだけ対応する
 8. VaultViewComposer が delta merge の base tree が gc により消失していることを検知したとき、full merge にフォールバックする
 9. VaultViewComposer は merged tree を生成したのち、その view の最終ファイル構造を確定する **tree 正規化**（大小衝突解消）を実行する。正規化は merged tree の構造のみから決定論的に導出され、reverse-index コレクションを必要としない
 10. （大小衝突解消）同一ディレクトリ直下で、小文字化して一致する名前が 2 件以上存在するとき（blob・subtree の双方を対象）、VaultViewComposer は各メンバーの名前に `__<hash8>` suffix を付与して衝突を解消する。`hash8` は当該エントリの suffix 付与前 filePath の SHA-1 先頭 8 文字とする
@@ -188,3 +188,19 @@
 3. `looseObjectCount` および `repoSizeBytes` の取得は bare repo ディレクトリの低コストなファイルシステム操作（`fs.stat` / `git count-objects` 相当）で行い、O(repo size) の重い処理を行わない
 4. `lastSquashAt` および `lastGcAt` は `VaultMaintenanceScheduler.getStatus()` の値を返し、未実行時は null を返す
 5. ストレージ統計の集計に失敗したとき、StorageStatsController は 500 を返し、エラー詳細をログに記録する
+
+---
+
+### 要件 12: 利用者に対応しない view の起動時の片付け
+
+**目的**: システム管理者として、以前の版が作った、利用者に対応しない共有の view（`anonymous-view`）とその記録が、vault-manager を更新して起動するだけで取り除かれてほしい。これにより、共有の view の履歴に残った過去の内容を、bare repo から取り出せる状態が残らない。
+
+#### 受け入れ基準
+
+1. vault-manager が起動したとき、vault-manager は bare repo の初期化（要件 9.1）の後、sparse-checkout パターン集合の設置（要件 5.10）と instruction の購読（要件 1.1）より前に、管理者の操作なしに `refs/namespaces/anonymous-view/` の ref と HEAD を取り除き、続けて `vault_user_views` の `userId` が null の記録を取り除く
+2. `anonymous-view` の ref を取り除くとき、vault-manager は ref が loose ファイルにある場合も `packed-refs` の中にある場合も取り除く
+3. `anonymous-view` の ref・HEAD・記録のいずれも存在しないとき、vault-manager は何も変更せず、エラーも出さずに起動を続ける。片付けは毎回の起動で実行する
+4. 片付けに失敗したとき、vault-manager は失敗を error ログに残して例外を投げずに起動を続け、次の起動でもう一度取り除きを試みる
+5. vault-manager は片付けのために Vault の再構築（`reset-all`）を必要としない
+6. 片付けを実行するとき、vault-manager はほかの namespace（`user-<uid>-view`、`public` などのコンテンツの namespace）とその HEAD、`refs/vault/sparse-filters/` の ref、`userId` が文字列の `vault_user_views` の記録を変えない
+7. 片付けの後、vault-manager は、`anonymous-view` の履歴からしかたどれない object を、要件 5.6 の検査によってどの view の clone / fetch にも返さない。これらの object を object pool から消すのは周期 gc（要件 6.4）であり、片付けはその場では消さない

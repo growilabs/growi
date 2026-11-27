@@ -57,7 +57,7 @@ export interface SpawnOptions {
   /** Operating mode: advertise refs or serve a stateless-rpc pack request. */
   readonly mode: 'advertise' | 'rpc';
   /**
-   * The view ref name (e.g. 'user-<uid>-view' or 'anonymous-view').
+   * The view ref name (e.g. 'user-<uid>-view').
    * Set as GIT_NAMESPACE so git scopes all operations to this namespace.
    */
   readonly viewRef: string;

@@ -14,6 +14,7 @@
  * because they do not guarantee atomic rename semantics (requirement 9.5).
  */
 
+import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { loggerFactory } from '@growi/logger';
@@ -452,7 +453,7 @@ export async function deleteAllNamespaceRefs(): Promise<void> {
  * Without this file, `git clone` does not know which branch to check out
  * and emits "warning: remote HEAD refers to nonexistent ref".
  *
- * @param namespace - Namespace name (e.g. 'anonymous-view', 'user-<id>-view').
+ * @param namespace - Namespace name (e.g. 'user-<id>-view').
  */
 export async function ensureNamespaceHead(namespace: string): Promise<void> {
   const headPath = path.join(
@@ -472,4 +473,42 @@ export async function ensureNamespaceHead(namespace: string): Promise<void> {
     `ref: refs/namespaces/${namespace}/refs/heads/main\n`,
     'utf8',
   );
+}
+
+/**
+ * Removes one namespace's ref and HEAD. A no-op when neither exists.
+ *
+ * The ref goes through `git update-ref -d` because it may live in
+ * `packed-refs` after an earlier version's gc, where deleting the loose file
+ * would leave it behind (see design.md, VaultRepoStorage).
+ *
+ * @param namespace - A single path segment under `refs/namespaces/`.
+ */
+export async function deleteNamespace(namespace: string): Promise<void> {
+  const repoPath = getRepoPath();
+
+  await new Promise<void>((resolve, reject) => {
+    execFile(
+      'git',
+      [
+        '--git-dir',
+        repoPath,
+        'update-ref',
+        '-d',
+        `refs/namespaces/${namespace}/refs/heads/main`,
+      ],
+      (err) => {
+        if (err != null) {
+          reject(err);
+          return;
+        }
+        resolve();
+      },
+    );
+  });
+
+  await fs.promises.rm(path.join(namespacesDir(), namespace), {
+    recursive: true,
+    force: true,
+  });
 }

@@ -171,6 +171,33 @@
 - **Rationale**: clone の時点で 1 行で止まり、次に何をすればよいかが分かる。同じ判定が、公開していない object を `sparse:oid` に指定して応答サイズの差から内容を推し量る余地も塞ぐ
 - **Trade-offs**: 応答の文言がサーバの対応状況を明かす。ただしこれはリポジトリの保持内容ではないため要件 2.3 には触れない
 
+### Decision F: ゲスト用ビューの片付けは vault-manager の起動時に行う
+
+- **Context**: 以前の版は、認証情報のないクローンのために、ゲスト用のビュー（`anonymous-view` の ref と HEAD、および `userId` が null の `vault_user_views` 記録）を持っていた。gateway はゲストを通さないが、これらが残っている限り、履歴に過去の public の内容を抱えたまま残る。
+- **Alternatives Considered**:
+  1. 起動のたびに消す（なければ何もしない）
+  2. 管理者が Vault を再構築したときに消す
+  3. migrate-mongo の migration で消す
+- **Selected Approach**: 案 1。`vault-legacy-anonymous-view.ts` の `removeLegacyAnonymousView()` を起動時に呼ぶ。
+- **Rationale**: 案 2 は、再構築するまで古いビューが残る。案 3 は、migration が apps/app の側で動くので、vault-manager の持つ bare repo に手が届かない。案 1 は、更新した時点で消え、管理者の操作が要らない。
+- **Where the knowledge lives**: 旧ゲスト用ビューに関する知識（namespace 名、記録の消し方）は `vault-legacy-anonymous-view.ts` の 1 ファイルに閉じる。次のメジャー版で、このファイルと呼び出しを削除するだけで済ませるため。モデルに static は足さない。`VaultRepoStorage` には namespace 名を引数に取る汎用の `deleteNamespace` だけを足し、`anonymous-view` という名前は持たせない。
+- **記録の消し方**: `VaultUserViewModel.deleteMany({ userId: { $type: "null" } })` を直接呼ぶ。`userId: null` という単純な条件だと、フィールドが存在しない文書にも一致してしまうので、値が null で保存された記録だけに一致する `$type: "null"` を使う。
+- **Trade-offs**: 更新が行き渡った後は何もしない処理が、起動のたびに動く。git の起動 1 回とファイルの削除 1 回、記録の削除 1 回なので、負担は小さい。
+
+### Decision G: 片付けが失敗しても起動を続ける
+
+- **Rationale**: gateway がゲストを通さないので、ref が残っていても内容は配られない。一方、vault-manager が起動しないと、ログインユーザーのクローンが止まる。`removeLegacyAnonymousView()` は例外を投げず、失敗を error ログに残して、次の起動でやり直す。
+
+### Decision H: ref の削除は `git update-ref -d` で行い、ファイルの削除だけにしない
+
+- **Context**: `deleteNamespace`（`vault-repo-storage.ts`）が、1 つの namespace の ref と HEAD を消す。
+- **Findings**:
+  - `VaultRepoStorage` は ref を loose ファイルとして直接読み書きし、`packed-refs` は読まない。
+  - 以前の版の `git gc` は ref を既定で `packed-refs` にまとめるため、その環境では ref が `packed-refs` の中にある。loose ファイルだけを消すと、ref が残る。
+  - `git update-ref -d` は、loose の ref も `packed-refs` の中の ref も消す。vault-manager は gc と upload-pack のためにすでに git を起動しているので、新しい依存は増えない。
+- **Selected Approach**: `git update-ref -d refs/namespaces/<namespace>/refs/heads/main` で ref を消し、その後で namespace のディレクトリ（HEAD を含む）を削除する。
+- **現在の gc との関係**: vault-manager の gc は `gc.packRefs=false` で動くので、vault-manager が `packed-refs` を作ることはない（過去の版の gc や手作業の gc が残したものはありうる）。`packed-refs` が残っている repo は、再構築が必要な状態として扱われる（`init()` が error ログを出し、`readRef` が例外を投げる）。`git update-ref -d` は `packed-refs` から対象の行だけを消し、ほかの行は変えない（`vault-repo-storage.spec.ts` の `keeps other namespaces and sparse-filter refs (packed)` で固定）。ほかに packed の ref がある限りファイルも残るので、再構築が必要な状態は片付けの後も残る。対象が唯一の packed の ref だった場合にファイルが残るかどうかは git の版による（git 2.55.0 ではヘッダーだけのファイルが残った。テストでは固定していない）。その場合はほかに packed の ref がないので、隠れる状態もない。
+
 ---
 
 ## 実装知見（Post-Implementation Discoveries）
@@ -196,6 +223,8 @@ upload-pack 自身が拒否時に返す形と同じなので、git クライア�
 | 公開する sparse filter のパターンを変えて README を直し忘れる | パターンから object ID を計算する単体テストが README を突き合わせる（`vault-sparse-filter.spec.ts`） |
 | gc が公開した filter の blob を消し、README の clone コマンドが解決できなくなる | `refs/vault/sparse-filters/<name>` から参照させ、起動ごとに再設置する。ref 経由の blob が `gc --prune=now` を越えて残ることを単体テストで固定 |
 | protocol v2 を通すと本文が解釈できず全拒否になる | 同上。gateway が `Git-Protocol` を転送しない現状が前提条件であることを明記 |
+| 旧ゲスト用ビューの片付けが失敗し、ref や記録が残る | gateway がゲストを通さないので内容は配られない。失敗は error ログに残し、次の起動で再実行する（Decision G） |
+| ref をファイルの削除だけで消して、`packed-refs` の中に残す | `git update-ref -d` を使う（Decision H） |
 | git の内部挙動（commit の到達性判定）に依存している | 到達性判定は自前の `merge-base` で行い、git 側の暗黙の挙動には依存しない。他ビューの commit 拒否は結合試験で固定 |
 
 ---

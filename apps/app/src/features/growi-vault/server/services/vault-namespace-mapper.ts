@@ -21,7 +21,7 @@ export type PageGrantState = Pick<
 
 export interface VaultNamespaceMapper {
   computeAccessibleNamespaces(
-    userId: string | null,
+    userId: string,
     scopes?: ReadonlyArray<string>,
   ): Promise<ReadonlyArray<Namespace>>;
 
@@ -104,11 +104,10 @@ export const createVaultNamespaceMapper = (): VaultNamespaceMapper => {
     /**
      * Compute the full set of namespaces accessible to a user.
      *
-     * Anonymous (userId === null): only the 'public' namespace.
-     * Authenticated: 'public', 'restricted-link', one 'group-<gid>' per group,
-     *   and 'user-<uid>-only-me' for the user's own private pages.
+     * Returns 'public', 'restricted-link', one 'group-<gid>' per group,
+     * and 'user-<uid>-only-me' for the user's own private pages.
      *
-     * @param userId - The authenticated user's ID, or null for anonymous access.
+     * @param userId - The authenticated user's ID.
      * @param scopes - PAT scopes from the authentication result (req 2.5).
      *   MVP: scopes filtering not applied; future vault-specific scopes can
      *   restrict namespace access here (e.g. a 'read:vault:public-only' scope
@@ -117,14 +116,9 @@ export const createVaultNamespaceMapper = (): VaultNamespaceMapper => {
      *   further interface changes.
      */
     async computeAccessibleNamespaces(
-      userId: string | null,
+      userId: string,
       _scopes?: ReadonlyArray<string>,
     ): Promise<ReadonlyArray<Namespace>> {
-      // Anonymous users can only access public content (req 3.2)
-      if (userId === null) {
-        return ['public'];
-      }
-
       // Resolve all groups the user belongs to (internal + external)
       const groupIds = await resolveGroupIds(userId);
 
