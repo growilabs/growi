@@ -18,6 +18,33 @@ export interface PageUpdateEventExtras {
 }
 
 /**
+ * Fourth argument of the 'updateMany' event that PageService emits for every
+ * batch of descendants it renames. The pages in the event still carry their
+ * pre-rename paths. Both prefixes are page paths without a trailing slash.
+ */
+export type PageUpdateManyEventExtras =
+  | {
+      /** Every page on the page tree under oldPagePathPrefix was renamed (v5). */
+      readonly scope: 'subtree';
+      readonly oldPagePathPrefix: string;
+      readonly newPagePathPrefix: string;
+      /**
+       * The same object for every batch of one rename operation, a new one
+       * per operation, so subscribers can tell which batches belong together.
+       */
+      readonly operation: object;
+    }
+  | {
+      /**
+       * Only the pages in this event were renamed: the v4 process skips the
+       * descendants the operating user may not edit.
+       */
+      readonly scope: 'listed-pages';
+      readonly oldPagePathPrefix: string;
+      readonly newPagePathPrefix: string;
+    };
+
+/**
  * Must be called before the update touches the page's grant fields: the arrays
  * are copied because the update replaces them on the same document.
  */

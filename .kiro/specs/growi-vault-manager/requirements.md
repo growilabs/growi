@@ -38,10 +38,10 @@
 1. `op: 'upsert'` instruction を受信したとき、VaultNamespaceBuilder は revision body を取得し、blob を書き込み、namespace tree の該当エントリを更新し、新しい commit を作成して namespace ref を更新する
 2. `op: 'bulk-upsert'` instruction を受信したとき、VaultNamespaceBuilder は `$in` で全 revisionId の body を 1 クエリで取得し、全 blob を書き込み、namespace tree を 1 度だけ rebuild し、1 件の commit で namespace ref を更新する
 3. `op: 'remove'` instruction を受信したとき、VaultNamespaceBuilder は namespace tree から当該 filePath のエントリを削除し、新しい commit を作成して namespace ref を更新する
-4. `op: 'rename-prefix'` instruction を受信したとき、VaultNamespaceBuilder は `oldFilePrefix` 配下の subtree を抽出して `newFilePrefix` 下に mount し、blob の再書き込みなしで namespace ref を更新する
+4. `op: 'rename-prefix'` instruction を受信したとき、VaultNamespaceBuilder は `oldFilePrefix` 配下の subtree を `newFilePrefix` へ移し、blob の再書き込みなしで namespace ref を更新する。移動先ディレクトリが既にあれば再帰的に合成し、同名の項目は移動先の側を残す。`newFilePrefix` が `oldFilePrefix` の配下にある（自分の配下への rename）とき、`newPrefix` に対応するページ自身のファイルは移動せずその位置に残す
 5. `op: 'grant-change-prefix'` instruction を受信したとき、VaultNamespaceBuilder は `fromNamespace` の subtree を切り離し、`namespace`（移動先）側に mount し、両 namespace の ref を更新する
 6. `op: 'reset-all'` instruction を受信したとき、VaultNamespaceBuilder は全 namespace の ref を削除し、`vault_namespace_state` と `vault_user_views` の全 doc を削除する。object pool は削除しない
-7. 同一 instruction を複数回実行したとき、VaultNamespaceBuilder はいずれの op 種別においても同一の namespace ref 状態に収束する（冪等性）
+7. 同一 instruction を複数回実行したとき、VaultNamespaceBuilder はいずれの op 種別においても同一の namespace ref 状態に収束する（冪等性）。ただし現状、移動先が移動元の配下にある `rename-prefix`（`/a` → `/a/b`）は冪等でない。2 回実行すると、移動したディレクトリがもう一段入れ子になる
 8. VaultNamespaceBuilder が commit を作成したとき、commit message は `vault: <namespace> [op] <pagePath or "N entries">` の形式を持ち、op / pageId / revisionId / entryCount / issuedAt 等のメタデータを含む
 
 ---

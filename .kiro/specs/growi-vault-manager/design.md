@@ -400,7 +400,8 @@ interface VaultNamespaceBuilder {
 
 - **upsert / remove**: `VaultPathMapper.map` で filePath を求め、blob write（content-addressed・既存 OID は no-op）→ tree を root まで再計算 → commit → `updateRef` → `vault_namespace_state.upsert({ version++ })`
 - **bulk-upsert**: revisions を `$in` 1 クエリで取得し、blob hash/write を並列（concurrency 16）化。全 entry を 1 度の tree rebuild・1 commit・1 ref update に集約する（N entries でも state は 1 step）
-- **rename-prefix / grant-change-prefix**: subtree を抽出し移動先 prefix / namespace に mount する。blob は再書き込み不要（content-addressing で OID 不変）。grant-change-prefix は両 namespace で namespace 単位 atomic に commit + updateRef
+- **rename-prefix**: `oldFilePrefix` の subtree を抽出し、`newFilePrefix` へ移す。移動先ディレクトリが既にあれば再帰的に合成し、同名の項目は移動先の側を残す（research.md Decision I）。自分の配下への rename では、`newPrefix` に対応するページ自身のファイルを移動せずその位置に残す。blob は再書き込み不要（content-addressing で OID 不変）
+- **grant-change-prefix**: subtree を抽出し移動先 namespace に mount する。blob は再書き込み不要。両 namespace で namespace 単位 atomic に commit + updateRef
 - **reset-all**: `payload.namespace` は **undefined**（特定 namespace を対象としない全体操作）。`refs/namespaces/` の下を丸ごと消し、`vault_namespace_state` / `vault_user_views` を wipe するが、**object pool は保持**し後続 upsert で content-addressing により再利用する。消す対象を `vault_namespace_state` の記録から決めないのは、`updateRef` と state の記録の間で失敗した namespace の ref が残り、再構築後の書き込みがその古い tree の上に積まれて、削除済みのページが残るため。view の ref と HEAD も同じく消える（`vault_user_views` も消すので、次の合成で作り直される）。`refs/vault/sparse-filters/` は `refs/namespaces/` の外にあるので残る。ロックは `vault_namespace_state` にある namespace を押さえる（`reset-all` と重なりうる書き込みは squash だけで、squash は state の記録をもとにロックするため）
 
 **Commit message フォーマット**（要件 2.8）

@@ -6,6 +6,7 @@ import type { MockInstance } from 'vitest';
 import { getInstance } from '^/test/setup/crowi';
 
 import type Crowi from '~/server/crowi';
+import type { PageUpdateManyEventExtras } from '~/server/events/page';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import UserGroup from '~/server/models/user-group';
 import UserGroupRelation from '~/server/models/user-group-relation';
@@ -609,6 +610,107 @@ describe('PageService', () => {
     });
   });
 
+  describe("'updateMany' emitted while renaming descendants", () => {
+    let pageEventSpy: MockInstance;
+
+    beforeEach(() => {
+      pageEventSpy = vi.spyOn(crowi.pageService.pageEvent, 'emit');
+    });
+
+    afterEach(() => {
+      pageEventSpy.mockRestore();
+    });
+
+    const updateManyCalls = (): Array<{
+      pages: Array<{ path: string }>;
+      extras: PageUpdateManyEventExtras;
+    }> =>
+      pageEventSpy.mock.calls
+        .filter(([eventName]) => eventName === 'updateMany')
+        .map(([, pages, , extras]) => ({ pages, extras }));
+
+    it('carries the page-path prefixes and the pre-rename paths for the legacy (v4) process', async () => {
+      await Page.insertMany(
+        ['/v4RenameTarget', '/v4RenameTarget/a', '/v4RenameTarget/b'].map(
+          (path) => ({
+            path,
+            grant: Page.GRANT_PUBLIC,
+            creator: testUser1,
+            lastUpdateUser: testUser1,
+          }),
+        ),
+      );
+      const target = await Page.findOne({ path: '/v4RenameTarget' });
+      assert(target != null);
+
+      await (crowi.pageService as any).renameDescendantsWithStream(
+        target,
+        '/v4Renamed',
+        testUser1,
+        {},
+        true,
+      );
+
+      const calls = updateManyCalls();
+      expect(calls).toHaveLength(1);
+      expect(calls[0].extras).toEqual({
+        scope: 'listed-pages',
+        oldPagePathPrefix: '/v4RenameTarget',
+        newPagePathPrefix: '/v4Renamed',
+      });
+      expect(calls[0].pages.map((p) => p.path).sort()).toEqual([
+        '/v4RenameTarget/a',
+        '/v4RenameTarget/b',
+      ]);
+      expect(await Page.exists({ path: '/v4Renamed/a' })).not.toBeNull();
+    });
+
+    it('carries the page-path prefixes in every batch for the v5 page tree', async () => {
+      const [target] = await Page.insertMany([
+        {
+          path: '/v5RenameTarget',
+          parent: rootPage._id,
+          grant: Page.GRANT_PUBLIC,
+          creator: testUser1,
+          lastUpdateUser: testUser1,
+        },
+      ]);
+      // More children than one batch (BULK_REINDEX_SIZE = 100) holds.
+      await Page.insertMany(
+        Array.from({ length: 101 }, (_, i) => ({
+          path: `/v5RenameTarget/child${i}`,
+          parent: target._id,
+          grant: Page.GRANT_PUBLIC,
+          creator: testUser1,
+          lastUpdateUser: testUser1,
+        })),
+      );
+
+      await (crowi.pageService as any).renameDescendantsWithStream(
+        target,
+        '/v5Renamed',
+        testUser1,
+        {},
+        false,
+        new Set(),
+      );
+
+      const calls = updateManyCalls();
+      expect(calls).toHaveLength(2);
+      for (const { extras, pages } of calls) {
+        expect(extras).toEqual({
+          scope: 'subtree',
+          oldPagePathPrefix: '/v5RenameTarget',
+          newPagePathPrefix: '/v5Renamed',
+          operation: expect.any(Object),
+        });
+        for (const page of pages) {
+          expect(page.path.startsWith('/v5RenameTarget/')).toBe(true);
+        }
+      }
+    });
+  });
+
   describe('rename page', () => {
     let pageEventSpy: MockInstance;
     let renameDescendantsWithStreamSpy: MockInstance;
@@ -743,15 +845,17 @@ describe('PageService', () => {
 
     it('renameDescendants without options', async () => {
       assert(childForRename1 != null);
-      const oldPagePathPrefix = /^\/parentForRename1/i;
-      const newPagePathPrefix = '/renamed1';
+      const rename: PageUpdateManyEventExtras = {
+        scope: 'listed-pages',
+        oldPagePathPrefix: '/parentForRename1',
+        newPagePathPrefix: '/renamed1',
+      };
 
       await (crowi.pageService as any).renameDescendants(
         [childForRename1],
         testUser2,
         {},
-        oldPagePathPrefix,
-        newPagePathPrefix,
+        rename,
       );
       const resultPage = await Page.findOne({ path: '/renamed1/child' });
 
@@ -760,7 +864,7 @@ describe('PageService', () => {
         'updateMany',
         [childForRename1],
         testUser2,
-        { oldPagePathPrefix, newPagePathPrefix },
+        rename,
       );
 
       expect(resultPage?.path).toBe('/renamed1/child');
@@ -770,15 +874,17 @@ describe('PageService', () => {
 
     it('renameDescendants with updateMetadata option', async () => {
       assert(childForRename2 != null);
-      const oldPagePathPrefix = /^\/parentForRename2/i;
-      const newPagePathPrefix = '/renamed2';
+      const rename: PageUpdateManyEventExtras = {
+        scope: 'listed-pages',
+        oldPagePathPrefix: '/parentForRename2',
+        newPagePathPrefix: '/renamed2',
+      };
 
       await (crowi.pageService as any).renameDescendants(
         [childForRename2],
         testUser2,
         { updateMetadata: true },
-        oldPagePathPrefix,
-        newPagePathPrefix,
+        rename,
       );
       const resultPage = await Page.findOne({ path: '/renamed2/child' });
 
@@ -787,7 +893,7 @@ describe('PageService', () => {
         'updateMany',
         [childForRename2],
         testUser2,
-        { oldPagePathPrefix, newPagePathPrefix },
+        rename,
       );
 
       expect(resultPage?.path).toBe('/renamed2/child');
@@ -797,15 +903,17 @@ describe('PageService', () => {
 
     it('renameDescendants with createRedirectPage option', async () => {
       assert(childForRename3 != null);
-      const oldPagePathPrefix = /^\/parentForRename3/i;
-      const newPagePathPrefix = '/renamed3';
+      const rename: PageUpdateManyEventExtras = {
+        scope: 'listed-pages',
+        oldPagePathPrefix: '/parentForRename3',
+        newPagePathPrefix: '/renamed3',
+      };
 
       await (crowi.pageService as any).renameDescendants(
         [childForRename3],
         testUser2,
         { createRedirectPage: true },
-        oldPagePathPrefix,
-        newPagePathPrefix,
+        rename,
       );
       const resultPage = await Page.findOne({ path: '/renamed3/child' });
 
@@ -814,7 +922,7 @@ describe('PageService', () => {
         'updateMany',
         [childForRename3],
         testUser2,
-        { oldPagePathPrefix, newPagePathPrefix },
+        rename,
       );
 
       expect(resultPage?.path).toBe('/renamed3/child');

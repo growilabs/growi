@@ -110,7 +110,7 @@
 1. When ページが作成または更新された場合, the GROWI Vault Gateway shall 対応する namespace に `op: 'upsert'` instruction を vault_instructions に挿入する（pageId・pagePath・revisionId・issuedAt を含む）
 2. When ページが削除された場合, the GROWI Vault Gateway shall 対応する namespace に `op: 'remove'` instruction を vault_instructions に挿入する（pagePath は削除直前の値）
 3. When 単一ページの ACL が変更された場合, the GROWI Vault Gateway shall 旧 namespace に `op: 'remove'` + 新 namespace に `op: 'upsert'` の 2 件を vault_instructions に挿入する
-4. When 親ページが rename された場合, the GROWI Vault Gateway shall 影響を受ける各 namespace に `op: 'rename-prefix'` instruction を 1 件ずつ挿入する（descendants 数に依らず namespace 数 M 件で収束する）
+4. When 親ページが rename された場合, the GROWI Vault Gateway shall descendants を次のとおり移動する: v5 ページツリーでは、影響を受ける各 namespace に `op: 'rename-prefix'` instruction を 1 回の rename 操作につき 1 件だけ挿入する（descendants 数・バッチ数に依らず namespace 数 M 件で収束する）。v4 互換処理（操作ユーザーが編集できる descendants だけを rename する）では、rename された各ページについて旧パスの `op: 'remove'` と新パスの `op: 'upsert'` を挿入する
 5. When 親ページの grant が一括変更された場合, the GROWI Vault Gateway shall 影響を受けた各 page に対して per-page `acl-change` instruction を発行する（remove from previous namespaces + upsert to current namespaces）
 6. When 同一 namespace 向けの `upsert` イベントが coalesce window（既定 1 秒）内に 100 件以上発生した場合, the GROWI Vault Gateway shall それらを 1 件の `op: 'bulk-upsert'` instruction にまとめる（chunk size 上限 1000 entries）
 7. When vault_instructions への書き込みが一時的に失敗した場合, the GROWI Vault Gateway shall WARN ログを記録してリトライする（ページ編集レスポンスとは切り離して処理する）

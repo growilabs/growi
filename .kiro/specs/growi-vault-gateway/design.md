@@ -396,6 +396,7 @@ interface VaultDispatcher {
   - 単一ページ更新での ACL 変更の検出: `PageService.updatePage` / `updatePageV4`（権限だけを変える `updateGrant` もここを通る）は `pageEvent.emit('update', page, user, { previousGrant, previousGrantedGroups, previousGrantedUsers })` の第 3 引数で、更新前の権限状態を渡す。購読側（`vault-page-update-handler.ts`）は更新前の namespace を計算し、`previous` として dispatcher に渡す
   - dispatcher は `previous` のうち `current` に含まれない namespace（ページが抜けた namespace）にだけ `remove` を発行する。ページが引き続き属する namespace には `remove` を発行しない（同じ namespace への `remove` と `upsert` は書き込み順が保証されないため）。抜けた namespace が無ければ通常の `update`（coalesce 対象の `upsert`）として扱う。この規則は親ページ grant 一括変更の経路にも同じく適用される
   - `remove` を伴う操作（`delete` / ACL 変更 / 単一ページ rename）は、発行の前に、同じページの coalesce 待ちの `upsert` を対象 namespace のバッファから取り除く（待機中の `upsert` が後から書き込まれて `remove` を打ち消すのを防ぐ）
+  - `rename-prefix` を発行する前に、対象 namespace のバッファで coalesce 待ちになっている `upsert` のうち、パスが `<旧 prefix>/` で始まるものを新 prefix のパスに書き換える（待機中の `upsert` が、ディレクトリの移動後に旧パスへファイルを作り直すのを防ぐ）
 - 単一ページ rename（`onPageRenamed`）: `current` 配列の各 namespace に `remove`（oldPath）+ `upsert`（newPath）を 1 件ずつ。ページ自身は namespace tree 上で blob（`<name>.md`）として保持されるため、ディレクトリ subtree 移動である `rename-prefix` では再配置できない（`rename-prefix` は `type === 'tree'` のエントリのみ移動する）。remove + upsert で blob を確実に旧パスから削除し新パスに再作成する。grant は rename で不変なので old/new は同一 namespace 集合に属する
 
 **coalesce 挙動**
@@ -406,13 +407,13 @@ interface VaultDispatcher {
 
 **prefix primitive（親ページのバルク操作）**
 
-- 親ページ rename: 2 経路に分離する。(1) rename されたページ**自身**の blob は `'rename'` イベント購読 → `onPageRenamed`（remove + upsert、上記「単一ページ操作」参照）で再配置する。(2) **descendants** の subtree は `pageEvent.emit('updateMany', pages, user, { oldPagePathPrefix, newPagePathPrefix })` 購読 → 影響を受ける各 namespace に `rename-prefix` 1 件（descendants 数 N によらず namespace 数 M 件）で移動する。`rename-prefix` は subtree（`type === 'tree'`）専用であり、ページ自身の blob には作用しないため、両経路の併用で旧パスの blob・subtree がともに残らないことを保証する
+- 親ページ rename: 2 経路に分離する。(1) rename されたページ**自身**の blob は `'rename'` イベント購読 → `onPageRenamed`（remove + upsert、上記「単一ページ操作」参照）で再配置する。(2) **descendants** は `pageEvent.emit('updateMany', pages, user, extras)`（`extras` は `PageUpdateManyEventExtras`）を購読して移動する。`scope: 'subtree'`（v5）では、namespace が初めて現れたバッチで、その namespace に `rename-prefix` を 1 件出す（同じ rename の後続バッチでは出さない。rename の区別は `operation` の同一性で行う）。`scope: 'listed-pages'`（v4）では、event のページごとに `onPageRenamed` で remove + upsert する。`rename-prefix` は旧パスのディレクトリ（subtree）を移すだけで、ページ自身の blob（`<name>.md`）はディレクトリの外にあるので動かさない。自分の配下への rename（`/a` → `/a/b`）では、(1) で書かれたページ自身の新しい blob（`a/b.md`）が旧ディレクトリの中に入るが、vault-manager はそれを移動せずその位置に残す。そのため両経路を併用しても、旧パスの blob・subtree は残らず、ページ自身の blob が descendants 側へ運ばれることもない
 - 親ページ grant 一括変更: 影響を受けた各 page に対して per-page `acl-change` instruction を発行（remove from previous namespaces + upsert to current namespaces）。`pageEvent.emit('descendantsGrantChanged', { affectedPages, user })` を購読する
 - 当初設計で想定した `grant-change-prefix` op は subtree 単位の prefix scope を持たないため、現状は使用していない（将来の vault-manager 設計改修で再評価）
 
 **実装ノート**
 - 既存 GROWI `PageEvent`（`apps/app/src/server/events/page.ts`）に subscribe
-- `syncDescendants` 完了 event 等の境界 event を購読し、descendants 処理途中での per-page event を受信しないようにする
+- descendants の移動は最初のバッチで発行する。そのため rename 処理中に、まだ rename されていない descendant を編集すると、旧パスのファイルが残り、新パスは編集前の内容になる。ページツリーに載っていない（未変換の）ページが同じ namespace の旧 prefix の下にあると、DB では rename されないまま、ファイルだけが移動する。新パスの古い内容や欠けたファイルは targeted reconcile で直せる（reconcile は `bulk-upsert` しか発行しない）。旧パスに残ったファイルは再構築で消す
 - 書き込み失敗時は WARN ログ + リトライ（ページ編集 response とは切り離す）
 
 ---

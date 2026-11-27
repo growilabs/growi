@@ -71,7 +71,10 @@ import loggerFactory from '~/utils/logger';
 import { prepareDeleteConfigValuesForCalc } from '~/utils/page-delete-config';
 import { prisma } from '~/utils/prisma';
 
-import { capturePreviousGrantState } from '../../events/page';
+import {
+  capturePreviousGrantState,
+  type PageUpdateManyEventExtras,
+} from '../../events/page';
 import type { ObjectIdLike } from '../../interfaces/mongoose-utils';
 import { PathAlreadyExistsError } from '../../models/errors';
 import type { PageOperationDocument } from '../../models/page-operation';
@@ -119,6 +122,7 @@ const {
   isUsersTopPage,
   isMovablePage,
   isUsersHomepage,
+  convertToNewAffiliationPath,
 } = pagePathUtils;
 
 const { addTrailingSlash } = pathUtils;
@@ -1195,19 +1199,11 @@ class PageService implements IPageService {
     pages,
     user,
     options,
-    oldPagePathPrefix,
-    newPagePathPrefix,
-    shouldUseV4Process = true,
+    rename: PageUpdateManyEventExtras,
   ) {
     // v4 compatible process
-    if (shouldUseV4Process) {
-      return this.renameDescendantsV4(
-        pages,
-        user,
-        options,
-        oldPagePathPrefix,
-        newPagePathPrefix,
-      );
+    if (rename.scope === 'listed-pages') {
+      return this.renameDescendantsV4(pages, user, options, rename);
     }
 
     const Page = mongoose.model<IPage, PageModel>('Page');
@@ -1218,9 +1214,10 @@ class PageService implements IPageService {
     const pageRedirectsToCreate: IPageRedirect[] = [];
 
     pages.forEach((page) => {
-      const newPagePath = page.path.replace(
-        oldPagePathPrefix,
-        newPagePathPrefix,
+      const newPagePath = convertToNewAffiliationPath(
+        rename.oldPagePathPrefix,
+        rename.newPagePathPrefix,
+        page.path,
       );
 
       // increment updatePathOperations
@@ -1267,21 +1264,15 @@ class PageService implements IPageService {
       pageRedirectsToCreate,
     );
 
-    // Carry the prefix shift so subscribers can propagate the bulk rename
-    // without re-deriving the prefix from individual pages. Optional 4th arg —
-    // existing subscribers that only read (pages, user) are unaffected.
-    this.pageEvent.emit('updateMany', pages, user, {
-      oldPagePathPrefix,
-      newPagePathPrefix,
-    });
+    // Optional 4th arg: subscribers that only read (pages, user) are unaffected.
+    this.pageEvent.emit('updateMany', pages, user, rename);
   }
 
   private async renameDescendantsV4(
     pages,
     user,
     options,
-    oldPagePathPrefix,
-    newPagePathPrefix,
+    rename: PageUpdateManyEventExtras,
   ) {
     const pageCollection = mongoose.connection.collection('pages');
     const { updateMetadata, createRedirectPage } = options;
@@ -1290,9 +1281,10 @@ class PageService implements IPageService {
     const pageRedirectsToCreate: IPageRedirect[] = [];
 
     pages.forEach((page) => {
-      const newPagePath = page.path.replace(
-        oldPagePathPrefix,
-        newPagePathPrefix,
+      const newPagePath = convertToNewAffiliationPath(
+        rename.oldPagePathPrefix,
+        rename.newPagePathPrefix,
+        page.path,
       );
 
       if (updateMetadata) {
@@ -1329,17 +1321,12 @@ class PageService implements IPageService {
       pageRedirectsToCreate,
     );
 
-    // Same payload contract as renameDescendants above — see the comment there
-    // for rationale on the optional 4th argument.
-    this.pageEvent.emit('updateMany', pages, user, {
-      oldPagePathPrefix,
-      newPagePathPrefix,
-    });
+    this.pageEvent.emit('updateMany', pages, user, rename);
   }
 
   private async renameDescendantsWithStream(
     targetPage,
-    newPagePathSanitized,
+    newPagePathSanitized: string,
     user,
     options = {},
     shouldUseV4Process = true,
@@ -1364,8 +1351,12 @@ class PageService implements IPageService {
 
     const batchStream = createBatchStream(BULK_REINDEX_SIZE);
 
-    const newPagePathPrefix = newPagePathSanitized;
-    const pathRegExp = new RegExp(`^${RegExp.escape(targetPage.path)}`, 'i');
+    const rename: PageUpdateManyEventExtras = {
+      scope: 'subtree',
+      oldPagePathPrefix: targetPage.path,
+      newPagePathPrefix: newPagePathSanitized,
+      operation: {},
+    };
 
     const renameDescendants = this.renameDescendants.bind(this);
     const pageEvent = this.pageEvent;
@@ -1375,14 +1366,7 @@ class PageService implements IPageService {
       async write(batch, encoding, callback) {
         try {
           count += batch.length;
-          await renameDescendants(
-            batch,
-            user,
-            options,
-            pathRegExp,
-            newPagePathPrefix,
-            shouldUseV4Process,
-          );
+          await renameDescendants(batch, user, options, rename);
           const subscribedUsers = await Subscription.getSubscriptions(batch);
           subscribedUsers.forEach((eachUser) => {
             descendantsSubscribedSets.add(eachUser);
@@ -1410,7 +1394,7 @@ class PageService implements IPageService {
 
   private async renameDescendantsWithStreamV4(
     targetPage,
-    newPagePathSanitized,
+    newPagePathSanitized: string,
     user,
     options = {},
   ) {
@@ -1420,8 +1404,11 @@ class PageService implements IPageService {
     );
     const batchStream = createBatchStream(BULK_REINDEX_SIZE);
 
-    const newPagePathPrefix = newPagePathSanitized;
-    const pathRegExp = new RegExp(`^${RegExp.escape(targetPage.path)}`, 'i');
+    const rename: PageUpdateManyEventExtras = {
+      scope: 'listed-pages',
+      oldPagePathPrefix: targetPage.path,
+      newPagePathPrefix: newPagePathSanitized,
+    };
 
     const renameDescendants = this.renameDescendants.bind(this);
     const pageEvent = this.pageEvent;
@@ -1431,13 +1418,7 @@ class PageService implements IPageService {
       async write(batch, encoding, callback) {
         try {
           count += batch.length;
-          await renameDescendants(
-            batch,
-            user,
-            options,
-            pathRegExp,
-            newPagePathPrefix,
-          );
+          await renameDescendants(batch, user, options, rename);
           logger.debug(`Renaming pages progressing: (count=${count})`);
         } catch (err) {
           logger.error('renameDescendants error on add anyway: ', err);
