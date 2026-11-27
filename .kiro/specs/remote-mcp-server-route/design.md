@@ -57,7 +57,7 @@
 
 次の変更は、`remote-mcp-server-oauth` の再確認を要する。
 
-- `McpAuth` の型（`authenticate` の戻り値、`McpAuthFailureReason` の種類、`respondAuthFailure` の引数）の変更。
+- `McpAuth` の型（`authenticate` の戻り値、`McpAuthFailureReason` の種類、`respondAuthFailure` の引数）の変更。成功の結果の `extra` に入れるキーを足すこと・変えることは、型の変更ではないので、ここに当たらない。
 - `MCP_ENDPOINT_PATH` または `MCP_REQUIRED_SCOPES` の値の変更。認可サーバーのメタデータ・同意画面・トークンの宛先が同じ値を使う。
 - `app:mcpEnabled` の意味の変更（「MCP 連携全体」を 1 つで切り替える前提）。
 - `isMcpAvailable` の条件の変更（有効で、かつサイト URL が設定済み）。認可サーバーのエンドポイントも、同じ関数で応答するかどうかを決める。
@@ -448,6 +448,11 @@ export const factory: (crowi: Crowi) => express.Router;
   - 閲覧専用の利用者のトークンは受け付けない（既存の `accessTokenParser` と同じ扱い）。
   - 戻す利用者は `serializeUserSecurely` を通す。
 - 暫定の `respondAuthFailure`（`auth-failure-response.ts`）: 理由によらず、固定の本文の 401 を返す。`WWW-Authenticate` を付けない。リダイレクトしない（2.5、2.9、2.10）。
+- **成功の結果の `extra`**: 認証の中身が、利用者のほかに運びたい情報を入れる入れ物である。暫定の認証は使わない（省略する）。
+  - 想定している使い道: `remote-mcp-server-oauth` が、「どの連携（どのクライアントへの許可）からの呼び出しか」を入れ、連携ごとの失効や Activity に使う。何を入れるかは、同 spec の要件で決める。この spec では、キーも値の型も決めない。
+  - ルーターは、`extra` を読まずに `McpCallerContext.extra` へそのまま移す。ツールの実行役（`registerMcpTools`）と共有関数も読まない。キーを足しても、この spec のコードは変わらない。
+  - 読むのは、キーを決めた側（`remote-mcp-server-oauth` が足すコード）だけである。値は `unknown` なので、型ガードで形を確かめてから使う。
+  - トークンの値は入れない（7.6）。
 - **失敗の理由を型で運ぶ理由**: MCP の認可の仕様は、無効なトークンに 401（`error="invalid_token"`）、スコープ不足に 403（`error="insufficient_scope"`）、トークンなしに案内だけの 401 を求める。`remote-mcp-server-oauth` がこれらを出し分けるとき、理由が型に無いと `McpAuth` の型を変えることになり、ルーターにも変更が及ぶ。理由を先に型に入れておけば、差し替えは 2 つの関数の中身だけで済む。
 - 理由は、応答を選ぶためにだけ使う。Activity には記録しない。応答の本文に、トークンが拒否された理由（存在しない・期限切れ）を区別して書かないことは、差し替えた後も保つ（2.10）。
 - `accessTokenParser` を使わない理由: parser は、Bearer の他に `X-GROWI-ACCESS-TOKEN`・クエリ・本文からもトークンを読む。また、トークンが無い・無効なときは、何もせずに次へ進む。parser を変えずに 2.2〜2.5 を満たすには、parser の前後に確認の処理を重ねることになる。暫定の認証は `remote-mcp-server-oauth` が置き換えるので、消しやすい独立したファイルにする。引き換えに、「閲覧専用の利用者を拒否する」判定が parser と 2 か所になる。この判定は、境界のテストで固定する。
@@ -474,8 +479,16 @@ export type McpAuthFailureReason =
   | 'invalid_token'
   | 'insufficient_scope';
 
+// 値は unknown。読む側が型ガードで確かめてから使う
+export type McpAuthExtra = Readonly<Record<string, unknown>>;
+
 export type McpAuthResult =
-  | { readonly authenticated: true; readonly user: IUserHasId }
+  | {
+      readonly authenticated: true;
+      readonly user: IUserHasId;
+      // 認証の中身が自由に使う入れ物。ルーターとツールは中身を読まずに運ぶ（下記）
+      readonly extra?: McpAuthExtra;
+    }
   | { readonly authenticated: false; readonly reason: McpAuthFailureReason };
 
 export type McpAuthenticator = (req: Request) => Promise<McpAuthResult>;
@@ -496,7 +509,7 @@ export const mcpAuth: McpAuth;
 ```
 
 - Preconditions: なし。`req.user` の有無に依存しない。
-- Postconditions: `authenticated: true` のとき、`user` は有効な利用者である。`authenticated: false` は、失敗の理由を 3 種類のどれかで運ぶ。存在しないトークンと期限切れのトークンは、同じ `invalid_token` であり、区別しない（2.10）。
+- Postconditions: `authenticated: true` のとき、`user` は有効な利用者である。`extra` は省略できる。`authenticated: false` は、失敗の理由を 3 種類のどれかで運ぶ。存在しないトークンと期限切れのトークンは、同じ `invalid_token` であり、区別しない（2.10）。
 - Invariants: `authenticate` は例外を投げない。検証中の例外は、ログに残して `invalid_token` の失敗にする。
 
 #### McpRequestHandler
@@ -539,6 +552,8 @@ export type McpCallerContext = {
   readonly user: IUserHasId;
   readonly ip: string | undefined;
   readonly endpoint: string;
+  // McpAuthResult の extra を、そのまま運ぶ
+  readonly extra?: McpAuthExtra;
 };
 
 // AuthInfo は MCP SDK の型。extra に McpCallerContext を入れて運ぶ。
@@ -551,7 +566,7 @@ export const readCallerContext: (
 ```
 
 - `AuthInfo.token` には、トークンの値を入れない（固定の文字列を入れる）。SDK は `authInfo` を検証せずにそのまま渡すので、固定の文字列で動く（検証で確認）。下流はトークンを使わないので、値を運ばなければ、記録やログに漏れる経路が無くなる（7.6）。
-- `readCallerContext` は、型ガードで形を確かめてから返す。型アサーションでは取り出さない。
+- `readCallerContext` は、型ガードで形を確かめてから返す。型アサーションでは取り出さない。`extra` は、オブジェクトであることだけを確かめ、中身は確かめない。
 - 取り出すのは、リクエストごとに呼ばれるサーバーのファクトリの中の 1 か所である。ツールは、ファクトリが取り出した呼び出し元を受け取る。
 
 #### McpToolDeclarations / registerMcpTools

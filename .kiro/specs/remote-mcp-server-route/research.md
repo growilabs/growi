@@ -395,6 +395,17 @@ umbrella 全体の調査（claude.ai の挙動、MCP の仕様、先行事例）
 - **Trade-offs**: `release()` で回収されるのは、ハンドラと `MCPServer` の実体だけで、メモリの大半（モジュールのコード）は戻らない。完全に戻すには再起動が要る。
 - **Follow-up**: 本番ビルドの GROWI で、読み込みの前後・リクエストの処理の後・`release()` の後のメモリを測る（design.md の Verification Checkpoints 6）。
 
+#### Decision: 認証の成功の結果に、中身を決めない入れ物（`extra`）を持たせる
+
+- **Context**: PR のレビュー（2026-11-27）で、`McpAuthResult` が利用者しか運ばないことが指摘された。OAuth では「どの連携からの呼び出しか」が、失効や Activity で要る。`remote-mcp-server-oauth` の要件が決まる前に型を固定すると、Revalidation Triggers に当たる型の変更が後で出る。
+- **Alternatives Considered**:
+  1. 連携を表す項目（連携の ID、クライアントの名前など）を、型として今決める。
+  2. 中身を決めない入れ物（`Readonly<Record<string, unknown>>`）を、任意の項目として持たせる。
+  3. `McpAuth` を、成功の結果の型で総称型にする。
+- **Selected Approach**: 2。
+- **Rationale**: 1 は、決まっていない spec 2 の要件を先取りする。3 は、ルーターとツールにも型引数が広がり、使わない spec 1 のコードが複雑になる。2 なら、spec 1 のコードは中身を読まずに運ぶだけで、キーを足しても型が変わらない。
+- **Trade-offs**: 中身が `unknown` なので、読む側（spec 2 が足すコード）が型ガードを書く。読む場所は spec 2 の中に限られるので、受け入れる。
+
 #### Decision: MCP のルートは、セッションより前にマウントする
 
 - **Context**: PR のレビュー（2026-11-27）で、セッションより前にマウントする案との比較を求められた。それまでの設計は、他の API と同じ位置（共通処理の後）にマウントし、MCP に合わない共通処理を個別に打ち消していた。
@@ -507,4 +518,4 @@ PR のレビューで、`@modelcontextprotocol/server` を直接使う案との�
 - 既存ツールからの取り出しで、AI チャットの結果が変わる — 既存の spec を変えずに通すことを、取り出しのタスクの完了条件にする。
 
 ---
-_Updated: 2026-11-27. 置き場所を `features/mcp-server` に改める Decision を足した。Prior: 2026-11-27. `@mastra/mcp` と SDK の比較の検証と、SDK を直接使う Decision を足した。Prior: 2026-11-27. マウントする位置の Decision（セッションより前）と検証の結果を足し、それで覆った記述（3.1、3.2、3.8、3.9）に結論を書いた。Prior: 2026-11-27. PR のレビューを受けて、動かない状態のメモリの扱いの Decision と、共有された計測値を足した。Prior: 2026-11-25. PR のレビューを受けて、後の決定で覆った記述（ギャップ分析の 2 と 3）を直し、Decision を 3 つ足した。Prior: 2026-11-25. 設計の調査と判断（Design Discovery）を足した。Prior: 2026-11-25. 置き場所を `features/mastra` にする決定を、設計への申し送りに足した。Prior: 2026-11-25. パスを `/_api/v3/mcp` にする決定を反映した（1.1 を解決済みにし、`CertifyOrigin` の制約を 3.9 に足した）。Prior: 2026-11-24. ギャップ分析を記録。_
+_Updated: 2026-11-27. 認証の成功の結果に `extra` を持たせる Decision を足した。Prior: 2026-11-27. 置き場所を `features/mcp-server` に改める Decision を足した。Prior: 2026-11-27. `@mastra/mcp` と SDK の比較の検証と、SDK を直接使う Decision を足した。Prior: 2026-11-27. マウントする位置の Decision（セッションより前）と検証の結果を足し、それで覆った記述（3.1、3.2、3.8、3.9）に結論を書いた。Prior: 2026-11-27. PR のレビューを受けて、動かない状態のメモリの扱いの Decision と、共有された計測値を足した。Prior: 2026-11-25. PR のレビューを受けて、後の決定で覆った記述（ギャップ分析の 2 と 3）を直し、Decision を 3 つ足した。Prior: 2026-11-25. 設計の調査と判断（Design Discovery）を足した。Prior: 2026-11-25. 置き場所を `features/mastra` にする決定を、設計への申し送りに足した。Prior: 2026-11-25. パスを `/_api/v3/mcp` にする決定を反映した（1.1 を解決済みにし、`CertifyOrigin` の制約を 3.9 に足した）。Prior: 2026-11-24. ギャップ分析を記録。_
