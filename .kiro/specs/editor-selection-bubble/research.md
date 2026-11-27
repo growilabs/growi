@@ -1,7 +1,7 @@
-# Research & Design Decisions: editor-bubble
+# Research & Design Decisions: editor-selection-bubble
 
 ## Summary
-- **Feature**: `editor-bubble`（アンブレラ `editor-commands` の子スペック）
+- **Feature**: `editor-selection-bubble`（アンブレラ `editor-commands` の子スペック）
 - **Discovery Scope**: Extension（既存 CodeMirror エディタへの浮動 UI 追加 + 閲覧ページ「Comment」バブルとの見た目共有）
 - **Key Findings**:
   - 「Comment」バブル（`inline-comment`）の位置合わせは Popper（placement `top` + `flip` / `preventOverflow` / `offset [0, 8]`）で、基準は選択範囲の**カーソル側の端**。CodeMirror 6.43 の tooltip は「上側優先・余白不足で反転・左右 clamp・`offset.y`・`getCoords` 差し替え」を標準で持ち、`getCoords` で基準を「head 位置を中心」にずらせば**新規依存なしで同等の配置**を得られる。
