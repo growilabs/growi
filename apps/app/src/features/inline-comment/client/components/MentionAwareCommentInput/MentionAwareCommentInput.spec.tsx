@@ -3,7 +3,6 @@ import { useRef } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { INLINE_COMMENT_POPOVER_Z_INDEX } from '../../constants/z-index';
 import { MentionPickerButton } from '../InlineCommentForm/MentionPickerButton';
 import { MentionAwareCommentInput } from './MentionAwareCommentInput';
 import { useCommentInputControls } from './use-comment-input-controls';
@@ -58,10 +57,7 @@ const tooltipsMock = vi.hoisted(() =>
 // mirrors that shape so the wrapping test below exercises the real hazard,
 // not a simplified stand-in.
 const themeMock = vi.hoisted(() =>
-  vi.fn((_spec: Record<string, Record<string, string>>) => [
-    'theme-part-1-sentinel',
-    'theme-part-2-sentinel',
-  ]),
+  vi.fn(() => ['theme-part-1-sentinel', 'theme-part-2-sentinel']),
 );
 vi.mock('@codemirror/view', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@codemirror/view')>();
@@ -365,12 +361,9 @@ describe('MentionAwareCommentInput', () => {
   it('raises the mention-completion popup above the popover the input sits in, wrapped so the two-part theme extension does not get split across appendExtensions calls', () => {
     render(<MentionAwareCommentInput editorKey="key-1" onSubmit={vi.fn()} />);
 
-    const autocompleteZIndex = themeMock.mock.calls
-      .map(([spec]) => spec['.cm-tooltip.cm-tooltip-autocomplete']?.zIndex)
-      .find((zIndex) => zIndex != null);
-    expect(Number(autocompleteZIndex)).toBeGreaterThan(
-      INLINE_COMMENT_POPOVER_Z_INDEX,
-    );
+    expect(themeMock).toHaveBeenCalledWith({
+      '.cm-tooltip.cm-tooltip-autocomplete': { zIndex: '1080' },
+    });
     // EditorView.theme() returns an array of two extensions (mocked above to
     // mirror that). appendExtensions must receive it wrapped in ANOTHER
     // array -- passed bare, appendExtensions would unpack its two elements
