@@ -128,6 +128,22 @@ describe('plugin-set declaration module', () => {
       );
     });
 
+    it('applies pukiwiki-like-linker and growi-directive to the text output only', () => {
+      for (const name of ['pukiwiki-like-linker', 'growi-directive']) {
+        expect(ADOPTED_PLUGINS.find((p) => p.name === name)?.output).toBe(
+          'text',
+        );
+      }
+    });
+
+    it('applies rehype-katex, add-class and rehype-stringify to the html output only', () => {
+      for (const name of ['rehype-katex', 'add-class', 'rehype-stringify']) {
+        expect(ADOPTED_PLUGINS.find((p) => p.name === name)?.output).toBe(
+          'html',
+        );
+      }
+    });
+
     it('orders pukiwiki-like-linker and growi-directive after emoji and before remark-directive (mirrors the web order)', () => {
       const names = ADOPTED_PLUGINS.map((p) => p.name);
       const emojiIndex = names.indexOf('emoji');

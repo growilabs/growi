@@ -1,4 +1,4 @@
-import { renderMarkdownToHast } from '~/server/service/markdown-pipeline';
+import { renderMarkdownToTextHast } from '~/server/service/markdown-pipeline';
 
 import type { InlineCommentAnchor } from '../../interfaces';
 import {
@@ -103,7 +103,7 @@ export async function resolveMarkdownQuoteAnchor(
     return selection;
   }
 
-  const tree = await renderMarkdownToHast(body);
+  const tree = await renderMarkdownToTextHast(body);
   return anchorForMarkdownRange(
     renderedTextWithSourceOf(tree, body),
     selection.range,

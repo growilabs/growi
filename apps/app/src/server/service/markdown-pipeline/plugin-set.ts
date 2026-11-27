@@ -46,7 +46,15 @@ export interface PluginDeclaration {
    * (rehype-sanitize's schema is computed at runtime and supplied by the renderer.)
    */
   readonly options?: Record<string, unknown>;
+  /**
+   * Which output the plugin belongs to: `html` (bulk-export HTML only),
+   * `text` (the rendered text inline comment anchors are computed from), or
+   * both when omitted.
+   */
+  readonly output?: PipelineOutput;
 }
+
+export type PipelineOutput = 'html' | 'text';
 
 /**
  * Adopted plugins in pipeline execution order.
@@ -76,25 +84,27 @@ export const ADOPTED_PLUGINS: ReadonlyArray<PluginDeclaration> = [
   // Reused GROWI web plugin: pukiwiki-like-linker turns `[[page]]` /
   // `[[label>page]]` into a link showing the page or the label, as the web
   // renderer does (generateCommonOptions). DOM-free micromark/mdast extension;
-  // placed after emoji, mirroring the web order. The web renderer's
-  // relative-links rehype plugins, which resolve the href against the page
-  // path, are not adopted, so the href stays as written.
+  // placed after emoji, mirroring the web order. Text output only:
+  // bulk-export keeps the syntax as written.
   {
     name: 'pukiwiki-like-linker',
     load: () =>
       import('~/services/renderer/remark-plugins/pukiwiki-like-linker'),
     exportName: 'pukiwikiLikeLinker',
     options: undefined,
+    output: 'text',
   },
   // growi-directive parses `$name` / `$name(args)` directives (DOM-free
   // micromark/mdast extension), as the web renderer does. With no React
   // consumer here, a directive renders as an empty element — the same text the
-  // web renderer shows for any directive other than its lsx/ref widgets. The
-  // `load` thunk is needed because the canonical name is not the package name.
+  // web renderer shows for any directive other than its lsx/ref widgets. Text
+  // output only: bulk-export keeps the directive as written. The `load` thunk
+  // is needed because the canonical name is not the package name.
   {
     name: 'growi-directive',
     load: () => import('@growi/remark-growi-directive'),
     options: undefined,
+    output: 'text',
   },
   // remark-directive parses `:foo[..]{..}` / `::bar` / `:::baz` directive syntax
   // into directive nodes. Required for echo-directive (next) to find them. npm ESM.
@@ -130,8 +140,10 @@ export const ADOPTED_PLUGINS: ReadonlyArray<PluginDeclaration> = [
   { name: 'rehype-slug', options: undefined },
   // Sanitize must run after rehype-raw and before rehype-katex (katex output is trusted)
   { name: 'rehype-sanitize', options: undefined },
-  // rehype-katex renders math nodes; placed after sanitize so its trusted output is not stripped
-  { name: 'rehype-katex', options: undefined },
+  // rehype-katex renders math nodes; placed after sanitize so its trusted output is not stripped.
+  // HTML output only: the anchor text excludes formulas, and KaTeX is the
+  // most expensive step of a render.
+  { name: 'rehype-katex', options: undefined, output: 'html' },
   // Reused GROWI web plugin: add-class adds `table table-bordered` so the design
   // system's .table/.table-bordered borders apply (mirrors generateCommonOptions).
   // Loaded via a dynamic import() thunk; its only runtime dependency
@@ -142,9 +154,10 @@ export const ADOPTED_PLUGINS: ReadonlyArray<PluginDeclaration> = [
     load: () => import('~/services/renderer/rehype-plugins/add-class'),
     exportName: 'rehypePlugin',
     options: { table: 'table table-bordered' },
+    output: 'html',
   },
   // Serialises the hast tree to an HTML string; must be last
-  { name: 'rehype-stringify', options: undefined },
+  { name: 'rehype-stringify', options: undefined, output: 'html' },
 ] as const;
 
 /**
@@ -172,8 +185,8 @@ export const ADOPTED_PLUGINS: ReadonlyArray<PluginDeclaration> = [
  *
  * (emoji, xsv-to-table, remark-directive and echo-directive were excluded here before
  * 改訂 5, and pukiwiki-like-linker / growi-directive until inline comments
- * needed the server text to match the browser's; they are now ADOPTED — see
- * ADOPTED_PLUGINS above.)
+ * needed the server text to match the browser's; they are now ADOPTED — the
+ * latter two for the text output only — see ADOPTED_PLUGINS above.)
  */
 export const INTENTIONALLY_EXCLUDED_PLUGINS: ReadonlyArray<string> = [
   'codeblock',

@@ -262,26 +262,6 @@ describe('BulkExportMarkdownRenderer', () => {
   });
 
   // Requirement 4.1: single-source allowlist — observable behaviour matches recommended-whitelist.ts
-  describe('GROWI link and directive syntax, as the web renderer shows it', () => {
-    it('renders [[page]] as a link showing the page name', async () => {
-      const html = await renderer.renderToHtml('see [[Foo]] now', CSS_HREF);
-      expect(html).toMatch(/<a [^>]*>Foo<\/a>/);
-      expect(html).not.toContain('[[');
-    });
-
-    it('renders [[label>path]] as a link showing the label', async () => {
-      const html = await renderer.renderToHtml('[[label>/path]]', CSS_HREF);
-      expect(html).toMatch(/<a [^>]*href="\/path"[^>]*>label<\/a>/);
-    });
-
-    it('drops a $name directive the web renderer does not show', async () => {
-      const html = await renderer.renderToHtml('a $foo(x) b', CSS_HREF);
-      expect(html).not.toContain('$foo');
-      expect(html).toContain('a ');
-      expect(html).toContain(' b');
-    });
-  });
-
   describe('sanitize allowlist provenance (Requirement 4.1)', () => {
     // details/summary are in defaultSchema.tagNames (included via recommended-whitelist's spread)
     // This confirms the allowlist is effectively applied from the single source of truth

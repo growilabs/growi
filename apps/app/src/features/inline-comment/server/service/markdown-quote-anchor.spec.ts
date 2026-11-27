@@ -1,4 +1,4 @@
-import { renderMarkdownToHast } from '~/server/service/markdown-pipeline';
+import { renderMarkdownToTextHast } from '~/server/service/markdown-pipeline';
 
 import golden from './__fixtures__/rendered-text-golden.json';
 import type { MarkdownRange } from './markdown-occurrence';
@@ -52,7 +52,7 @@ const allRangesWithin = ({ start, end }: MarkdownRange): MarkdownRange[] => {
 };
 
 const renderWithSource = async (md: string) =>
-  renderedTextWithSourceOf(await renderMarkdownToHast(md), md);
+  renderedTextWithSourceOf(await renderMarkdownToTextHast(md), md);
 
 describe('anchorForMarkdownRange — the browser can find every stored quote', () => {
   const guaranteed = Object.entries(GOLDEN).filter(

@@ -51,10 +51,14 @@ const classNamesOf = (element: Element): string[] => {
 };
 
 // The same exclusion as the browser's `renderedTextOf` (client/services/rendered-text.ts).
+// The text output does not run KaTeX, so a formula is still the remark-math
+// `code.language-math` element the browser's KaTeX would turn into `.katex`.
 const isExcludedRoot = (element: Element): boolean => {
   const { ariaHidden } = element.properties;
+  const classNames = classNamesOf(element);
   return (
-    classNamesOf(element).includes('katex') ||
+    classNames.includes('katex') ||
+    classNames.includes('language-math') ||
     ariaHidden === true ||
     ariaHidden === 'true'
   );

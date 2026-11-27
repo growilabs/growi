@@ -1,4 +1,4 @@
 export {
-  renderMarkdownToHast,
   renderMarkdownToHtml,
+  renderMarkdownToTextHast,
 } from './markdown-processor';
