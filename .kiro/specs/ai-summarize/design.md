@@ -708,7 +708,7 @@ export const limitedGetPageContentTool: Tool; // used only by summarizeAgent
 - **偽のAgentがツール呼び出しループを再現する**。`stream()` のモック実装は、渡された `options.requestContext` を捕捉した上で、**実物の `limitedGetPageContentTool.execute()` を実際に呼ぶ**。これにより「Agentが何回ツールを呼び、バジェットがどう消費され、`limit_exceeded` がどこで返るか」というループの挙動を、LLMの非決定性なしに検証できる。`limit_exceeded` を受け取ったらループを抜ける。
 - **実物のツールは必ず「バレル経由ではなく直接そのファイルから」インポートする**（`.../agents/summarize/limited-get-page-content-tool` を直指定）。Agentのバレル経由でインポートすると `@mastra/core/agent` が引き込まれ、vitest 下でロードできない（pnpm の `@mastra/core>p-map` override に起因する既知の制約。前例が同じ理由で同じ回避をしている）。
 - **ツール呼び出しの入出力は `as never` キャストで実行時の呼び出し形状に合わせる**（`limitedGetPageContentTool.execute!({ pageId, offset } as never, { requestContext } as never)`）。前例と同じ形にする。
-- **偽のAgentが返すストリームは、tool-call / tool-result パートと最終テキストを偽の `data` として組み立てる**。要件3.1の出力形式（リード文＋箇条書き）や「部分的な内容に基づく旨の明示」の検証は、この偽の最終テキストに対して行う。すなわち**LLMが指示に従うかは検証対象にせず**、ルート層・ツール層・ストリーム構築が仕様どおりに振る舞うかを検証する（LLMの指示追従性はテストで保証できない領域であり、design側で「ハード上限はコードで強制する」としている理由でもある）。
+- **偽のAgentが返すストリームは、tool-call / tool-result パートと最終テキストを偽の `data` として組み立てる**。要件3.1の出力形式（リード文＋箇条書き）や「部分的な内容に基づく旨の明示」は、エージェントの指示文に含まれることを `instructions.spec.ts` で確認し、偽の最終テキストはルートがそのまま中継することの確認にだけ使う。すなわち**LLMが指示に従うかは検証対象にせず**、ルート層・ツール層・ストリーム構築が仕様どおりに振る舞うかを検証する（LLMの指示追従性はテストで保証できない領域であり、design側で「ハード上限はコードで強制する」としている理由でもある）。
 - **周辺のモック**: `configManager` は `getConfig(key)` の switch で `app:aiEnabled` 等を返す（`aiReadyGuard` の分岐を実際に通すため）。認証ミドルウェア（`~/server/middlewares/login-required` はデフォルトエクスポートを含めてモックし、`req.user` を注入するパススルーにする。`access-token-parser` も同様）。`~/utils/logger` は無害化する。`Crowi` インスタンスは `vitest-mock-extended` の `mock<Crowi>()` を使い、型アサーションを避ける（`.claude/rules/testing.md`）。ルートは `express` + `supertest` でHTTP経由で駆動する。
 
 ### Unit Tests

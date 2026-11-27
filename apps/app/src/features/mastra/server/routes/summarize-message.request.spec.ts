@@ -1,4 +1,5 @@
 import { APICallError } from 'ai';
+import mongoose from 'mongoose';
 import request from 'supertest';
 
 import {
@@ -103,6 +104,20 @@ describe('POST /summary — request handling', () => {
       );
     });
 
+    it('relays the limit_exceeded tool output to the client unchanged', async () => {
+      const response = await request(route.app)
+        .post('/summary')
+        .send({ pageId: longPage._id.toString() })
+        .expect(200);
+
+      const lastToolOutput = parseSse(response.text).findLast(
+        (chunk) => chunk.type === 'tool-output-available',
+      );
+      expect(lastToolOutput?.output).toMatchObject({
+        result: 'limit_exceeded',
+      });
+    });
+
     it('withdraws tools from every later step once the budget is spent', async () => {
       await request(route.app)
         .post('/summary')
@@ -125,12 +140,22 @@ describe('POST /summary — request handling', () => {
         toolChoice: 'none',
       });
     });
+  });
 
-    it('gives each request its own RequestContext and a budget that starts at 0', async () => {
+  // Suppressing a duplicate click is the trigger UI's job (Req 1.5); the
+  // server only has to keep concurrent runs independent.
+  describe('concurrent requests for the same page', () => {
+    it('serves both, each with its own RequestContext and a budget neither run shares', async () => {
       const body = { pageId: longPage._id.toString() };
-      await request(route.app).post('/summary').send(body).expect(200);
-      await request(route.app).post('/summary').send(body).expect(200);
 
+      const responses = await Promise.all([
+        request(route.app).post('/summary').send(body).expect(200),
+        request(route.app).post('/summary').send(body).expect(200),
+      ]);
+
+      for (const response of responses) {
+        expect(textOf(parseSse(response.text))).toBe(FINAL_TEXT);
+      }
       const [first, second] = route.streamCalls;
       expect(second.options.requestContext).not.toBe(
         first.options.requestContext,
@@ -138,10 +163,16 @@ describe('POST /summary — request handling', () => {
       expect(second.options.requestContext.get('pageReadBudget')).not.toBe(
         first.options.requestContext.get('pageReadBudget'),
       );
-      expect(second.budgetAtStart).toEqual({
-        used: 0,
-        limit: PAGE_READ_LIMIT,
-      });
+      for (const call of route.streamCalls) {
+        expect(call.budgetAtStart).toEqual({ used: 0, limit: PAGE_READ_LIMIT });
+        expect(call.toolOutputs.at(-1)).toMatchObject({
+          result: 'limit_exceeded',
+        });
+        expect(call.options.requestContext.get('pageReadBudget')?.used).toBe(
+          PAGE_READ_LIMIT,
+        );
+      }
+      expect(first.toolOutputs).toEqual(second.toolOutputs);
     });
   });
 
@@ -188,6 +219,21 @@ describe('POST /summary — request handling', () => {
       expect(response.body.errors[0].code).toBe('not_found_or_forbidden');
       expect(mocks.stream).not.toHaveBeenCalled();
       expect(mocks.incrementCount).not.toHaveBeenCalled();
+    });
+
+    it('answers a page that does not exist exactly as one the viewer cannot see', async () => {
+      const forbidden = await request(route.app)
+        .post('/summary')
+        .send({ pageId: ownerOnlyPage._id.toString() });
+      const missing = await request(route.app)
+        .post('/summary')
+        .send({ pageId: new mongoose.Types.ObjectId().toString() });
+
+      expect(missing.status).toBe(404);
+      expect(missing.status).toBe(forbidden.status);
+      expect(missing.body).toEqual(forbidden.body);
+      expect(missing.headers['content-type']).not.toMatch(/text\/event-stream/);
+      expect(mocks.stream).not.toHaveBeenCalled();
     });
 
     it('short-circuits with 404 before starting the stream when the page has no revision', async () => {
