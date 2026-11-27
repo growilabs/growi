@@ -53,6 +53,7 @@ Guard / Drift Specs section of the `essential-test-design` skill.
 | `server/service/mail/no-eager-transport-imports.spec.ts` | `nodemailer`, `nodemailer-ses-transport`, `aws-sdk` |
 | `server/service/no-eager-passport-strategy-imports.spec.ts` | `openid-client`, `passport-ldapauth`, `ldapjs`, `passport-saml`, `passport-github`, `passport-google-oauth20` |
 | `.../llm-providers/no-eager-provider-imports.spec.ts` | `@ai-sdk/*`, `@azure/identity` (from the mastra provider graph) |
+| `server/service/markdown-pipeline/no-eager-markdown-pipeline-imports.spec.ts` | `unified`, `remark-*`, `rehype-*`, `mdast-*`, `hast-util-sanitize`, `katex` |
 
 History: the `openai` SDK and `@azure/identity` used to be boot-loaded through
 the legacy `features/openai` client-delegator until #11293 (agentic

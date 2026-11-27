@@ -1,6 +1,7 @@
 /**
  * Canonical declaration of adopted and intentionally-excluded plugins for the
- * bulk-export Markdown → HTML pipeline.
+ * server-side Markdown pipeline (used by page-bulk-export and inline-comment;
+ * designed in .kiro/specs/bulk-export-pdf-rendering).
  *
  * This module is the single source of truth used by:
  *  - EsmPluginLoader (task 3.x) — which plugins to load and in what order
@@ -9,7 +10,8 @@
  *
  * Ordering follows the unified pipeline (mirrors the web renderer's selection order):
  *   remark-parse (implicit base)
- *   → remark plugins (gfm, emoji, remark-directive, echo-directive, frontmatter,
+ *   → remark plugins (gfm, emoji, pukiwiki-like-linker, growi-directive,
+ *                      remark-directive, echo-directive, frontmatter,
  *                      math, xsv-to-table)
  *   → remark-rehype (bridge, allowDangerousHtml)
  *   → rehype plugins (raw, slug, sanitize, katex, add-class, stringify)
@@ -44,12 +46,20 @@ export interface PluginDeclaration {
    * (rehype-sanitize's schema is computed at runtime and supplied by the renderer.)
    */
   readonly options?: Record<string, unknown>;
+  /**
+   * Which output the plugin belongs to: `html` (bulk-export HTML only),
+   * `text` (the rendered text inline comment anchors are computed from), or
+   * both when omitted.
+   */
+  readonly output?: PipelineOutput;
 }
+
+export type PipelineOutput = 'html' | 'text';
 
 /**
  * Adopted plugins in pipeline execution order.
  *
- * Design reference: design.md § Technology Stack
+ * Design reference: bulk-export-pdf-rendering design.md § Technology Stack
  *   remark-parse, remark-gfm, remark-frontmatter, remark-math,
  *   remark-rehype (allowDangerousHtml), rehype-raw, rehype-slug,
  *   rehype-sanitize, rehype-katex, rehype-stringify
@@ -70,6 +80,31 @@ export const ADOPTED_PLUGINS: ReadonlyArray<PluginDeclaration> = [
     load: () => import('~/services/renderer/remark-plugins/emoji'),
     exportName: 'remarkPlugin',
     options: undefined,
+  },
+  // Reused GROWI web plugin: pukiwiki-like-linker turns `[[page]]` /
+  // `[[label>page]]` into a link showing the page or the label, as the web
+  // renderer does (generateCommonOptions). DOM-free micromark/mdast extension;
+  // placed after emoji, mirroring the web order. Text output only:
+  // bulk-export keeps the syntax as written.
+  {
+    name: 'pukiwiki-like-linker',
+    load: () =>
+      import('~/services/renderer/remark-plugins/pukiwiki-like-linker'),
+    exportName: 'pukiwikiLikeLinker',
+    options: undefined,
+    output: 'text',
+  },
+  // growi-directive parses `$name` / `$name(args)` directives (DOM-free
+  // micromark/mdast extension), as the web renderer does. With no React
+  // consumer here, a directive renders as an empty element — the same text the
+  // web renderer shows for any directive other than its lsx/ref widgets. Text
+  // output only: bulk-export keeps the directive as written. The `load` thunk
+  // is needed because the canonical name is not the package name.
+  {
+    name: 'growi-directive',
+    load: () => import('@growi/remark-growi-directive'),
+    options: undefined,
+    output: 'text',
   },
   // remark-directive parses `:foo[..]{..}` / `::bar` / `:::baz` directive syntax
   // into directive nodes. Required for echo-directive (next) to find them. npm ESM.
@@ -105,8 +140,10 @@ export const ADOPTED_PLUGINS: ReadonlyArray<PluginDeclaration> = [
   { name: 'rehype-slug', options: undefined },
   // Sanitize must run after rehype-raw and before rehype-katex (katex output is trusted)
   { name: 'rehype-sanitize', options: undefined },
-  // rehype-katex renders math nodes; placed after sanitize so its trusted output is not stripped
-  { name: 'rehype-katex', options: undefined },
+  // rehype-katex renders math nodes; placed after sanitize so its trusted output is not stripped.
+  // HTML output only: the anchor text excludes formulas, and KaTeX is the
+  // most expensive step of a render.
+  { name: 'rehype-katex', options: undefined, output: 'html' },
   // Reused GROWI web plugin: add-class adds `table table-bordered` so the design
   // system's .table/.table-bordered borders apply (mirrors generateCommonOptions).
   // Loaded via a dynamic import() thunk; its only runtime dependency
@@ -117,13 +154,14 @@ export const ADOPTED_PLUGINS: ReadonlyArray<PluginDeclaration> = [
     load: () => import('~/services/renderer/rehype-plugins/add-class'),
     exportName: 'rehypePlugin',
     options: { table: 'table table-bordered' },
+    output: 'html',
   },
   // Serialises the hast tree to an HTML string; must be last
-  { name: 'rehype-stringify', options: undefined },
+  { name: 'rehype-stringify', options: undefined, output: 'html' },
 ] as const;
 
 /**
- * Plugins intentionally excluded from the bulk-export pipeline.
+ * Plugins intentionally excluded from the server-side pipeline.
  *
  * These are plugins present in the GROWI web renderer (generateCommonOptions /
  * generateSSRViewOptions) that this pipeline consciously omits. NOTE (改訂 5):
@@ -141,17 +179,16 @@ export const ADOPTED_PLUGINS: ReadonlyArray<PluginDeclaration> = [
  *      callout (colored callouts via CalloutViewer), and the diagram/highlight features
  *      (drawio, lsx, mermaid, plantuml, attachment-refs, syntax-highlight colors).
  *  - Not needed by this spec / deferred for a different reason:
- *      pukiwiki-like-linker, growi-directive (parser alone is not useful without its
- *      React consumers), codeblock / add-inline-code (negligible visual effect),
+ *      codeblock / add-inline-code (negligible visual effect),
  *      relative-links (needs a per-page pagePath injected at runtime),
  *      remark-breaks (gated on the per-instance `isEnabledLinebreaks` config).
  *
  * (emoji, xsv-to-table, remark-directive and echo-directive were excluded here before
- * 改訂 5; they are now ADOPTED — see ADOPTED_PLUGINS above.)
+ * 改訂 5, and pukiwiki-like-linker / growi-directive until inline comments
+ * needed the server text to match the browser's; they are now ADOPTED — the
+ * latter two for the text output only — see ADOPTED_PLUGINS above.)
  */
 export const INTENTIONALLY_EXCLUDED_PLUGINS: ReadonlyArray<string> = [
-  'pukiwiki-like-linker',
-  'growi-directive',
   'codeblock',
   'github-admonitions',
   'callout',

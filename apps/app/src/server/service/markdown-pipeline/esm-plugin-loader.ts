@@ -39,7 +39,7 @@ export interface LoadedPipeline {
  * This loader's single responsibility is *loading*: the caller decides *what* to
  * load and passes the declarations in (the canonical set lives in plugin-set.ts).
  * It holds no cache — callers that need build-once semantics cache the assembled
- * processor (see BulkExportMarkdownRenderer).
+ * processor (see markdown-processor.ts).
  *
  * Each declaration is resolved as:
  *  - `load ?? (() => import(name))` — an explicit dynamic-import thunk for a

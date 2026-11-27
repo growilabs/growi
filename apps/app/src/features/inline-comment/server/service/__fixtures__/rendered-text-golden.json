@@ -1,0 +1,134 @@
+{
+  "paragraphs": {
+    "md": "First para with **bold** and *em*.\n\nSecond para.",
+    "text": "First para with bold and em.\nSecond para."
+  },
+  "softBreak": {
+    "md": "line one\nline two",
+    "text": "line one\nline two"
+  },
+  "hardBreak": {
+    "md": "line one  \nline two",
+    "text": "line one\nline two"
+  },
+  "heading": {
+    "md": "# Heading One\n\nbody",
+    "text": "#Heading One\nbody"
+  },
+  "emoji": {
+    "md": "hello :smile: world",
+    "text": "hello 😄 world"
+  },
+  "inlineMath": {
+    "md": "before $x^2$ after",
+    "text": "before  after"
+  },
+  "blockMath": {
+    "md": "before\n\n$$\nE=mc^2\n$$\n\nafter",
+    "text": "before\n\nafter"
+  },
+  "del": {
+    "md": "keep ~~gone~~ keep",
+    "text": "keep gone keep"
+  },
+  "table": {
+    "md": "| a | b |\n|---|---|\n| c1 | d1 |",
+    "text": "\n\n\n\n\n\n\n\n\n\n\n\n\nabc1d1"
+  },
+  "footnote": {
+    "md": "text[^1]\n\n[^1]: note body",
+    "text": "text1\n#Footnotes\n\n\nnote body ↩\n\n\n"
+  },
+  "rawHtml": {
+    "md": "x <span>inner</span> y",
+    "text": "x inner y"
+  },
+  "image": {
+    "md": "pre ![alt text](https://example.com/a.png) post",
+    "text": "pre  post"
+  },
+  "link": {
+    "md": "see [link text](https://example.com) now",
+    "text": "see link text now"
+  },
+  "autolink": {
+    "md": "go https://example.com now",
+    "text": "go https://example.com now"
+  },
+  "inlineCode": {
+    "md": "use `npm i` here",
+    "text": "use npm i here"
+  },
+  "fencedCode": {
+    "md": "```js\nconst a = 1;\n```",
+    "text": "const a = 1;"
+  },
+  "fencedCodeNoLang": {
+    "md": "```\nplain code\n```",
+    "text": "plain code"
+  },
+  "drawioFence": {
+    "md": "```drawio\nabc\n```",
+    "text": ""
+  },
+  "csvFence": {
+    "md": "```csv\nh1,h2\nv1,v2\n```",
+    "text": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nh1h2v1v2"
+  },
+  "textDirective": {
+    "md": "a :name[label] b",
+    "text": "a :name[label] b"
+  },
+  "leafDirective": {
+    "md": "::name[label]",
+    "text": "::name[label]"
+  },
+  "list": {
+    "md": "- item one\n- item **two**\n  - nested",
+    "text": "\nitem one\nitem two\n\nnested\n\n\n"
+  },
+  "blockquote": {
+    "md": "> quoted text",
+    "text": "\nquoted text\n"
+  },
+  "frontmatter": {
+    "md": "---\ntitle: t\n---\n\nbody after fm",
+    "text": "body after fm"
+  },
+  "admonition": {
+    "md": "> [!NOTE]\n> note text",
+    "text": "infoNotenote text"
+  },
+  "lsx": {
+    "md": "$lsx()",
+    "text": "progress_activity$lsx(prefix=/probe)"
+  },
+  "headings2": {
+    "md": "## Second level\n\ntext under",
+    "text": "#Second level\ntext under"
+  },
+  "mixed": {
+    "md": "# Title\n\nPara one.\n\n## Sub\n\nPara two.",
+    "text": "#Title\nPara one.\n#Sub\nPara two."
+  },
+  "pukiwikiLink": {
+    "md": "see [[Foo]] for details",
+    "text": "see Foo for details"
+  },
+  "pukiwikiLinkWithLabel": {
+    "md": "[[label>/path]]",
+    "text": "label"
+  },
+  "growiDirectiveBare": {
+    "md": "cost $HOME here",
+    "text": "cost  here"
+  },
+  "growiDirectiveWithArgs": {
+    "md": "a $foo(x) b",
+    "text": "a  b"
+  },
+  "titledCodeBlock": {
+    "md": "```js:app.js\nconst a = 1;\n```",
+    "text": "app.jsconst a = 1;"
+  }
+}

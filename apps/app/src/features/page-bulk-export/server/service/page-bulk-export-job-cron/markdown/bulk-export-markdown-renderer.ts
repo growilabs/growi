@@ -1,7 +1,5 @@
-import type * as HastUtilSanitize from 'hast-util-sanitize';
+import { renderMarkdownToHtml } from '~/server/service/markdown-pipeline';
 
-import { loadPlugins } from './esm-plugin-loader';
-import { ADOPTED_PLUGINS } from './plugin-set';
 import { createBulkExportStyleProvider } from './styles';
 
 /**
@@ -30,75 +28,10 @@ export interface BulkExportMarkdownRenderer {
 }
 
 /**
- * Module-level processor cache — unified pipeline is built once and reused
- * across all pages in a bulk-export job (module-cache pattern).
- */
-let cachedProcessor: Awaited<ReturnType<typeof buildProcessor>> | undefined;
-
-/**
- * Build the sanitize schema by loading hast-util-sanitize and
- * services/renderer/recommended-whitelist.ts so that the bulk-export renderer
- * shares a single source of truth with the web renderer.
- *
- * Design: design.md § Security Considerations — "許可リストの単一出所"
- */
-async function buildSanitizeOptions(): Promise<HastUtilSanitize.Schema> {
-  const { defaultSchema }: typeof HastUtilSanitize = await import(
-    'hast-util-sanitize'
-  );
-
-  // Single source of truth: load tagNames and attributes from the web
-  // renderer's whitelist.
-  const { tagNames, attributes } = await import(
-    '~/services/renderer/recommended-whitelist'
-  );
-
-  return {
-    ...defaultSchema,
-    tagNames,
-    attributes,
-  };
-}
-
-/**
- * Build the unified processor by iterating the plugins declared in
- * plugin-set.ts (the single source of truth) in order. The pipeline — including
- * the reused web `add-class` plugin (loaded via a dynamic import() thunk) — is
- * fully data driven; nothing is wired by hand here, so adding/removing/reordering
- * a plugin is a one-file change in plugin-set.ts.
- *
- * The one runtime-computed input is rehype-sanitize's schema (buildSanitizeOptions),
- * which the renderer supplies as that plugin's options.
- *
- * Design: design.md § System Flows
- */
-async function buildProcessor() {
-  const { unified, plugins } = await loadPlugins(ADOPTED_PLUGINS);
-  const sanitizeOptions = await buildSanitizeOptions();
-
-  // unified().use() mutates the processor in place and returns `this`, so we
-  // call it for its side effect on a single instance. (Reassigning would force
-  // the variable's tree-type generics to change at each step.)
-  const processor = unified();
-  for (const { name, plugin, options } of plugins) {
-    // rehype-sanitize's schema is resolved at runtime (single-source whitelist);
-    // all other plugins use the static options declared in plugin-set.ts.
-    const resolvedOptions: unknown =
-      name === 'rehype-sanitize' ? sanitizeOptions : options;
-    if (resolvedOptions != null) {
-      processor.use(plugin, resolvedOptions);
-    } else {
-      processor.use(plugin);
-    }
-  }
-  return processor;
-}
-
-/**
  * Factory for BulkExportMarkdownRenderer.
  *
- * The unified pipeline is built once on first call to renderToHtml and cached
- * at module level for reuse across all pages in a bulk-export job.
+ * The shared markdown pipeline builds its processor once and reuses it across
+ * all pages in a bulk-export job.
  */
 export function createBulkExportMarkdownRenderer(): BulkExportMarkdownRenderer {
   const styleProvider = createBulkExportStyleProvider();
@@ -107,10 +40,7 @@ export function createBulkExportMarkdownRenderer(): BulkExportMarkdownRenderer {
       return styleProvider.getCss();
     },
     async renderToHtml(markdownBody: string, cssHref: string): Promise<string> {
-      if (cachedProcessor == null) {
-        cachedProcessor = await buildProcessor();
-      }
-      const htmlFragment = String(await cachedProcessor.process(markdownBody));
+      const htmlFragment = await renderMarkdownToHtml(markdownBody);
       return styleProvider.wrap(htmlFragment, cssHref);
     },
   };

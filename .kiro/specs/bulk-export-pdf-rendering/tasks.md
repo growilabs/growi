@@ -113,7 +113,7 @@ _Boundary: BulkExportStyleProvider, export-pages-to-fs-async, pdf-converter(HTML
 _Boundary: plugin-set, EsmPluginLoader, BulkExportMarkdownRenderer_
 
 ### N3. ドリフト検知は renderer.tsx の AST import 解析
-`renderer-parity.spec.ts` は TypeScript コンパイラ API で `renderer.tsx`（`generateCommonOptions` /
+`apps/app/src/server/service/markdown-pipeline/renderer-parity.spec.ts` は TypeScript コンパイラ API で `renderer.tsx`（`generateCommonOptions` /
 `generateSSRViewOptions`）の **import 宣言を AST 抽出**し、各プラグインが bulk-export 側で adopted /
 intentionally-excluded のいずれかに分類済みであることを検査する。手書きブロックリストは持たず、解析不能時は
 loud に失敗する。Web レンダラのプラグイン集合・順序が変わると検知される（Revalidation Trigger）。

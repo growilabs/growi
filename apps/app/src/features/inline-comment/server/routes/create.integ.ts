@@ -365,4 +365,306 @@ describe('POST /_api/v3/inline-comments', () => {
       expect.objectContaining({ code: 'notfound_or_forbidden' }),
     ]);
   });
+
+  describe('with a part of the page markdown instead of an anchor (requirement 26)', () => {
+    const BODY = [
+      'Intro with **bold** words.',
+      '',
+      'repeat here',
+      '',
+      'and repeat there',
+      '',
+      '![only an image](https://example.com/a.png)',
+    ].join('\n');
+
+    let markdownPage: HydratedDocument<PageDocument>;
+    let olderRevisionId: string;
+    let latestRevisionId: string;
+
+    const createRevision = async (pageId: string, body: string) =>
+      prisma.revisions.create({
+        data: {
+          id: String(new Types.ObjectId()),
+          pageId,
+          body,
+          format: 'markdown',
+          authorId: String(owner._id),
+        },
+      });
+
+    beforeAll(async () => {
+      const { Page } = crowi.models;
+      markdownPage = await Page.create({
+        path: `${FIXTURE_ROOT}/markdown`,
+        grant: PageGrant.GRANT_PUBLIC,
+        creator: owner._id,
+        lastUpdateUser: owner._id,
+      });
+      const pageId = String(markdownPage._id);
+      olderRevisionId = (await createRevision(pageId, 'an older body')).id;
+      latestRevisionId = (await createRevision(pageId, BODY)).id;
+      await Page.updateOne(
+        { _id: markdownPage._id },
+        { revision: latestRevisionId },
+      );
+    });
+
+    afterAll(async () => {
+      const pageId = String(markdownPage._id);
+      await prisma.comments.deleteMany({ where: { pageId } });
+      await prisma.revisions.deleteMany({ where: { pageId } });
+      await crowi.models.Page.deleteMany({ _id: markdownPage._id });
+    });
+
+    const markdownBody = (fields: Record<string, unknown>) => ({
+      pageId: String(markdownPage._id),
+      comment: 'markdown mode comment',
+      ...fields,
+    });
+
+    const errorOf = (res: request.Response) => res.body.errors?.[0];
+
+    it('creates the comment (201) with an anchor computed from the rendered text, taken from the latest revision', async () => {
+      const res = await request(app)
+        .post('/_api/v3/inline-comments')
+        .send(markdownBody({ markdownQuote: '**bold** words' }));
+
+      expect(res.status).toBe(201);
+      expect(res.body.inlineComment).toMatchObject({
+        anchorOriginRevisionId: latestRevisionId,
+        anchor: {
+          quote: 'bold words',
+          prefix: 'Intro with ',
+          approxOffset: 'Intro with '.length,
+        },
+      });
+
+      const row = await prisma.comments.findUnique({
+        where: { id: res.body.inlineComment.id },
+      });
+      expect(row).toMatchObject({
+        isInline: true,
+        quote: 'bold words',
+        anchorOriginRevisionId: latestRevisionId,
+      });
+    });
+
+    it('records the same create activity as the anchor mode', async () => {
+      const res = await request(app)
+        .post('/_api/v3/inline-comments')
+        .send(markdownBody({ markdownQuote: 'Intro' }));
+
+      expect(res.status).toBe(201);
+      const activity = await prisma.activities.findFirst({
+        where: {
+          event: res.body.inlineComment.id,
+          action: SupportedAction.ACTION_INLINE_COMMENT_CREATE,
+        },
+      });
+      expect(activity).not.toBeNull();
+    });
+
+    it('accepts the latest revision id', async () => {
+      const res = await request(app)
+        .post('/_api/v3/inline-comments')
+        .send(
+          markdownBody({
+            markdownQuote: 'Intro',
+            revisionId: latestRevisionId,
+          }),
+        );
+
+      expect(res.status).toBe(201);
+    });
+
+    it('anchors the occurrence that starts at markdownOffset', async () => {
+      const secondOffset = BODY.lastIndexOf('repeat');
+
+      const res = await request(app)
+        .post('/_api/v3/inline-comments')
+        .send(
+          markdownBody({
+            markdownQuote: 'repeat',
+            markdownOffset: secondOffset,
+          }),
+        );
+
+      expect(res.status).toBe(201);
+      expect(res.body.inlineComment.anchor).toMatchObject({
+        quote: 'repeat',
+        prefix: expect.stringMatching(/and $/),
+        suffix: expect.stringMatching(/^ there/),
+      });
+    });
+
+    it('returns 400 inline-comment-quote-not-found and stores nothing when the quote is not in the latest revision', async () => {
+      const before = await prisma.comments.count({
+        where: { pageId: String(markdownPage._id) },
+      });
+
+      const res = await request(app)
+        .post('/_api/v3/inline-comments')
+        .send(markdownBody({ markdownQuote: 'an older body' }));
+
+      expect(res.status).toBe(400);
+      expect(errorOf(res)).toMatchObject({
+        code: 'inline-comment-quote-not-found',
+      });
+      expect(
+        await prisma.comments.count({
+          where: { pageId: String(markdownPage._id) },
+        }),
+      ).toBe(before);
+    });
+
+    it('returns 400 inline-comment-quote-ambiguous with every candidate when the quote occurs more than once', async () => {
+      const res = await request(app)
+        .post('/_api/v3/inline-comments')
+        .send(markdownBody({ markdownQuote: 'repeat' }));
+
+      expect(res.status).toBe(400);
+      expect(errorOf(res)).toMatchObject({
+        code: 'inline-comment-quote-ambiguous',
+        args: {
+          total: 2,
+          candidates: [
+            {
+              offset: BODY.indexOf('repeat'),
+              line: 3,
+              snippet: expect.stringContaining('repeat here'),
+            },
+            {
+              offset: BODY.lastIndexOf('repeat'),
+              line: 5,
+              snippet: expect.stringContaining('and repeat there'),
+            },
+          ],
+        },
+      });
+    });
+
+    it('returns 400 inline-comment-quote-offset-mismatch with the candidates when no occurrence starts at markdownOffset', async () => {
+      const res = await request(app)
+        .post('/_api/v3/inline-comments')
+        .send(
+          markdownBody({
+            markdownQuote: 'repeat',
+            markdownOffset: BODY.indexOf('repeat') + 1,
+          }),
+        );
+
+      expect(res.status).toBe(400);
+      expect(errorOf(res)).toMatchObject({
+        code: 'inline-comment-quote-offset-mismatch',
+        args: {
+          total: 2,
+          candidates: [
+            expect.objectContaining({ offset: BODY.indexOf('repeat') }),
+            expect.objectContaining({ offset: BODY.lastIndexOf('repeat') }),
+          ],
+        },
+      });
+    });
+
+    it('returns 400 inline-comment-quote-not-anchorable for a range that shows no text', async () => {
+      const res = await request(app)
+        .post('/_api/v3/inline-comments')
+        .send(
+          markdownBody({
+            markdownQuote: '![only an image](https://example.com/a.png)',
+          }),
+        );
+
+      expect(res.status).toBe(400);
+      expect(errorOf(res)).toMatchObject({
+        code: 'inline-comment-quote-not-anchorable',
+      });
+    });
+
+    it('returns 409 inline-comment-revision-outdated when revisionId is not the latest revision', async () => {
+      const res = await request(app)
+        .post('/_api/v3/inline-comments')
+        .send(
+          markdownBody({ markdownQuote: 'Intro', revisionId: olderRevisionId }),
+        );
+
+      expect(res.status).toBe(409);
+      expect(errorOf(res)).toMatchObject({
+        code: 'inline-comment-revision-outdated',
+      });
+    });
+
+    it.each([
+      ['markdownOffset', { markdownOffset: 0 }],
+      ['revisionId', { revisionId: String(new Types.ObjectId()) }],
+    ])('returns 400 when an anchor is sent with %s', async (_field, extra) => {
+      const res = await request(app)
+        .post('/_api/v3/inline-comments')
+        .send({ ...validBody(), pageId: String(markdownPage._id), ...extra });
+
+      expect(res.status).toBe(400);
+      expect(errorOf(res)).toMatchObject({ code: 'validation_failed' });
+    });
+
+    it('returns 400 and stores nothing when both an anchor and a markdown quote are sent', async () => {
+      const before = await prisma.comments.count({
+        where: { pageId: String(markdownPage._id) },
+      });
+
+      const res = await request(app)
+        .post('/_api/v3/inline-comments')
+        .send({
+          ...validBody(),
+          pageId: String(markdownPage._id),
+          markdownQuote: 'Intro',
+        });
+
+      expect(res.status).toBe(400);
+      expect(errorOf(res)).toMatchObject({ code: 'validation_failed' });
+      expect(
+        await prisma.comments.count({
+          where: { pageId: String(markdownPage._id) },
+        }),
+      ).toBe(before);
+    });
+
+    it('returns 400 for an empty markdown quote', async () => {
+      const res = await request(app)
+        .post('/_api/v3/inline-comments')
+        .send(markdownBody({ markdownQuote: '' }));
+
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 400 for a markdown quote longer than 2000 characters', async () => {
+      const res = await request(app)
+        .post('/_api/v3/inline-comments')
+        .send(markdownBody({ markdownQuote: 'a'.repeat(2001) }));
+
+      expect(res.status).toBe(400);
+      expect(errorOf(res)).toMatchObject({ code: 'validation_failed' });
+    });
+
+    it('returns 400 when neither an anchor nor a markdown quote is sent', async () => {
+      const res = await request(app)
+        .post('/_api/v3/inline-comments')
+        .send(markdownBody({}));
+
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 404 (uniform) when the requester lacks view permission on the page', async () => {
+      const res = await request(app)
+        .post('/_api/v3/inline-comments')
+        .send(
+          markdownBody({
+            pageId: String(forbiddenPage._id),
+            markdownQuote: 'anything',
+          }),
+        );
+
+      expect(res.status).toBe(404);
+      expect(errorOf(res)).toMatchObject({ code: 'notfound_or_forbidden' });
+    });
+  });
 });
