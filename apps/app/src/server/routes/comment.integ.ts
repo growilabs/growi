@@ -739,6 +739,112 @@ describe('/comments.get share-link authorization (integration)', () => {
     });
   });
 
+  describe('POST /comments.add — replyTo target', () => {
+    const replierId = new ObjectId();
+    let topLevelCommentId: string;
+    let nestedReplyId: string;
+
+    const sendAdd = (comment: string, replyTo?: string) =>
+      request(app)
+        .post('/comments.add')
+        .send({
+          commentForm: {
+            page_id: pageAId.toString(),
+            revision_id: revAId.toString(),
+            comment,
+            replyTo,
+          },
+          slackNotificationForm: { isSlackEnabled: false },
+        });
+
+    const findStoredByBody = (comment: string) =>
+      prisma.comments.findMany({
+        where: { pageId: pageAId.toString(), comment },
+      });
+
+    beforeAll(() => {
+      // The success path prepares mention notifications through it.
+      crowi.setupCommentService();
+    });
+
+    beforeEach(async () => {
+      const topLevel = await prisma.comments.add(
+        pageAId.toString(),
+        new ObjectId().toString(),
+        revAId.toString(),
+        'top-level comment to reply to',
+        -1,
+      );
+      topLevelCommentId = topLevel.id;
+      const nested = await prisma.comments.add(
+        pageAId.toString(),
+        new ObjectId().toString(),
+        revAId.toString(),
+        'existing reply',
+        -1,
+        topLevelCommentId,
+      );
+      nestedReplyId = nested.id;
+
+      currentUser = { _id: replierId };
+      accessSpy.mockResolvedValue(true);
+    });
+
+    afterEach(async () => {
+      // Replies first: the reply relation forbids deleting a comment that still has replies.
+      await prisma.comments.deleteMany({
+        where: {
+          OR: [
+            { replyToId: topLevelCommentId },
+            { creatorId: replierId.toString(), replyToId: { not: null } },
+          ],
+        },
+      });
+      await prisma.comments.deleteMany({
+        where: {
+          OR: [{ creatorId: replierId.toString() }, { id: topLevelCommentId }],
+        },
+      });
+    });
+
+    it('stores a reply to a top-level comment of the same page', async () => {
+      const res = await sendAdd('a valid reply', topLevelCommentId);
+
+      expect(res.body.ok).toBe(true);
+      expect(res.body.comment.replyTo).toBe(topLevelCommentId);
+      const stored = await findStoredByBody('a valid reply');
+      expect(stored).toHaveLength(1);
+      expect(stored[0].replyToId).toBe(topLevelCommentId);
+    });
+
+    it.each([
+      ['an empty string', ''],
+      ['omitted', undefined],
+    ])('stores a top-level comment when replyTo is %s', async (_label, replyTo) => {
+      const body = `top-level via ${String(replyTo)}`;
+      const res = await sendAdd(body, replyTo);
+
+      expect(res.body.ok).toBe(true);
+      const stored = await findStoredByBody(body);
+      expect(stored).toHaveLength(1);
+      expect(stored[0].replyToId).toBeNull();
+    });
+
+    it.each([
+      ['a comment of another page', () => commentBId],
+      ['an inline comment', () => inlineCommentAId],
+      ['a reply (replies are one level deep)', () => nestedReplyId],
+      ['a comment that does not exist', () => new ObjectId().toString()],
+      ['a value that is not an ObjectId', () => 'not-an-object-id'],
+    ])('rejects a reply to %s and stores nothing', async (_label, target) => {
+      const body = `rejected reply to ${_label}`;
+      const res = await sendAdd(body, target());
+
+      expect(res.body.ok).toBe(false);
+      expect(await findStoredByBody(body)).toHaveLength(0);
+    });
+  });
+
   describe('GET /comments.get — creator output is the full sanitized user row (5.1, 5.4)', () => {
     const workerId = process.env.VITEST_WORKER_ID ?? '1';
     const pageCId = new ObjectId();
