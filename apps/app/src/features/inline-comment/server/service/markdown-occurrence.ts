@@ -14,7 +14,7 @@ export interface MarkdownOccurrenceCandidate {
   readonly offset: number;
   /** 1-based line number of `offset`. */
   readonly line: number;
-  /** The occurrence with a little of the markdown around it. */
+  /** The occurrence (truncated when long) with a little of the markdown around it. */
   readonly snippet: string;
 }
 
@@ -23,49 +23,66 @@ export type MarkdownOccurrenceSelection =
   | { readonly kind: 'not-found' }
   | {
       readonly kind: 'ambiguous' | 'offset-mismatch';
+      /** The first occurrences in document order, at most MAX_CANDIDATES. */
       readonly candidates: readonly MarkdownOccurrenceCandidate[];
+      /** How many occurrences there are in all. */
+      readonly total: number;
     };
 
+export const MAX_CANDIDATES = 20;
 const SNIPPET_CONTEXT_SIZE = 20;
+const SNIPPET_MATCH_SIZE = 40;
 
+/** Start offsets of the non-overlapping occurrences, in document order. */
 function findOccurrenceOffsets(body: string, quote: string): number[] {
   const offsets: number[] = [];
   for (
     let found = body.indexOf(quote);
     found !== -1;
-    found = body.indexOf(quote, found + 1)
+    found = body.indexOf(quote, found + quote.length)
   ) {
     offsets.push(found);
   }
   return offsets;
 }
 
-function lineNumberAt(body: string, offset: number): number {
-  let line = 1;
-  for (
-    let newline = body.indexOf('\n');
-    newline !== -1 && newline < offset;
-    newline = body.indexOf('\n', newline + 1)
-  ) {
-    line++;
-  }
-  return line;
-}
-
-function toCandidate(
+function toCandidates(
   body: string,
   quote: string,
-  offset: number,
-): MarkdownOccurrenceCandidate {
-  const end = offset + quote.length;
-  return {
-    offset,
-    line: lineNumberAt(body, offset),
-    snippet:
-      buildPrefixWindow(body, offset, SNIPPET_CONTEXT_SIZE, 'en') +
-      quote +
-      buildSuffixWindow(body, end, SNIPPET_CONTEXT_SIZE, 'en'),
-  };
+  offsets: readonly number[],
+): MarkdownOccurrenceCandidate[] {
+  const candidates: MarkdownOccurrenceCandidate[] = [];
+  let line = 1;
+  let countedUpTo = 0;
+  for (const offset of offsets) {
+    for (
+      let newline = body.indexOf('\n', countedUpTo);
+      newline !== -1 && newline < offset;
+      newline = body.indexOf('\n', newline + 1)
+    ) {
+      line++;
+    }
+    countedUpTo = offset;
+
+    const match =
+      quote.length > SNIPPET_MATCH_SIZE
+        ? `${buildSuffixWindow(body, offset, SNIPPET_MATCH_SIZE, 'en')}…`
+        : quote;
+    candidates.push({
+      offset,
+      line,
+      snippet:
+        buildPrefixWindow(body, offset, SNIPPET_CONTEXT_SIZE, 'en') +
+        match +
+        buildSuffixWindow(
+          body,
+          offset + quote.length,
+          SNIPPET_CONTEXT_SIZE,
+          'en',
+        ),
+    });
+  }
+  return candidates;
 }
 
 /**
@@ -78,26 +95,27 @@ export function selectMarkdownOccurrence(
   quote: string,
   offset?: number,
 ): MarkdownOccurrenceSelection {
+  if (offset != null && body.startsWith(quote, offset)) {
+    return {
+      kind: 'selected',
+      range: { start: offset, end: offset + quote.length },
+    };
+  }
+
   const offsets = findOccurrenceOffsets(body, quote);
   if (offsets.length === 0) {
     return { kind: 'not-found' };
   }
-
-  const selectedOffset =
-    offset == null
-      ? offsets.length === 1
-        ? offsets[0]
-        : undefined
-      : offsets.find((candidate) => candidate === offset);
-  if (selectedOffset != null) {
+  if (offset == null && offsets.length === 1) {
     return {
       kind: 'selected',
-      range: { start: selectedOffset, end: selectedOffset + quote.length },
+      range: { start: offsets[0], end: offsets[0] + quote.length },
     };
   }
 
   return {
     kind: offset == null ? 'ambiguous' : 'offset-mismatch',
-    candidates: offsets.map((candidate) => toCandidate(body, quote, candidate)),
+    candidates: toCandidates(body, quote, offsets.slice(0, MAX_CANDIDATES)),
+    total: offsets.length,
   };
 }

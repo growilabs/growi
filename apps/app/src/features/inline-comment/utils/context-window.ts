@@ -68,8 +68,18 @@ export function buildSuffixWindow(
 }
 
 /** Grapheme cluster boundary offsets within `text` (segment starts, plus the string's own end). */
-function graphemeBoundaries(text: string, locale: string): number[] {
+const segmenters = new Map<string, Intl.Segmenter>();
+
+function segmenterFor(locale: string): Intl.Segmenter {
+  const cached = segmenters.get(locale);
+  if (cached != null) return cached;
   const segmenter = new Intl.Segmenter(locale, { granularity: 'grapheme' });
+  segmenters.set(locale, segmenter);
+  return segmenter;
+}
+
+function graphemeBoundaries(text: string, locale: string): number[] {
+  const segmenter = segmenterFor(locale);
   const boundaries = Array.from(
     segmenter.segment(text),
     (segment) => segment.index,

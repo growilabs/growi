@@ -296,6 +296,7 @@ describe('resolveMarkdownQuoteAnchor', () => {
     });
     expect(await resolveMarkdownQuoteAnchor('a b a', 'a')).toEqual({
       kind: 'ambiguous',
+      total: 2,
       candidates: [
         expect.objectContaining({ offset: 0 }),
         expect.objectContaining({ offset: 4 }),
@@ -303,6 +304,7 @@ describe('resolveMarkdownQuoteAnchor', () => {
     });
     expect(await resolveMarkdownQuoteAnchor('a b a', 'a', 1)).toEqual({
       kind: 'offset-mismatch',
+      total: 2,
       candidates: [
         expect.objectContaining({ offset: 0 }),
         expect.objectContaining({ offset: 4 }),

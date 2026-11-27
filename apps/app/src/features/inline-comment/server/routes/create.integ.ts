@@ -526,6 +526,7 @@ describe('POST /_api/v3/inline-comments', () => {
       expect(errorOf(res)).toMatchObject({
         code: 'inline-comment-quote-ambiguous',
         args: {
+          total: 2,
           candidates: [
             {
               offset: BODY.indexOf('repeat'),
@@ -556,6 +557,7 @@ describe('POST /_api/v3/inline-comments', () => {
       expect(errorOf(res)).toMatchObject({
         code: 'inline-comment-quote-offset-mismatch',
         args: {
+          total: 2,
           candidates: [
             expect.objectContaining({ offset: BODY.indexOf('repeat') }),
             expect.objectContaining({ offset: BODY.lastIndexOf('repeat') }),
@@ -620,6 +622,15 @@ describe('POST /_api/v3/inline-comments', () => {
         .send(markdownBody({ markdownQuote: '' }));
 
       expect(res.status).toBe(400);
+    });
+
+    it('returns 400 for a markdown quote longer than 2000 characters', async () => {
+      const res = await request(app)
+        .post('/_api/v3/inline-comments')
+        .send(markdownBody({ markdownQuote: 'a'.repeat(2001) }));
+
+      expect(res.status).toBe(400);
+      expect(errorOf(res)).toMatchObject({ code: 'validation_failed' });
     });
 
     it('returns 400 when neither an anchor nor a markdown quote is sent', async () => {

@@ -23,6 +23,7 @@ describe('selectMarkdownOccurrence', () => {
 
     expect(result).toEqual({
       kind: 'ambiguous',
+      total: 2,
       candidates: [
         {
           offset: firstOffset,
@@ -51,15 +52,54 @@ describe('selectMarkdownOccurrence', () => {
     }
   });
 
-  it('counts overlapping occurrences as separate candidates', () => {
-    const result = selectMarkdownOccurrence('aaa', 'aa');
-
-    expect(result).toEqual({
+  it('counts occurrences without overlap', () => {
+    expect(selectMarkdownOccurrence('aaa', 'aa')).toEqual({
+      kind: 'selected',
+      range: { start: 0, end: 2 },
+    });
+    expect(selectMarkdownOccurrence('aaaa', 'aa')).toEqual({
       kind: 'ambiguous',
+      total: 2,
       candidates: [
         expect.objectContaining({ offset: 0 }),
-        expect.objectContaining({ offset: 1 }),
+        expect.objectContaining({ offset: 2 }),
       ],
+    });
+  });
+
+  it('lists at most the first 20 occurrences, with the total count, however many there are', () => {
+    const manyBody = 'x\n'.repeat(50_000);
+
+    const result = selectMarkdownOccurrence(manyBody, 'x');
+
+    expect(result.kind).toBe('ambiguous');
+    if (result.kind !== 'ambiguous') return;
+    expect(result.total).toBe(50_000);
+    expect(result.candidates).toHaveLength(20);
+    expect(result.candidates[19]).toMatchObject({ offset: 38, line: 20 });
+  });
+
+  it('truncates a long match in the snippet', () => {
+    const longQuote = 'q'.repeat(1000);
+    const longBody = `before ${longQuote} middle ${longQuote} after`;
+
+    const result = selectMarkdownOccurrence(longBody, longQuote);
+
+    expect(result.kind).toBe('ambiguous');
+    if (result.kind !== 'ambiguous') return;
+    for (const candidate of result.candidates) {
+      expect(candidate.snippet.length).toBeLessThan(200);
+    }
+    expect(result.candidates[0].snippet).toContain('before ');
+    expect(result.candidates[1].snippet).toContain(' after');
+  });
+
+  it('accepts the offset of any occurrence beyond the listed ones', () => {
+    const manyBody = 'x\n'.repeat(100);
+
+    expect(selectMarkdownOccurrence(manyBody, 'x', 180)).toEqual({
+      kind: 'selected',
+      range: { start: 180, end: 181 },
     });
   });
 
@@ -80,6 +120,7 @@ describe('selectMarkdownOccurrence', () => {
   it('refuses an offset at which no occurrence starts, listing the candidates', () => {
     expect(selectMarkdownOccurrence(body, 'target', firstOffset + 1)).toEqual({
       kind: 'offset-mismatch',
+      total: 2,
       candidates: [
         expect.objectContaining({ offset: firstOffset, line: 1 }),
         expect.objectContaining({ offset: secondOffset, line: 4 }),

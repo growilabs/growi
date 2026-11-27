@@ -61,6 +61,8 @@ type Req = Request<
   user?: HydratedDocument<IUser>;
 };
 
+const MAX_MARKDOWN_QUOTE_LENGTH = 2000;
+
 // The two input modes are told apart by the presence of `markdownQuote`.
 const isAnchorMode = () => body('markdownQuote').not().exists();
 const isMarkdownQuoteMode = () => body('markdownQuote').exists();
@@ -97,8 +99,10 @@ const validator = [
     .isString()
     .withMessage('markdownQuote must be a string')
     .bail()
-    .isLength({ min: 1 })
-    .withMessage('markdownQuote must not be empty'),
+    .isLength({ min: 1, max: MAX_MARKDOWN_QUOTE_LENGTH })
+    .withMessage(
+      `markdownQuote must be 1 to ${MAX_MARKDOWN_QUOTE_LENGTH} characters long`,
+    ),
   body('markdownOffset')
     .if(isMarkdownQuoteMode())
     .optional()
@@ -299,9 +303,11 @@ const validator = [
  *          markdownQuote:
  *            type: string
  *            minLength: 1
+ *            maxLength: 2000
  *            description: >
  *              An exact substring of the page body markdown, markdown syntax included
- *              (for example `**bold** text`).
+ *              (for example `**bold** text`), at most 2000 UTF-16 code units long.
+ *              Occurrences are counted without overlap.
  *          markdownOffset:
  *            type: integer
  *            minimum: 0
@@ -309,7 +315,9 @@ const validator = [
  *              UTF-16 index in the body where the chosen occurrence of `markdownQuote`
  *              starts. Required only when `markdownQuote` occurs more than once: send
  *              back the `offset` of one of the candidates returned with the error
- *              `inline-comment-quote-ambiguous`, rather than counting characters.
+ *              `inline-comment-quote-ambiguous`, rather than counting characters. When
+ *              there are more occurrences than the listed candidates, make
+ *              `markdownQuote` longer so that it occurs fewer times.
  *          revisionId:
  *            type: string
  *            description: >
@@ -333,7 +341,9 @@ const validator = [
  *            description: 1-based line number of the occurrence.
  *          snippet:
  *            type: string
- *            description: The occurrence with a little of the markdown around it.
+ *            description: >
+ *              The occurrence with a little of the markdown around it. An occurrence
+ *              longer than 40 code units is cut and ends with `…`.
  */
 
 type CreateTarget = Pick<
@@ -413,7 +423,7 @@ const refusedMarkdownQuote = (
     code,
     400,
     'candidates' in resolution
-      ? { candidates: resolution.candidates }
+      ? { candidates: resolution.candidates, total: resolution.total }
       : undefined,
   );
 };
@@ -511,7 +521,9 @@ const targetFromMarkdownQuote = async (
  *              range shows no text on the page (an image, a formula or markup only) or
  *              reaches into a code block drawn as a diagram (`drawio`, `mermaid`,
  *              `plantuml`) (code `inline-comment-quote-not-anchorable`). The ambiguous
- *              and offset-mismatch errors list every occurrence in `args.candidates`.
+ *              and offset-mismatch errors list the first 20 occurrences in document
+ *              order in `args.candidates` and the number of all occurrences in
+ *              `args.total`.
  *            content:
  *              application/json:
  *                schema:
@@ -522,8 +534,12 @@ const targetFromMarkdownQuote = async (
  *                        args:
  *                          type: object
  *                          properties:
+ *                            total:
+ *                              type: integer
+ *                              description: The number of all occurrences of `markdownQuote`.
  *                            candidates:
  *                              type: array
+ *                              maxItems: 20
  *                              items:
  *                                $ref: '#/components/schemas/InlineCommentQuoteCandidate'
  *          403:
