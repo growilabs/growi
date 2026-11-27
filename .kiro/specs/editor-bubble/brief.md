@@ -1,4 +1,4 @@
-# Brief: editor-selection-palette
+# Brief: editor-bubble
 
 > アンブレラ `editor-commands` の子スペック。**基盤 `editor-slash-command` に依存しない**（独立実装可。基底 `toggleMarkdownSymbol` + 既存 toolbar i18n/アイコン + 閲覧ページの「Comment」バブルの見た目・位置合わせを再利用して成立）。umbrella 所属は維持。
 
