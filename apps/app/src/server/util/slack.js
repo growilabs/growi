@@ -159,7 +159,7 @@ export const prepareSlackMessageForComment = (
     attachment.author_icon = user.image;
   }
 
-  const pageUrl = `<${urljoin(siteUrl, String(comment.page))}|${path}>`;
+  const pageUrl = `<${urljoin(siteUrl, String(comment.pageId))}|${path}>`;
   const text = `:speech_balloon: ${user.username} commented on ${pageUrl}`;
 
   const message = {
