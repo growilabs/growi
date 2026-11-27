@@ -1,4 +1,5 @@
 import { getIdStringForRef } from '@growi/core';
+import { objectIdUtils } from '@growi/core/dist/utils';
 import { body, query, validationResult } from 'express-validator';
 import mongoose from 'mongoose';
 
@@ -72,6 +73,24 @@ export const setup = (crowi, _app) => {
       }),
       pageId,
     );
+
+  // Replies are one level deep and stay in the thread kind of their parent, as
+  // the comment UI renders them; inline comment replies have their own route.
+  const isRepliableCommentOfPageId = async (commentId, pageId) => {
+    if (!objectIdUtils.isValidObjectId(commentId)) {
+      return false;
+    }
+    const target = await prisma.comments.findUnique({
+      where: { id: commentId },
+      select: { pageId: true, isInline: true, replyToId: true },
+    });
+    return (
+      target != null &&
+      target.pageId === pageId &&
+      target.isInline !== true &&
+      target.replyToId == null
+    );
+  };
 
   const logger = loggerFactory('growi:routes:comment');
   const { Page } = crowi.models;
@@ -270,6 +289,15 @@ export const setup = (crowi, _app) => {
    *                        $ref: '#/components/schemas/CommentBody'
    *                      comment_position:
    *                        $ref: '#/components/schemas/CommentPosition'
+   *                      replyTo:
+   *                        allOf:
+   *                          - $ref: '#/components/schemas/ObjectId'
+   *                        description: >
+   *                          ID of the comment to reply to. It must be a top-level
+   *                          (not itself a reply), non-inline comment of the same page;
+   *                          otherwise the request fails. Omit it, or send an empty
+   *                          string, to post a top-level comment. To reply to an inline
+   *                          comment, use POST /_api/v3/inline-comments/{id}/replies.
    *                required:
    *                  - commentForm
    *        responses:
@@ -312,7 +340,8 @@ export const setup = (crowi, _app) => {
     const revisionId = commentForm.revision_id;
     const comment = commentForm.comment;
     const position = commentForm.comment_position || -1;
-    const replyTo = commentForm.replyTo;
+    const replyTo =
+      commentForm.replyTo === '' ? undefined : commentForm.replyTo;
 
     // check whether accessible
     const isAccessible = await Page.isAccessiblePageByViewer(pageId, req.user);
@@ -331,6 +360,16 @@ export const setup = (crowi, _app) => {
       if (!(await isRevisionOfPageId(revisionId, pageId))) {
         return res.json(
           ApiResponse.error('The revision does not belong to this page.'),
+        );
+      }
+      if (
+        replyTo != null &&
+        !(await isRepliableCommentOfPageId(replyTo, pageId))
+      ) {
+        return res.json(
+          ApiResponse.error(
+            'The reply target must be a top-level, non-inline comment of this page.',
+          ),
         );
       }
       createdComment = await prisma.comments.add(
