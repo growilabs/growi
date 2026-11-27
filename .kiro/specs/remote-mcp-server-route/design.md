@@ -995,7 +995,7 @@ HTTP の層のエラーと、ツールの結果としてのエラーを分ける
 | 5 | `compression()` の下で、2025 年の版の SSE の応答が遅れずに届く | `/_api/v3/mcp` を圧縮の対象から外す |
 | 6 | 本番ビルドの GROWI で、MCP の部品を読み込む前後と、リクエストを処理した後のメモリ（RSS とヒープ）。無効に戻して `release()` したあとに、どれだけ戻るか | 数値を research.md に記録する（8.3・8.7・8.8 の根拠）。単独のプロセスでの参考値は research.md にある |
 | 7 | ビルド後に、`@modelcontextprotocol/*`、`hono`、`@hono/node-server` が `.next/node_modules/` に現れるか | `dependencies` に置く |
-| 8 | claude.ai が送るプロトコルの版、`Origin` ヘッダーの有無、バッチの有無 | `Origin` を送るなら、`isAllowedOrigin` が許可するオリジンに足すかを、バッチを送るなら 3.11 を、利用者と相談する |
+| 8 | claude.ai が送るプロトコルの版、`Origin` ヘッダーの有無、バッチの有無。特に、ヘッダー（`MCP-Protocol-Version`）と本文（`_meta`）で版が食い違うリクエストを送るか。SDK は、この食い違いを 400（-32020）で拒否する（PR のレビューで確認。SDK の分類の仕様でもある） | `Origin` を送るなら、`isAllowedOrigin` が許可するオリジンに足すかを、バッチを送るなら 3.11 を、利用者と相談する。版が食い違うリクエストを送るなら、claude.ai から接続できない。ルーターでヘッダーを本文に合わせて直してから SDK に渡す、などの対処を、利用者と相談する |
 
 ## Security Considerations
 

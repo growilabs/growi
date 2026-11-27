@@ -495,6 +495,21 @@ PR のレビューで、`@modelcontextprotocol/server` を直接使う案との�
 - 本番ビルドの GROWI の中でのメモリ（design.md の Verification Checkpoints 6）。
 - SDK の直接利用で、ビルド後に `.next/node_modules/` に現れるパッケージ。
 
+### PR のレビューで確かめられた動作（2026-11-27、yuki-takei）
+
+`@mastra/mcp` 2.8.0 を動かして確かめられた。同梱の SDK（2.4.0）の動作なので、SDK を直接使う場合も同じである（SDK の `isLegacyRequest` の説明とも一致する）。
+
+| 確かめたこと | 結果 | design.md の扱い |
+|---|---|---|
+| `_meta` の `io.modelcontextprotocol/protocolVersion` と `clientCapabilities` が無い 2026-07-28 版のリクエスト | 400 で拒否される | Verification Checkpoints 1（`mongoSanitize` より前にマウントするので、削られない） |
+| `legacy: 'stateless'` で、`initialize` を経ていない `tools/call` | 応答する | Verification Checkpoints 2（SDK でも確認） |
+| ヘッダーが 2025-11-25、本文が 2026-07-28 と食い違うリクエスト | 400（-32020）で拒否される | Verification Checkpoints 8。claude.ai が実際に送るかは未確認 |
+| GET | 405 | 要件 3.6 |
+| `initialize` を含む配列 | 400 | 要件 3.11（GROWI は配列を、SDK に渡す前に拒否する） |
+| `instructions` | `server/discover` と `initialize` の両方の応答に載る | GrowiMcpServerFactory |
+
+- 版が食い違うリクエストについては、コネクタの追加時の確認が 2025-11-25 で来て、ツールの呼び出しが 2026-07-28 で来るという第三者の報告と、ヘッダーと本文で版が食い違うリクエストが来たという報告がある（umbrella の research.md の C）。claude.ai がこれを送っていれば、SDK が拒否するので接続できない。実機での確認を、実装の早い段階で行う。
+
 ### PR のレビューで共有された計測（2026-11-27、yuki-takei）
 
 `@mastra/mcp` 2.8.0 を、単独のプロセスで動かして測った値（Node 24、各 5 回）。GROWI の中での値ではない。
@@ -518,4 +533,4 @@ PR のレビューで、`@modelcontextprotocol/server` を直接使う案との�
 - 既存ツールからの取り出しで、AI チャットの結果が変わる — 既存の spec を変えずに通すことを、取り出しのタスクの完了条件にする。
 
 ---
-_Updated: 2026-11-27. 認証の成功の結果に `extra` を持たせる Decision を足した。Prior: 2026-11-27. 置き場所を `features/mcp-server` に改める Decision を足した。Prior: 2026-11-27. `@mastra/mcp` と SDK の比較の検証と、SDK を直接使う Decision を足した。Prior: 2026-11-27. マウントする位置の Decision（セッションより前）と検証の結果を足し、それで覆った記述（3.1、3.2、3.8、3.9）に結論を書いた。Prior: 2026-11-27. PR のレビューを受けて、動かない状態のメモリの扱いの Decision と、共有された計測値を足した。Prior: 2026-11-25. PR のレビューを受けて、後の決定で覆った記述（ギャップ分析の 2 と 3）を直し、Decision を 3 つ足した。Prior: 2026-11-25. 設計の調査と判断（Design Discovery）を足した。Prior: 2026-11-25. 置き場所を `features/mastra` にする決定を、設計への申し送りに足した。Prior: 2026-11-25. パスを `/_api/v3/mcp` にする決定を反映した（1.1 を解決済みにし、`CertifyOrigin` の制約を 3.9 に足した）。Prior: 2026-11-24. ギャップ分析を記録。_
+_Updated: 2026-11-27. PR のレビューで確かめられた動作を記録した。Prior: 2026-11-27. 認証の成功の結果に `extra` を持たせる Decision を足した。Prior: 2026-11-27. 置き場所を `features/mcp-server` に改める Decision を足した。Prior: 2026-11-27. `@mastra/mcp` と SDK の比較の検証と、SDK を直接使う Decision を足した。Prior: 2026-11-27. マウントする位置の Decision（セッションより前）と検証の結果を足し、それで覆った記述（3.1、3.2、3.8、3.9）に結論を書いた。Prior: 2026-11-27. PR のレビューを受けて、動かない状態のメモリの扱いの Decision と、共有された計測値を足した。Prior: 2026-11-25. PR のレビューを受けて、後の決定で覆った記述（ギャップ分析の 2 と 3）を直し、Decision を 3 つ足した。Prior: 2026-11-25. 設計の調査と判断（Design Discovery）を足した。Prior: 2026-11-25. 置き場所を `features/mastra` にする決定を、設計への申し送りに足した。Prior: 2026-11-25. パスを `/_api/v3/mcp` にする決定を反映した（1.1 を解決済みにし、`CertifyOrigin` の制約を 3.9 に足した）。Prior: 2026-11-24. ギャップ分析を記録。_
