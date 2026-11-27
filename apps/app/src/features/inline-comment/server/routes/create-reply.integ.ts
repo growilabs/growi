@@ -16,7 +16,6 @@ import { getInstance } from '^/test/setup/crowi';
 
 import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
-import { InAppNotification } from '~/server/models/in-app-notification';
 import type { PageDocument } from '~/server/models/page';
 import addCustomFunctionToResponse from '~/server/routes/apiv3/response';
 import { prisma } from '~/utils/prisma';
@@ -210,7 +209,9 @@ describe('POST /_api/v3/inline-comments/:id/replies', () => {
         ],
       },
     });
-    await InAppNotification.deleteMany({ user: mentionedUser._id });
+    await prisma.inappnotifications.deleteMany({
+      where: { userId: mentionedUser._id.toString() },
+    });
     // Replies before origins: comments.replyTo (`CommentToReply`) is a
     // required-relation-checked self-reference, so Prisma's Mongo connector
     // rejects deleting a parent row in the same deleteMany() call as a child
@@ -278,11 +279,13 @@ describe('POST /_api/v3/inline-comments/:id/replies', () => {
     // *origin* comment's page (parent.page), since createReply() passes the
     // parent's page — not the reply row itself — to
     // prepareMentionNotifications.
-    const notification = await InAppNotification.findOne({
-      user: mentionedUser._id,
-      action: SupportedAction.ACTION_COMMENT_MENTION,
-      target: publicPage._id,
-      targetModel: SupportedTargetModel.MODEL_PAGE,
+    const notification = await prisma.inappnotifications.findFirst({
+      where: {
+        userId: mentionedUser._id.toString(),
+        action: SupportedAction.ACTION_COMMENT_MENTION,
+        target: publicPage._id.toString(),
+        targetModel: SupportedTargetModel.MODEL_PAGE,
+      },
     });
     expect(notification).not.toBeNull();
   });

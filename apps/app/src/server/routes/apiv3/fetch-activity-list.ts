@@ -15,7 +15,6 @@ import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import { isValid } from 'date-fns/isValid';
 import { parseISO } from 'date-fns/parseISO';
 
-import type { Prisma } from '~/generated/prisma/client';
 import type { ISearchFilter } from '~/interfaces/activity';
 import { prisma } from '~/utils/prisma';
 
@@ -70,17 +69,7 @@ export async function paginateAndSerializeActivities(
     include: { user: true },
   });
 
-  // Type note: the `paginate` generic resolves via PaginateOptions<…> which
-  // does not propagate `include` into the result type, so `docs` is typed as
-  // the base scalar shape (no `user` property). We route through `unknown` to
-  // reach the correct payload type — the runtime value is correct because
-  // `include: { user: true }` was passed to `paginate`.
-  type ActivityWithUser = Prisma.activitiesGetPayload<{
-    include: { user: true };
-  }>;
-  const serializedDocs = (
-    paginateResult.docs as unknown as ActivityWithUser[]
-  ).map((doc) => {
+  const serializedDocs = paginateResult.docs.map((doc) => {
     const { user, userId, ...rest } = doc;
     return {
       // The Prisma `users` type has nullable fields (e.g. name: string|null)

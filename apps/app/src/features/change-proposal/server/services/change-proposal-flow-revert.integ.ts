@@ -6,7 +6,6 @@ import { getInstance } from '^/test/setup/crowi';
 
 import { SupportedAction } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
-import { InAppNotification } from '~/server/models/in-app-notification';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import type {
   IPageOperation,
@@ -140,7 +139,9 @@ describe('change proposal flow: apply, revert everything, then revert the revert
         select: { id: true },
       })
     ).map((p) => p.id);
-    await InAppNotification.deleteMany({ target: { $in: ids } });
+    await prisma.inappnotifications.deleteMany({
+      where: { target: { in: ids.map(String) } },
+    });
     await prisma.activities.deleteMany({ where: { target: { in: ids } } });
     await prisma.changeproposals.deleteMany({ where: { id: { in: ids } } });
     const trashed = await Page().find({
@@ -222,7 +223,7 @@ describe('change proposal flow: apply, revert everything, then revert the revert
     // the subscriber hears about the revert once, as a revert
     expect(
       (await kit.aggregatedNotifications(first.revert._id)).map((n) => [
-        String(n.user),
+        n.userId,
         n.action,
       ]),
     ).toEqual([

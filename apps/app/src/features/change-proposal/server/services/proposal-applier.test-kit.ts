@@ -6,7 +6,6 @@ import mongoose from 'mongoose';
 
 import { SupportedTargetModel } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
-import { InAppNotification } from '~/server/models/in-app-notification';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import type {
   IPageOperation,
@@ -198,13 +197,20 @@ export const createApplierTestKit = (args: {
     });
 
   const aggregatedNotifications = (proposalId: string) =>
-    InAppNotification.find({
-      target: proposalId,
-      targetModel: SupportedTargetModel.MODEL_CHANGE_PROPOSAL,
-    })
-      .sort({ _id: 1 })
-      .lean()
-      .exec();
+    prisma.inappnotifications
+      .findMany({
+        where: {
+          target: proposalId,
+          targetModel: SupportedTargetModel.MODEL_CHANGE_PROPOSAL,
+        },
+        orderBy: { id: 'asc' },
+      })
+      .then((rows) =>
+        rows.map(({ snapshot, ...row }) => ({
+          ...row,
+          snapshot: snapshot ?? '',
+        })),
+      );
 
   const snapshotPagesOf = (
     notification: Awaited<ReturnType<typeof aggregatedNotifications>>[number],
@@ -268,8 +274,10 @@ export const createApplierTestKit = (args: {
     await prisma.revisions.deleteMany({
       where: { pageId: { in: pageIds.map((id) => id.toString()) } },
     });
-    await InAppNotification.deleteMany({
-      $or: [{ target: { $in: pageIds } }, { target: { $in: proposalIds } }],
+    await prisma.inappnotifications.deleteMany({
+      where: {
+        target: { in: [...pageIds, ...proposalIds].map(String) },
+      },
     });
     await Subscription.deleteMany({ target: { $in: pageIds } });
     // An apply set off by an approval records no ip, so its rows go by proposal and operator.

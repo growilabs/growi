@@ -8,7 +8,6 @@ import request from 'supertest';
 import { getInstance } from '^/test/setup/crowi';
 
 import type Crowi from '~/server/crowi';
-import { InAppNotification } from '~/server/models/in-app-notification';
 import type { PageDocument } from '~/server/models/page';
 import Subscription from '~/server/models/subscription';
 import { UserStatus } from '~/server/models/user/conts';
@@ -167,7 +166,7 @@ describe('reverts and summary notifications never disclose pages a user cannot s
   ): Promise<Map<string, ChangeProposalNotificationSnapshot[]>> => {
     const byUser = new Map<string, ChangeProposalNotificationSnapshot[]>();
     for (const n of await kit.aggregatedNotifications(proposalId)) {
-      const user = String(n.user);
+      const user = n.userId;
       byUser.set(user, [
         ...(byUser.get(user) ?? []),
         JSON.parse(n.snapshot) as ChangeProposalNotificationSnapshot,
@@ -242,8 +241,8 @@ describe('reverts and summary notifications never disclose pages a user cannot s
 
   afterAll(async () => {
     vi.restoreAllMocks();
-    await InAppNotification.deleteMany({
-      target: { $in: revertProposalIds },
+    await prisma.inappnotifications.deleteMany({
+      where: { target: { in: revertProposalIds.map(String) } },
     });
     await prisma.activities.deleteMany({
       where: { target: { in: [...appliedProposalIds, ...revertProposalIds] } },

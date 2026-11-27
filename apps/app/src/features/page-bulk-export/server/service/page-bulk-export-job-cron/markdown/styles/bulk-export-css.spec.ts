@@ -120,7 +120,8 @@ describe('BULK_EXPORT_CSS', () => {
 
     it('does not contain external url() font references (fonts must be inlined as data URIs)', () => {
       // Any remaining url() must be a data: URI, not a relative fonts/ path
-      const fontUrlMatches = BULK_EXPORT_CSS.match(/url\([^)]+\)/g) ?? [];
+      const fontUrlMatches: string[] =
+        BULK_EXPORT_CSS.match(/url\([^)]+\)/g) ?? [];
       const externalFontUrls = fontUrlMatches.filter(
         (u) => u.includes('fonts/') && !u.startsWith('url(data:'),
       );

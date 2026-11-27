@@ -21,7 +21,6 @@ import { getInstance } from '^/test/setup/crowi';
 
 import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
-import { InAppNotification } from '~/server/models/in-app-notification';
 import type { PageDocument } from '~/server/models/page';
 import addCustomFunctionToResponse from '~/server/routes/apiv3/response';
 import { prisma } from '~/utils/prisma';
@@ -164,7 +163,9 @@ describe('POST /_api/v3/inline-comments', () => {
         ],
       },
     });
-    await InAppNotification.deleteMany({ user: mentionedUser._id });
+    await prisma.inappnotifications.deleteMany({
+      where: { userId: mentionedUser._id.toString() },
+    });
   });
 
   const validBody = () => ({
@@ -240,11 +241,13 @@ describe('POST /_api/v3/inline-comments', () => {
     // comment was posted on. This mirrors the row shape
     // insertMentionNotifications() writes (see
     // src/server/service/in-app-notification.ts).
-    const notification = await InAppNotification.findOne({
-      user: mentionedUser._id,
-      action: SupportedAction.ACTION_COMMENT_MENTION,
-      target: publicPage._id,
-      targetModel: SupportedTargetModel.MODEL_PAGE,
+    const notification = await prisma.inappnotifications.findFirst({
+      where: {
+        userId: mentionedUser._id.toString(),
+        action: SupportedAction.ACTION_COMMENT_MENTION,
+        target: publicPage._id.toString(),
+        targetModel: SupportedTargetModel.MODEL_PAGE,
+      },
     });
     expect(notification).not.toBeNull();
   });

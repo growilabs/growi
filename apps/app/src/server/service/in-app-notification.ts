@@ -1,8 +1,7 @@
 import type { HasObjectId, IPage, IPageHasId, IUser } from '@growi/core';
 import { SubscriptionStatusType } from '@growi/core';
-import { toLegacyAttachmentShape } from '@growi/core/dist/models/serializers';
 import { subDays } from 'date-fns/subDays';
-import type { FilterQuery, Types, UpdateQuery } from 'mongoose';
+import mongoose, { type Types } from 'mongoose';
 
 import type {
   auditlogbulkexportjobs,
@@ -13,14 +12,13 @@ import {
   SupportedAction,
   SupportedTargetModel,
 } from '~/interfaces/activity';
-import type {
-  IInAppNotification,
-  PaginateResult,
-} from '~/interfaces/in-app-notification';
+import type { PaginateResult } from '~/interfaces/in-app-notification';
 import { InAppNotificationStatuses } from '~/interfaces/in-app-notification';
 import type { ActivityDocument } from '~/server/models/activity';
-import type { InAppNotificationDocument } from '~/server/models/in-app-notification';
-import { InAppNotification } from '~/server/models/in-app-notification';
+import type {
+  HydratedNotification,
+  PageLoader,
+} from '~/server/models/in-app-notification';
 import InAppNotificationSettings from '~/server/models/in-app-notification-settings';
 import Subscription from '~/server/models/subscription';
 import loggerFactory from '~/utils/logger';
@@ -33,15 +31,16 @@ import { getRoomNameWithId, RoomPrefix } from './socket-io/helper';
 
 const { STATUS_UNOPENED, STATUS_OPENED } = InAppNotificationStatuses;
 
-const logger = loggerFactory('growi:service:inAppNotification');
+// TODO: once the Page model is migrated to prisma, read through prisma.pages
+// inside paginateAndIncludeTarget and stop passing `loadPages` from here.
+const loadPages: PageLoader = (pageIds) =>
+  mongoose
+    .model('Page')
+    .find({ _id: { $in: pageIds } })
+    .lean<Array<{ _id: { toString(): string } }>>()
+    .exec();
 
-const hasAttachmentRef = (
-  target: unknown,
-): target is { attachment: NonNullable<unknown> } =>
-  target != null &&
-  typeof target === 'object' &&
-  'attachment' in target &&
-  target.attachment != null;
+const logger = loggerFactory('growi:service:inAppNotification');
 
 export class InAppNotificationService {
   crowi!: Crowi;
@@ -109,41 +108,23 @@ export class InAppNotificationService {
   upsertByActivity = async (
     users: Types.ObjectId[],
     activity: ActivityDocument,
-    snapshot: string,
+    snapshot?: string,
     createdAt?: Date | null,
   ): Promise<void> => {
     const { _id: activityId, targetModel, target, action } = activity;
-    const now = createdAt || Date.now();
-    const lastWeek = subDays(now, 7);
-    const operations = users.map((user) => {
-      const filter: FilterQuery<InAppNotificationDocument> = {
-        user,
-        target,
-        action,
-        createdAt: { $gt: lastWeek },
-        snapshot,
-      };
-      const parameters: UpdateQuery<InAppNotificationDocument> = {
-        user,
-        targetModel,
-        target,
-        action,
-        status: STATUS_UNOPENED,
-        createdAt: now,
-        snapshot,
-        $addToSet: { activities: activityId },
-      };
-      return {
-        updateOne: {
-          filter,
-          update: parameters,
-          upsert: true,
-        },
-      };
-    });
+    const now = createdAt || new Date();
 
-    await InAppNotification.bulkWrite(operations);
-    logger.info('InAppNotification bulkWrite has run');
+    await prisma.inappnotifications.upsertByActivity({
+      userIds: users.map(String),
+      activityId: String(activityId),
+      targetModel,
+      target: target != null ? String(target) : null,
+      action,
+      snapshot: snapshot ?? null,
+      createdAt: now,
+      lastWeek: subDays(now, 7),
+    });
+    logger.info('InAppNotification upsert has run');
     return;
   };
 
@@ -154,129 +135,54 @@ export class InAppNotificationService {
       limit: number;
       status?: InAppNotificationStatuses;
     },
-  ): Promise<PaginateResult<InAppNotificationDocument>> => {
+  ): Promise<PaginateResult<HydratedNotification>> => {
     const { limit, offset, status } = queryOptions;
 
     try {
-      const paginateOptions = { user: userId };
-      if (status != null) {
-        Object.assign(paginateOptions, { status });
-      }
-      // TODO: import @types/mongoose-paginate-v2 and use PaginateResult as a type after upgrading mongoose v6.0.0
-      const paginationResult = await (InAppNotification as any).paginate(
-        paginateOptions,
+      return await prisma.inappnotifications.paginateAndIncludeTarget(
         {
-          sort: { createdAt: -1 },
+          where: { userId: String(userId), ...(status != null && { status }) },
+          orderBy: { createdAt: 'desc' },
+          include: { user: true },
           limit,
           offset,
-          populate: [
-            { path: 'user' },
-            { path: 'activities', populate: { path: 'user' } },
-          ],
         },
+        loadPages,
       );
-      // target.attachment is populated via prisma by
-      // populateTargetAttachments after toObject(): mongoose casts a
-      // prisma row assigned to a ref path back to an ObjectId, dropping
-      // `downloadPathProxied`.
-      // A change proposal is never loaded: it holds every operation (paths and
-      // bodies), while a recipient may only see its own snapshot.
-      await InAppNotification.populate(
-        paginationResult.docs.filter(
-          (doc) =>
-            doc.targetModel !== SupportedTargetModel.MODEL_CHANGE_PROPOSAL,
-        ),
-        { path: 'target' },
-      );
-
-      return paginationResult;
     } catch (err) {
       logger.error('Error', err);
       throw new Error(err);
     }
   };
 
-  // TODO: populate target.attachment in the notification query itself once
-  // InAppNotification is migrated to prisma. Read through prisma so it carries
-  // the computed `downloadPathProxied`.
-  populateTargetAttachments = async <T extends IInAppNotification>(
-    notifications: T[],
-  ): Promise<T[]> => {
-    const attachmentIds = [
-      ...new Set<string>(
-        notifications
-          .map(({ target }) => target)
-          .filter(hasAttachmentRef)
-          .map(({ attachment }) => String(attachment)),
-      ),
-    ];
-    if (attachmentIds.length === 0) {
-      return notifications;
-    }
-
-    const attachments = await prisma.attachments.findMany({
-      where: { id: { in: attachmentIds } },
-    });
-    const attachmentsById = new Map(
-      attachments.map((attachment) => [attachment.id, attachment]),
-    );
-
-    return notifications.map((notification) => {
-      const { target } = notification;
-      if (!hasAttachmentRef(target)) {
-        return notification;
-      }
-      const attachment = attachmentsById.get(String(target.attachment));
-      return {
-        ...notification,
-        target: {
-          ...target,
-          attachment: attachment ? toLegacyAttachmentShape(attachment) : null,
-        },
-      };
-    });
-  };
-
-  hideChangeProposalTargets = <T extends IInAppNotification>(
-    notifications: T[],
-  ): T[] =>
-    notifications.map((notification) =>
-      notification.targetModel === SupportedTargetModel.MODEL_CHANGE_PROPOSAL
-        ? { ...notification, target: { _id: notification.target } }
-        : notification,
-    );
-
   open = async (
     user: IUser & HasObjectId,
     id: Types.ObjectId,
   ): Promise<void> => {
-    const query = { _id: id, user: user._id };
-    const parameters = { status: STATUS_OPENED };
-    const options = { new: true };
-
-    await InAppNotification.findOneAndUpdate(query, parameters, options);
+    await prisma.inappnotifications.updateMany({
+      where: { id: String(id), userId: String(user._id) },
+      data: { status: STATUS_OPENED },
+    });
     return;
   };
 
   updateAllNotificationsAsOpened = async (
     user: IUser & HasObjectId,
   ): Promise<void> => {
-    const filter = { user: user._id, status: STATUS_UNOPENED };
-    const options = { status: STATUS_OPENED };
-
-    await InAppNotification.updateMany(filter, options);
+    await prisma.inappnotifications.updateMany({
+      where: { userId: String(user._id), status: STATUS_UNOPENED },
+      data: { status: STATUS_OPENED },
+    });
     return;
   };
 
   getUnreadCountByUser = async (
     user: Types.ObjectId,
   ): Promise<number | undefined> => {
-    const query = { user, status: STATUS_UNOPENED };
-
     try {
-      const count = await InAppNotification.countDocuments(query);
-
-      return count;
+      return await prisma.inappnotifications.count({
+        where: { userId: String(user), status: STATUS_UNOPENED },
+      });
     } catch (err) {
       logger.error('Error on getUnreadCountByUser', err);
       throw err;
@@ -312,17 +218,17 @@ export class InAppNotificationService {
     );
 
     const documents = filteredUserIds.map((userId) => ({
-      user: userId,
+      userId: String(userId),
       targetModel: SupportedTargetModel.MODEL_PAGE,
-      target: page._id,
+      target: String(page._id),
       action: SupportedAction.ACTION_COMMENT_MENTION,
       status: STATUS_UNOPENED,
       createdAt: now,
       snapshot,
-      activities: [activityId],
+      activities: [String(activityId)],
     }));
 
-    await InAppNotification.insertMany(documents, { ordered: false });
+    await prisma.inappnotifications.createMany({ data: documents });
     logger.info(
       `insertMentionNotifications: inserted ${filteredUserIds.length} notifications`,
     );
