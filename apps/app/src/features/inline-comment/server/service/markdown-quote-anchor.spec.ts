@@ -51,6 +51,9 @@ const allRangesWithin = ({ start, end }: MarkdownRange): MarkdownRange[] => {
   return ranges;
 };
 
+// Distinct bodies get distinct ids, as distinct revisions would.
+const asRevision = (body: string) => ({ id: body, body });
+
 const renderWithSource = async (md: string) =>
   renderedTextWithSourceOf(await renderMarkdownToTextHast(md), md);
 
@@ -192,7 +195,10 @@ describe('resolveMarkdownQuoteAnchor', () => {
     ])('%s', async (_title, fixture, markdownQuote, expectedQuote) => {
       const { md, text: browserText } = GOLDEN[fixture];
 
-      const result = await resolveMarkdownQuoteAnchor(md, markdownQuote);
+      const result = await resolveMarkdownQuoteAnchor(
+        asRevision(md),
+        markdownQuote,
+      );
 
       expect(result).toEqual({
         kind: 'anchored',
@@ -204,7 +210,10 @@ describe('resolveMarkdownQuoteAnchor', () => {
     it('quotes a footnote definition written before later text, though it is rendered at the end', async () => {
       const md = 'a[^1]\n\n[^1]: :smile: note\n\nlater para';
 
-      const result = await resolveMarkdownQuoteAnchor(md, ':smile: note');
+      const result = await resolveMarkdownQuoteAnchor(
+        asRevision(md),
+        ':smile: note',
+      );
 
       expect(result).toEqual({
         kind: 'anchored',
@@ -215,7 +224,7 @@ describe('resolveMarkdownQuoteAnchor', () => {
     it('anchors a range near the end of a long paragraph full of entities', async () => {
       const md = `${'あ&hearts;'.repeat(40_000)} target end`;
 
-      const result = await resolveMarkdownQuoteAnchor(md, 'target');
+      const result = await resolveMarkdownQuoteAnchor(asRevision(md), 'target');
 
       expect(result).toEqual({
         kind: 'anchored',
@@ -230,7 +239,7 @@ describe('resolveMarkdownQuoteAnchor', () => {
 
     it('unescapes markdown escapes and entities', async () => {
       const result = await resolveMarkdownQuoteAnchor(
-        'a \\*b\\* &amp; c',
+        asRevision('a \\*b\\* &amp; c'),
         '\\*b\\*',
       );
 
@@ -245,7 +254,7 @@ describe('resolveMarkdownQuoteAnchor', () => {
       const renderedBefore = 'word '.repeat(10);
       const renderedAfter = ' tail'.repeat(10);
 
-      const result = await resolveMarkdownQuoteAnchor(md, 'TARGET');
+      const result = await resolveMarkdownQuoteAnchor(asRevision(md), 'TARGET');
 
       expect(result).toEqual({
         kind: 'anchored',
@@ -261,7 +270,11 @@ describe('resolveMarkdownQuoteAnchor', () => {
     it('anchors the occurrence chosen by the offset', async () => {
       const md = 'same\n\n**same**';
 
-      const result = await resolveMarkdownQuoteAnchor(md, 'same', 8);
+      const result = await resolveMarkdownQuoteAnchor(
+        asRevision(md),
+        'same',
+        8,
+      );
 
       expect(result).toEqual({
         kind: 'anchored',
@@ -287,7 +300,9 @@ describe('resolveMarkdownQuoteAnchor', () => {
       ['the blank line between paragraphs only', GOLDEN.paragraphs.md, '\n\n'],
       ['a drawio block', GOLDEN.drawioFence.md, 'abc'],
     ])('%s', async (_title, md, markdownQuote) => {
-      expect(await resolveMarkdownQuoteAnchor(md, markdownQuote)).toEqual({
+      expect(
+        await resolveMarkdownQuoteAnchor(asRevision(md), markdownQuote),
+      ).toEqual({
         kind: 'not-anchorable',
       });
     });
@@ -299,7 +314,9 @@ describe('resolveMarkdownQuoteAnchor', () => {
     ])('refuses a range that reaches into a %s block, even with text before it', async (language) => {
       const md = `before\n\n\`\`\`${language}\ndiagram source\n\`\`\``;
 
-      expect(await resolveMarkdownQuoteAnchor(md, 'before\n\n```')).toEqual({
+      expect(
+        await resolveMarkdownQuoteAnchor(asRevision(md), 'before\n\n```'),
+      ).toEqual({
         kind: 'not-anchorable',
       });
     });
@@ -307,7 +324,9 @@ describe('resolveMarkdownQuoteAnchor', () => {
     it('refuses a diagram block whose fence carries a title', async () => {
       const md = '```mermaid:My chart\ngraph TD\n```';
 
-      expect(await resolveMarkdownQuoteAnchor(md, 'graph TD')).toEqual({
+      expect(
+        await resolveMarkdownQuoteAnchor(asRevision(md), 'graph TD'),
+      ).toEqual({
         kind: 'not-anchorable',
       });
     });
@@ -316,7 +335,7 @@ describe('resolveMarkdownQuoteAnchor', () => {
   it('leaves diagram source out of the rendered text used for nearby anchors', async () => {
     const md = 'before\n\n```drawio\nlong diagram source\n```\n\nafter';
 
-    const result = await resolveMarkdownQuoteAnchor(md, 'after');
+    const result = await resolveMarkdownQuoteAnchor(asRevision(md), 'after');
 
     expect(result).toEqual({
       kind: 'anchored',
@@ -325,10 +344,12 @@ describe('resolveMarkdownQuoteAnchor', () => {
   });
 
   it('passes the occurrence errors through', async () => {
-    expect(await resolveMarkdownQuoteAnchor('one two', 'three')).toEqual({
+    expect(
+      await resolveMarkdownQuoteAnchor(asRevision('one two'), 'three'),
+    ).toEqual({
       kind: 'not-found',
     });
-    expect(await resolveMarkdownQuoteAnchor('a b a', 'a')).toEqual({
+    expect(await resolveMarkdownQuoteAnchor(asRevision('a b a'), 'a')).toEqual({
       kind: 'ambiguous',
       total: 2,
       candidates: [
@@ -336,7 +357,9 @@ describe('resolveMarkdownQuoteAnchor', () => {
         expect.objectContaining({ offset: 4 }),
       ],
     });
-    expect(await resolveMarkdownQuoteAnchor('a b a', 'a', 1)).toEqual({
+    expect(
+      await resolveMarkdownQuoteAnchor(asRevision('a b a'), 'a', 1),
+    ).toEqual({
       kind: 'offset-mismatch',
       total: 2,
       candidates: [

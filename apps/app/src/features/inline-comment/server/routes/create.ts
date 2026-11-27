@@ -462,7 +462,7 @@ const targetFromMarkdownQuote = async (
   }
 
   const resolution = await resolveMarkdownQuoteAnchor(
-    latestRevision.body,
+    { id: latestRevisionId, body: latestRevision.body },
     markdownQuote,
     markdownOffset,
   );

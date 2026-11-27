@@ -1,5 +1,3 @@
-import { renderMarkdownToTextHast } from '~/server/service/markdown-pipeline';
-
 import type { InlineCommentAnchor } from '../../interfaces';
 import {
   buildPrefixWindow,
@@ -12,9 +10,12 @@ import {
   selectMarkdownOccurrence,
 } from './markdown-occurrence';
 import {
-  type RenderedTextWithSource,
-  renderedTextWithSourceOf,
-  type SourceSpan,
+  type RevisionBody,
+  renderedTextOfRevision,
+} from './rendered-text-cache';
+import type {
+  RenderedTextWithSource,
+  SourceSpan,
 } from './rendered-text-source-map';
 
 export type MarkdownRangeAnchoring =
@@ -86,16 +87,16 @@ export function anchorForMarkdownRange(
 
 /**
  * Computes the anchor for an occurrence of `markdownQuote` in the page body
- * (requirement 26). `body` must be the exact revision body: every offset here
- * indexes that string.
+ * (requirement 26). `revision.body` must be the exact revision body: every
+ * offset here indexes that string.
  */
 export async function resolveMarkdownQuoteAnchor(
-  body: string,
+  revision: RevisionBody,
   markdownQuote: string,
   markdownOffset?: number,
 ): Promise<MarkdownQuoteAnchorResolution> {
   const selection = selectMarkdownOccurrence(
-    body,
+    revision.body,
     markdownQuote,
     markdownOffset,
   );
@@ -103,9 +104,8 @@ export async function resolveMarkdownQuoteAnchor(
     return selection;
   }
 
-  const tree = await renderMarkdownToTextHast(body);
   return anchorForMarkdownRange(
-    renderedTextWithSourceOf(tree, body),
+    await renderedTextOfRevision(revision),
     selection.range,
   );
 }
