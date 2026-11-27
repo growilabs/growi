@@ -20,7 +20,6 @@ import {
   PageBulkExportJobInProgressStatus,
   PageBulkExportJobStatus,
 } from '../../../interfaces/page-bulk-export';
-import PageBulkExportPageSnapshot from '../../models/page-bulk-export-page-snapshot';
 import {
   BulkExportJobExpiredError,
   BulkExportJobStreamDestroyedByCleanupError,
@@ -299,8 +298,8 @@ class PageBulkExportJobCronService
     }
 
     const promises = [
-      PageBulkExportPageSnapshot.deleteMany({
-        pageBulkExportJob: pageBulkExportJob.id,
+      prisma.pagebulkexportpagesnapshots.deleteMany({
+        where: { pageBulkExportJobId: pageBulkExportJob.id },
       }),
       fs.promises.rm(this.getTmpOutputDir(pageBulkExportJob), {
         recursive: true,

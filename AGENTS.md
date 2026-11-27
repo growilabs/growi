@@ -65,13 +65,13 @@ rule bodies under `.cursor/`.
 | **github-actions-workflows** | A comment inside a workflow's `if: \|` block is literal expression text, not a YAML comment — a possessive apostrophe there can break the whole file's parse; how to test an `if:` fix correctly |
 | **devcontainer** | Compose services are reachable by hostname (no connectivity checks); `mongosh` is absent — query via the bundled driver; never run `pnpm install` concurrently with a build/test |
 | **kiro-impl-orchestration** | How `/kiro-impl` distributes work across models (mode selection, implementer model by difficulty, adversarial final review); outranks the generated skill's argument-derived default |
-| **spec-lifecycle** | A spec that amends an already-completed spec's contract (an amend spec) is a temporary vehicle: it must port its changes back into the target spec and delete itself as its final task |
+| **spec-lifecycle** | A spec that amends an already-completed spec's contract (an amend spec) is a temporary vehicle: it must port its changes back into the target spec and delete itself as its final task, unless the part it changes needs its own spec and is worth maintaining after its tasks are done, in which case it takes over that part and stays |
 
 Path-scoped rules load only when the work touches matching files:
 
 | Rule | Applies to | Description |
 |------|-----------|-------------|
-| **model** | `apps/app/src/server/models/**` | Mongoose → Prisma migration rules: Mongoose keeps owning index creation until the migration finishes, statics become `Prisma.defineExtension`, `_id`/`__v` mapping, changed `__v` semantics |
+| **model** | `apps/app/src/server/models/**` | Mongoose → Prisma migration rules: new indexes are created by migrations (never by a Mongoose schema), statics become `Prisma.defineExtension`, `_id`/`__v` mapping, changed `__v` semantics |
 
 ### On-Demand Skills
 
@@ -101,6 +101,7 @@ Path-scoped rules load only when the work touches matching files:
 Each application has its own CLAUDE.md with detailed instructions:
 
 - `apps/app/CLAUDE.md` - Main GROWI application
+- `apps/attachment-text-extractor/CLAUDE.md` - Attachment text extraction microservice
 - `apps/pdf-converter/CLAUDE.md` - PDF conversion microservice
 - `apps/slackbot-proxy/CLAUDE.md` - Slack integration proxy
 
@@ -127,6 +128,7 @@ pnpm start                      # Build and start
 growi/
 ├── apps/
 │   ├── app/                # Main GROWI application (Next.js + Express)
+│   ├── attachment-text-extractor/ # Attachment text extraction microservice (Hono)
 │   ├── pdf-converter/      # PDF conversion microservice
 │   └── slackbot-proxy/     # Slack integration proxy
 ├── packages/               # Shared libraries (@growi/core, @growi/ui, etc.)

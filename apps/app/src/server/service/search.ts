@@ -1,7 +1,5 @@
 import type { IPage, IPageHasId, IUser } from '@growi/core';
-import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import mongoose from 'mongoose';
-import { FilterXSS } from 'xss';
 
 import { CommentEvent, commentEvent } from '~/features/comment/server';
 import ExternalUserGroup from '~/features/external-user-group/server/models/external-user-group';
@@ -10,6 +8,13 @@ import {
   FILTER_FIELDS,
   SEARCH_FILTER_PREFIXES,
 } from '~/features/search/utils/filter-fields';
+import type {
+  AttachmentSearchInput,
+  AttachmentSearchResultAggregator,
+  IPrimarySearchResult,
+  IResolvedSecondaryResult,
+} from '~/features/search-attachments/server/services/attachment-search-result-aggregator';
+import type { AttachmentSearchViewer } from '~/features/search-attachments/server/services/search-accessible-pages';
 import type {
   AuditlogSuggestionField,
   AuditlogSuggestionsResponse,
@@ -42,8 +47,13 @@ import type {
 import NamedQuery from '../models/named-query';
 import type { PageModel } from '../models/page';
 import { SearchError } from '../models/vo/search-error';
-import { hasIntersection } from '../util/compare-objectId';
+import { withTimeout } from '../util/with-timeout';
 import { configManager } from './config-manager';
+import { canShowSnippetOfPage } from './search/can-show-snippet';
+import {
+  toElasticSearchResult,
+  toSearchedPageDocument,
+} from './search/page-search-item';
 import ElasticsearchDelegator from './search-delegator/elasticsearch';
 import PrivateLegacyPagesDelegator from './search-delegator/private-legacy-pages';
 
@@ -51,15 +61,8 @@ const logger = loggerFactory('growi:service:search');
 
 const nonNullable = <T>(value: T): value is NonNullable<T> => value != null;
 
-// options for filtering xss
-// Do not change the property key name to 'whitelist" because it depends on the 'xss' library
-const filterXssOptions = {
-  whiteList: {
-    em: ['class'],
-  },
-};
-
-const filterXss = new FilterXSS(filterXssOptions);
+/** The time limit of the snippet search for facet=attachments items. */
+const FACET_SNIPPET_TIMEOUT_MS = 500;
 
 // The shared UI operators plus the server-only `prefix:` path filter.
 const FILTER_PREFIXES = ['prefix:', ...SEARCH_FILTER_PREFIXES] as const;
@@ -107,13 +110,9 @@ const findPageListByIds = async (pageIds: ObjectIdLike[], crowi: any) => {
     select: USER_FIELDS_EXCEPT_CONFIDENTIAL,
   });
 
-  const pages = await builder.query.clone().exec('find');
-  const totalCount = await builder.query.exec('count');
+  const pages = await builder.query.exec('find');
 
-  return {
-    pages,
-    totalCount,
-  };
+  return { pages };
 };
 
 class SearchService implements SearchQueryParser, SearchResolver {
@@ -128,6 +127,9 @@ class SearchService implements SearchQueryParser, SearchResolver {
   fullTextSearchDelegator: ElasticsearchDelegator;
 
   nqDelegators: { [key in SearchDelegatorName]: SearchDelegator };
+
+  private attachmentSearchResultAggregator: AttachmentSearchResultAggregator | null =
+    null;
 
   static async create(crowi: Crowi) {
     const instance = new SearchService();
@@ -519,13 +521,15 @@ class SearchService implements SearchQueryParser, SearchResolver {
     );
   }
 
-  async searchKeyword(
+  /**
+   * Parses and resolves a query string once: the delegator to run it with and
+   * the searchable data (terms, resolved filter data) to run.
+   */
+  private async prepareSearch(
     keyword: string,
     nqName: string | null,
-    user,
     userGroups: ObjectIdLike[] | null,
-    searchOpts,
-  ): Promise<[ISearchResult<unknown>, SearchDelegatorName | null]> {
+  ): Promise<[SearchDelegator, SearchableData]> {
     let parsedQuery: ParsedQuery;
     // parse
     try {
@@ -552,10 +556,202 @@ class SearchService implements SearchQueryParser, SearchResolver {
       userGroups,
     );
 
+    return [delegator, data];
+  }
+
+  async searchKeyword(
+    keyword: string,
+    nqName: string | null,
+    user,
+    userGroups: ObjectIdLike[] | null,
+    searchOpts,
+  ): Promise<[ISearchResult<unknown>, SearchDelegatorName | null]> {
+    const [delegator, data] = await this.prepareSearch(
+      keyword,
+      nqName,
+      userGroups,
+    );
+
     return [
       await delegator.search(data, user, userGroups, searchOpts),
       delegator.name ?? null,
     ];
+  }
+
+  /**
+   * Parses a query for the full-text search delegator, once, into what both
+   * the page side and the attachment side of a faceted search run with.
+   */
+  async createAttachmentSearchInput(
+    keyword: string,
+    viewer: AttachmentSearchViewer,
+  ): Promise<AttachmentSearchInput> {
+    const [, data] = await this.prepareSearch(keyword, null, viewer.userGroups);
+    return {
+      queryString: data.queryString,
+      terms: data.terms as QueryTerms,
+      resolvedFilterData: data.resolvedFilterData ?? {
+        groupIds: [],
+        notGroupIds: [],
+      },
+      viewer,
+    };
+  }
+
+  /**
+   * Register an AttachmentSearchResultAggregator for faceted search routing.
+   * Called by initAttachmentFullTextSearch.
+   */
+  setAttachmentSearchResultAggregator(
+    agg: AttachmentSearchResultAggregator,
+  ): void {
+    this.attachmentSearchResultAggregator = agg;
+  }
+
+  /**
+   * The facet=attachments search, routed through the
+   * AttachmentSearchResultAggregator. Callers check
+   * isAttachmentFullTextSearchEnabled first.
+   *
+   * `viewer` is resolved the same way the page search route resolves it; a
+   * null user means guest. `primary` is the aggregator's result and `items`
+   * its items as facet=attachments answers them (formatFacetSearchItems),
+   * with the query parsed once for both.
+   */
+  async searchByFacet(
+    keyword: string,
+    viewer: AttachmentSearchViewer,
+    options: { from?: number; size?: number },
+  ): Promise<{ primary: IPrimarySearchResult; items: IPageWithSearchMeta[] }> {
+    const aggregator = this.requireAttachmentSearchResultAggregator();
+    const input = await this.createAttachmentSearchInput(keyword, viewer);
+    const primary = await aggregator.searchPrimary(input, {
+      from: options.from ?? 0,
+      size: options.size ?? 20,
+    });
+    const items = await this.formatFacetSearchItems(input, primary.items);
+    return { primary, items };
+  }
+
+  private requireAttachmentSearchResultAggregator(): AttachmentSearchResultAggregator {
+    const aggregator = this.attachmentSearchResultAggregator;
+    if (aggregator == null) {
+      throw new Error('Attachment search is not initialized');
+    }
+    return aggregator;
+  }
+
+  /**
+   * Attachment hits for page ids the client got from the page search.
+   *
+   * @throws {RangeError} when more than 20 distinct ids are given
+   * @throws when the attachment search is not initialized or the aggregator fails
+   */
+  async resolveAttachmentSecondary(
+    keyword: string,
+    viewer: AttachmentSearchViewer,
+    { primaryIds }: { primaryIds: string[] },
+  ): Promise<IResolvedSecondaryResult> {
+    const aggregator = this.requireAttachmentSearchResultAggregator();
+    const input = await this.createAttachmentSearchInput(keyword, viewer);
+    return aggregator.resolveSecondary(input, { primaryIds });
+  }
+
+  /**
+   * The facet=attachments items with the page document page search returns;
+   * items whose page is gone from MongoDB are dropped. A page that itself
+   * also matches the query gets page search's snippet; the snippet search
+   * failing or timing out only leaves the snippets out (research.md 14.3).
+   */
+  private async formatFacetSearchItems(
+    input: AttachmentSearchInput,
+    items: readonly IPageWithSearchMeta[],
+  ): Promise<IPageWithSearchMeta[]> {
+    if (items.length === 0) {
+      return [];
+    }
+    const pageIds = items.map((item) => String(item.data._id));
+
+    const [{ pages }, hits] = await Promise.all([
+      this.findPageListByIds(pageIds),
+      this.searchHitsOfPages(input, pageIds),
+    ]);
+
+    const User = mongoose.model('User');
+    const pageById = new Map<string, IPageHasId>(
+      pages.map((page) => [String(page._id), page]),
+    );
+    const { user, userGroups } = input.viewer;
+
+    return items.flatMap((item) => {
+      const pageId = String(item.data._id);
+      const page = pageById.get(pageId);
+      if (page == null) {
+        return [];
+      }
+      toSearchedPageDocument(page, User);
+      const hit = hits.get(pageId);
+      const meta =
+        hit == null
+          ? item.meta
+          : {
+              ...item.meta,
+              bookmarkCount: hit.bookmarkCount,
+              elasticSearchResult: toElasticSearchResult(
+                hit.highlight,
+                this.canShowSnippet(page, user, userGroups),
+              ),
+            };
+      return [{ data: page, meta }];
+    });
+  }
+
+  /**
+   * The highlight and bookmark count of each page that matches the query with
+   * a highlight; empty on failure (research.md 14.3, 14.4).
+   */
+  private async searchHitsOfPages(
+    { terms, resolvedFilterData, viewer }: AttachmentSearchInput,
+    pageIds: readonly string[],
+  ): Promise<Map<string, { highlight: unknown; bookmarkCount: number }>> {
+    try {
+      const { data } = await withTimeout(
+        this.fullTextSearchDelegator.searchWithinPages(
+          { terms, resolvedFilterData },
+          viewer.user,
+          viewer.userGroups,
+          pageIds,
+        ),
+        FACET_SNIPPET_TIMEOUT_MS,
+      );
+      return new Map(
+        data.flatMap((hit) =>
+          hit._highlight == null
+            ? []
+            : [
+                [
+                  hit._id,
+                  {
+                    highlight: hit._highlight,
+                    bookmarkCount: hit._source.bookmark_count || 0,
+                  },
+                ],
+              ],
+        ),
+      );
+    } catch (err) {
+      logger.warn(
+        { err },
+        'Answering facet=attachments items without snippets',
+      );
+      return new Map();
+    }
+  }
+
+  protected findPageListByIds(
+    pageIds: ObjectIdLike[],
+  ): ReturnType<typeof findPageListByIds> {
+    return findPageListByIds(pageIds, this.crowi);
   }
 
   async resolveFilterData(
@@ -785,7 +981,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
       return page._id;
     });
 
-    const findPageResult = await findPageListByIds(pageIds, this.crowi);
+    const findPageResult = await this.findPageListByIds(pageIds);
 
     // set meta data
     result.meta = searchResult.meta;
@@ -801,56 +997,17 @@ class SearchService implements SearchQueryParser, SearchResolver {
           return null;
         }
 
-        // add tags and seenUserCount to pageData
         pageData._doc.tags = data._source.tag_names;
-        pageData._doc.seenUserCount =
-          (pageData.seenUsers && pageData.seenUsers.length) || 0;
+        toSearchedPageDocument(pageData, User);
 
-        // serialize lastUpdateUser
-        if (
-          pageData.lastUpdateUser != null &&
-          pageData.lastUpdateUser instanceof User
-        ) {
-          pageData.lastUpdateUser = serializeUserSecurely(
-            pageData.lastUpdateUser,
-          );
-        }
+        const elasticSearchResult =
+          data._highlight != null
+            ? toElasticSearchResult(
+                data._highlight,
+                this.canShowSnippet(pageData, user, userGroups),
+              )
+            : undefined;
 
-        // increment elasticSearchResult
-        let elasticSearchResult:
-          | { snippet: string | null; highlightedPath: string | null }
-          | undefined;
-        const highlightData = data._highlight;
-        if (highlightData != null) {
-          const snippet = this.canShowSnippet(pageData, user, userGroups)
-            ? highlightData.body ||
-              highlightData['body.en'] ||
-              highlightData['body.ja'] ||
-              highlightData.comments ||
-              highlightData['comments.en'] ||
-              highlightData['comments.ja']
-            : null;
-          const pathMatch =
-            highlightData['path.en'] || highlightData['path.ja'];
-
-          elasticSearchResult = {
-            snippet:
-              snippet != null && typeof snippet[0] === 'string'
-                ? filterXss.process(snippet)
-                : null,
-            highlightedPath:
-              pathMatch != null && typeof pathMatch[0] === 'string'
-                ? filterXss.process(pathMatch)
-                : null,
-          };
-        }
-
-        // serialize creator
-        if (pageData.creator != null && pageData.creator instanceof User) {
-          pageData.creator = serializeUserSecurely(pageData.creator);
-        }
-
-        // generate pageMeta data
         const pageMeta = {
           bookmarkCount: data._source.bookmark_count || 0,
           elasticSearchResult,
@@ -865,32 +1022,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
   }
 
   canShowSnippet(pageData, user, userGroups): boolean {
-    const Page = mongoose.model('Page') as unknown as PageModel;
-
-    const testGrant = pageData.grant;
-    const testGrantedUser = pageData.grantedUsers?.[0];
-    const testGrantedGroups = pageData.grantedGroups;
-
-    if (testGrant === Page.GRANT_RESTRICTED) {
-      return false;
-    }
-
-    if (testGrant === Page.GRANT_OWNER) {
-      if (user == null) return false;
-
-      return user._id.toString() === testGrantedUser.toString();
-    }
-
-    if (testGrant === Page.GRANT_USER_GROUP) {
-      if (userGroups == null) return false;
-
-      return hasIntersection(
-        userGroups.map((id) => id.toString()),
-        testGrantedGroups,
-      );
-    }
-
-    return true;
+    return canShowSnippetOfPage(pageData, user, userGroups);
   }
 }
 

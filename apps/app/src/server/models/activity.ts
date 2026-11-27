@@ -5,7 +5,8 @@ import { Schema, Types } from 'mongoose';
 import mongoosePaginate from 'mongoose-paginate-v2';
 
 import type {
-  AttachmentRemoveSnapshot,
+  AttachmentSnapshot,
+  ChangeProposalReviewSnapshot,
   IActivity,
   ISnapshot,
   SupportedActionType,
@@ -236,6 +237,16 @@ export type IActivityUpdateParameters = Omit<
 };
 
 /**
+ * Every field of every ISnapshot variant, all optional. Each variant is
+ * structurally assignable to it, so the save gates read any variant's fields
+ * type-safely (absent ones are simply undefined) with plain assignability, no
+ * casts. Add a new variant here when ISnapshot gains one, or its fields are
+ * silently dropped on save.
+ */
+type PersistableSnapshotFields = AttachmentSnapshot &
+  ChangeProposalReviewSnapshot;
+
+/**
  * Converts a plain `ISnapshot` to the Prisma composite update envelope.
  *
  * Prisma composite types reject a bare object on update — the value must be
@@ -258,11 +269,7 @@ function buildSnapshotUpdateEnvelope(
 ): Prisma.ActivitiesSnapshotUpdateEnvelopeInput | undefined {
   if (snapshot == null) return undefined;
 
-  // Every ISnapshot variant is structurally assignable to
-  // AttachmentRemoveSnapshot (all fields optional), so widening here lets us
-  // read the attachment fields type-safely — they are simply undefined for
-  // the default variant. Plain assignability, no casts.
-  const snap: AttachmentRemoveSnapshot = snapshot;
+  const snap: PersistableSnapshotFields = snapshot;
 
   return {
     update: {
@@ -271,6 +278,7 @@ function buildSnapshotUpdateEnvelope(
       pagePath: snap.pagePath,
       pageId: snap.pageId,
       fileSize: snap.fileSize,
+      reviewChannel: snap.reviewChannel,
     },
   };
 }
@@ -436,11 +444,7 @@ export const extension = Prisma.defineExtension((client) => {
           const { id, _id, user, target, event, snapshot, createdAt, ...rest } =
             parameters;
 
-          // Every ISnapshot variant is structurally assignable to
-          // AttachmentRemoveSnapshot (all fields optional), so widening here
-          // lets us read the attachment fields type-safely — they are simply
-          // undefined for the default variant. Plain assignability, no casts.
-          const snap: AttachmentRemoveSnapshot | undefined = snapshot;
+          const snap: PersistableSnapshotFields | undefined = snapshot;
 
           // Build the snapshot composite type Prisma requires. snapshot.id
           // maps to _id in the ActivitiesSnapshot composite; generate a new
@@ -459,6 +463,7 @@ export const extension = Prisma.defineExtension((client) => {
               pagePath: snap?.pagePath,
               pageId: snap?.pageId,
               fileSize: snap?.fileSize,
+              reviewChannel: snap?.reviewChannel,
             };
 
           const data: Prisma.activitiesUncheckedCreateInput = {

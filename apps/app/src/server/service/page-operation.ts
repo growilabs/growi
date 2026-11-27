@@ -22,17 +22,11 @@ const { isEitherOfPathAreaOverlap, isPathAreaOverlap, isTrashPage } =
   pagePathUtils;
 const AUTO_UPDATE_INTERVAL_SEC = 5;
 
-const {
-  Create,
-  Update,
-  Duplicate,
-  Delete,
-  DeleteCompletely,
-  Revert,
-  NormalizeParent,
-} = PageActionType;
+const { Create, Update, Delete, DeleteCompletely, Revert, NormalizeParent } =
+  PageActionType;
 
 export interface IPageOperationService {
+  init(): Promise<void>;
   generateProcessInfo(
     pageOperations: PageOperationDocument[],
   ): IPageOperationProcessInfo;
@@ -56,10 +50,10 @@ class PageOperationService implements IPageOperationService {
 
   async init(): Promise<void> {
     // cleanup PageOperation documents except ones with { actionType: Rename, actionStage: Sub }
+    // and Duplicate ones, which the interrupted-duplicate recovery cron takes over
     const types = [
       Create,
       Update,
-      Duplicate,
       Delete,
       DeleteCompletely,
       Revert,

@@ -52,7 +52,11 @@ import { setup } from './index';
 // router the factory builds.
 // ---------------------------------------------------------------------------
 const getHandler = (path: string): RequestHandler => {
-  const crowi = mockDeep<Crowi>();
+  // setup() reaches into configManager / events / models, so a shallow
+  // mock<Crowi>() cannot stand in for this one.
+  // biome-ignore lint/suspicious/noTsIgnore: Suppress auto fix by lefthook
+  // @ts-ignore - Crowi's mongoose model types cause "Type instantiation is excessively deep" with tsgo
+  const crowi: Crowi = mockDeep<Crowi>();
   const router = setup(crowi);
   const layer = router.stack.find(
     // biome-ignore lint/suspicious/noExplicitAny: Express Layer internals are untyped

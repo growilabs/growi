@@ -31,6 +31,7 @@ import request from 'supertest';
 
 import { getInstance } from '^/test/setup/crowi';
 
+import { PageDeleteConfigValue } from '~/interfaces/page-delete-config';
 import type Crowi from '~/server/crowi';
 import type { PageDocument } from '~/server/models/page';
 import PageOperation from '~/server/models/page-operation';
@@ -91,6 +92,8 @@ describe('POST /pages.remove', () => {
     }
     return getIdStringForRef(revision);
   };
+
+  const requestersHomepagePath = () => `/user/${requesterUsername}`;
 
   const removeFixtures = async (): Promise<void> => {
     const { Page } = crowi.models;
@@ -157,6 +160,14 @@ describe('POST /pages.remove', () => {
 
   afterEach(async () => {
     await removeFixtures();
+    await crowi.models.Page.deleteMany({ path: requestersHomepagePath() });
+    await crowi.configManager.updateConfigs(
+      {
+        'security:pageDeletionAuthority': undefined,
+        'security:pageCompleteDeletionAuthority': undefined,
+      },
+      { removeIfUndefined: true },
+    );
   });
 
   afterAll(async () => {
@@ -221,5 +232,110 @@ describe('POST /pages.remove', () => {
     const deletedPage = await crowi.models.Page.findById(page._id);
     expect(deletedPage?.path).toBe(`/trash${targetPath}`);
     expect(deletedPage?.status).toBe('deleted');
+  });
+
+  describe('refusals', () => {
+    const removePage = (body: Record<string, unknown>) =>
+      request(app)
+        .post('/pages.remove')
+        .set('X-Forwarded-For', TEST_IP)
+        .send(body);
+
+    const expectSurvives = async (page: HydratedDocument<PageDocument>) => {
+      const survivingPage = await crowi.models.Page.findById(page._id);
+      expect(survivingPage?.path).toBe(page.path);
+      expect(survivingPage?.status).toBe('published');
+    };
+
+    it('refuses a page the requester may not delete', async () => {
+      const page = await createPage(targetPath, 'target body');
+      await crowi.configManager.updateConfig(
+        'security:pageDeletionAuthority',
+        PageDeleteConfigValue.AdminOnly,
+      );
+
+      const response = await removePage({
+        page_id: page._id.toString(),
+        revision_id: latestRevisionIdOf(page),
+      });
+
+      expect(response.body).toMatchObject({
+        ok: false,
+        code: 'user_not_admin',
+      });
+      await expectSurvives(page);
+    });
+
+    it('refuses a page the requester may not delete completely', async () => {
+      const page = await createPage(targetPath, 'target body');
+      await crowi.configManager.updateConfig(
+        'security:pageCompleteDeletionAuthority',
+        PageDeleteConfigValue.AdminOnly,
+      );
+
+      const response = await removePage({
+        page_id: page._id.toString(),
+        completely: true,
+      });
+
+      expect(response.body).toMatchObject({
+        ok: false,
+        code: 'complete_deletion_not_allowed_for_user',
+      });
+      await expectSurvives(page);
+    });
+
+    it('answers outdated before a missing authority', async () => {
+      const page = await createPage(targetPath, 'target body');
+      await crowi.configManager.updateConfig(
+        'security:pageDeletionAuthority',
+        PageDeleteConfigValue.AdminOnly,
+      );
+
+      const response = await removePage({
+        page_id: page._id.toString(),
+        revision_id: new Types.ObjectId().toString(),
+      });
+
+      expect(response.body).toMatchObject({ ok: false, code: 'outdated' });
+      await expectSurvives(page);
+    });
+
+    it('refuses an empty page without recursively', async () => {
+      await createPage(`${FIXTURE_ROOT}/empty/child`, 'child body');
+      const emptyPage = await crowi.models.Page.findOne({
+        path: `${FIXTURE_ROOT}/empty`,
+        isEmpty: true,
+      });
+      if (emptyPage == null) {
+        throw new Error('the fixture must have an empty page');
+      }
+
+      const response = await removePage({ page_id: emptyPage._id.toString() });
+
+      expect(response.body).toMatchObject({
+        ok: false,
+        code: 'single_deletion_empty_pages',
+      });
+    });
+
+    it.each([
+      ['moving it to the trash', {}],
+      ['deleting it completely', { completely: true }],
+    ])('refuses the homepage of an existing user when %s', async (_, options) => {
+      const homepage = await createPage(requestersHomepagePath(), 'home');
+
+      const response = await removePage({
+        page_id: homepage._id.toString(),
+        revision_id: latestRevisionIdOf(homepage),
+        ...options,
+      });
+
+      expect(response.body).toMatchObject({
+        ok: false,
+        error: 'Could not delete user homepage',
+      });
+      await expectSurvives(homepage);
+    });
   });
 });

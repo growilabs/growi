@@ -1,8 +1,123 @@
 # Changelog
 
-## [Unreleased](https://github.com/growilabs/compare/v8.0.8...HEAD)
+## [Unreleased](https://github.com/growilabs/compare/v8.0.12...HEAD)
 
 *Please do not manually update this file. We've automated the process.*
+
+## [v8.0.12](https://github.com/growilabs/compare/v8.0.11...v8.0.12) - 2026-11-25
+
+### 💎 Features
+
+> [!NOTE]
+The attachment full-text search (#12197, with the attachment-text-extractor changes in #12304) and the change proposal review (#12288) land the foundation of features planned for the next minor release. They are explicitly disabled in this version and cannot be used yet. The attachment-text-extractor service itself runs when started, but GROWI does not call its API in this version, so there is no need to deploy it.
+
+* feat(attachment-search): full-text search for attachments (specs, extractor service, partial app implementation) (#12197) @yuki-takei
+* feat(attachment-search): Add the caller app ID to the log, a /metrics endpoint and limit fixes to attachment-text-extractor 1.1.0 (#12304) @yuki-takei
+* feat(change-proposal): Let reviewers approve, reject and abstain on change proposals (#12288) @yuki-takei
+
+### 🚀 Improvement
+
+* imprv(duplicate): memory-flat descendant duplication with stall recovery (#12315) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix(s2c-message): stop sending the editor's password hash and API token in page update events (#12270) @miya
+* fix(bookmarks): Require view permission on the page for GET /bookmarks/info (#12327) @miya
+* fix: Page search shows body snippets of "Specified users only" pages to anyone and hides group page snippets from members (#12277) @yuki-takei
+* fix(math): Render math with the same KaTeX version as the bundled CSS (#12263) @hamataku
+* fix: reject POST /_api/v3/invited from users who are not INVITED (#12282) @miya
+* fix: Users are sent back to the login page right after logging in (#12274) @yuki-takei
+* fix: answer a refused duplicate instead of leaving the request unanswered (#12284) @yuki-takei
+
+### 🧰 Maintenance
+
+* support: Read the tag of a published version from the remote in the release workflows (#12314) @yuki-takei
+* support(flaky-ci): attribute flaky Playwright tests from the end-of-run list instead of annotations (#12275) @yuki-takei
+* ci(deps): Bump next from 16.4.1 to 16.4.6 (#12272) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci: Publish the attachment-text-extractor image to Docker Hub (#12291) @yuki-takei
+* docs(change-proposal-core): Reword the core spec with self-explanatory terms (#12292) @yuki-takei
+
+## [v8.0.11](https://github.com/growilabs/compare/v8.0.10...v8.0.11) - 2026-11-17
+
+### 💎 Features
+
+* feat: infinite scroll at search (#11970) @mariko-h
+* feat(change-proposal): Implement the core of change proposals (#12222) @yuki-takei
+
+### 🚀 Improvement
+
+* imprv: render large PlantUML diagrams (choose GET/POST by destination, lighter theme, per-diagram errors) (#12243) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix(user-activities): stop returning activities on pages the viewer cannot list (#12239) @yuki-takei
+* fix(page-operation): clean up interrupted operation records at startup again (#12264) @yuki-takei
+* fix: Plugin installation never finishes when the download stalls (#12261) @yuki-takei
+* fix: Sidebar menus close by themselves right after page load (#12256) @yuki-takei
+
+### 🧰 Maintenance
+
+* test(e2e): await page template modal expectations (#12229) @katesaikishore
+* ci: Integration tests intermittently time out when the CI runner's disk is slow (#12258) @yuki-takei
+* chore(deps): Bump @mastra/core to 1.80.0 (#12217) @Appleple47
+* ci(deps): Bump mongoose from 6.13.9 to 6.13.12 (#12231) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps): Bump isomorphic-git from 1.38.4 to 1.38.6 (#12224) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps): Bump next from 16.4.1 to 16.4.5 (#12259) @[dependabot[bot]](https://github.com/apps/dependabot)
+
+## [v8.0.10](https://github.com/growilabs/compare/v8.0.9...v8.0.10) - 2026-11-09
+
+### 🐛 Bug Fixes
+
+* fix(page-bulk-export): Embed attachment images in PDFs for every storage response mode (#12209) @yuki-takei
+* fix(i18n): correct spelling and grammar mistakes in English translations (#193092) (#12199) @arvid-e
+
+### 🧰 Maintenance
+
+* support: audit log bulk export job model  (#12198) @mizozobu
+* chore(opentelemetry): mark CI and devcontainer runs as service type dev with telemetry off (#12204) @yuki-takei
+* chore(app): Add contributor (#12218) @miya
+* chore(app): Add contributor (#12205) @miya
+
+## [v8.0.9](https://github.com/growilabs/compare/v8.0.8...v8.0.9) - 2026-11-04
+
+### 💎 Features
+
+* feat(ai-chat): make the AI chat sidebar resizable (#12082) @miya
+* feat(ai-usage): record AI usage for chat, suggest-path and title generation and expose it through a public API (#12089) @yuki-takei
+
+### 🚀 Improvement
+
+* imprv(page): Judge page deletion authority in one place for every user request (#12182) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix(page): Respect page deletion permission settings when deleting pages and emptying the trash (#12163) @yuki-takei
+* fix(share-links): validate expiredAt against the current time per request (#12118) @yuki-takei
+* fix(share-links): read the real admin field in the DELETE /:id bypass (#12122) @yuki-takei
+* fix(rate-limiter): match auth route paths consistently (#12127) @yuki-takei
+* fix: Page path checks hang on paths with many slashes (#12159) @yuki-takei
+* fix(opentelemetry): anonymize http.url as well as http.target (#12151) @yuki-takei
+* fix(opentelemetry): anonymize non-ASCII page paths (#12123) @jay23606
+* fix(opentelemetry): rule-driven HTTP anonymization with a coverage table kept in sync by tests (#12158) @yuki-takei
+* fix(page): keep a page on the tree when a rename fails midway (#11917) @arvid-e
+* fix(page): close the remaining gaps in the failed-rename rollback (#12150) @yuki-takei
+* fix(core): Treat page paths literally when omitting pages under other selected pages (#12176) @yuki-takei
+* fix: Bookmark listings return 500 for users whose folders contain null bookmark ids (#12167) @yuki-takei
+* fix(share): Show the shared page when navigating to a share link from another page (#12142) @yuki-takei
+* fix(math): Prevent live preview from breaking due to incomplete math blocks (#12075) @yotatameguchi-boop
+* fix(presentation): disable Marp CSS minification to avoid a crash on … (#12157) @y-oda-nipponrick
+* fix(editor): Rename the PlantUML slash command label (#12174) @Ryosei-Fukushima
+
+### 🧰 Maintenance
+
+* support: prisma page bulk export job model  (#12096) @mizozobu
+* support: page bulk export page snapshot model (#12170) @mizozobu
+* chore(deps): bump @playwright/test to 1.64.1 for Ubuntu 26.04 support (#12129) @yuki-takei
+* ci(deps): Bump qs from 6.13.0 to 6.17.0 (#12164) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps): Bump body-parser from 1.20.6 to 1.20.9 (#12130) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps): Bump zod from 4.4.3 to 4.6.6 (#12135) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps-dev): Bump vite from 6.4.3 to 6.4.4 (#12109) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps-dev): Bump vite from 6.4.4 to 6.4.5 (#12190) @[dependabot[bot]](https://github.com/apps/dependabot)
 
 ## [v8.0.8](https://github.com/growilabs/compare/v8.0.7...v8.0.8) - 2026-10-22
 

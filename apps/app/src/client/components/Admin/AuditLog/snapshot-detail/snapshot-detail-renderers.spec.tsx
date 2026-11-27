@@ -32,17 +32,20 @@ const componentFor = (activity: IActivityHasId): unknown =>
   snapshotDetailRenderers.find((r) => r.canRender(activity))?.Component;
 
 describe('snapshot-detail-renderers', () => {
-  it('registers one entry per attachment action (REMOVE, ADD, DOWNLOAD)', () => {
-    expect(snapshotDetailRenderers).toHaveLength(3);
+  it('registers one entry per attachment action (REMOVE, ADD, DOWNLOAD, REEXTRACT)', () => {
+    expect(snapshotDetailRenderers).toHaveLength(4);
   });
 
   it('routes each attachment action to its renderer purely by action', () => {
-    // ADD and DOWNLOAD share the live-attachment renderer; REMOVE has its own.
+    // ADD, DOWNLOAD and REEXTRACT share the live-attachment renderer; REMOVE has its own.
     expect(
       componentFor(buildActivity(SupportedAction.ACTION_ATTACHMENT_ADD)),
     ).toBe(LiveAttachmentSnapshotDetail);
     expect(
       componentFor(buildActivity(SupportedAction.ACTION_ATTACHMENT_DOWNLOAD)),
+    ).toBe(LiveAttachmentSnapshotDetail);
+    expect(
+      componentFor(buildActivity(SupportedAction.ACTION_ATTACHMENT_REEXTRACT)),
     ).toBe(LiveAttachmentSnapshotDetail);
     expect(
       componentFor(buildActivity(SupportedAction.ACTION_ATTACHMENT_REMOVE)),
@@ -59,6 +62,7 @@ describe('snapshot-detail-renderers', () => {
       SupportedAction.ACTION_ATTACHMENT_ADD,
       SupportedAction.ACTION_ATTACHMENT_REMOVE,
       SupportedAction.ACTION_ATTACHMENT_DOWNLOAD,
+      SupportedAction.ACTION_ATTACHMENT_REEXTRACT,
     ]) {
       const matches = snapshotDetailRenderers.filter((r) =>
         r.canRender(buildActivity(action)),
@@ -95,6 +99,6 @@ describe('snapshot-detail-renderers', () => {
     // requiring fileSize: string is not an assignable pairing.
     defineRenderer(isAttachmentRemoveActivity, MismatchedComponent);
 
-    expect(snapshotDetailRenderers).toHaveLength(3);
+    expect(snapshotDetailRenderers).toHaveLength(4);
   });
 });

@@ -154,6 +154,37 @@ keymaps/emacs/
 └── navigation.ts     ← Movement and editing commands
 ```
 
+### Make Invalid States Unrepresentable (Don't Patch the Type Hole with a Test)
+
+When a bug exists because the types allowed a wrong value or a mix-up, fix the
+type, not the symptom. Do not close the hole with a runtime branch plus a
+regression test alone.
+
+- **Never carry an internal sentinel in the same field as untrusted input.**
+  A magic value shares one channel with caller-supplied data, so validation
+  cannot tell them apart. Use a discriminated union so the internal case cannot
+  be produced from outside.
+- **Validate at the boundary, then wrap.** Input that bypasses the route's
+  validators (AI tools, internal callers) is checked where it enters the
+  service and converted into the typed shape once; downstream code trusts the
+  type.
+- **A test for such a hole is a boundary check, not the fix.** Add it after the
+  type change, to assert that malformed input is refused. If the only
+  protection is a test plus an `if (action === ...)` branch, the design is still
+  wrong — say so in review and recommend the type change.
+
+```typescript
+// ❌ WRONG: the internal sentinel travels in the field that also carries caller input
+interface ApplyTarget {
+  readonly operationKeys: readonly string[] | 'whole-proposal';
+}
+
+// ✅ CORRECT: the internal case is a separate variant no caller-supplied key list can produce
+type ApplyTarget =
+  | { readonly scope: 'whole' }
+  | { readonly scope: 'operations'; readonly operationKeys: readonly string[] };
+```
+
 ## Module Public Surface: Barrel Files & Directory Boundaries
 
 Treat a directory as a **module with a single public entry point** (`index.ts`). The barrel declares the public API; everything else is an implementation detail.
@@ -313,6 +344,7 @@ Before marking work complete:
 - [ ] No hard-coded mode/variant checks in consumers (use declared metadata)
 - [ ] **Executors/loaders/runners receive their work-set as input** (don't `import` the dataset); items are declared in a single source, not special-cased in the consumer
 - [ ] Modules with multiple responsibilities split by domain
+- [ ] No internal sentinel value shares a field with untrusted input (use a discriminated union); a type hole is fixed in the type, not by a runtime branch plus a test alone
 - [ ] **Module public surface is minimal** — `index.ts` re-exports only what external callers need; internals stay unexported
 - [ ] **Cohesive internals are grouped in subdirectories** with their own barrel, not flattened into the parent
 - [ ] *(apps/app)* Import specifiers follow the no-extension convention — see `apps/app/.claude/rules/import-convention.md`
@@ -320,7 +352,8 @@ Before marking work complete:
 ## Reviewing for Design Quality (「筋の良い実装」)
 
 A change can pass its tests and match the spec and still be the *wrong shape*.
-When reviewing (in `/review`, `kiro-review`, or `kiro-validate-impl`), do not stop
+When reviewing — in any form: `/code-review`, `/review`, `kiro-review`,
+`kiro-validate-impl`, or a review asked for in plain words — do not stop
 at "does it work?" and "does it match the spec?" — also ask **"is this a sound,
 well-shaped implementation (筋の良い実装)?"**
 
@@ -349,14 +382,46 @@ tradeoff that justifies it:
   data-driven; executors take their work-set as input rather than hard-coding it.
 - **Not a workaround in disguise** — it addresses the actual cause, rather than
   papering over a symptom in a way a maintainer would have to unwind later.
+- **Type holes closed in the type** — where the types allowed a wrong value or a
+  mix-up, the type itself was changed to rule it out; the hole is not held shut
+  by a runtime branch plus a test alone.
 
 These defaults must never veto a sound, explicitly-argued context judgment. If a
 default and the tradeoff judgment conflict, the judgment wins and the default is the
 thing to revisit — not the code. This section anchors the question; it does not cap
 the answer.
 
+### Scope and shape before defects
+
+A bug-hunting recipe (such as `/code-review`'s) or the requester's stated priority
+("regressions first, then performance") sets where to look hardest. It does not
+replace the question above. Hunting defects first anchors the review on the code
+as written: every finding turns into a patch to that code, and a part that should
+not exist gets polished instead of removed. So work in this order:
+
+1. **Scope** — map each change in the diff to the requirement it serves (the spec;
+   without a spec, the ticket or PR description). A change that serves none is out
+   of scope. Recommend splitting it into its own PR. For functionality nobody
+   specified, recommend removing it, or adding it to the spec first if it is truly
+   needed. Do not review its details as if it belonged.
+2. **Shape** — for what remains: is it the least code that meets the requirement,
+   type-safe and robust, and does it follow the framework's and the repo's
+   conventions?
+3. **Defects** — only then hunt for bugs in what is left.
+
+**Prefer fixes that remove code.** When a finding can be fixed either by deleting
+the code that causes it or by adding code around it, recommend the deletion. Hold
+your own suggested fixes to the same bar as the author's code before reporting
+them: a new helper, guard, upgrade note, or abstraction that compensates for a part
+that need not exist is the wrong fix.
+
+**Following a repo rule is not, by itself, a justification.** When an author's
+stated reason is "the rule says so" and the rule leads to a fragile shape, say so,
+and name the rule as the thing to revisit.
+
 **Severity discipline.** A spec-compliant change with a poor shape is normally a
 `Suggestion` or `Important` finding, not an automatic rejection — reserve blocking
 for a shape that is genuinely hard to maintain, hides coupling, or will force a
-rewrite. Design-quality review sharpens the result; it is not a license to loop on
+rewrite. An out-of-scope change or unspecified functionality is at least
+`Important`. Design-quality review sharpens the result; it is not a license to loop on
 taste. (See `kiro-review` for the task-local severity model.)

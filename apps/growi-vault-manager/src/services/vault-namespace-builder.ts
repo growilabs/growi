@@ -21,9 +21,11 @@ import type { VaultInstructionDoc } from '@growi/core/dist/interfaces/vault';
 import { loggerFactory } from '@growi/logger';
 
 import { RevisionModel } from '../models/revision.js';
+import { VaultInstructionModel } from '../models/vault-instruction.js';
 import { VaultNamespaceStateModel } from '../models/vault-namespace-state.js';
 import { VaultUserViewModel } from '../models/vault-user-view.js';
 import * as VaultBlobHasher from './vault-blob-hasher.js';
+import { withNamespaceLock } from './vault-namespace-lock.js';
 import * as VaultPathMapper from './vault-path-mapper.js';
 import type { TreeEntry } from './vault-repo-storage.js';
 import * as VaultRepoStorage from './vault-repo-storage.js';
@@ -640,25 +642,23 @@ async function applyGrantChangePrefix(
 }
 
 /**
- * Handles op === 'reset-all': delete every namespace ref and clear
+ * Handles op === 'reset-all': delete every namespace ref on disk, including
+ * view refs and refs vault_namespace_state has no record of, and clear
  * vault_namespace_state + vault_user_views.  The object pool is preserved.
+ * Instructions still pending from before the wipe are superseded by it: the
+ * rebuild that follows re-derives their effect from the database.
  */
-async function applyResetAll(): Promise<void> {
-  // Collect all known namespaces from vault_namespace_state.
-  // Lean query to get all namespace strings without loading full docs.
-  const allDocs = await VaultNamespaceStateModel.find(
-    {},
-    { namespace: 1 },
-  ).lean<{ namespace: string }[]>();
-
-  // Delete every namespace ref from the bare repository.
-  await Promise.all(
-    allDocs.map((doc) => VaultRepoStorage.deleteRef(nsRef(doc.namespace))),
-  );
+async function applyResetAll(instruction: VaultInstructionDoc): Promise<void> {
+  await VaultRepoStorage.deleteAllNamespaceRefs();
 
   // Clear MongoDB state collections.
   await VaultNamespaceStateModel.deleteAll();
   await VaultUserViewModel.deleteAll();
+  await VaultInstructionModel.supersedeUnprocessedBefore(instruction.issuedAt);
+
+  // Last: packed-refs is what keeps refs unreadable, so a wipe that fails
+  // halfway must leave it in place (see design.md, VaultMaintenanceScheduler).
+  await VaultRepoStorage.dropPackedNamespaceRefs();
 }
 
 // ---------------------------------------------------------------------------
@@ -681,6 +681,29 @@ async function applyResetAll(): Promise<void> {
 export async function applyInstruction(
   instruction: VaultInstructionDoc,
 ): Promise<void> {
+  const namespaces = await namespacesWrittenBy(instruction);
+  await withNamespaceLock(namespaces, () => dispatchOp(instruction));
+}
+
+/**
+ * Returns the namespaces whose ref the instruction may write. reset-all
+ * locks every namespace that has a vault_namespace_state document: the only
+ * other writer it can overlap with is a squash, which locks by that document.
+ */
+async function namespacesWrittenBy(
+  instruction: VaultInstructionDoc,
+): Promise<string[]> {
+  if (instruction.op === 'reset-all') {
+    const docs = await VaultNamespaceStateModel.find({}, { namespace: 1 }).lean<
+      { namespace: string }[]
+    >();
+    return docs.map((doc) => doc.namespace);
+  }
+  const { namespace, fromNamespace } = instruction.payload;
+  return [namespace, fromNamespace].filter((ns): ns is string => ns != null);
+}
+
+async function dispatchOp(instruction: VaultInstructionDoc): Promise<void> {
   switch (instruction.op) {
     case 'upsert':
       await applyUpsert(instruction);
@@ -698,7 +721,7 @@ export async function applyInstruction(
       await applyGrantChangePrefix(instruction);
       break;
     case 'reset-all':
-      await applyResetAll();
+      await applyResetAll(instruction);
       break;
     default: {
       // TypeScript exhaustiveness check

@@ -6,7 +6,7 @@
  *   (b) Each getter is a synchronous function (not async, no Promise returned)
  */
 
-import { mockDeep } from 'vitest-mock-extended';
+import { mock } from 'vitest-mock-extended';
 
 import type Crowi from '~/server/crowi';
 
@@ -159,10 +159,7 @@ describe('models/user password methods (PasswordHashService delegation)', () => 
   // legacy PASSWORD_SEED, then grab the schema instance passed to the mocked
   // mongoose.model() so instance methods can be invoked against a plain `this`.
   const buildMethods = async () => {
-    const crowi = mockDeep<Crowi>();
-    // Set the property rather than replacing the deep-mock proxy object (which is
-    // typed ProcessEnv & DeepMockProxy and rejects a plain-object assignment).
-    crowi.env.PASSWORD_SEED = SEED;
+    const crowi = mock<Crowi>({ env: { PASSWORD_SEED: SEED } });
 
     const mongoose = (await import('mongoose')).default;
     const userModule = await import('.');

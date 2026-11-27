@@ -58,6 +58,9 @@ export interface IPageOperation {
   incForUpdatingDescendantCount?: number;
   unprocessableExpiryDate: Date;
   exPage?: IPageForResuming;
+  // Ownership and progress of a Duplicate operation (see page-duplicate design.md)
+  lastProgressAt?: Date;
+  ownerToken?: string;
 
   isProcessable(): boolean;
 }
@@ -166,6 +169,8 @@ const schema = new Schema<PageOperationDocument, PageOperationModel>({
     type: Date,
     default: () => addSeconds(new Date(), 10),
   },
+  lastProgressAt: { type: Date },
+  ownerToken: { type: String },
 });
 
 schema.statics.findByIdAndUpdatePageActionStage = async function (

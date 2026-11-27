@@ -46,6 +46,9 @@ Write the port-back-and-delete step as **the amend spec's own final task in its
 
 Implementation landing is not the completion point — **this final task is**.
 
+The one alternative is to stay as a standing spec — see
+[Alternative: stay as a standing spec](#alternative-stay-as-a-standing-spec) below.
+
 ## Procedure
 
 ### 1. When opening the amend spec — declare the target up front
@@ -96,6 +99,31 @@ current facts belong there. History lives in git (same principle as this repo's
   sub-spec or similar)
 - Delete `.kiro/specs/<amend spec>/`
 
+## Alternative: stay as a standing spec
+
+Folding back is the default. An amend spec may instead take over ownership of the part
+it changes and stay as a standing spec (e.g. a new sub-spec under the same umbrella).
+Judge this by whether that part needs its own spec and someone should keep maintaining
+it after the tasks are done — and whether that reason holds up:
+
+- It is a cohesive part that will keep changing on its own, with a boundary you can
+  name (a directory, an API) that leaves the target's contracts with other specs alone.
+- Saving the port-back work is not a reason. If the part would just sit there once the
+  tasks are done, fold back.
+
+The target gives that part up, so there is still one source of truth. Design rationale
+stays in this spec's research.md, and the final task becomes:
+
+```markdown
+- [ ] N. Take over ownership from the target spec
+  - [ ] N.1 Port new acceptance criteria to whoever owns requirements (append, never renumber)
+  - [ ] N.2 Remove the transferred sections from <target-spec>'s design.md, leave a pointer to this spec, and list the part under its Out of Boundary
+  - [ ] N.3 Add Revalidation Triggers on both sides for what the two specs still share
+  - [ ] N.4 Update <target-spec>'s spec.json `updated_at`; register this spec in the umbrella's `sub_specs` and roadmap.md
+```
+
+After implementation, run `/kiro-spec-cleanup` on it like any other spec.
+
 ## What this does NOT apply to
 
 - **A spec for new functionality** — if it doesn't change an already-shipped spec's
@@ -128,3 +156,6 @@ Confirm before treating an amend spec as complete:
 - [ ] The target spec's `spec.json` `updated_at` was updated
 - [ ] The amend spec's row was removed from `roadmap.md`
 - [ ] `.kiro/specs/<amend spec>/` was deleted
+
+If the spec stays as a standing spec instead, its final task above replaces the
+items from "Design rationale was moved" onward.

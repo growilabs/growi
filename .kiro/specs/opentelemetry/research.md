@@ -21,13 +21,7 @@
 
 ### Anonymization Handler の登録順とパターン
 
-- **Context**: 新規 anonymization handler を追加するとき、`canHandle` の衝突を避ける必要がある。
-- **Sources Consulted**: `anonymization/handlers/index.ts`、各 handler の `canHandle` 実装。
-- **Findings**:
-  - 配列順 = 評価順だが、すべてが OR で集約される（複数 module が同一 URL を匿名化することは現状無いが、可能性としては存在する）。
-  - より具体的なパス（API 系）を先、汎用パス（page access）を最後に配置するのが現状の慣習。
-  - `canHandle` は副作用無しで判定のみ、`handle` は失敗時に `null` を返すか元の URL を維持する。
-- **Implications**: 新規 handler 追加時は、既存 4 handler の対象 URL と衝突しないかを `canHandle` ロジックで確認する。
+`opentelemetry-anonymization` の research.md を参照。
 
 ### `process.constrainedMemory()` の挙動
 
@@ -57,8 +51,6 @@
 | Single Meter, all metrics | 全 7+ メトリクスを単一 Meter で束ねる | コードが小さい | 観測スコープ（business vs system）の責務が混在、テスト分離困難 | 不採用 |
 | 2-stage Resource initialization | DB 非依存 → DB 初期化後 の 2 段階で Resource を構築 | 循環依存回避、DB 接続前に SDK 部分起動可能 | `_resource` private アクセス必要 | **採用** |
 | Single-stage Resource | すべての Resource を DB 初期化後に作る | private アクセス不要 | OpenTelemetry の起動が DB 接続まで遅延、`service.name` などの基本属性も遅れる | 不採用 |
-| Module-based anonymization | `AnonymizationModule` interface + 配列順評価 | 新規パス追加が局所変更で済む、handler ごとに spec | 配列順への暗黙依存 | **採用** |
-| Centralized anonymization (switch / regex map) | 1 ファイルで if/else または map で振り分け | フローが見やすい | 拡張ごとに 1 ファイルが肥大化、spec が結合 | 不採用 |
 | 4 instrumentation の direct import | `HttpInstrumentation` 等 4 class を `new` で構築し配列に詰める | actual usage と依存表面が一致、RSS が真に削減される（isolated benchmark で −11 MB）、`OTEL_AUTO_INSTRUMENTATION_*` 系の制御変数 / 分岐が不要 | 新 instrumentation 追加時にコード変更（1 import + 1 `new` 行）が必要 | **採用** |
 | `@opentelemetry/auto-instrumentations-node` の deny-list | `getNodeAutoInstrumentations({ pino: false, fs: false, ... })` で不要 instrumentation を無効化 | 設定が宣言的、追加 instrumentation のオプトインが容易 | `enabled: false` でも 31 instrumentation 全件が instantiate される仕様で、約 11 MB の RSS オーバーヘッドが発生（`memory-leak-investigation` L2 finding で実証） | 不採用 |
 
@@ -112,15 +104,11 @@
 - **Rationale**: いずれも「ランタイム / ホストのリソース観測」という単一目的で、`system.*`/`process.*` の prefix で十分名前空間が分離できる。Meter を分けると `addBatchObservableCallback` の呼び出しと spec も二重になり管理コスト増。
 - **Trade-offs**: 将来「process 系のみオフにする」のような細かい制御が困難になるが、現時点で必要性なし。
 
-### Decision: Anonymization は best-effort, module-based, opt-in
+### Decision: 匿名化は opt-in（`otel:anonymizeInBestEffort`）
 
-- **Context**: 個人情報（検索クエリ・ページパス・ユーザー名）が `http.target` 経由でトレースに残るリスクを下げたいが、auto-instrumentation の挙動を完全に制御することはできない。
-- **Selected Approach**:
-  1. `otel:anonymizeInBestEffort` が `true` のときのみ `startIncomingSpanHook` を注入。
-  2. handler は `AnonymizationModule` interface に従い、`canHandle` で対象選別 / `handle` で attribute を返す。
-  3. 4 つの handler を配列順で評価し、複数 module がマッチしたら `Object.assign` でマージ。
-- **Rationale**: opt-in にすることで導入リスクを抑え、module 化により拡張時の差分が局所化される。
-- **Trade-offs**: 配列順への暗黙依存があり、追加時に既存 handler との衝突確認が必要。
+- **Selected Approach**: 匿名化 hook は `otel:anonymizeInBestEffort` が true のときだけ HTTP 計測に渡す（要件 1.5）。
+- **Rationale**: opt-in にすることで導入リスクを抑える。auto-instrumentation の挙動は完全には制御できないため、匿名化は best-effort の位置づけで、既定では動かさない。
+- **匿名化の中身**: 規則の構成・失敗時の扱いなどは `opentelemetry-anonymization` の research.md を参照。
 
 ### Decision: SemConv の不安定 attribute は `semconv.ts` にコピー
 
@@ -165,7 +153,7 @@
 - **`process.constrainedMemory()` のプラットフォーム依存**: Linux cgroup v1/v2 のみサポートで、macOS/Windows では常に 0 を返す。**Mitigation**: 0 のときは `system.memory.limit` を観測しない挙動が、そのまま非対応プラットフォームの振る舞いと一致するため追加対策不要。
 - **新規メトリクスのカーディナリティ**: 観測値メトリクスは label を持たない gauge であり、追加カーディナリティ寄与はインスタンス分のみ。**Mitigation**: 設計上、観測値メトリクスには attribute を付与しないことを徹底（identity は Resource、設定値は `growi.configs` ラベル経由）。
 - **NodeSDK private アクセスの破綻**: `_resource` プロパティが SDK メジャー更新で消滅する可能性。**Mitigation**: Revalidation Trigger として SDK バージョンアップ時にチェック。public API が出たら即座に切り替え。
-- **Anonymization の網羅性不足**: 新規 API パスが追加されたとき、対応する handler を忘れると平文の URL が span に残る。**Mitigation**: 新規 API 追加時のレビューで `anonymization/handlers/` の更新有無を確認する文化を維持。`handlers/index.ts` の `anonymizationModules` 配列が単一の真実ソース。
+- **Anonymization の網羅性不足**: `opentelemetry-anonymization` の research.md を参照。
 - **SemConv 不安定 attribute の stable promotion 漏れ**: `service.instance.id` / `http.target` が stable 化されているのに local 定数を放置すると、最新 OTLP 受信側との互換性が崩れる可能性。**Mitigation**: `@opentelemetry/semantic-conventions` メジャー / minor 更新時に Revalidation Trigger で見直す。
 
 ## References

@@ -1,0 +1,68 @@
+import type { IUserHasId } from '@growi/core';
+
+import type {
+  ApplyResult,
+  ApplyTrigger,
+  BasedOn,
+  CreatableEntry,
+  CreatableOperationInput,
+  ReviewerInput,
+} from '../../interfaces';
+import type { CreateInputRejection } from './normalize-create-input';
+
+export type ServiceError =
+  // missing, not requester, or nothing the caller may see — one shape
+  | { readonly code: 'not-found' }
+  | { readonly code: 'not-open' }
+  | {
+      readonly code: 'input-rejected';
+      readonly rejection: CreateInputRejection;
+    }
+  | { readonly code: 'feature-disabled' }
+  | { readonly code: 'daily-limit-reached'; readonly max: number }
+  | { readonly code: 'target-unavailable'; readonly index: number }
+  | { readonly code: 'base-revision-mismatch'; readonly index: number }
+  | { readonly code: 'user-not-allowed' }
+  // reviewers other than the requester while app:changeProposalReviewersEnabled is off
+  | { readonly code: 'reviewers-disabled' }
+  | { readonly code: 'reviewer-not-found' }
+  // missing base, other requester's, or a revert proposal — one shape
+  | { readonly code: 'based-on-unavailable' }
+  | {
+      readonly code: 'based-on-operation-not-eligible';
+      readonly operationKey?: string;
+    };
+
+export type ServiceResult<T> =
+  | { readonly ok: true; readonly value: T }
+  | { readonly ok: false; readonly error: ServiceError };
+
+export type CreateProposalRequest = {
+  // null stands for a guest
+  readonly requester: IUserHasId | null;
+  readonly entry: CreatableEntry;
+  readonly modelLabel?: string;
+  readonly purpose?: string;
+  // Omitted: a follow-up or rework inherits the base's reviewers, others get none.
+  readonly reviewers?: readonly ReviewerInput[];
+  readonly operations: readonly CreatableOperationInput[];
+  readonly request?: RequestParameters;
+  // request: the caller route's activity is settled as CHANGE_PROPOSAL_CREATE
+  readonly trigger?: ApplyTrigger;
+  readonly basedOn?: BasedOn;
+  readonly perPageNotifications?: boolean;
+};
+
+export type CreateProposalResult = {
+  readonly proposalId: string;
+  // null when nothing was due for auto-apply
+  readonly apply: ApplyResult | null;
+};
+
+export type RequestParameters = {
+  readonly ip?: string;
+  readonly endpoint?: string;
+};
+
+// Operation keys, or every applied operation the user may see.
+export type RevertTargets = readonly string[] | 'all-visible';
