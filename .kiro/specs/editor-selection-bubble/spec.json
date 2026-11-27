@@ -1,17 +1,17 @@
 {
-  "feature_name": "editor-selection-palette",
+  "feature_name": "editor-selection-bubble",
   "created_at": "2026-06-26T04:14:20Z",
-  "updated_at": "2026-06-26T04:36:44Z",
+  "updated_at": "2026-11-27T00:00:00Z",
   "language": "ja",
   "phase": "tasks-generated",
   "approvals": {
     "requirements": {
       "generated": true,
-      "approved": true
+      "approved": false
     },
     "design": {
       "generated": true,
-      "approved": true
+      "approved": false
     },
     "tasks": {
       "generated": true,
