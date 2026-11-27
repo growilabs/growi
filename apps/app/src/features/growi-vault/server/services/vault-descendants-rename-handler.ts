@@ -5,6 +5,7 @@ import { convertToNewAffiliationPath } from '@growi/core/dist/utils/page-path-ut
 import type { PageUpdateManyEventExtras } from '~/server/events/page';
 import loggerFactory from '~/utils/logger';
 
+import { resolveRevisionId } from './resolve-revision-id';
 import type { DispatchedPage, VaultDispatcher } from './vault-dispatcher';
 import type { VaultNamespaceMapper } from './vault-namespace-mapper';
 
@@ -20,15 +21,6 @@ export type VaultDescendantsRenameHandler = (
   pages: ReadonlyArray<RenamedDescendant>,
   extras?: PageUpdateManyEventExtras,
 ) => Promise<void>;
-
-const resolveRevisionId = (revision: unknown): string | undefined => {
-  if (revision == null) {
-    return undefined;
-  }
-  return typeof revision === 'object' && '_id' in revision
-    ? (revision as { _id: { toString(): string } })._id.toString()
-    : (revision as { toString(): string }).toString();
-};
 
 /**
  * Builds the subscriber for the page 'updateMany' event, which PageService

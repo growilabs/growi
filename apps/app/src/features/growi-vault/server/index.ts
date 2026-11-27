@@ -17,6 +17,7 @@ import {
 } from './services/reconcile';
 import { createHistoryStore } from './services/reconcile/reconcile-history-store';
 import { isStaleBootstrapRunner } from './services/resilience';
+import { resolveRevisionId } from './services/resolve-revision-id';
 import { createVaultBootstrapper } from './services/vault-bootstrapper';
 import { subscribeToDescendantsRename } from './services/vault-descendants-rename-handler';
 import { createVaultDispatcher } from './services/vault-dispatcher';
@@ -285,16 +286,7 @@ export const initializeVaultFeature = async (crowi: any): Promise<void> => {
     pageEvent.on(
       'create',
       (page: IPage & { _id: { toString(): string } }, _user: unknown) => {
-        // Resolve revisionId from the populated page object.
-        // page.revision may be an ObjectId or a populated Revision document.
-        const revisionId =
-          page.revision != null
-            ? typeof page.revision === 'object' && '_id' in page.revision
-              ? (
-                  page.revision as { _id: { toString(): string } }
-                )._id.toString()
-              : page.revision.toString()
-            : undefined;
+        const revisionId = resolveRevisionId(page.revision);
 
         dispatcher
           .onPageChanged({ type: 'create', page, revisionId })
@@ -369,14 +361,7 @@ export const initializeVaultFeature = async (crowi: any): Promise<void> => {
           return;
         }
         const { page } = payload;
-        const revisionId =
-          page.revision != null
-            ? typeof page.revision === 'object' && '_id' in page.revision
-              ? (
-                  page.revision as { _id: { toString(): string } }
-                )._id.toString()
-              : (page.revision as { toString(): string }).toString()
-            : undefined;
+        const revisionId = resolveRevisionId(page.revision);
         dispatcher
           .onPageRenamed({
             page,
@@ -483,15 +468,7 @@ export const initializeVaultFeature = async (crowi: any): Promise<void> => {
             grantedUsers: item.newGrantedUsers,
           };
 
-          const revisionId =
-            item.page.revision == null
-              ? undefined
-              : typeof item.page.revision === 'object' &&
-                  '_id' in (item.page.revision as object)
-                ? (
-                    item.page.revision as { _id: { toString(): string } }
-                  )._id.toString()
-                : (item.page.revision as { toString(): string }).toString();
+          const revisionId = resolveRevisionId(item.page.revision);
 
           dispatcher
             .onPageChanged({

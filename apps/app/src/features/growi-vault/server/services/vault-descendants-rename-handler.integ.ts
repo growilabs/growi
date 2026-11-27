@@ -9,7 +9,10 @@ import type { PageModel } from '~/server/models/page';
 
 import { VaultInstruction } from '../models/vault-instruction';
 import { subscribeToDescendantsRename } from './vault-descendants-rename-handler';
-import { createVaultDispatcher } from './vault-dispatcher';
+import {
+  createVaultDispatcher,
+  type VaultDispatcher,
+} from './vault-dispatcher';
 import { vaultNamespaceMapper } from './vault-namespace-mapper';
 
 const OLD_PATH = '/vault-descendants-rename-seam/before';
@@ -32,16 +35,11 @@ describe('PageService descendant rename → vault_instructions', () => {
       'payload.newPrefix': newPrefix,
     }).lean();
 
-  const waitForInstructions = async (
-    newPrefix: string,
-    count: number,
-  ): Promise<void> => {
-    await vi.waitFor(
-      async () => {
-        expect(await renamePrefixInstructions(newPrefix)).toHaveLength(count);
-      },
-      { timeout: 5000, interval: 50 },
-    );
+  // The subscriber writes without being awaited by PageService, so the test
+  // collects the writes it started to know when all of them have finished.
+  const startedWrites: Promise<void>[] = [];
+  const allWritesFinished = async (): Promise<void> => {
+    await Promise.allSettled(startedWrites.splice(0));
   };
 
   const renameDescendants = (
@@ -69,9 +67,21 @@ describe('PageService descendant rename → vault_instructions', () => {
       email: `${USERNAME}@example.com`,
     });
 
+    const dispatcher = createVaultDispatcher(vaultNamespaceMapper);
+    const trackedDispatcher: Pick<
+      VaultDispatcher,
+      'onPageRenamed' | 'onBulkOperation'
+    > = {
+      onPageRenamed: (event) => dispatcher.onPageRenamed(event),
+      onBulkOperation: (event) => {
+        const write = dispatcher.onBulkOperation(event);
+        startedWrites.push(write);
+        return write;
+      },
+    };
     unsubscribe = subscribeToDescendantsRename(
       crowi.events.page,
-      createVaultDispatcher(vaultNamespaceMapper),
+      trackedDispatcher,
       vaultNamespaceMapper,
     );
   });
@@ -112,9 +122,7 @@ describe('PageService descendant rename → vault_instructions', () => {
     await renameDescendants(target, NEW_PATH);
 
     const onlyMeNamespace = `user-${user._id.toString()}-only-me`;
-    await waitForInstructions(NEW_PATH, 2);
-    // Give a duplicate, if one were written, the time to arrive.
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    await allWritesFinished();
 
     const instructions = await renamePrefixInstructions(NEW_PATH);
     expect(
@@ -147,13 +155,13 @@ describe('PageService descendant rename → vault_instructions', () => {
     });
 
     await renameDescendants(target, back);
-    await waitForInstructions(back, 1);
-
     await renameDescendants({ _id: target._id, path: back }, there);
-    await waitForInstructions(there, 1);
+    await allWritesFinished();
 
-    const [instruction] = await renamePrefixInstructions(there);
-    expect(instruction.payload).toMatchObject({
+    expect(await renamePrefixInstructions(back)).toHaveLength(1);
+    const instructions = await renamePrefixInstructions(there);
+    expect(instructions).toHaveLength(1);
+    expect(instructions[0].payload).toMatchObject({
       namespace: 'public',
       oldPrefix: back,
       newPrefix: there,
