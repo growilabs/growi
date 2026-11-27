@@ -1,18 +1,31 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
 
+import type { ReviewChannel } from '~/features/change-proposal/interfaces';
+
 import type {
   AttachmentRemoveSnapshot,
   AttachmentSnapshot,
+  ChangeProposalReviewSnapshot,
   DefaultSnapshot,
   IActivity,
   ISnapshot,
 } from './activity';
 import {
+  AdminActions,
+  AllEssentialActions,
+  AllLargeGroupActions,
+  AllMediumGroupActions,
+  AllSmallGroupActions,
   AllSupportedActions,
+  AllSupportedTargetModels,
+  AttachmentActions,
+  ChangeProposalActions,
   isAttachmentAddActivity,
   isAttachmentDownloadActivity,
+  isAttachmentReextractActivity,
   isAttachmentRemoveActivity,
   isAuditlogSuggestionField,
+  isChangeProposalReviewActivity,
   MODEL_ATTACHMENT,
   SupportedAction,
   SupportedTargetModel,
@@ -186,13 +199,14 @@ describe('SupportedAction - inline comment constants', () => {
 });
 
 describe('SupportedTargetModel', () => {
-  it('includes Attachment while preserving the existing four models', () => {
+  it('includes Attachment and ChangeProposal while preserving the existing models', () => {
     expect(SupportedTargetModel).toEqual({
       MODEL_PAGE: 'Page',
       MODEL_USER: 'User',
       MODEL_PAGE_BULK_EXPORT_JOB: 'PageBulkExportJob',
       MODEL_AUDIT_LOG_BULK_EXPORT_JOB: 'AuditLogBulkExportJob',
       MODEL_ATTACHMENT: 'Attachment',
+      MODEL_CHANGE_PROPOSAL: 'ChangeProposal',
     });
   });
 
@@ -421,6 +435,27 @@ describe('isAttachmentDownloadActivity', () => {
   });
 });
 
+describe('isAttachmentReextractActivity', () => {
+  it('accepts only ATTACHMENT_REEXTRACT, which is an attachment action in the medium group', () => {
+    const of = (action: IActivity['action']) => ({ action });
+
+    expect(
+      isAttachmentReextractActivity(
+        of(SupportedAction.ACTION_ATTACHMENT_REEXTRACT),
+      ),
+    ).toBe(true);
+    for (const action of [
+      SupportedAction.ACTION_ATTACHMENT_ADD,
+      SupportedAction.ACTION_ATTACHMENT_REMOVE,
+      SupportedAction.ACTION_ATTACHMENT_DOWNLOAD,
+    ]) {
+      expect(isAttachmentReextractActivity(of(action))).toBe(false);
+    }
+    expect(AttachmentActions).toContain('ATTACHMENT_REEXTRACT');
+    expect(AllMediumGroupActions).toContain('ATTACHMENT_REEXTRACT');
+  });
+});
+
 describe('attachment guards coexistence', () => {
   it('matches each attachment action with exactly its own guard', () => {
     const add: Pick<IActivity, 'action' | 'snapshot'> = {
@@ -508,5 +543,196 @@ describe('ISnapshot union', () => {
     expectTypeOf<AttachmentRemoveSnapshot['fileSize']>().toEqualTypeOf<
       number | undefined
     >();
+  });
+});
+
+describe('Change Proposal activity declarations', () => {
+  const newActions = [
+    'CHANGE_PROPOSAL_CREATE',
+    'CHANGE_PROPOSAL_APPLY',
+    'CHANGE_PROPOSAL_REVERT',
+    'ADMIN_CHANGE_PROPOSAL_SETTINGS_UPDATE',
+  ];
+
+  it('declares the four actions with their literal values', () => {
+    expect(SupportedAction.ACTION_CHANGE_PROPOSAL_CREATE).toBe(
+      'CHANGE_PROPOSAL_CREATE',
+    );
+    expect(SupportedAction.ACTION_CHANGE_PROPOSAL_APPLY).toBe(
+      'CHANGE_PROPOSAL_APPLY',
+    );
+    expect(SupportedAction.ACTION_CHANGE_PROPOSAL_REVERT).toBe(
+      'CHANGE_PROPOSAL_REVERT',
+    );
+    expect(SupportedAction.ACTION_ADMIN_CHANGE_PROPOSAL_SETTINGS_UPDATE).toBe(
+      'ADMIN_CHANGE_PROPOSAL_SETTINGS_UPDATE',
+    );
+    expect(AllSupportedActions).toEqual(expect.arrayContaining(newActions));
+  });
+
+  it('accepts ChangeProposal as a target model', () => {
+    expect(AllSupportedTargetModels).toContain('ChangeProposal');
+  });
+
+  it('always records APPLY and REVERT regardless of audit log settings', () => {
+    expect(AllEssentialActions).toContain('CHANGE_PROPOSAL_APPLY');
+    expect(AllEssentialActions).toContain('CHANGE_PROPOSAL_REVERT');
+  });
+
+  it('also lists APPLY and REVERT in the Medium and Large groups so the audit log filter shows them', () => {
+    for (const action of ['CHANGE_PROPOSAL_APPLY', 'CHANGE_PROPOSAL_REVERT']) {
+      expect(AllEssentialActions).toContain(action);
+      expect(AllMediumGroupActions).toContain(action);
+      expect(AllLargeGroupActions).toContain(action);
+    }
+  });
+
+  it('leaves CREATE governed by the audit log group settings', () => {
+    expect(AllEssentialActions).not.toContain('CHANGE_PROPOSAL_CREATE');
+    expect(AllSmallGroupActions).not.toContain('CHANGE_PROPOSAL_CREATE');
+    expect(AllMediumGroupActions).toContain('CHANGE_PROPOSAL_CREATE');
+    expect(AllLargeGroupActions).toContain('CHANGE_PROPOSAL_CREATE');
+  });
+
+  it('records the admin settings update only in the Large group', () => {
+    expect(AllMediumGroupActions).not.toContain(
+      'ADMIN_CHANGE_PROPOSAL_SETTINGS_UPDATE',
+    );
+    expect(AllLargeGroupActions).toContain(
+      'ADMIN_CHANGE_PROPOSAL_SETTINGS_UPDATE',
+    );
+  });
+
+  it('groups the CHANGE_PROPOSAL_ actions into their own category without capturing the admin action', () => {
+    expect([...ChangeProposalActions].sort()).toEqual([
+      'CHANGE_PROPOSAL_ABSTAIN',
+      'CHANGE_PROPOSAL_APPLY',
+      'CHANGE_PROPOSAL_APPROVE',
+      'CHANGE_PROPOSAL_CREATE',
+      'CHANGE_PROPOSAL_REJECT',
+      'CHANGE_PROPOSAL_REVERT',
+      'CHANGE_PROPOSAL_REVIEWER_ADD',
+      'CHANGE_PROPOSAL_REVIEWER_REMOVE',
+    ]);
+  });
+
+  it('keeps the admin settings action in the Admin category', () => {
+    expect(AdminActions).toContain('ADMIN_CHANGE_PROPOSAL_SETTINGS_UPDATE');
+  });
+});
+
+describe('Change Proposal review activity declarations', () => {
+  const reviewActions = [
+    'CHANGE_PROPOSAL_APPROVE',
+    'CHANGE_PROPOSAL_REJECT',
+    'CHANGE_PROPOSAL_ABSTAIN',
+    'CHANGE_PROPOSAL_REVIEWER_ADD',
+    'CHANGE_PROPOSAL_REVIEWER_REMOVE',
+  ];
+
+  it('Req 20.8/20.10 — declares the five review actions with their literal values', () => {
+    expect(SupportedAction.ACTION_CHANGE_PROPOSAL_APPROVE).toBe(
+      'CHANGE_PROPOSAL_APPROVE',
+    );
+    expect(SupportedAction.ACTION_CHANGE_PROPOSAL_REJECT).toBe(
+      'CHANGE_PROPOSAL_REJECT',
+    );
+    expect(SupportedAction.ACTION_CHANGE_PROPOSAL_ABSTAIN).toBe(
+      'CHANGE_PROPOSAL_ABSTAIN',
+    );
+    expect(SupportedAction.ACTION_CHANGE_PROPOSAL_REVIEWER_ADD).toBe(
+      'CHANGE_PROPOSAL_REVIEWER_ADD',
+    );
+    expect(SupportedAction.ACTION_CHANGE_PROPOSAL_REVIEWER_REMOVE).toBe(
+      'CHANGE_PROPOSAL_REVIEWER_REMOVE',
+    );
+  });
+
+  it('Req 20.8/20.10 — records the review actions regardless of audit log settings and lists them in the audit log groups', () => {
+    for (const action of reviewActions) {
+      expect(AllEssentialActions).toContain(action);
+      expect(AllMediumGroupActions).toContain(action);
+      expect(AllLargeGroupActions).toContain(action);
+      expect(AllSmallGroupActions).not.toContain(action);
+    }
+  });
+});
+
+describe('isChangeProposalReviewActivity', () => {
+  it('Req 20.8 — narrows a review activity so reviewChannel is readable', () => {
+    const activity: Pick<IActivity, 'action' | 'snapshot'> = {
+      action: SupportedAction.ACTION_CHANGE_PROPOSAL_APPROVE,
+      snapshot: { username: 'alice', reviewChannel: 'api' },
+    };
+
+    if (!isChangeProposalReviewActivity(activity)) {
+      expect.unreachable('an APPROVE activity must match the guard');
+    }
+    // Reading reviewChannel only compiles after narrowing
+    expect(activity.snapshot?.reviewChannel).toBe('api');
+    expect(activity.snapshot?.username).toBe('alice');
+  });
+
+  it('Req 20.8/20.10 — matches every one of the five review actions', () => {
+    for (const action of [
+      SupportedAction.ACTION_CHANGE_PROPOSAL_APPROVE,
+      SupportedAction.ACTION_CHANGE_PROPOSAL_REJECT,
+      SupportedAction.ACTION_CHANGE_PROPOSAL_ABSTAIN,
+      SupportedAction.ACTION_CHANGE_PROPOSAL_REVIEWER_ADD,
+      SupportedAction.ACTION_CHANGE_PROPOSAL_REVIEWER_REMOVE,
+    ]) {
+      expect(isChangeProposalReviewActivity({ action })).toBe(true);
+    }
+  });
+
+  it('rejects the other change proposal actions', () => {
+    for (const action of [
+      SupportedAction.ACTION_CHANGE_PROPOSAL_CREATE,
+      SupportedAction.ACTION_CHANGE_PROPOSAL_APPLY,
+      SupportedAction.ACTION_CHANGE_PROPOSAL_REVERT,
+    ]) {
+      expect(isChangeProposalReviewActivity({ action })).toBe(false);
+    }
+  });
+
+  it('rejects other actions even when the snapshot carries a reviewChannel-shaped field', () => {
+    const activity: Pick<IActivity, 'action' | 'snapshot'> = {
+      action: SupportedAction.ACTION_ATTACHMENT_REMOVE,
+      snapshot: { username: 'alice', reviewChannel: 'ui' },
+    };
+
+    expect(isChangeProposalReviewActivity(activity)).toBe(false);
+  });
+});
+
+describe('ChangeProposalReviewSnapshot type', () => {
+  it('Req 20.8 — carries an optional username and an optional review channel', () => {
+    expectTypeOf<ChangeProposalReviewSnapshot>().toEqualTypeOf<{
+      username?: string;
+      reviewChannel?: ReviewChannel;
+    }>();
+  });
+
+  it('is a member of the ISnapshot union without exposing reviewChannel on the unnarrowed union', () => {
+    const snapshot: ChangeProposalReviewSnapshot = { reviewChannel: 'ai-tool' };
+    const asUnion: ISnapshot = snapshot;
+
+    expect(asUnion).toBe(snapshot);
+    expectTypeOf<ISnapshot>().not.toHaveProperty('reviewChannel');
+  });
+});
+
+describe('attachment search settings activity declaration', () => {
+  it('records the admin update only in the Large group, in the Admin category', () => {
+    expect(SupportedAction.ACTION_ADMIN_ATTACHMENT_SEARCH_SETTINGS_UPDATE).toBe(
+      'ADMIN_ATTACHMENT_SEARCH_SETTINGS_UPDATE',
+    );
+    expect(AllMediumGroupActions).not.toContain(
+      'ADMIN_ATTACHMENT_SEARCH_SETTINGS_UPDATE',
+    );
+    expect(AllLargeGroupActions).toContain(
+      'ADMIN_ATTACHMENT_SEARCH_SETTINGS_UPDATE',
+    );
+    expect(AdminActions).toContain('ADMIN_ATTACHMENT_SEARCH_SETTINGS_UPDATE');
   });
 });

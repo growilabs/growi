@@ -1,0 +1,22 @@
+{
+  "feature_name": "page-duplicate",
+  "created_at": "2026-11-20T08:14:32Z",
+  "updated_at": "2026-11-20T10:53:22Z",
+  "language": "ja",
+  "phase": "tasks-generated",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true
+    }
+  },
+  "ready_for_implementation": true
+}

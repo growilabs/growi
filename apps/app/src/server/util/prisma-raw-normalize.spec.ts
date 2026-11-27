@@ -1,7 +1,10 @@
+import { Types } from 'mongoose';
+
 import {
   assertIsArray,
   normalizeAggregateRaw,
   toRawDate,
+  toRawFilter,
   toRawObjectId,
 } from './prisma-raw-normalize';
 
@@ -257,5 +260,94 @@ describe('assertIsArray', () => {
     expect(() => assertIsArray(undefined, 'test context')).toThrow(
       /test context/,
     );
+  });
+});
+
+describe('toRawFilter', () => {
+  const HEX_A = '507f1f77bcf86cd799439011';
+  const HEX_B = 'aabbccddeeff001122334455';
+
+  it('replaces an ObjectId field value with its $oid form', () => {
+    const result = toRawFilter({ creator: new Types.ObjectId(HEX_A) });
+    expect(result).toEqual({ creator: { $oid: HEX_A } });
+  });
+
+  it('replaces ObjectIds nested under $and / $or / $in / $elemMatch', () => {
+    const result = toRawFilter({
+      $and: [
+        {
+          _id: { $in: [new Types.ObjectId(HEX_A), new Types.ObjectId(HEX_B)] },
+        },
+        {
+          $or: [
+            { grant: 4, grantedUsers: new Types.ObjectId(HEX_A) },
+            {
+              grant: 5,
+              grantedGroups: {
+                $elemMatch: { item: { $in: [new Types.ObjectId(HEX_B)] } },
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(result).toEqual({
+      $and: [
+        { _id: { $in: [{ $oid: HEX_A }, { $oid: HEX_B }] } },
+        {
+          $or: [
+            { grant: 4, grantedUsers: { $oid: HEX_A } },
+            {
+              grant: 5,
+              grantedGroups: {
+                $elemMatch: { item: { $in: [{ $oid: HEX_B }] } },
+              },
+            },
+          ],
+        },
+      ],
+    });
+  });
+
+  it('leaves values that are not ObjectIds as they are', () => {
+    const date = new Date('2024-03-15T10:30:00.000Z');
+    const regex = /^\/user\//;
+    const result = toRawFilter({
+      grant: 1,
+      status: null,
+      path: '/a',
+      // a 24-hex string is not an ObjectId instance and must stay a string
+      note: HEX_A,
+      wip: false,
+      updatedAt: { $gte: date },
+      title: regex,
+      tags: ['x', 2, null],
+      already: { $oid: HEX_B },
+    });
+
+    expect(result).toEqual({
+      grant: 1,
+      status: null,
+      path: '/a',
+      note: HEX_A,
+      wip: false,
+      updatedAt: { $gte: date },
+      title: regex,
+      tags: ['x', 2, null],
+      already: { $oid: HEX_B },
+    });
+    expect(result.title).toBe(regex);
+  });
+
+  it('does not modify the filter it was given', () => {
+    const id = new Types.ObjectId(HEX_A);
+    const inner = { $in: [id] };
+    const filter = { $or: [{ _id: inner }] };
+
+    toRawFilter(filter);
+
+    expect(filter.$or[0]._id).toBe(inner);
+    expect(inner.$in[0]).toBe(id);
   });
 });

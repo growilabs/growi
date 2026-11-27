@@ -77,7 +77,7 @@
   "in_app_notification": {
     "notification_list": "In-App Notification List",
     "see_all": "See All",
-    "no_notification": "You don't have any notificatios.",
+    "no_notification": "You don't have any notifications.",
     "all": "All",
     "unopend": "Unread",
     "mark_all_as_read": "Mark all as read",
@@ -87,7 +87,11 @@
     "notifications": "Notifications",
     "filter_all": "All",
     "no_news": "No news available",
-    "view_detail": "View details"
+    "view_detail": "View details",
+    "page_duplicate_interrupted": {
+      "summary": "The copy at {{toPath}} is incomplete: {{copiedPageCount}} of {{sourcePageCount}} pages were copied from {{fromPath}}.",
+      "advice": "You can delete the incomplete copy, or duplicate again under a different name."
+    }
   },
   "personal_dropdown": {
     "home": "Home",

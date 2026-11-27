@@ -4,8 +4,10 @@ import { toLegacyAttachmentShape } from '@growi/core/dist/models/serializers';
 import { subDays } from 'date-fns/subDays';
 import type { FilterQuery, Types, UpdateQuery } from 'mongoose';
 
-import type { IAuditLogBulkExportJob } from '~/features/audit-log-bulk-export/interfaces/audit-log-bulk-export';
-import type { pagebulkexportjobs } from '~/generated/prisma/client';
+import type {
+  auditlogbulkexportjobs,
+  pagebulkexportjobs,
+} from '~/generated/prisma/client';
 import {
   AllEssentialActions,
   SupportedAction,
@@ -66,8 +68,9 @@ export class InAppNotificationService {
       'updated',
       async (
         activity: ActivityDocument,
-        target: IUser | IPage | pagebulkexportjobs | IAuditLogBulkExportJob,
+        target: IUser | IPage | pagebulkexportjobs | auditlogbulkexportjobs,
         preNotify: PreNotify,
+        snapshot?: string,
       ) => {
         try {
           const shouldNotification =
@@ -77,7 +80,12 @@ export class InAppNotificationService {
               activity.action,
             );
           if (shouldNotification) {
-            await this.createInAppNotification(activity, target, preNotify);
+            await this.createInAppNotification(
+              activity,
+              target,
+              preNotify,
+              snapshot,
+            );
           }
         } catch (err) {
           logger.error('Create InAppNotification failed', err);
@@ -163,14 +171,22 @@ export class InAppNotificationService {
           offset,
           populate: [
             { path: 'user' },
-            // target.attachment is populated via prisma by
-            // populateTargetAttachments after toObject(): mongoose casts a
-            // prisma row assigned to a ref path back to an ObjectId, dropping
-            // `downloadPathProxied`.
-            { path: 'target' },
             { path: 'activities', populate: { path: 'user' } },
           ],
         },
+      );
+      // target.attachment is populated via prisma by
+      // populateTargetAttachments after toObject(): mongoose casts a
+      // prisma row assigned to a ref path back to an ObjectId, dropping
+      // `downloadPathProxied`.
+      // A change proposal is never loaded: it holds every operation (paths and
+      // bodies), while a recipient may only see its own snapshot.
+      await InAppNotification.populate(
+        paginationResult.docs.filter(
+          (doc) =>
+            doc.targetModel !== SupportedTargetModel.MODEL_CHANGE_PROPOSAL,
+        ),
+        { path: 'target' },
       );
 
       return paginationResult;
@@ -220,6 +236,15 @@ export class InAppNotificationService {
       };
     });
   };
+
+  hideChangeProposalTargets = <T extends IInAppNotification>(
+    notifications: T[],
+  ): T[] =>
+    notifications.map((notification) =>
+      notification.targetModel === SupportedTargetModel.MODEL_CHANGE_PROPOSAL
+        ? { ...notification, target: { _id: notification.target } }
+        : notification,
+    );
 
   open = async (
     user: IUser & HasObjectId,
@@ -330,8 +355,9 @@ export class InAppNotificationService {
 
   createInAppNotification = async function (
     activity: ActivityDocument,
-    target: IUser | IPage | pagebulkexportjobs | IAuditLogBulkExportJob,
+    target: IUser | IPage | pagebulkexportjobs | auditlogbulkexportjobs,
     preNotify: PreNotify,
+    prebuiltSnapshot?: string,
   ): Promise<void> {
     const shouldNotification =
       activity != null &&
@@ -340,7 +366,8 @@ export class InAppNotificationService {
 
     const targetModel = activity.targetModel;
 
-    const snapshot = await generateSnapshot(targetModel, target);
+    const snapshot =
+      prebuiltSnapshot ?? (await generateSnapshot(targetModel, target));
 
     if (shouldNotification) {
       const props = preNotifyService.generateInitialPreNotifyProps();

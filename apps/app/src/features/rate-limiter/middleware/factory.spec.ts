@@ -1,11 +1,15 @@
 import type { IUserHasId } from '@growi/core';
 import type { NextFunction, Request, Response } from 'express';
+import express from 'express';
+import request from 'supertest';
 import { mock } from 'vitest-mock-extended';
 
 const consumePoints = vi.hoisted(() => vi.fn());
 
 vi.mock('./consume-points', () => ({ consumePoints }));
 vi.mock('~/utils/logger', () => ({ default: () => ({ error: vi.fn() }) }));
+
+import { rateLimitErrorCode } from '~/interfaces/errors/rate-limit';
 
 import {
   DEFAULT_MAX_REQUESTS,
@@ -152,5 +156,66 @@ describe('middlewareFactory', () => {
     expect(variant[0]?.config?.maxRequests).toBe(
       canonical[0]?.config?.maxRequests,
     );
+  });
+
+  describe('attachment re-extraction', () => {
+    const ID = '0123456789abcdef01234567';
+
+    it.each([
+      `/_api/v3/attachments/${ID}/reextract`,
+      `/_API/v3/attachments/${ID.toUpperCase()}/reextract/`,
+      `/_api/v3//attachments/${ID}/reextract`,
+    ])('limits POST %s to the tier-1 limit', async (path) => {
+      const configs = await configsUsedFor(path, 'POST');
+
+      for (const config of configs) {
+        expect(config?.maxRequests).toBe(5);
+      }
+    });
+
+    it('leaves other attachment routes on the global default', async () => {
+      const configs = await configsUsedFor(
+        `/_api/v3/attachments/${ID}`,
+        'POST',
+      );
+
+      for (const config of configs) {
+        expect(config).toBeUndefined();
+      }
+    });
+  });
+});
+
+describe('middlewareFactory when the limit is exceeded', () => {
+  const appWithLimiter = () => {
+    const app = express();
+    app.use(middlewareFactory());
+    app.all('*', (_req, res) => {
+      res.sendStatus(200);
+    });
+    return app;
+  };
+
+  beforeEach(() => {
+    consumePoints.mockReset();
+    consumePoints.mockRejectedValue(new Error('limit exceeded'));
+  });
+
+  it('answers an apiv3 request with a 429 carrying the too-many-requests error code', async () => {
+    const res = await request(appWithLimiter()).post(
+      '/_api/v3/forgot-password',
+    );
+
+    expect(res.status).toBe(429);
+    expect(res.body.errors).toEqual([
+      expect.objectContaining({ code: rateLimitErrorCode.TOO_MANY_REQUESTS }),
+    ]);
+  });
+
+  it('answers a non-apiv3 request with a plain 429', async () => {
+    const res = await request(appWithLimiter()).get('/forgot-password/token');
+
+    expect(res.status).toBe(429);
+    expect(res.text).toBe('Too Many Requests');
   });
 });

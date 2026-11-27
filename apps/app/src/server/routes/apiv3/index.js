@@ -4,6 +4,10 @@ import express from 'express';
 import { factory as aiToolsRouteFactory } from '~/features/ai-tools/server/routes/apiv3';
 import { createAiUsageRouter } from '~/features/ai-usage/server';
 import { factory as auditLogBulkExportRouteFactory } from '~/features/audit-log-bulk-export/server/routes/apiv3';
+import {
+  createChangeProposalAdminRouter,
+  createChangeProposalRouter,
+} from '~/features/change-proposal/server';
 import { listCommentsRouteHandlersFactory } from '~/features/comment/server/routes/list';
 import { setup as setupExternalUserGroup } from '~/features/external-user-group/server/routes/apiv3/external-user-group';
 import { setup as setupExternalUserGroupRelation } from '~/features/external-user-group/server/routes/apiv3/external-user-group-relation';
@@ -25,6 +29,9 @@ import newsRoute from '~/features/news/server/routes/news';
 import { setup as setupPageBulkExport } from '~/features/page-bulk-export/server/routes/apiv3/page-bulk-export';
 import { changesRouteHandlersFactory } from '~/features/revision-diff/server/routes/changes';
 import { diffRouteHandlersFactory } from '~/features/revision-diff/server/routes/diff';
+import { createAttachmentReextractRouter } from '~/features/search-attachments/server/routes/apiv3/attachment-reextract';
+import { attachmentSearchAdminFactory } from '~/features/search-attachments/server/routes/apiv3/attachment-search-admin';
+import { createSearchAttachmentsRouter } from '~/features/search-attachments/server/routes/apiv3/search-attachments';
 import { setup as setupTemplates } from '~/features/templates/server/routes/apiv3';
 import { allreadyInstalledMiddleware } from '~/server/middlewares/application-not-installed';
 import loggerFactory from '~/utils/logger';
@@ -111,6 +118,10 @@ export const setup = (crowi, app) => {
     setupContentDispositionSettings(crowi),
   );
   routerForAdmin.use('/ai-settings', adminAiSettingsRouteFactory(crowi));
+  routerForAdmin.use(
+    '/change-proposal-settings',
+    createChangeProposalAdminRouter(crowi),
+  );
   routerForAdmin.use('/app-settings', setupAppSettings(crowi));
   routerForAdmin.use('/customize-setting', setupCustomizeSetting(crowi));
   routerForAdmin.use('/notification-setting', setupNotificationSetting(crowi));
@@ -120,6 +131,11 @@ export const setup = (crowi, app) => {
   routerForAdmin.use('/export', setupExport(crowi));
   routerForAdmin.use('/import', importRoute(crowi));
   routerForAdmin.use('/search', setupSearch(crowi));
+  // Not feature-gated: this is where an admin enables attachment search.
+  routerForAdmin.use(
+    '/admin/attachment-search',
+    attachmentSearchAdminFactory(crowi),
+  );
   routerForAdmin.use('/security-setting', securitySettings(crowi));
   routerForAdmin.use('/mongo', setupMongo(crowi));
   routerForAdmin.use(
@@ -201,6 +217,9 @@ export const setup = (crowi, app) => {
 
   router.use('/statistics', setupStatistics(crowi));
 
+  // Each router carries its own auth chain and the attachment search gate.
+  router.use('/search/attachments', createSearchAttachmentsRouter(crowi));
+  router.use('/attachments', createAttachmentReextractRouter(crowi));
   router.use('/search', setupSearch(crowi));
 
   router.use('/page', setupPage(crowi));
@@ -260,6 +279,8 @@ export const setup = (crowi, app) => {
     commentsRouter.get('/', listCommentsRouteHandlersFactory(crowi));
     router.use('/comments', commentsRouter);
   }
+
+  router.use('/change-proposals', createChangeProposalRouter(crowi));
 
   router.use('/page-listing', pageListing(crowi));
 

@@ -1,3 +1,4 @@
+export { processPasswordResetRequest } from './process-password-reset-request';
 export type {
   PasswordResetTemplateMailArgs,
   PasswordResetTemplateName,

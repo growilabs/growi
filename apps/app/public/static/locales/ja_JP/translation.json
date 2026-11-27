@@ -38,6 +38,7 @@
   "Update": "更新",
   "Update Page": "ページを更新",
   "Error": "エラー",
+  "Retry": "再試行",
   "Warning": "注意",
   "Sign in": "ログイン",
   "Sign in with External auth": "{{signin}} でログイン",
@@ -272,7 +273,7 @@
     "password_is_not_set": "パスワードが設定されていません"
   },
   "share_links": {
-    "Shere this page link to public": "外部に共有するリンクを発行する",
+    "Share this page link to public": "外部に共有するリンクを発行する",
     "share_link_list": "共有リンクリスト",
     "share_link_management": "共有リンク管理",
     "delete_all_share_links": "全ての共有リンクを削除します",
@@ -427,7 +428,10 @@
     "invalid_body": "操作対象のページのバージョンがリクエストに含まれていません。",
     "user_not_admin": "権限のあるユーザーのみが削除できます",
     "single_deletion_empty_pages": "空ページの単体削除はできません",
-    "complete_deletion_not_allowed_for_user": "ページを完全に削除する権限がありません"
+    "complete_deletion_not_allowed_for_user": "ページを完全に削除する権限がありません",
+    "deletion_not_allowed_for_user": "ページを削除する権限がありません",
+    "grant_not_assignable": "親ページの公開範囲のほうが狭いため、現在の公開範囲のままではこのパスにページを置けません。",
+    "operation_in_progress": "このページまたは近くのページに対する別の操作がまだ実行中です。しばらくしてからもう一度お試しください。"
   },
   "page_history": {
     "revision_list": "更新履歴",
@@ -692,11 +696,14 @@
     "delete_all_selected_page": "一括削除",
     "select_all": "全件選択",
     "delete_selected_pages": "選択したページを削除",
+    "selected_count": "{{selectedCount}} 件選択中",
+    "selected_count_of_loaded": "{{selectedCount}} 件選択中（読み込み済み {{loadedCount}} 件）",
     "currently_not_implemented": "現在未実装の機能です",
     "search_again": "再検索",
     "number_of_list_to_display": "表示件数",
     "page_number_unit": "件",
     "hit_number_unit": "件",
+    "failed_to_load_more": "検索結果の追加読み込みに失敗しました",
     "filter": "フィルター",
     "search_option": "検索オプション",
     "filter_remove": "削除",
@@ -818,6 +825,7 @@
     "successfully_created": "{{username}} が作成されました。",
     "can_not_activate_maximum_number_of_users": "ユーザーが上限に達したためアクティベートできません。",
     "failed_to_activate": "アクティベートに失敗しました。",
+    "only_invited_user_can_activate": "招待されたユーザーのみアカウントを有効化できます。",
     "unable_to_use_this_user": "利用できないユーザーIDです。",
     "complete_to_install1": "GROWI のインストールが完了しました！管理者アカウントでログインしてください。",
     "complete_to_install2": "GROWI のインストールが完了しました！はじめに、このページで各種設定を確認してください。",
@@ -862,11 +870,17 @@
     "new_password": "新しいパスワード",
     "confirm_new_password": "新しいパスワードの確認",
     "email_is_required": "メールを入力してください",
-    "success_to_send_email": "メールを送信しました",
+    "email_sent_if_account_exists": "そのメールアドレスのアカウントが存在する場合、パスワードリセット用のメールを送信しました。",
     "feature_is_unavailable": "この機能を利用することはできません。",
     "incorrect_token_or_expired_url": "トークンが正しくないか、URLの有効期限が切れています。 以下のリンクからパスワードリセットリクエストを再送信してください。",
     "password_and_confirm_password_does_not_match": "パスワードと確認パスワードが一致しません",
-    "please_enable_mailer_alert": "メール設定が完了していないため、パスワード再設定機能が無効になっています。メール設定を完了させるよう管理者に依頼してください。"
+    "please_enable_mailer_alert": "メール設定が完了していないため、パスワード再設定機能が無効になっています。メール設定を完了させるよう管理者に依頼してください。",
+    "email_address": "メールアドレス",
+    "error_notice_after_send": "送信後、システム上で問題が発生した場合は{{seconds}}秒以内にこの画面でお知らせします。",
+    "check_spam_folder_notice": "数分たってもメールが届かない場合は、迷惑メールフォルダをご確認のうえ、もう一度送信してください。",
+    "request_failed": "エラーが発生しました。時間をおいて再度お試しください。それでも解決しない場合は管理者にお問い合わせください。",
+    "password_reset_disabled": "パスワードリセット機能が無効です。管理者にお知らせください。",
+    "invalid_input_format": "入力形式が無効です"
   },
   "maintenance_mode": {
     "maintenance_mode": "メンテナンスモード",
@@ -1154,7 +1168,7 @@
       "description": ""
     },
     "plantuml": {
-      "label": "PlantUML",
+      "label": "UML図（PlantUML）",
       "description": ""
     },
     "lsx": {
@@ -1195,5 +1209,96 @@
         "description": ""
       }
     }
+  },
+  "change_proposal": {
+    "operation_type": {
+      "edit": "ページの編集",
+      "create": "ページの作成",
+      "move": "ページの移動",
+      "delete_completely": "ページの完全削除"
+    },
+    "operation_status": {
+      "pending": "承認待ち",
+      "applied": "反映済み",
+      "failed": "失敗",
+      "stale": "見送り（ページが先に変わっていた）",
+      "skipped": "スキップ",
+      "reverted": "取り消し済み",
+      "revert_refused": "取り消せなかった"
+    },
+    "proposal_status": {
+      "pending": "承認待ち",
+      "applied": "反映済み",
+      "partially_applied": "一部を反映",
+      "reverted": "取り消し済み",
+      "partially_reverted": "一部を取り消し",
+      "not_applied": "反映されなかった",
+      "discarded": "残りを反映せずに閉じた",
+      "expired": "期限切れ",
+      "withdrawn": "取り下げ"
+    },
+    "reason": {
+      "page_being_edited": "ページが編集中",
+      "page_operation_in_progress": "ページに対する別の操作が実行中",
+      "target_unavailable": "対象のページが見つからない",
+      "path_occupied": "そのパスにはすでにページがある",
+      "grant_not_assignable": "ページの公開範囲を設定できない",
+      "feature_disabled": "機能が無効になっている",
+      "operation_type_disabled": "この種類の操作が無効になっている",
+      "requester_not_allowed": "依頼した人にこの操作の権限がない",
+      "write_error": "変更の書き込みに失敗した",
+      "not_revertible_state": "取り消せる状態ではない",
+      "edited_after_apply": "反映のあとにページが編集された",
+      "has_children": "ページに子ページがある",
+      "moved_after_apply": "反映のあとにページが移動された",
+      "original_path_occupied": "元のパスにはすでにページがある",
+      "not_deletable": "ページを削除する権限がない",
+      "apply_failed": "取り消しに失敗した",
+      "base_revision_changed": "反映の前にページが変わっていた",
+      "skipped_by_requester": "依頼した人がスキップした",
+      "discarded": "残りを反映せずに閉じた",
+      "expired": "期限切れ",
+      "withdrawn": "取り下げ"
+    },
+    "revert_refusal_reason": {
+      "not_revertible_state": "取り消せる状態ではない",
+      "target_unavailable": "対象のページが見つからない",
+      "edited_after_apply": "反映のあとにページが編集された",
+      "has_children": "ページに子ページがある",
+      "moved_after_apply": "反映のあとにページが移動された",
+      "original_path_occupied": "元のパスにはすでにページがある",
+      "not_deletable": "ページを削除する権限がない",
+      "page_operation_in_progress": "ページに対する別の操作が実行中",
+      "apply_failed": "取り消しに失敗した"
+    },
+    "lifecycle": {
+      "open": "承認待ち",
+      "settled": "完了",
+      "discarded": "残りを反映せずに閉じた",
+      "expired": "期限切れ",
+      "withdrawn": "取り下げ"
+    },
+    "link": {
+      "follow_up": "後続",
+      "rework": "見直し",
+      "based_on": "元"
+    },
+    "achievement": {
+      "settled_with_percent": "完了（達成度 {{percent}}%）"
+    },
+    "review_term": {
+      "reviewer": "承認者",
+      "approve": "承認",
+      "reject": "却下",
+      "abstain": "放棄",
+      "comment": "コメント",
+      "purpose": "変更の目的",
+      "decision": "判断"
+    }
+  },
+  "plantuml": {
+    "url-too-long": "図が大きすぎて、PlantUML サーバーの URL 長の上限を超えた可能性が高いです。図を分割するか、簡略化してください。",
+    "post-unavailable": "PlantUML サーバーが POST に対応していないか、ブラウザから接続できない可能性があります。管理者は PLANTUML_HTTP_METHOD=get を設定すると GET 方式に戻せます。",
+    "render-failed": "図を描画できませんでした。PlantUML サーバーに接続できないか、サーバーがエラーを返しました。"
   }
 }

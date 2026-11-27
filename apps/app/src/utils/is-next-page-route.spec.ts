@@ -54,4 +54,48 @@ describe('isNextPageRoute', () => {
       expect(isNextPageRoute(path)).toBe(false);
     });
   });
+
+  describe('depth limit', () => {
+    it.each([
+      { depth: 129, trailingSlash: false, expected: true },
+      { depth: 129, trailingSlash: true, expected: true },
+      { depth: 130, trailingSlash: false, expected: false },
+      { depth: 130, trailingSlash: true, expected: false },
+    ])('depth $depth (trailing slash: $trailingSlash) returns $expected', ({
+      depth,
+      trailingSlash,
+      expected,
+    }) => {
+      const path = `${'/seg'.repeat(depth)}${trailingSlash ? '/' : ''}`;
+      expect(isNextPageRoute(path)).toBe(expected);
+    });
+  });
+
+  describe('spaces around a slash', () => {
+    it.each([
+      ['/a /b', true],
+      ['/a/ b', true],
+      ['/a / b', false],
+    ])('returns %s -> %s', (path, expected) => {
+      expect(isNextPageRoute(path)).toBe(expected);
+    });
+  });
+
+  describe('time taken for adversarial input', () => {
+    const LIMIT_MS = 100;
+
+    const elapsedMs = (path: string): number => {
+      const start = performance.now();
+      isNextPageRoute(path);
+      return performance.now() - start;
+    };
+
+    it.each([
+      ['a shallow path with many segments', '/LongSegment'.repeat(26)],
+      ['a path far deeper than the limit', '/LongSegment'.repeat(4000)],
+      ['a long run of whitespace', `/${' '.repeat(64000)}`],
+    ])('returns within the limit for %s', (_, path) => {
+      expect(elapsedMs(path)).toBeLessThan(LIMIT_MS);
+    });
+  });
 });

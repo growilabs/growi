@@ -12,7 +12,11 @@ import type { Cursor, HydratedDocument, Types } from 'mongoose';
 
 import type { ExternalUserGroupDocument } from '~/features/external-user-group/server/models/external-user-group';
 import type { SupportedActionType } from '~/interfaces/activity';
-import type { IOptionsForCreate, IOptionsForUpdate } from '~/interfaces/page';
+import type {
+  IOptionsForCreate,
+  IOptionsForInAppNotificationSuppression,
+  IOptionsForUpdate,
+} from '~/interfaces/page';
 import type { PopulatedGrantedGroup } from '~/interfaces/page-grant';
 import type { PageActionOnGroupDelete } from '~/interfaces/user-group';
 import type { CurrentPageYjsData } from '~/interfaces/yjs';
@@ -21,6 +25,27 @@ import type { PageDocument } from '~/server/models/page';
 import type { PageOperationDocument } from '~/server/models/page-operation';
 import type { UserGroupDocument } from '~/server/models/user-group';
 import type { ActivityActor } from '~/server/service/attachment/attachment-removal-snapshot';
+
+import type { DuplicateDeps, DuplicatedPage } from './duplicate';
+
+export type DeletionOptions = {
+  isCompletely: boolean;
+  isRecursively: boolean;
+};
+
+export type DeletionVerdict =
+  | 'permitted'
+  | 'forbidden'
+  | 'protected_user_homepage';
+
+export type EmptyTrashResult =
+  | { isForbidden: true }
+  | {
+      isForbidden: false;
+      isAllDeletable: boolean;
+      deletablePages: PageDocument[];
+      nDeletedNonEmptyPages: number;
+    };
 
 export interface IPageService {
   // Page event emitter
@@ -109,10 +134,26 @@ export interface IPageService {
     pageId: string,
     revisionBody?: string,
   ): Promise<CurrentPageYjsData>;
-  updateDescendantCountOfPagesWithPaths(paths: string[]): Promise<void>;
+  // onBatchStart: called before each batch; throwing aborts the run with that error
+  normalizeParentRecursively(
+    paths: string[],
+    user,
+    isDuplicateOperation?: boolean,
+    shouldEmitProgress?: boolean,
+    onBatchStart?: () => Promise<void>,
+  ): Promise<number>;
+  updateDescendantCountOfSelfAndDescendants(
+    path: string,
+    onBatchStart?: () => Promise<void>,
+  ): Promise<void>;
+  updateDescendantCountOfPagesWithPaths(
+    paths: string[],
+    onBatchStart?: () => Promise<void>,
+  ): Promise<void>;
   recountAndUpdateDescendantCountOfPages(
     pageCursor: Cursor<unknown>,
     batchSize: number,
+    onBatchStart?: () => Promise<void>,
   ): Promise<void>;
   revertRecursivelyMainOperation(
     page,
@@ -125,7 +166,7 @@ export interface IPageService {
   revertDeletedPage(
     page,
     user,
-    options,
+    options: IOptionsForInAppNotificationSuppression,
     isRecursively: boolean,
     activityParameters?,
   );
@@ -139,7 +180,7 @@ export interface IPageService {
   deleteCompletely(
     page,
     user,
-    options,
+    options: IOptionsForInAppNotificationSuppression,
     isRecursively: boolean,
     preventEmitting: boolean,
     activityParameters,
@@ -150,21 +191,40 @@ export interface IPageService {
     pageOpId: ObjectIdLike,
     activity?,
   ): Promise<void>;
-  deletePage(page, user, options, isRecursively: boolean, activityParameters);
-  duplicateRecursivelyMainOperation(
-    page: PageDocument,
-    newPagePath: string,
+  deletePage(
+    page,
     user,
-    pageOpId: ObjectIdLike,
-    onlyDuplicateUserRelatedResources: boolean,
-  ): Promise<void>;
+    options: IOptionsForInAppNotificationSuppression,
+    isRecursively: boolean,
+    activityParameters,
+  );
+  // Deletion requested by a user: judge the deletion authority before deleting
+  judgeDeletion(
+    page: PageDocument,
+    user: IUserHasId,
+    options: DeletionOptions,
+  ): Promise<DeletionVerdict>;
+  filterPagesByDeletionAuthority(
+    pages: PageDocument[],
+    user: IUserHasId,
+    options: DeletionOptions,
+  ): Promise<PageDocument[]>;
+  deletePagesWithAuthority(
+    pages: PageDocument[],
+    user: IUserHasId,
+    options: DeletionOptions,
+    activityParameters,
+  ): Promise<PageDocument[]>;
+  emptyTrash(user: IUserHasId, activityParameters): Promise<EmptyTrashResult>;
   duplicate(
-    page: PageDocument,
+    page: HydratedDocument<PageDocument>,
     newPagePath: string,
-    user,
+    user: IUserHasId,
     isRecursively: boolean,
     onlyDuplicateUserRelatedResources: boolean,
-  );
+  ): Promise<DuplicatedPage>;
+  /** The collaborators the duplicate module runs with, assembled from this service's own. */
+  duplicateDeps(): DuplicateDeps;
   renameSubOperation(
     page,
     newPagePath: string,

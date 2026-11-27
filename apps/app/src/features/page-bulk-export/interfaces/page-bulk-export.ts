@@ -1,11 +1,4 @@
-import type {
-  HasObjectId,
-  IAttachment,
-  IPage,
-  IRevision,
-  IUser,
-  Ref,
-} from '@growi/core';
+import type { HasObjectId, IAttachment, IPage, IUser, Ref } from '@growi/core';
 
 export const PageBulkExportFormat = {
   md: 'md',
@@ -58,10 +51,3 @@ export interface IPageBulkExportJob {
 export interface IPageBulkExportJobHasId
   extends IPageBulkExportJob,
     HasObjectId {}
-
-// snapshot of page info to upload
-export interface IPageBulkExportPageSnapshot {
-  pageBulkExportJob: Ref<IPageBulkExportJob>;
-  path: string; // page path when export was stared
-  revision: Ref<IRevision>; // page revision when export was stared
-}

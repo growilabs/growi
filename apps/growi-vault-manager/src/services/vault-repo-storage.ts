@@ -7,7 +7,8 @@
  *
  * Object I/O delegates to isomorphic-git; ref management uses plain Node.js
  * fs calls with an atomic tmpfile-then-rename pattern so that concurrent
- * readers always see a consistent ref value.
+ * readers always see a consistent ref value.  Those calls only see loose ref
+ * files, so refs are kept loose (see design.md, VaultMaintenanceScheduler).
  *
  * GCSFuse and similar object-storage FUSE mounts are explicitly NOT supported
  * because they do not guarantee atomic rename semantics (requirement 9.5).
@@ -15,8 +16,11 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { loggerFactory } from '@growi/logger';
 import type { TreeEntry as GitTreeEntry } from 'isomorphic-git';
 import git from 'isomorphic-git';
+
+const logger = loggerFactory('growi:vault-manager:vault-repo-storage');
 
 // ---------------------------------------------------------------------------
 // Type re-exports (kept local to avoid coupling to isomorphic-git's types)
@@ -126,7 +130,7 @@ export function getRepoPath(): string {
 
 /**
  * Initialises the bare repository if it does not already exist.
- * Idempotent: calling this when the repo exists is a no-op.
+ * Idempotent.
  *
  * Corresponds to `git init --bare <repoPath>`.
  */
@@ -135,46 +139,82 @@ export async function init(): Promise<void> {
 
   // Check whether the repo already looks initialised by testing for the
   // presence of the 'HEAD' file, which git init always creates.
-  const headFile = path.join(repoPath, 'HEAD');
-  if (
-    await fs.promises
-      .access(headFile)
-      .then(() => true)
-      .catch(() => false)
-  ) {
-    // Already initialised — nothing to do.
-    return;
+  if (!(await fileExists(path.join(repoPath, 'HEAD')))) {
+    // Ensure the parent directory exists before initialising.
+    await fs.promises.mkdir(repoPath, { recursive: true });
+
+    await git.init({
+      fs,
+      gitdir: repoPath,
+      bare: true,
+      defaultBranch: 'main',
+    });
   }
 
-  // Ensure the parent directory exists before initialising.
-  await fs.promises.mkdir(repoPath, { recursive: true });
+  if (await fileExists(packedRefsPath())) {
+    logger.error(PACKED_REFS_MESSAGE);
+  }
+}
 
-  await git.init({
-    fs,
-    gitdir: repoPath,
-    bare: true,
-    defaultBranch: 'main',
-  });
+/**
+ * Marks an object that a write is about to depend on as recently used.
+ *
+ * isomorphic-git skips the write when the loose object already exists and
+ * leaves its mtime alone, so an old unreferenced object would stay eligible
+ * for `git gc --prune` until a ref reaches it (see design.md,
+ * VaultMaintenanceScheduler).
+ *
+ * @returns false when the object is gone, i.e. a prune removed it meanwhile.
+ */
+async function freshenLooseObject(oid: string): Promise<boolean> {
+  const objectPath = path.join(
+    getRepoPath(),
+    'objects',
+    oid.slice(0, 2),
+    oid.slice(2),
+  );
+  const now = new Date();
+  try {
+    await fs.promises.utimes(objectPath, now, now);
+    return true;
+  } catch (err: unknown) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+      return false;
+    }
+    throw err;
+  }
+}
+
+/**
+ * Runs an object write and guarantees the object is fresh on return.
+ */
+async function writeFreshObject(write: () => Promise<string>): Promise<string> {
+  const oid = await write();
+  if (await freshenLooseObject(oid)) {
+    return oid;
+  }
+  // Pruned between the write's existence check and the freshen: this time
+  // the object is absent, so the write creates it.
+  return write();
 }
 
 /**
  * Writes blob content to the object pool and returns its OID.
  *
- * If a blob with the same OID already exists (content-addressed no-op),
- * isomorphic-git will simply overwrite the loose object with identical
- * bytes, which is functionally equivalent to a skip and does not produce
- * an error (requirement 9.3).
+ * Writing content that is already stored is not an error (requirement 9.3).
  *
  * @param content - Raw bytes to store as a git blob.
  * @returns 40-character SHA-1 OID.
  */
 export function writeBlob(content: Buffer): Promise<string> {
   const repoPath = getRepoPath();
-  return git.writeBlob({
-    fs,
-    gitdir: repoPath,
-    blob: content,
-  });
+  return writeFreshObject(() =>
+    git.writeBlob({
+      fs,
+      gitdir: repoPath,
+      blob: content,
+    }),
+  );
 }
 
 /**
@@ -185,11 +225,13 @@ export function writeBlob(content: Buffer): Promise<string> {
  */
 export function writeTree(entries: ReadonlyArray<TreeEntry>): Promise<string> {
   const repoPath = getRepoPath();
-  return git.writeTree({
-    fs,
-    gitdir: repoPath,
-    tree: entries.map(toGitTreeEntry),
-  });
+  return writeFreshObject(() =>
+    git.writeTree({
+      fs,
+      gitdir: repoPath,
+      tree: entries.map(toGitTreeEntry),
+    }),
+  );
 }
 
 /**
@@ -205,17 +247,19 @@ export function writeCommit(opts: CommitOptions): Promise<string> {
   // Using 0 (UTC) keeps commit timestamps portable across environments.
   const timezoneOffset = 0;
 
-  return git.writeCommit({
-    fs,
-    gitdir: repoPath,
-    commit: {
-      message: opts.message,
-      tree: opts.tree,
-      parent: [...opts.parents],
-      author: { ...opts.author, timezoneOffset },
-      committer: { ...opts.committer, timezoneOffset },
-    },
-  });
+  return writeFreshObject(() =>
+    git.writeCommit({
+      fs,
+      gitdir: repoPath,
+      commit: {
+        message: opts.message,
+        tree: opts.tree,
+        parent: [...opts.parents],
+        author: { ...opts.author, timezoneOffset },
+        committer: { ...opts.committer, timezoneOffset },
+      },
+    }),
+  );
 }
 
 /**
@@ -296,8 +340,80 @@ export async function updateRef(
  *
  * @param refPath - Ref path relative to the git directory.
  * @returns 40-character OID, or null if the ref does not exist.
+ * @throws while packed-refs exists.
  */
 export async function readRef(refPath: string): Promise<string | null> {
+  await assertRefsReadable();
+  return readLooseRef(refPath);
+}
+
+// Only ENOENT means "absent": the packed-refs check must not pass because of
+// an I/O error (e.g. ESTALE on NFS).
+async function fileExists(filePath: string): Promise<boolean> {
+  try {
+    await fs.promises.access(filePath);
+    return true;
+  } catch (err: unknown) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+      return false;
+    }
+    throw err;
+  }
+}
+
+const PACKED_REFS_MESSAGE =
+  'packed-refs found in the vault repository; namespace refs cannot be read until the vault is rebuilt. Run "Rebuild Vault" from the GROWI admin page.';
+
+function packedRefsPath(): string {
+  return path.join(getRepoPath(), 'packed-refs');
+}
+
+/**
+ * Neither a missing nor a loose ref can be trusted while packed-refs exists
+ * (see design.md, VaultMaintenanceScheduler).
+ *
+ * @throws while packed-refs exists.
+ */
+export async function assertRefsReadable(): Promise<void> {
+  if (await fileExists(packedRefsPath())) {
+    throw new Error(PACKED_REFS_MESSAGE);
+  }
+}
+
+/**
+ * Removes packed-refs, dropping every packed namespace ref and keeping any
+ * other packed ref (e.g. sparse-filter anchors) as a loose file.  Only a full
+ * wipe (reset-all) may call this.
+ */
+export async function dropPackedNamespaceRefs(): Promise<void> {
+  let content: string;
+  try {
+    content = await fs.promises.readFile(packedRefsPath(), 'utf8');
+  } catch (err: unknown) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+      return;
+    }
+    throw err;
+  }
+
+  // Lines are "<oid> <ref>"; '#' starts the header and '^' a peeled tag.
+  const kept = content
+    .split('\n')
+    .filter((line) => line !== '' && !/^[#^]/.test(line))
+    .map((line) => line.split(' '))
+    .filter(([, ref]) => !ref.startsWith('refs/namespaces/'));
+
+  for (const [oid, ref] of kept) {
+    // biome-ignore lint/performance/noAwaitInLoops: a handful of refs; sequential keeps it simple
+    if ((await readLooseRef(ref)) == null) {
+      await updateRef(ref, oid);
+    }
+  }
+
+  await fs.promises.unlink(packedRefsPath());
+}
+
+async function readLooseRef(refPath: string): Promise<string | null> {
   const target = refFilePath(refPath);
   try {
     const content = await fs.promises.readFile(target, 'utf8');
@@ -310,23 +426,23 @@ export async function readRef(refPath: string): Promise<string | null> {
   }
 }
 
+function namespacesDir(): string {
+  return path.join(getRepoPath(), 'refs', 'namespaces');
+}
+
 /**
- * Deletes a ref from the repository.
- * If the ref does not exist, this is a no-op (idempotent).
- *
- * @param refPath - Ref path relative to the git directory.
+ * Deletes every loose ref and HEAD under refs/namespaces/, including those
+ * of namespaces the database has no record of.  Only a full wipe (reset-all)
+ * may call this.
  */
-export async function deleteRef(refPath: string): Promise<void> {
-  const target = refFilePath(refPath);
-  try {
-    await fs.promises.unlink(target);
-  } catch (err: unknown) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
-      // Already gone — treat as success.
-      return;
-    }
-    throw err;
-  }
+export async function deleteAllNamespaceRefs(): Promise<void> {
+  await fs.promises.rm(namespacesDir(), {
+    recursive: true,
+    force: true,
+    // A view composed during the wipe can add a file to a directory that is
+    // being removed (ENOTEMPTY).
+    maxRetries: 3,
+  });
 }
 
 /**

@@ -9,6 +9,7 @@ import type {
 import {
   AdminActions,
   AttachmentActions,
+  ChangeProposalActions,
   CommentActions,
   InAppNotificationActions,
   PageActions,
@@ -96,6 +97,12 @@ export const SelectActionDropdown: FC<Props> = (props: Props) => {
       {
         actionCategory: SupportedActionCategory.ADMIN,
         actions: AdminActions.filter((action) =>
+          availableActions.includes(action),
+        ),
+      },
+      {
+        actionCategory: SupportedActionCategory.CHANGE_PROPOSAL,
+        actions: ChangeProposalActions.filter((action) =>
           availableActions.includes(action),
         ),
       },

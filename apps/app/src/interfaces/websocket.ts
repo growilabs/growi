@@ -37,6 +37,11 @@ export const SocketEventName = {
   FinishAddPage: 'finishAddPage',
   RebuildingFailed: 'rebuildingFailed',
 
+  // Attachment full-text search reindex
+  AddAttachmentProgress: 'addAttachmentProgress',
+  FinishAddAttachment: 'finishAddAttachment',
+  AttachmentRebuildingFailed: 'attachmentRebuildingFailed',
+
   // Elasticsearch - auditlog rebuild
   AddAuditlogProgress: 'addAuditlogProgress',
   FinishAddAuditlog: 'finishAddAuditlog',

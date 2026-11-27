@@ -1,14 +1,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pipeline, Readable, Writable } from 'node:stream';
-import { getIdStringForRef } from '@growi/core';
 
 import { AuditLogBulkExportJobStatus } from '~/features/audit-log-bulk-export/interfaces/audit-log-bulk-export';
-import type { Prisma } from '~/generated/prisma/client';
+import type { auditlogbulkexportjobs, Prisma } from '~/generated/prisma/client';
 import { SupportedAction } from '~/interfaces/activity';
 import { type PrismaClient, prisma } from '~/utils/prisma';
 
-import type { AuditLogBulkExportJobDocument } from '../../../models/audit-log-bulk-export-job';
 import type { IAuditLogBulkExportJobCronService } from '..';
 import { exportActivityCursor } from './activity-export-cursor';
 
@@ -22,11 +20,13 @@ type ExportedActivityRow = Awaited<
  */
 function getAuditLogWritable(
   this: IAuditLogBulkExportJobCronService,
-  job: AuditLogBulkExportJobDocument,
+  job: auditlogbulkexportjobs,
 ): Writable {
   const outputDir = this.getTmpOutputDir(job);
   let buffer: Array<ExportedActivityRow & { user?: string }> = [];
   let fileIndex = 0;
+  let lastExportedId = job.lastExportedId;
+  let totalExportedCount = job.totalExportedCount ?? 0;
   return new Writable({
     objectMode: true,
     write: async (log: ExportedActivityRow, _encoding, callback) => {
@@ -38,13 +38,13 @@ function getAuditLogWritable(
         buffer.push({ ...log, user: log.userId ?? undefined });
 
         // Update lastExportedId for resumability
-        job.lastExportedId = log._id.toString();
-        job.totalExportedCount = (job.totalExportedCount || 0) + 1;
+        lastExportedId = log._id.toString();
+        totalExportedCount += 1;
 
         if (buffer.length >= this.maxLogsPerFile) {
           const filePath = path.join(
             outputDir,
-            `audit-logs-${job._id.toString()}-${String(fileIndex).padStart(2, '0')}.json`,
+            `audit-logs-${job.id}-${String(fileIndex).padStart(2, '0')}.json`,
           );
           await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
           await fs.promises.writeFile(
@@ -52,7 +52,10 @@ function getAuditLogWritable(
             JSON.stringify(buffer, null, 2),
           );
 
-          await job.save();
+          await prisma.auditlogbulkexportjobs.update({
+            where: { id: job.id },
+            data: { lastExportedId, totalExportedCount },
+          });
 
           buffer = [];
           fileIndex++;
@@ -68,7 +71,7 @@ function getAuditLogWritable(
         if (buffer.length > 0) {
           const filePath = path.join(
             outputDir,
-            `audit-logs-${job._id.toString()}-${String(fileIndex).padStart(2, '0')}.json`,
+            `audit-logs-${job.id}-${String(fileIndex).padStart(2, '0')}.json`,
           );
           await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
           await fs.promises.writeFile(
@@ -76,8 +79,14 @@ function getAuditLogWritable(
             JSON.stringify(buffer, null, 2),
           );
         }
-        job.status = AuditLogBulkExportJobStatus.uploading;
-        await job.save();
+        await prisma.auditlogbulkexportjobs.update({
+          where: { id: job.id },
+          data: {
+            status: AuditLogBulkExportJobStatus.uploading,
+            lastExportedId,
+            totalExportedCount,
+          },
+        });
       } catch (err) {
         callback(err as Error);
         return;
@@ -92,14 +101,14 @@ function getAuditLogWritable(
  */
 export async function exportAuditLogsToFsAsync(
   this: IAuditLogBulkExportJobCronService,
-  job: AuditLogBulkExportJobDocument,
+  job: auditlogbulkexportjobs,
 ): Promise<void> {
-  const filters = job.filters ?? {};
+  const { filters } = job;
 
   // Build Prisma where filter from user-defined filters
   const where: Prisma.activitiesWhereInput = {};
 
-  if (filters.actions && filters.actions.length > 0) {
+  if (filters.actions.length > 0) {
     where.action = { in: filters.actions };
   }
   if (filters.dateFrom || filters.dateTo) {
@@ -112,9 +121,8 @@ export async function exportAuditLogsToFsAsync(
     }
     where.createdAt = createdAt;
   }
-  if (filters.users && filters.users.length > 0) {
-    // Normalize Ref<IUser> (ObjectId | IUser) to string IDs for Prisma
-    where.userId = { in: filters.users.map(getIdStringForRef) };
+  if (filters.users.length > 0) {
+    where.userId = { in: filters.users };
   }
 
   // Check whether any matching documents exist (replaces Activity.exists(query)).
@@ -134,14 +142,18 @@ export async function exportAuditLogsToFsAsync(
     })) != null;
 
   if (!hasAny) {
-    job.totalExportedCount = 0;
-    job.status = AuditLogBulkExportJobStatus.completed;
-    job.lastExportedId = undefined;
-    await job.save();
+    const completedJob = await prisma.auditlogbulkexportjobs.update({
+      where: { id: job.id },
+      data: {
+        totalExportedCount: 0,
+        status: AuditLogBulkExportJobStatus.completed,
+        lastExportedId: null,
+      },
+    });
 
     await this.notifyExportResultAndCleanUp(
       SupportedAction.ACTION_AUDIT_LOG_BULK_EXPORT_NO_RESULTS,
-      job,
+      completedJob,
     );
     return;
   }
@@ -151,12 +163,17 @@ export async function exportAuditLogsToFsAsync(
   // the first batch starts after the last-exported document (id > lastExportedId),
   // preserving the same resume behaviour as the former Mongoose _id: { $gt: ... }.
   const logsReadable = Readable.from(
-    exportActivityCursor(prisma, where, this.pageBatchSize, job.lastExportedId),
+    exportActivityCursor(
+      prisma,
+      where,
+      this.pageBatchSize,
+      job.lastExportedId ?? undefined,
+    ),
   );
 
   const writable = getAuditLogWritable.bind(this)(job);
 
-  this.setStreamInExecution(job._id, logsReadable);
+  this.setStreamInExecution(job.id, logsReadable);
 
   pipeline(logsReadable, writable, (err) => {
     this.handleError(err, job);

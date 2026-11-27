@@ -38,10 +38,6 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-      with:
-        # Tags are the record of what has already been published; the check below
-        # reads them. History is not needed, so fetch the tags without it.
-        fetch-tags: true
 
     - name: Retrieve information from package.json
       uses: myrotvorets/info-from-package-json-action@v2.0.2
@@ -53,26 +49,7 @@ jobs:
       id: decide
       env:
         VERSION: ${{ steps.package-json.outputs.packageVersion }}
-      run: |
-        TAG="pdf-converter/v${VERSION}"
-
-        # A prerelease version is a work-in-progress marker, never something to publish.
-        if [[ "$VERSION" == *-* ]]; then
-          echo "::notice::${VERSION} is a prerelease version - nothing to publish."
-          echo "should-release=false" >> "$GITHUB_OUTPUT"
-          exit 0
-        fi
-
-        # The tag is created only after a successful publish, so its presence means
-        # this exact version is already on Docker Hub.
-        if git rev-parse -q --verify "refs/tags/${TAG}" > /dev/null; then
-          echo "::notice::${TAG} already exists - nothing to publish."
-          echo "should-release=false" >> "$GITHUB_OUTPUT"
-          exit 0
-        fi
-
-        echo "::notice::Publishing ${TAG}."
-        echo "should-release=true" >> "$GITHUB_OUTPUT"
+      run: bash .github/scripts/decide-release.sh "$VERSION" pdf-converter
 
 
   build-and-push-image:

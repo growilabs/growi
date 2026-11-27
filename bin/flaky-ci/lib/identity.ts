@@ -14,7 +14,8 @@
  * `detect-flaky-ci` path produces one, so this is a precondition to surface,
  * not a case to guess through.
  *
- * This module only decomposes; it does not decide anything. Which of the
+ * This module decomposes a title into those parts and builds the precise
+ * Playwright key from one listed test; it does not decide anything. Which of the
  * three shapes leads to which next step (read the linked run's Playwright
  * report before Step 2, stop and report a precondition failure, proceed to
  * reproduction) is a judgment left in `investigate-flaky-test/SKILL.md`, not
@@ -35,6 +36,8 @@
  * issue #11818) without being mistaken for the boundary, because the
  * shortest match wins and that mention is never followed by `:`.
  */
+
+import type { PlaywrightListedTest } from './job-log.ts';
 
 const FLAKY_TITLE_PREFIX = 'flaky: ';
 
@@ -138,4 +141,14 @@ export const parse = (title: string): ParsedIdentity => {
   }
 
   return malformed(kind);
+};
+
+/**
+ * The precise Playwright identity key for one listed test. The browser is the
+ * project name up to its first `/`, so `chromium/guest-mode` and `chromium`
+ * share a key.
+ */
+export const buildPlaywrightKey = (test: PlaywrightListedTest): string => {
+  const browser = test.project.split('/')[0];
+  return `playwright:${browser}:${test.specPath}:${test.testTitle}`;
 };

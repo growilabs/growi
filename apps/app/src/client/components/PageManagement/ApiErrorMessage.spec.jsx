@@ -48,6 +48,19 @@ describe('ApiErrorMessage', () => {
     expect(screen.getByText(/Unknown error occured/)).toBeInTheDocument();
   });
 
+  it('shows a translated message when the requester may not delete the pages', () => {
+    render(
+      <ApiErrorMessage
+        errorCode="deletion_not_allowed_for_user"
+        errorMessage="You are not allowed to delete these pages."
+      />,
+    );
+
+    expect(
+      screen.getByText('page_api_error.deletion_not_allowed_for_user'),
+    ).toBeInTheDocument();
+  });
+
   it('keeps rendering the message of a code it knows', () => {
     render(
       <ApiErrorMessage

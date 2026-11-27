@@ -166,3 +166,64 @@ export function assertIsArray(
     );
   }
 }
+
+/**
+ * A MongoDB filter over a page document, already in the form `findRaw` /
+ * `aggregateRaw` accept (every ObjectId is `{ $oid: string }`).
+ */
+export type RawPageFilter = Record<string, unknown>;
+
+type ObjectIdInstance = { toHexString(): string };
+
+// Detected by the bson type tag instead of `instanceof`: mongoose and the
+// mongodb driver can each bundle their own copy of the bson ObjectId class.
+// bson v4 tags it 'ObjectID', v5+ 'ObjectId'.
+function isObjectIdInstance(value: object): value is ObjectIdInstance {
+  const tag: unknown = Reflect.get(value, '_bsontype');
+  return (
+    (tag === 'ObjectId' || tag === 'ObjectID') &&
+    typeof Reflect.get(value, 'toHexString') === 'function'
+  );
+}
+
+function isPlainObject(value: object): value is Record<string, unknown> {
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
+}
+
+function toRawFilterValue(value: unknown): unknown {
+  if (value === null || typeof value !== 'object') {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value.map(toRawFilterValue);
+  }
+  if (isObjectIdInstance(value)) {
+    return toRawObjectId(value.toHexString());
+  }
+  // Class instances (Date, RegExp, ...) are not filter structure; rebuilding
+  // them key by key would destroy them.
+  if (!isPlainObject(value)) {
+    return value;
+  }
+  return Object.fromEntries(
+    Object.entries(value).map(([key, val]) => [key, toRawFilterValue(val)]),
+  );
+}
+
+/**
+ * Returns a copy of a MongoDB filter in which every ObjectId instance, at any
+ * depth (inside `$and` / `$or` / `$in` / `$elemMatch` ...), is replaced by its
+ * `{ $oid: string }` form, so the filter can be passed to `findRaw` /
+ * `aggregateRaw`. The given filter is not modified.
+ *
+ * Only ObjectId instances are converted. An id held as a hex string cannot be
+ * told apart from an ordinary string and is left as it is.
+ */
+export function toRawFilter(
+  filter: Readonly<Record<string, unknown>>,
+): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(filter).map(([key, val]) => [key, toRawFilterValue(val)]),
+  );
+}

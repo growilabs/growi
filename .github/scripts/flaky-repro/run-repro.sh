@@ -21,7 +21,7 @@ case "$PROJECT" in
   # the runner's CPUs the way the CI job does — that contention is
   # itself a source of the non-determinism being measured (#11752).
   app-integration|app-integration-exclusive)
-    VITEST_ARGS+=(--poolOptions.forks.maxForks=4)
+    VITEST_ARGS+=(--poolOptions.forks.maxForks=3)
     ;;
 esac
 
