@@ -1,12 +1,13 @@
 import EventEmitter from 'events';
 import mongoose from 'mongoose';
-import { type DeepMockProxy, mock, mockDeep } from 'vitest-mock-extended';
+import { type MockProxy, mock } from 'vitest-mock-extended';
 
 import { ActionGroupSize, SupportedAction } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
 import Activity from '~/server/models/activity';
 import ActivityService from '~/server/service/activity';
 import type { ConfigValues } from '~/server/service/config-manager/config-definition';
+import type { ConfigManager } from '~/server/service/config-manager/config-manager';
 import { prisma } from '~/utils/prisma';
 
 vi.mock('~/utils/logger', () => ({
@@ -19,8 +20,8 @@ vi.mock('~/utils/logger', () => ({
 }));
 
 describe('ActivityService', () => {
-  let configManager: DeepMockProxy<Crowi['configManager']>;
-  let mockCrowi: Crowi;
+  let mockCrowi: MockProxy<Crowi>;
+  let configManager: MockProxy<ConfigManager>;
   let activityService: ActivityService;
   let activityEvent: EventEmitter;
 
@@ -30,7 +31,7 @@ describe('ActivityService', () => {
 
   beforeEach(() => {
     activityEvent = new EventEmitter();
-    configManager = mockDeep<Crowi['configManager']>();
+    configManager = mock<ConfigManager>();
     mockCrowi = mock<Crowi>({
       configManager,
       events: { activity: activityEvent },

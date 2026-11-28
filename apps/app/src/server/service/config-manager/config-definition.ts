@@ -390,6 +390,13 @@ export const CONFIG_KEYS = [
   // Access Token Settings
   'accessToken:deletionCronExpression',
 
+  // Backlinks Settings
+  'backlinks:drainIntervalMs',
+  'backlinks:dutyCyclePercent',
+  'backlinks:backfillDutyCyclePercent',
+  'backlinks:backfillMaxPagesPerSecond',
+  'backlinks:backfillMaxBodyKiB',
+
   // Change Proposal Settings
   'app:changeProposalEnabled',
   'app:changeProposalReviewersEnabled',
@@ -1678,6 +1685,34 @@ export const CONFIG_DEFINITIONS = {
   'accessToken:deletionCronExpression': defineConfig<string>({
     envVarName: 'ACCESS_TOKEN_DELETION_CRON_EXPRESSION',
     defaultValue: '0 15 * * *',
+  }),
+
+  // Backlinks Settings
+  'backlinks:drainIntervalMs': defineConfig<number>({
+    envVarName: 'BACKLINKS_DRAIN_INTERVAL_MS',
+    defaultValue: 1000,
+  }),
+  // Share of the event loop the backlinks queue may occupy. A percent integer, not a fraction:
+  // numeric env vars go through a bare parseInt, which would read 0.2 as 0.
+  'backlinks:dutyCyclePercent': defineConfig<number>({
+    envVarName: 'BACKLINKS_DUTY_CYCLE_PERCENT',
+    defaultValue: 20,
+  }),
+  // Pacing of the backfill of pre-existing pages, separate from the live queue's above. The
+  // defaults are provisional until the backfill performance run (design.md, PageLinkBackfillCron).
+  'backlinks:backfillDutyCyclePercent': defineConfig<number>({
+    envVarName: 'BACKLINKS_BACKFILL_DUTY_CYCLE_PERCENT',
+    defaultValue: 25,
+  }),
+  // Floor on the interval between backfilled pages, bounding the per-app database operation rate.
+  'backlinks:backfillMaxPagesPerSecond': defineConfig<number>({
+    envVarName: 'BACKLINKS_BACKFILL_MAX_PAGES_PER_SECOND',
+    defaultValue: 20,
+  }),
+  // Bodies larger than this (UTF-8 KiB) are skipped by the backfill rather than parsed.
+  'backlinks:backfillMaxBodyKiB': defineConfig<number>({
+    envVarName: 'BACKLINKS_BACKFILL_MAX_BODY_KIB',
+    defaultValue: 256,
   }),
 
   // Change Proposal Settings
